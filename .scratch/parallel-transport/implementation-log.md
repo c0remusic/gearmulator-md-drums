@@ -577,6 +577,59 @@ latent : `JitStackHelper` sauve et restaure les XMM en `movq` (64 bits sur des
 emplacements de 16 octets), mais sous Win64 `g_spillToNonVolatileXmms = false`
 tient XMM6-15 hors des blocs. À durcir (`movdqu`) avant de réactiver ce spill.
 
+## Course du mode paire (2026-09-28)
+
+`mmSineFirmwareTest` en paire échouait par intermittence, commit de base
+compris : 2/16 en séquentiel, 1/16 avec deux instances à la fois, 0/24 avec
+six (sous charge, le défaut disparaît). Deux signatures : piste muette
+(« MM note produced silence », niveau ou note-on perdu) et clics.
+
+Rapport d'échec ajouté au test (reste) : attentes expirées par site, trames
+sorties muettes et jetées, échantillons autour de la plus grande différence
+seconde du rendu fautif. Instrumentation temporaire (retirée) : retard des
+mots UC→DSP à leur dépôt (position publiée du DSP moins l'échéance du mot),
+retard de prise des mots DSP→UC, délai d'envoi des commandes, lectures CVR
+pendant qu'une commande attend dans le flux daté.
+
+Cause 1, mots hôte en retard. À vide, le worker attend à sa porte : chaque mot
+de l'UC atterrit avec toute l'avance DSP (30 µs), plus jusqu'à un tronçon
+(22,7 µs) s'il arrive pendant un tronçon. Le série alternait (0 à 30 µs).
+Dose-réponse (sine, 2 instances) : avance DSP 60 µs → 6/6 échecs ; 45 µs →
+6/6, dont 2 pistes muettes, même signature que les échecs par défaut ; 30 µs
+→ ~1/16 ; 0 µs → 0/6, et 0/6 même avec avance UC 60 µs. Débit (banc, MM
+paire, 44,1 kHz, 20 s) : avance DSP 30 µs 81-87 %, 20 µs 82,7 %, 15 µs
+82,9 %, 10 µs 82,6-84,2 %, 5 µs 91 %, 0 µs 105-110 % (le worker ne se
+pipeline plus). La fenêtre totale compte : DSP 10 + UC 20 → 91,7 %, 5 + 20
+→ 101 %. Correctif : avance DSP portée par la politique de transport, 10 µs
+pour le MM ; l'UC garde son quantum (30 µs), le MD aussi (125 µs).
+
+Cause 2, bloc court d'une trame. Avec l'avance à 10 µs : 1/24, un seul
+échantillon nul en dernière position d'un bloc de 256, sinus décalé d'un
+échantillon ensuite. En fin de bloc, le thread audio prend les trames que le
+mixer a émises ; worker pile à la cible, la dernière trame du bloc peut ne
+pas être sortie. Nombre de trames par bloc lié à l'avance réelle du worker,
+d'où plus fréquent à 10 µs qu'à 30. Nouveau compteur `hostAudioUnderrunCount`
+(trames sorties muettes faute de trame codec) : série 4 fixes par run (aux
+reprises après `advance()` sans audio, hors fenêtre mesurée), paire 0 à 4
+selon le run. Correctif : deux trames muettes d'avance dans la file hôte dès
+le passage en paire (+45 µs de latence), qui absorbent la trame manquante.
+Dater chaque trame à l'émission ne suffisait pas : une trame due avant la
+cible peut être enregistrée juste après (fin de bloc JIT).
+
+Pistes écartées :
+- CVR : l'UC lit HC à 0 alors que sa commande attend encore dans le flux
+  (~2 M lectures par run). Lire HC à 1 tant qu'elle attend : pire (6/6 plus
+  tôt ; l'UC scrute pendant toute la vidange HORX). Geler l'UC dans son
+  écriture CVR jusqu'à l'envoi, comme le pont série : pire, même par défaut
+  (2/2), sortie mixer presque vide, car pendant le gel l'allocation sans
+  plafond laisse les DSP courir loin devant.
+- Contre-pression MM : jamais active en paire (backlog ≤ 2 mots, seuil 4).
+- Attentes expirées : 0 dans tous les runs. Anneau codec : SPSC correct.
+
+Trafic mesuré, run complet du test : ~570 000 commandes et ~18 M mots de
+données par DSP ; 65 commandes par run attendent plus de 256 trames (vidange
+HORX jusqu'à l'échéance de 4 clamps).
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
