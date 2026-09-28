@@ -489,6 +489,34 @@ aller-retour strobe (port C) → rafale DMA sur ESSI0 que DSP1 attend ;
 coupé entre deux threads, chaque strobe devient une attente croisée
 UC ↔ DSP1 ↔ DSP2.
 
+## Test Ableton du MM (2026-09-28)
+
+Ableton Live 12.2.1, ASIO MOTU M Series, 44,1 kHz, buffer de 256 échantillons
+(5,8 ms). VST3 MM du commit 9d9b1da8 : mode paire, placement automatique,
+latence du plug-in 2 blocs (réglage de l'utilisateur, conservé).
+
+- Page DSP & Audio : « Parallel transport is running ».
+- Compteur CPU d'Ableton relevé toutes les 1,5 s pendant 30 s : 13-21 %
+  (moyenne ~17 %) transport arrêté, le MM jouant son propre pattern ;
+  14-18 % (moyenne ~15 %) transport en lecture. Cible (30 %) tenue.
+- Capture « Performance diagnostics » du plug-in, 10 min (limite atteinte) :
+  103 395 callbacks hôte, 0 dépassement estimé, 23 µs par callback en moyenne
+  (0,4 % du budget). Une seule perturbation : une rafale de 350 ms (~55
+  callbacks) où le thread hôte a attendu le rendu jusqu'à 5,62 ms sur 5,80,
+  pendant un scan disque récursif lancé à côté. Avec 1 bloc de latence, la
+  même perturbation aurait probablement décroché : garder 2 blocs ici.
+- Horloge : l'écran du MM reste à 120.0 pendant qu'Ableton joue à 136. Le
+  plug-in envoie bien l'horloge (`synthLib::MidiClock` : 24 PPQN, START, SPP,
+  STOP, seulement transport en lecture) ; c'est la réception du MM qui est
+  coupée (GLOBAL = FUNCTION + KIT, puis MIDI SYNC).
+- Hors plug-in : le bandeau « Certains plug-ins sont désactivés » vient
+  d'Oxford Inflator (« VST3: Restore 1 failed » dans Log.txt). Le rapport de
+  crash affiché par Live concerne la session précédente (25/09 → 28/09
+  02:27), terminée sans dump : arrêt forcé ou blocage, rien qui désigne
+  Gearmulator.
+- Accords au panneau à la souris : Shift maintenu, le premier contrôle cliqué
+  reste tenu jusqu'au relâchement de Shift (`ShiftPanelLatch`).
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
