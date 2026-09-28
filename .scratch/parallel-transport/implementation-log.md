@@ -611,10 +611,35 @@ pas être sortie. Nombre de trames par bloc lié à l'avance réelle du worker,
 d'où plus fréquent à 10 µs qu'à 30. Nouveau compteur `hostAudioUnderrunCount`
 (trames sorties muettes faute de trame codec) : série 4 fixes par run (aux
 reprises après `advance()` sans audio, hors fenêtre mesurée), paire 0 à 4
-selon le run. Correctif : deux trames muettes d'avance dans la file hôte dès
-le passage en paire (+45 µs de latence), qui absorbent la trame manquante.
-Dater chaque trame à l'émission ne suffisait pas : une trame due avant la
-cible peut être enregistrée juste après (fin de bloc JIT).
+selon le run. Premier correctif (commit 11644327) : deux trames muettes
+d'avance dans la file hôte dès le passage en paire. Insuffisant : 1/16 en
+séquentiel, un échantillon nul juste avant la fenêtre mesurée. Entre deux
+rendus, le test avance la machine sans audio ; les trames vidées alors sont
+jetées et chaque trou décale le niveau de la file d'une trame ou deux, marche
+aléatoire qui finit par vider le coussin.
+
+Correctif retenu : chaque bloc prend exactement ses trames. Le worker date
+chaque trame codec avec le tick d'horloge ESSI qui l'a émise
+(`EsxiClock::getLastClock`), le thread audio prend les trames datées jusqu'à
+deux trames avant la cible du bloc et laisse les suivantes au bloc suivant.
+Mesures : dates espacées d'exactement 2304 cycles, rappel en retard sur son
+tick de 1060 cycles au plus (une fois 1619, soit 0,7 trame), trames sorties
+muettes : 0 par run en paire. Écarté en chemin : compter les trames depuis la
+position du mixer au passage en paire (le codec ne démarre que bien après,
+aucune trame pendant des centaines de blocs : le compte part devant et la
+vidange reprend tout ce qui est là) ; arrondir le cycle du rappel sur une
+grille de 2304 (retard jusqu'à une demi-trame, une trame datée deux fois).
+
+Résiduel (avance 10 µs, vidange datée) : 1 échec sur 80 runs (16 séquentiels
++ 64 à deux instances), signature différente : 16 zéros exacts dans la sortie
+même du mixer, puis ruptures à +16 et +32 trames, 0 trame hôte manquante. Une
+rafale du lien DSP2→DSP1 manquée. Piste : le rendez-vous du strobe PDRC
+(`setCallbackDspWrite` du port C du mixer) purge l'anneau de lien et attend
+une trame fraîche quand les DMA des deux DSP sont inactifs ; en paire, l'ordre
+fin DSP1/DSP2 sur le worker dépend des échéances des mots UC (fin de tronçon
+sur `nextHostTransportCycle`), qui arrivent en temps réel. Heuristique réglée
+sur l'ordre déterministe du série : une rafale légitime peut être purgée. À
+traiter dans le modèle du lien, pas dans le transport hôte.
 
 Pistes écartées :
 - CVR : l'UC lit HC à 0 alors que sa commande attend encore dans le flux
