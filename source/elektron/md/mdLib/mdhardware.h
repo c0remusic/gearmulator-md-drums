@@ -126,6 +126,12 @@ namespace md
 		{
 			return m_schedHostAudioOverflow.load(std::memory_order_relaxed);
 		}
+		// Host output frames the codec had not produced by the end of their
+		// block: they were output silent.
+		uint64_t hostAudioUnderrunCount() const
+		{
+			return m_schedHostAudioUnderrun.load(std::memory_order_relaxed);
+		}
 		uint64_t hostAudioInputUnderflowCount() const
 		{
 			return hostAudioInputUnderflowCount(0) + hostAudioInputUnderflowCount(1);
@@ -581,6 +587,10 @@ namespace md
 		// drains the queue every callback so stale audio cannot accumulate between blocks.
 		RealtimeHostAudioQueue m_schedHostAudio;
 		std::atomic<uint64_t> m_schedHostAudioOverflow{0};
+		std::atomic<uint64_t> m_schedHostAudioUnderrun{0};
+		// Audio thread: the pair handoff happened, the next processAudio puts
+		// the host queue's cushion in.
+		bool m_hostAudioCushionPending = false;
 		bool     m_schedHostAudioActive = false;	// retain drained frames for a host callback
 		bool     m_schedBoundedJit = true;		// cycle-bounded DSP background slices
 		TransportMode m_transportMode = TransportMode::Serial;

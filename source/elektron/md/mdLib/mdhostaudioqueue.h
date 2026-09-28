@@ -186,10 +186,12 @@ namespace md
 	// the machine by the full requested duration. Existing carry is always older
 	// than newly generated audio and is therefore copied first. Splitting oversized
 	// offline blocks keeps fixed storage bounded without changing machine time.
+	// _unfilled, if given, is increased by the frames the queue could not
+	// supply: they stay silent.
 	template<size_t Capacity, typename Advance>
 	size_t renderHostAudio(HostAudioQueue<6, Capacity>& _queue,
 		std::array<std::vector<dsp56k::TWord>, 6>& _outputs,
-		const uint32_t _frames, Advance&& _advance)
+		const uint32_t _frames, Advance&& _advance, size_t* _unfilled = nullptr)
 	{
 		typename HostAudioQueue<6, Capacity>::Frame frame{};
 		uint32_t outputOffset = 0;
@@ -210,6 +212,8 @@ namespace md
 			copyAvailable();
 			_advance(chunk);
 			copyAvailable();
+			if(_unfilled)
+				*_unfilled += chunk - chunkOutput;
 			outputOffset += chunk;
 		}
 

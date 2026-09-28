@@ -6,11 +6,13 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace
@@ -19,6 +21,47 @@ namespace
 	{
 		if(!condition)
 			throw std::runtime_error(message);
+	}
+
+	// Failure evidence: the last render's samples (interleaved stereo), so an
+	// intermittent failure shows where its waveform breaks.
+	std::vector<float> g_lastRender;
+
+	void reportExpiredWaits(std::ostream& out, const md::Hardware& hardware)
+	{
+		using Site = md::Hardware::TransportWaitSite;
+		out << "expiredWaits dsp=" << hardware.transportWaitClamps(Site::DspTime)
+			<< " link=" << hardware.transportWaitClamps(Site::LinkProducer)
+			<< " room=" << hardware.transportWaitClamps(Site::HostToDspRoom)
+			<< " parked=" << hardware.transportWaitClamps(Site::ProducerParked)
+			<< " mixerGate=" << hardware.transportWaitClamps(Site::MixerGate)
+			<< " hostAudio unfilled=" << hardware.hostAudioUnderrunCount()
+			<< " dropped=" << hardware.hostAudioOverflowCount() << '\n';
+	}
+
+	void reportLastRender(std::ostream& out)
+	{
+		const size_t frames = g_lastRender.size() / 2;
+		const auto at = [&](size_t frame, size_t channel) { return double(g_lastRender[frame * 2 + channel]); };
+		for(size_t channel = 0; channel < 2 && frames > 4; ++channel)
+		{
+			// The largest second differences of the measured half, with the
+			// samples around the largest one.
+			std::vector<std::pair<double, size_t>> peaks;
+			for(size_t frame = std::max<size_t>(frames / 2, 2); frame < frames; ++frame)
+				peaks.emplace_back(std::abs(at(frame, channel) - 2 * at(frame - 1, channel) + at(frame - 2, channel)), frame);
+			const auto count = std::min<size_t>(6, peaks.size());
+			std::partial_sort(peaks.begin(), peaks.begin() + count, peaks.end(), std::greater<>());
+			out << "channel " << channel << " largest second differences:";
+			for(size_t i = 0; i < count; ++i)
+				out << ' ' << peaks[i].first << "@" << peaks[i].second << "(block " << peaks[i].second / 256
+					<< '+' << peaks[i].second % 256 << ')';
+			out << "\n  samples around frame " << peaks[0].second << ':';
+			const auto first = peaks[0].second > 8 ? peaks[0].second - 8 : 0;
+			for(size_t frame = first; frame < std::min(frames, peaks[0].second + 8); ++frame)
+				out << ' ' << at(frame, channel);
+			out << '\n';
+		}
 	}
 
 	void advance(md::Hardware& hardware, uint32_t frames)
@@ -58,9 +101,15 @@ namespace
 		std::array<DifferenceEnergy, 2> energy{};
 		std::array<double, 2> windowSum{}, windowPower{}, windowPeak{};
 		unsigned windowFrames = 0;
+		g_lastRender.clear();
 		for(unsigned block = 0; block < blocks; ++block)
 		{
 			hardware.processAudio(outputs, 256, 0);
+			for(size_t frame = 0; frame < samples[0].size(); ++frame)
+			{
+				g_lastRender.push_back(samples[0][frame]);
+				g_lastRender.push_back(samples[1][frame]);
+			}
 			for(size_t channel = 0; channel < samples.size(); ++channel)
 				for(const auto sample : samples[channel])
 				{
@@ -248,13 +297,14 @@ int main(int argc, char** argv)
 		std::cout << "mmAudioFirmwareTest: SKIP (MM firmware not supplied)\n";
 		return 77;
 	}
+	std::unique_ptr<md::Hardware> machine;
 	try
 	{
 		std::vector<uint8_t> rom;
 		require(baseLib::filesystem::readFile(rom, path), "could not read MM fixture");
 		require(md::RomLoader::isRomForModel(rom, md::MachineModel::Monomachine),
 			"MM fixture fingerprint mismatch");
-		auto machine = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Monomachine);
+		machine = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Monomachine);
 		auto& hardware = *machine;
 		advance(hardware, md::g_samplerate * 20);
 		require(hardware.isAudioReady() && hardware.isFirmwareMidiReady(), "MM boot incomplete");
@@ -404,12 +454,18 @@ int main(int argc, char** argv)
 					advance(hardware, md::g_samplerate / 2);
 				}
 		}
+		reportExpiredWaits(std::cout, hardware);
 		std::cout << "mmAudioFirmwareTest: PASS\n";
 		return 0;
 	}
 	catch(const std::exception& error)
 	{
 		std::cerr << "mmAudioFirmwareTest: " << error.what() << '\n';
+		if(machine)
+		{
+			reportExpiredWaits(std::cerr, *machine);
+			reportLastRender(std::cerr);
+		}
 		return 1;
 	}
 }

@@ -40,6 +40,13 @@ namespace md
 	// The UC is granted g_ucClockHz/44100, about 907.03 cycles per frame.
 	constexpr uint64_t g_dsp1CyclesPerEsaiFrame  = 2304;
 
+	// Pair mode: silent frames the host queue keeps ahead of the codec. A
+	// block takes the frames the mixer worker has emitted when the audio
+	// thread drains; with the worker at the block target, the block's last
+	// frame may not be out yet, and the block came out one frame short. The
+	// cushion absorbs that frame, for 45 us more latency.
+	constexpr size_t g_pairHostAudioCushionFrames = 2;
+
 	Rom initRom(const std::vector<uint8_t>& _romData, const std::string& _romName,
 		const MachineModel _model)
 	{
@@ -1559,14 +1566,24 @@ namespace md
 		for(auto& output : m_audioOutputs)
 			std::fill_n(output.data(), _frames, dsp56k::TWord(0));
 
+		if(m_hostAudioCushionPending)
+		{
+			m_hostAudioCushionPending = false;
+			for(size_t i = 0; i < g_pairHostAudioCushionFrames; ++i)
+				m_schedHostAudio.push({});
+		}
+
 		m_schedHostAudioActive = true;
+		size_t unfilled = 0;
 		const auto trimmed = renderHostAudio(m_schedHostAudio, m_audioOutputs, _frames,
 			[this](const uint32_t _chunk)
 			{
 				queueHostAudioInput(_chunk);
 				advance(_chunk);
-			});
+			}, &unfilled);
 		m_schedHostAudioActive = false;
+		if(unfilled)
+			m_schedHostAudioUnderrun.fetch_add(unfilled, std::memory_order_relaxed);
 
 		// Preserve a small surplus to maintain codec continuity, but never allow
 		// stale output to accumulate beyond one current host block.
@@ -2126,16 +2143,19 @@ namespace md
 		if(m_transportTrace)
 			std::fprintf(stderr, "[pair] handoff at uc=%llu\n", static_cast<unsigned long long>(m_schedUcCyclesDone));
 		schedDrainCodecOutput();
+		m_hostAudioCushionPending = true;
 		m_dspMixer.enterThreadedHostTransport();
 		m_dspProducer.enterThreadedHostTransport();
 		m_dspMixer.publishHostStatus();
 		m_dspProducer.publishHostStatus();
-		// Gate constants: the serial envelope, one quantum each way. The
-		// laggard-first scheduler let a DSP run up to a quantum past the UC (a
-		// UC word then landed that much late in DSP time) and the UC a quantum
-		// past a DSP (a DSP word reached it that much late). MD_PAIR_LEAD_US
-		// and MD_PAIR_UC_LEAD_US override them; past about 60 us each way the
-		// Monomachine's GND SIN oracle fails.
+		// Gate constants. The laggard-first scheduler let a DSP run up to a
+		// quantum past the UC (a UC word then landed that much late in DSP
+		// time) and the UC a quantum past a DSP (a DSP word reached it that
+		// much late). The UC keeps that quantum. The DSPs get the policy's
+		// shorter lead: an idle worker waits at its gate, so unlike the serial
+		// scheduler it lands nearly every UC word at the full lead, plus up to
+		// a chunk (transportPolicy). MD_PAIR_LEAD_US and MD_PAIR_UC_LEAD_US
+		// override them.
 		const auto envUs = [](const char* _name)
 		{
 			const char* const value = std::getenv(_name);
@@ -2145,7 +2165,7 @@ namespace md
 		const auto policy = transportPolicy(m_model);
 		m_pairQuantumFrames = schedQuantumFrames(m_model);
 		const double dspLeadUs = envUs("MD_PAIR_LEAD_US");
-		const double dspLeadFrames = dspLeadUs >= 0.0 ? usToFrames(dspLeadUs) : m_pairQuantumFrames;
+		const double dspLeadFrames = usToFrames(dspLeadUs >= 0.0 ? dspLeadUs : policy.pairDspLeadMicroseconds);
 		m_pairDspLeadUc = static_cast<uint64_t>(dspLeadFrames * schedUcCyclesPerFrame());
 		const double ucLeadUs = envUs("MD_PAIR_UC_LEAD_US");
 		m_pairUcLeadFrames = ucLeadUs >= 0.0 ? usToFrames(ucLeadUs) : m_pairQuantumFrames;

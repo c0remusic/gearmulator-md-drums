@@ -25,12 +25,20 @@ namespace md
 		// 0 disables dating entirely (the documented fallback).
 		// MD_LINK_PIPELINE_DEPTH overrides for experiments.
 		double linkPipelineDepthFrames;
+		// Pair mode: how far the DSP worker may run ahead of the UC. A host
+		// word lands that much late in DSP time, plus up to one worker chunk.
+		// MD_PAIR_LEAD_US overrides for experiments.
+		double pairDspLeadMicroseconds;
 	};
 
 	namespace detail
 	{
-		inline constexpr TransportPolicy g_monomachinePolicy{30.0, 100'000, 1, 16, 4, 200'000, true, 1.0};
-		inline constexpr TransportPolicy g_machinedrumPolicy{125.0, 100'000, 3, 16, 4, 200'000, false, 1.0};
+		// Monomachine pair lead: an idle worker sits at its lead, so every host
+		// word landed that late. At one quantum (30 us) the GND SIN gates
+		// failed now and then (silent note, clicks), at 45 and 60 us always;
+		// at 10 us the throughput is the same and 0 costs about 25 points.
+		inline constexpr TransportPolicy g_monomachinePolicy{30.0, 100'000, 1, 16, 4, 200'000, true, 1.0, 10.0};
+		inline constexpr TransportPolicy g_machinedrumPolicy{125.0, 100'000, 3, 16, 4, 200'000, false, 1.0, 125.0};
 	}
 
 	// Scheduler hot paths ask for this per step: hand out the constant, not a copy
