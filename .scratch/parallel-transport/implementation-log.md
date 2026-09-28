@@ -641,6 +641,46 @@ sur `nextHostTransportCycle`), qui arrivent en temps réel. Heuristique réglée
 sur l'ordre déterministe du série : une rafale légitime peut être purgée. À
 traiter dans le modèle du lien, pas dans le transport hôte.
 
+### Rafale de lien manquée : enquête (2026-09-28)
+
+Build de diagnostic séparé (`temp/cmake_diag`, `MD_TRANSPORT_DIAGNOSTICS=ON`,
+sans plug-ins) pour les compteurs du lien, plus sondes temporaires sur le
+strobe PDRC (écriture par DSP1, première lecture du nouveau niveau par DSP2).
+- ~232 000 strobes par run. À l'écriture, DSP2 est derrière DSP1 de 0 à 1
+  trame ; la boîte aux lettres n'est pas datée, DSP2 voit donc le nouveau
+  niveau « avant » l'écriture en temps émulé. Réaction de DSP2 : ≤ 0,02 trame
+  après l'écriture en paire (avance 10 µs), ≤ 0,85 en série.
+- Lectures à vide du mixer : 11 à 24 par run, en série comme en paire, toutes
+  à l'époque 0 (démarrage du lien). Hors sujet.
+- Avance DSP 60 µs (6/6 échecs) : strobe vu jusqu'à 3,3 trames après
+  l'écriture, `mmProducerDmaInactiveDrops` ×10 (620 000 contre 45-64 000 en
+  paire à 10 µs, 93 000 en série). DSP2 répond tard au strobe.
+
+Expériences sur ce cas amplifié :
+- Retenue « aller-retour » (`MD_PAIR_REPLY_US`, retirée) : tant qu'un mot
+  d'un DSP va vers l'UC (copie posée, prise pas encore acquittée) et 30 µs
+  d'UC après la prise, aucun DSP ne dépasse l'UC. Retenir DSP2 seul : 6/6
+  échecs, pires (le mixer garde son avance et affame le lien). Retenir les
+  deux : **6/6 verts** à avance 60 µs, réaction au strobe ≤ 0,015 trame.
+  Mécanisme confirmé : les réponses de l'UC aux requêtes des DSP arrivent en
+  retard de l'avance DSP. Mais coût au banc (MM paire, 44,1 kHz) : 92-100 %
+  du temps réel selon l'avance, contre 71-84 % sans retenue. Les DSP écrivent
+  à l'UC des milliers de fois par seconde (DSP2 ~5 000-9 000/s), chaque fois
+  le worker attend l'UC.
+- Statut HI08 daté (`MD_PAIR_DATED_STATUS`, retiré) : historique des
+  changements HF2/HF3 et profondeur HORX avec le cycle DSP, lu par l'UC à son
+  propre temps (plus de lecture du futur du DSP). 6/6 échecs à 60 µs : pas la
+  cause.
+- Avance DSP 0 avec avance UC plus grande : 92,8 % (UC 60), 91,7 % (UC 90),
+  95,4 % (UC 120). Trop cher aussi.
+
+Piste restante, non testée : les vidanges HORX longues. 65 commandes par run
+attendent plus de 256 trames (règle MM « données avant commande », jusqu'à 4
+clamps ≈ 3,9 ms) ; pendant ces épisodes l'allocation laisse les DSP courir
+loin devant l'UC (~130 000 mots UC par run déposés avec plus de 100 µs de
+retard, même à avance 10 µs). Si un aller-retour critique tombe dedans, sa
+réponse arrive très en retard. À corréler avec le moment de l'échec.
+
 Pistes écartées :
 - CVR : l'UC lit HC à 0 alors que sa commande attend encore dans le flux
   (~2 M lectures par run). Lire HC à 1 tant qu'elle attend : pire (6/6 plus
