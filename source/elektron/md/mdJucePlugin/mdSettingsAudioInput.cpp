@@ -29,12 +29,22 @@ namespace mdJucePlugin
 		, m_status(juceRmlUi::helper::findChild(_root, "audioInputStatus"))
 		, m_settings(juceRmlUi::helper::findChild(_root, "btAudioInputSettings"))
 		, m_transportStatus(juceRmlUi::helper::findChild(_root, "parallelTransportStatus", false))
+		, m_hostSyncStatus(juceRmlUi::helper::findChild(_root, "hostSyncStatus", false))
 	{
 		juceRmlUi::EventListener::AddClick(m_settings, [this]
 		{
 			if(auto* const holder = standaloneHolder(m_processor))
 				holder->showAudioSettingsDialog();
 		});
+		if(m_hostSyncStatus)
+		{
+			jucePluginEditorLib::SettingsPlugin::createToggleButton(_root, "btFollowHostTempo",
+				m_processor.getConfig(), AudioPluginAudioProcessor::FollowHostTempoConfigKey, [this](bool)
+				{
+					static_cast<AudioPluginAudioProcessor&>(m_processor).applyFollowHostTempoSetting(true);
+					updateHostSyncStatus();
+				}, false);
+		}
 		// Both machines' pages carry the transport switch; the toggle writes
 		// the config value, the processor pushes it to the device.
 		auto& processor = static_cast<AudioPluginAudioProcessor&>(m_processor);
@@ -81,6 +91,42 @@ namespace mdJucePlugin
 			m_lastStatus = std::move(status);
 		}
 		updateTransportStatus();
+		updateHostSyncStatus();
+	}
+
+	void SettingsAudioInput::updateHostSyncStatus()
+	{
+		if(!m_hostSyncStatus)
+			return;
+		auto& processor = static_cast<AudioPluginAudioProcessor&>(m_processor);
+		const bool wanted = processor.getFollowHostTempoSetting();
+		using State = md::HostSync::State;
+		std::string status;
+		switch(processor.getHostSyncState())
+		{
+		case State::Unknown:
+			status = "Waiting for the machine to boot.";
+			break;
+		case State::Applying:
+			status = wanted ? "Setting the machine to follow the host..." : "Giving the machine its own tempo back...";
+			break;
+		case State::Following:
+			status = "The machine follows the host's tempo and transport.";
+			break;
+		case State::NotFollowing:
+			status = "The machine runs on its own tempo.";
+			break;
+		case State::Failed:
+			status = processor.getModel() == md::MachineModel::Monomachine
+				? "The machine did not take the setting. Set it on the machine: GLOBAL > CONTROL > CONTROL IN."
+				: "The machine did not take the setting. Set it on the machine: GLOBAL > SYNC.";
+			break;
+		}
+		if(status != m_lastHostSyncStatus)
+		{
+			m_hostSyncStatus->SetInnerRML(Rml::StringUtilities::EncodeRml(status));
+			m_lastHostSyncStatus = std::move(status);
+		}
 	}
 
 	void SettingsAudioInput::updateTransportStatus()

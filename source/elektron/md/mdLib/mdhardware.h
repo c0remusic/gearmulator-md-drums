@@ -418,6 +418,12 @@ namespace md
 		size_t getPendingPanelInputBytes() const;
 		size_t getPanelInputOverflowCount() const;
 		PanelInputQueueStatus getPanelInputStatus() const;
+		// Machine frames the scheduler was asked to reach, published before each
+		// block: an emulated clock that other threads may read.
+		uint64_t getEmulatedFrames() const
+		{
+			return m_schedTargetFrames.load(std::memory_order_acquire);
+		}
 
 		const auto& getAudioOutputs() const { return m_audioOutputs; }
 		const std::string& getRomFilename() const { return m_rom.getFilename(); }

@@ -11,6 +11,15 @@ set_tests_properties(mmBootFirmwareTest PROPERTIES
 set_property(TARGET mmBootFirmwareTest PROPERTY FOLDER "Elektron/test")
 add_dependencies(mdLibTest mmBootFirmwareTest)
 
+# Needs GEARMULATOR_MM_FIRMWARE_BIN and/or GEARMULATOR_MD_FIRMWARE_BIN.
+add_executable(hostSyncFirmwareTest hostSyncFirmwareTest.cpp)
+target_link_libraries(hostSyncFirmwareTest PRIVATE mdLib)
+add_test(NAME hostSyncFirmwareTest COMMAND hostSyncFirmwareTest)
+set_tests_properties(hostSyncFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi" SKIP_RETURN_CODE 77 TIMEOUT 600)
+set_property(TARGET hostSyncFirmwareTest PROPERTY FOLDER "Elektron/test")
+add_dependencies(mdLibTest hostSyncFirmwareTest)
+
 add_test(NAME mdLibTests COMMAND mdLibTest)
 set_tests_properties(mdLibTests PROPERTIES LABELS "UnitTest")
 

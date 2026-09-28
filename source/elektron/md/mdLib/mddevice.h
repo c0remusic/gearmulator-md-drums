@@ -6,6 +6,7 @@
 
 #include "mdasyncrender.h"
 #include "mdhardware.h"
+#include "mdhostsync.h"
 #include "mdsyseximport.h"
 
 #include "synthLib/device.h"
@@ -202,6 +203,13 @@ namespace md
 		SysexImportProgress userSysexImportProgress() const;
 		void setNativeProgramChangesEnabled(bool _enabled) { m_nativeProgramChangesEnabled = _enabled; }
 		bool nativeProgramChangesEnabled() const { return m_nativeProgramChangesEnabled; }
+		// "Follow host tempo": the Device services a HostSync on its rendering
+		// thread, taking requests from and publishing its state to _control. Set
+		// before the Device renders.
+		void setHostSyncControl(std::shared_ptr<HostSyncControl> _control)
+		{
+			m_hostSyncControl = std::move(_control);
+		}
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -284,6 +292,7 @@ namespace md
 
 		void clearProjectStateRestore();
 		void failProjectStateRestore(std::string _error);
+		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
 		uint32_t hardwareLatency() const { return isRenderingAsync() ? 0 : getExtraLatencySamples(); }
@@ -309,6 +318,12 @@ namespace md
 		uint64_t m_deferredStateGeneration = 0;
 		bool m_asyncRenderAllowed = true;
 		bool m_parallelTransport = false;	// the library default stays serial; the plug-in chooses
+		// Rendering thread only, except m_hostSyncControl's own atomics.
+		HostSync m_hostSync;
+		HostSync::Actions m_hostSyncActions;
+		std::shared_ptr<HostSyncControl> m_hostSyncControl;
+		uint32_t m_hostSyncRequest = 0;		// the last request handed to m_hostSync
+		uint8_t m_hostSyncSlot = 0xff;		// active Global slot, from status answers
 		// Last member: destroyed (render thread stopped) before everything it renders.
 		std::unique_ptr<AsyncRender> m_async;
 	};

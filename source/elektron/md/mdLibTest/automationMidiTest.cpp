@@ -1,5 +1,6 @@
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
+#include "mdLib/mdhostsync.h"
 #include "mdLib/mdsysexautomation.h"
 #include "synthLib/midiBufferParser.h"
 
@@ -519,6 +520,184 @@ namespace
 		require(status.requestDump && !status.selectionChanged,
 			"same-slot Global poll did not refresh its MIDI channel data");
 	}
+
+	// Factory-like Globals: Machinedrum OS 1.63 (CTRL IN on, clock internal, both
+	// outputs on) and Monomachine OS 1.32b (both inputs off).
+	md::automation::sysex::Message machinedrumGlobal()
+	{
+		md::automation::sysex::Message global{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00,
+			0x50, 0x06, 0x01, 0x00};
+		global.resize(0xc0, 0x06);
+		global[0xad] = 0;
+		global[0xb2] = 0x60;
+		finishDump(global);
+		return global;
+	}
+
+	std::vector<uint8_t> monomachineGlobalData()
+	{
+		std::vector<uint8_t> data(264, 0);
+		const uint8_t channels[] = {8, 0, 6, 6, 7};
+		std::copy(std::begin(channels), std::end(channels), data.begin());
+		data[5] = 0x70;
+		data[9] = 2;
+		data[10] = data[11] = 1;
+		for(uint8_t i = 0; i < 6; ++i)
+			data[18 + i] = static_cast<uint8_t>(9 + i);
+		data[100] = 0x91;
+		data.back() = 0x80;
+		return data;
+	}
+
+	void testGlobalSync()
+	{
+		using namespace md::automation::sysex;
+		constexpr auto mdModel = md::MachineModel::Machinedrum;
+		const auto mdGlobal = machinedrumGlobal();
+		require(mdGlobal.size() == 0xc5, "MD Global fixture has the wrong size");
+		require(parseGlobalSync(mdModel, mdGlobal) == GlobalSync{false, true},
+			"wrong MD factory sync reading");
+		const auto mdFollow = withGlobalSync(mdModel, mdGlobal, {true, true});
+		require(mdFollow && parseGlobalDump(mdModel, *mdFollow), "MD sync patch is not a valid Global");
+		require((*mdFollow)[0xb2] == 0x61, "MD sync patch touched the outputs or kept CTRL IN off");
+		for(size_t i = 0; i < 0xc0; ++i)
+			require(i == 0xb2 || (*mdFollow)[i] == mdGlobal[i], "MD sync patch changed another byte");
+		const auto mdRelease = withGlobalSync(mdModel, *mdFollow, {false, false});
+		require(mdRelease && (*mdRelease)[0xb2] == 0x70, "MD CTRL IN off is bit 4 set");
+		require(withGlobalSync(mdModel, *mdFollow, {false, true}) == mdGlobal, "MD sync patch is not reversible");
+		auto shortGlobal = mdGlobal;
+		shortGlobal.erase(shortGlobal.begin() + 0xb0, shortGlobal.end() - 5);
+		shortGlobal.resize(shortGlobal.size() - 5);
+		finishDump(shortGlobal);
+		require(!parseGlobalSync(mdModel, shortGlobal), "accepted an MD Global of another size");
+
+		constexpr auto mmModel = md::MachineModel::Monomachine;
+		const auto data = monomachineGlobalData();
+		const auto mmGlobal = makeMmDump(0x50, data, 0);
+		require(parseGlobalSync(mmModel, mmGlobal) == GlobalSync{false, false},
+			"wrong MM factory sync reading");
+		require(withGlobalSync(mmModel, mmGlobal, {false, false}) == mmGlobal,
+			"MM Global does not re-encode to the same bytes");
+		auto following = data;
+		following[5] = 0x71;
+		following[6] = 1;
+		require(withGlobalSync(mmModel, mmGlobal, {true, true}) == makeMmDump(0x50, following, 0),
+			"MM sync patch changed more than TEMPO SYNC and TRANSPORT");
+	}
+
+	struct HostSyncProbe
+	{
+		std::vector<md::automation::sysex::Message> sysex;
+		std::vector<md::PanelPacket> panel;
+		unsigned requests = 0;
+		md::HostSync::Actions actions;
+
+		HostSyncProbe()
+		{
+			actions.sendSysex = [this](const md::automation::sysex::Message& _message) { sysex.push_back(_message); };
+			actions.sendPanel = [this](const md::PanelPacket& _packet) { panel.push_back(_packet); return true; };
+			actions.requestGlobal = [this] { ++requests; };
+		}
+	};
+
+	// Services _sync for _seconds of emulated time, a block at a time.
+	uint64_t runHostSync(md::HostSync& _sync, HostSyncProbe& _probe, uint64_t _frames, const double _seconds,
+		const uint64_t _epoch = 1)
+	{
+		const auto end = _frames + static_cast<uint64_t>(_seconds * md::g_samplerate);
+		for(; _frames < end; _frames += 256)
+			_sync.service(_frames, _epoch, _probe.actions);
+		return _frames;
+	}
+
+	void testHostSync()
+	{
+		using namespace md::automation::sysex;
+		using Target = md::HostSync::Target;
+		using State = md::HostSync::State;
+		constexpr auto mdModel = md::MachineModel::Machinedrum;
+		const auto factory = machinedrumGlobal();
+		const auto following = *withGlobalSync(mdModel, factory, {true, true});
+
+		md::HostSync sync(mdModel);
+		HostSyncProbe probe;
+		uint64_t frames = runHostSync(sync, probe, 0, 1);
+		require(probe.sysex.empty() && probe.requests == 0 && sync.getState() == State::Unknown,
+			"host sync acted while left alone");
+
+		sync.setTarget(Target::Follow);
+		frames = runHostSync(sync, probe, frames, 0.1);
+		require(probe.requests == 1 && probe.sysex.empty(), "host sync did not ask for the Global it lacks");
+		sync.onGlobalDump(factory);
+		frames = runHostSync(sync, probe, frames, 0.1);
+		require(probe.sysex.empty() && sync.getState() == State::Applying,
+			"host sync changed a machine that just came up");
+		while(probe.sysex.empty() && frames < 12 * md::g_samplerate)
+			frames = runHostSync(sync, probe, frames, 0.001);
+		require(frames >= 10 * md::g_samplerate, "host sync did not let the machine settle first");
+		require(probe.sysex.size() == 2 && sync.getState() == State::Applying, "MD Global was not rewritten");
+		require(parseGlobalSync(mdModel, probe.sysex[0]) == GlobalSync{true, true}
+			&& probe.sysex[1] == globalReload(mdModel, 0), "MD rewrite is not the patched Global and a reload");
+		// An answer to a request sent before the change must not count as its result.
+		sync.onGlobalDump(factory);
+		frames = runHostSync(sync, probe, frames, 0.3);
+		require(probe.sysex.size() == 2 && probe.requests == 1, "host sync verified too early");
+		frames = runHostSync(sync, probe, frames, 0.3);
+		require(probe.requests == 2, "host sync did not ask for a Global to verify its change");
+		sync.onGlobalDump(following);
+		frames = runHostSync(sync, probe, frames, 0.1);
+		require(sync.getState() == State::Following && probe.sysex.size() == 2, "MD did not settle as following");
+
+		sync.setTarget(Target::Release);
+		frames = runHostSync(sync, probe, frames, 0.1);
+		require(probe.sysex.size() == 4 && parseGlobalSync(mdModel, probe.sysex[2]) == GlobalSync{false, true},
+			"release did not restore the MD factory setting");
+		frames = runHostSync(sync, probe, frames, 0.6);
+		sync.onGlobalDump(factory);
+		frames = runHostSync(sync, probe, frames, 0.1);
+		require(sync.getState() == State::NotFollowing && sync.getTarget() == Target::Leave,
+			"release did not settle and hand back to Leave");
+
+		// A machine that never takes the setting: MaxAttempts rewrites, then Failed.
+		sync.setTarget(Target::Follow);
+		for(unsigned i = 0; i < 20; ++i)
+		{
+			frames = runHostSync(sync, probe, frames, 0.5);
+			sync.onGlobalDump(factory);
+		}
+		require(sync.getState() == State::Failed
+			&& probe.sysex.size() == 4 + 2 * md::HostSync::MaxAttempts, "host sync did not give up");
+
+		// A replaced machine is read again before anything is sent to it.
+		const auto sent = probe.sysex.size();
+		const auto requests = probe.requests;
+		frames = runHostSync(sync, probe, frames, 0.1, 2);
+		require(sync.getState() == State::Unknown && probe.sysex.size() == sent && probe.requests > requests,
+			"host sync kept state across machines");
+
+		constexpr auto mmModel = md::MachineModel::Monomachine;
+		const auto mmFactory = makeMmDump(0x50, monomachineGlobalData(), 0);
+		md::HostSync mm(mmModel);
+		HostSyncProbe mmProbe;
+		mm.setTarget(Target::Follow);
+		mm.onGlobalDump(mmFactory);
+		frames = runHostSync(mm, mmProbe, 0, 15);
+		const auto macro = md::monomachineSyncMacro({true, true});
+		require(mmProbe.panel.size() == macro.size() && mmProbe.sysex.empty(), "MM macro was not played in full");
+		for(size_t i = 0; i < macro.size(); ++i)
+			require(mmProbe.panel[i] == macro[i].packet, "MM macro packets out of order");
+		const auto function = md::panelPacket(mmModel, md::PanelControl::Function);
+		const auto kit = md::panelPacket(mmModel, md::PanelControl::Kit);
+		require(std::any_of(macro.begin(), macro.end(), [&](const md::PanelMacroStep& _step)
+			{
+				return _step.packet.row == function->row && _step.packet.mask == (function->mask | kit->mask);
+			}), "MM macro does not hold FUNCTION with KIT");
+		require(macro.back().packet.mask == 0, "MM macro leaves a button held");
+		require(mmProbe.requests >= 1 && mm.getState() == State::Applying, "MM macro was not verified");
+		mm.onGlobalDump(*withGlobalSync(mmModel, mmFactory, {true, true}));
+		runHostSync(mm, mmProbe, frames, 0.1);
+		require(mm.getState() == State::Following, "MM did not settle as following");
+	}
 }
 
 int main(const int _argc, const char* const* _argv)
@@ -530,6 +709,8 @@ int main(const int _argc, const char* const* _argv)
 	testMachinedrumDumps();
 	testMonomachineDumps();
 	testDumpRequestOrdering();
+	testGlobalSync();
+	testHostSync();
 	if(_argc > 1)
 		testBackupFile(_argv[1], md::MachineModel::Machinedrum);
 	if(_argc > 2)

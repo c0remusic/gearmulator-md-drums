@@ -9,6 +9,17 @@
 	<settingsspacer1/>
 	<button id="btAudioInputSettings" class="button">Open Audio/MIDI Settings...</button>
 	<settingsspacer1/>
+	<h1>Host Sync</h1>
+	<settingsspacer1/>
+	<div id="btFollowHostTempo" class="settings-checkboxwithlabel">
+		<button id="button" class="settings-checkbox"/>
+		<label>Follow host tempo</label>
+	</div>
+	<settingsspacer1/>
+	<label>The machine takes its tempo, start and stop from the host: it plays when the host plays, in time with it. The plug-in sets the machine's active Global (SYNC: TEMPO IN external, CTRL IN on). Turned off, the machine gets its own tempo back.</label>
+	<settingsspacer1/>
+	<label id="hostSyncStatus"/>
+	<settingsspacer1/>
 	<h1>CPU Load</h1>
 	<settingsspacer1/>
 	<div id="btParallelTransport" class="settings-checkboxwithlabel">

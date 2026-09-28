@@ -130,11 +130,31 @@ namespace md
 		, m_preparationContext(new PreparationContext(_params, m_model))
 		, m_mdFlashCacheFilename(mdFlashCacheFilename(_params, m_model))
 		, m_sysexDeviceId(g_sysexDeviceIds.fetch_add(1, std::memory_order_relaxed) + 1)
+		, m_hostSync(m_model)
 	{
 		auto initialFlash = loadInitialMdFlash(_params, m_model);
 		m_hardware = std::make_unique<Hardware>(_params.romData, _params.romName, m_model,
 			loadInitialPatchRam(_params, m_model, _initialPatchRam), m_frontPanelPublisher,
 			initialFlash.flash, initialFlash.cache);
+
+		const auto sendSysex = [this](const automation::sysex::Message& _message)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+			event.sysex.assign(_message.begin(), _message.end());
+			m_hardware->sendMidi(event);
+		};
+		m_hostSyncActions.sendSysex = sendSysex;
+		m_hostSyncActions.sendPanel = [this](const PanelPacket& _packet)
+		{
+			return m_hardware->trySendPanelEvent(_packet.row, _packet.mask);
+		};
+		// The status answer names the active slot; its Global follows once known.
+		m_hostSyncActions.requestGlobal = [this, sendSysex]
+		{
+			sendSysex(automation::sysex::statusRequest(m_model, automation::sysex::StatusParameter::Global));
+			if(m_hostSyncSlot < 8)
+				sendSysex(automation::sysex::globalRequest(m_model, m_hostSyncSlot));
+		};
 	}
 
 	bool Device::captureFactoryFlashCachePersistence(std::string& _filename,
@@ -672,7 +692,52 @@ namespace md
 
 	void Device::readMidiOut(std::vector<synthLib::SMidiEvent>& _midiOut)
 	{
+		const auto first = _midiOut.size();
 		m_hardware->readMidiOut(_midiOut);
+		serviceHostSync(_midiOut, first);
+	}
+
+	void Device::serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, const size_t _first)
+	{
+		if(!m_hostSyncControl)
+			return;
+
+		// The firmware's answers to status and Global requests, whoever sent them
+		// (the plug-in's controller polls both).
+		for(size_t i = _first; i < _midiOut.size(); ++i)
+		{
+			const auto& sysex = _midiOut[i].sysex;
+			if(sysex.size() < 10)
+				continue;
+			if(const auto status = automation::sysex::parseStatusResponse(m_model, sysex))
+			{
+				if(status->parameter == automation::sysex::StatusParameter::Global)
+					m_hostSyncSlot = status->value;
+			}
+			else if(const auto dump = automation::sysex::parseGlobalDump(m_model, sysex))
+			{
+				if(dump->slot == m_hostSyncSlot)
+					m_hostSync.onGlobalDump(sysex);
+			}
+		}
+
+		const auto request = m_hostSyncControl->pendingRequest();
+		if(request != m_hostSyncRequest)
+		{
+			m_hostSyncRequest = request;
+			m_hostSync.setTarget(HostSyncControl::targetOf(request));
+		}
+
+		// Hands off while a user SysEx import owns the MIDI input, while a project
+		// state is restored, and while the factory image is still being learned.
+		if(m_hardware->isMidiSysexTransferActive() || isProjectStateRestorePending()
+			|| !m_hardware->isFirmwareMidiReady() || m_hardware->isFactoryFlashInitializationExpected())
+			return;
+
+		// Another machine or another active Global slot starts over from a fresh read.
+		const auto epoch = (m_hardwareEpoch << 8) | m_hostSyncSlot;
+		m_hostSync.service(m_hardware->getEmulatedFrames(), epoch, m_hostSyncActions);
+		m_hostSyncControl->publish(m_hostSync.getState());
 	}
 
 	TransportMode Device::preferredTransport() const

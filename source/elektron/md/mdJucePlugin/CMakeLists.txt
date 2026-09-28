@@ -298,6 +298,11 @@ if(BUILD_TESTING)
 	set_tests_properties(mdParallelTransportFirmwareTest PROPERTIES
 		LABELS "Integration;FirmwareTest;Transport" SKIP_RETURN_CODE 77 TIMEOUT 600)
 
+	add_md_automation_firmware_test(mdHostSyncPluginTest mdHostSyncPluginTest.cpp)
+	add_test(NAME mdHostSyncPluginTest COMMAND mdHostSyncPluginTest)
+	set_tests_properties(mdHostSyncPluginTest PROPERTIES
+		LABELS "Integration;FirmwareTest;Midi" SKIP_RETURN_CODE 77 TIMEOUT 900)
+
 	add_md_automation_firmware_test(mdSysexLifecycleTest mdSysexLifecycleTest.cpp)
 	add_test(NAME mdSysexLifecycleTest COMMAND mdSysexLifecycleTest)
 	set_tests_properties(mdSysexLifecycleTest PROPERTIES

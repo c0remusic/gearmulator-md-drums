@@ -396,6 +396,7 @@ namespace mdJucePlugin
 
 		getController();
 		setRamRecordingMode(getRamRecordingMode());
+		applyFollowHostTempoSetting(false);
 		// A new configuration gets two blocks of latency on the Machinedrum:
 		// the machine then renders ahead on its own threads and the host's
 		// audio callback only exchanges buffers. A saved choice is kept, and
@@ -847,7 +848,21 @@ namespace mdJucePlugin
 				"or ask for help obtaining or installing firmware.");
 		d->setRamRecordingMode(getRamRecordingMode());
 		d->setParallelTransport(getParallelTransportSetting());
+		d->setHostSyncControl(m_hostSyncControl);
 		return d.release();
+	}
+
+	bool AudioPluginAudioProcessor::getFollowHostTempoSetting()
+	{
+		return getConfig().getBoolValue(FollowHostTempoConfigKey, false);
+	}
+
+	void AudioPluginAudioProcessor::applyFollowHostTempoSetting(const bool _changedByUser)
+	{
+		if(getFollowHostTempoSetting())
+			m_hostSyncControl->request(md::HostSync::Target::Follow);
+		else
+			m_hostSyncControl->request(_changedByUser ? md::HostSync::Target::Release : md::HostSync::Target::Leave);
 	}
 
 	bool AudioPluginAudioProcessor::getParallelTransportSetting()

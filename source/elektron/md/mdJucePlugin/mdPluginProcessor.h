@@ -1,10 +1,12 @@
 #pragma once
 
 #include "jucePluginEditorLib/pluginProcessor.h"
+#include "mdLib/mdhostsync.h"
 #include "mdLib/mdtypes.h"
 #include "synthLib/performanceReport.h"
 
 #include <atomic>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,6 +70,15 @@ namespace mdJucePlugin
 		// Machinedrum render ahead on its own threads (see md::AsyncRender).
 		static constexpr int DefaultLatencyBlocks = 2;
 
+		// "Follow host tempo" (off by default): the machine takes its tempo and
+		// start/stop from the host's MIDI clock (see md::HostSync). On, it is kept
+		// that way; turned off by the user, it gets its factory setting back; off at
+		// startup, the machine's own setting is left alone.
+		static constexpr const char* FollowHostTempoConfigKey = "followHostTempo";
+		bool getFollowHostTempoSetting();
+		void applyFollowHostTempoSetting(bool _changedByUser);
+		md::HostSync::State getHostSyncState() const { return m_hostSyncControl->getState(); }
+
 	    jucePluginEditorLib::PluginEditorState* createEditorState() override;
 	    synthLib::Device* createDevice() override;
 		void getRemoteDeviceParams(synthLib::DeviceCreateParams& _params) const override;
@@ -104,6 +115,7 @@ namespace mdJucePlugin
 		std::atomic<uint8_t> m_ramRecordingMode{
 			static_cast<uint8_t>(md::RamRecordingMode::Original)};
 		bool m_ramRecordingModeChunkSeen = false;
+		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 	};
 }

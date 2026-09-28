@@ -131,6 +131,79 @@ namespace md::automation::sysex
 			}
 			return decoded;
 		}
+
+		// Inverse of decodeMonomachinePayload: run-length pass, then 7-bit groups.
+		std::vector<uint8_t> encodeMonomachinePayload(const std::vector<uint8_t>& _decoded)
+		{
+			// A byte with bit 7 set is the repeat count of the byte after it. Single
+			// bytes stay literal unless their own bit 7 would read as a count.
+			std::vector<uint8_t> rle;
+			rle.reserve(_decoded.size() + 16);
+			for(size_t position = 0; position < _decoded.size();)
+			{
+				const auto value = _decoded[position];
+				size_t count = 1;
+				while(count < 0x7f && position + count < _decoded.size()
+					&& _decoded[position + count] == value)
+					++count;
+				if(count == 1 && (value & 0x80) == 0)
+					rle.push_back(value);
+				else
+				{
+					rle.push_back(static_cast<uint8_t>(0x80 | count));
+					rle.push_back(value);
+				}
+				position += count;
+			}
+
+			// Each group of up to seven bytes is preceded by their top bits, MSB first.
+			std::vector<uint8_t> packed;
+			packed.reserve(rle.size() + rle.size() / 7 + 1);
+			for(size_t position = 0; position < rle.size(); position += 7)
+			{
+				const auto count = std::min<size_t>(7, rle.size() - position);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+				{
+					if(rle[position + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				}
+				packed.push_back(highBits);
+				for(size_t bit = 0; bit < count; ++bit)
+					packed.push_back(static_cast<uint8_t>(rle[position + bit] & 0x7f));
+			}
+			return packed;
+		}
+
+		// Appends checksum, length and F7 to a dump that ends with its payload.
+		void finishDump(Message& _message)
+		{
+			uint32_t sum = 0;
+			for(size_t i = 9; i < _message.size(); ++i)
+				sum += _message[i];
+			const auto length = _message.size() - 5;
+			_message.push_back(static_cast<uint8_t>((sum >> 7) & 0x7f));
+			_message.push_back(static_cast<uint8_t>(sum & 0x7f));
+			_message.push_back(static_cast<uint8_t>((length >> 7) & 0x7f));
+			_message.push_back(static_cast<uint8_t>(length & 0x7f));
+			_message.push_back(0xf7);
+		}
+
+		// Machinedrum Global: raw bytes follow the 7-bit packed key map. In the
+		// sync byte (OS 1.63, Global version 6), bit 0 selects the EXTERNAL tempo
+		// source and bit 4 turns CTRL IN (start, stop, song position) off; the
+		// factory Global has both clear. Bits 5 and 6 are the outputs.
+		constexpr size_t g_mdGlobalSize = 0xc5;
+		constexpr size_t g_mdSyncPosition = 0xb2;
+		constexpr uint8_t g_mdClockIn = 0x01;
+		constexpr uint8_t g_mdTransportInOff = 0x10;
+
+		// Monomachine Global, decoded payload: five MIDI channels, then a byte
+		// whose bit 0 is CLOCK IN (its bits 4 to 6 are CTRL IN, CLOCK OUT and
+		// CTRL OUT), then TRANSPORT IN as a byte of its own.
+		constexpr size_t g_mmSyncIndex = 5;
+		constexpr size_t g_mmTransportInIndex = 6;
+		constexpr uint8_t g_mmClockIn = 0x01;
 	}
 
 	Message statusRequest(const MachineModel _model,
@@ -279,5 +352,55 @@ namespace md::automation::sysex
 				(*decoded)[levelPosition + track]});
 		}
 		return KitDump{slot, std::move(result)};
+	}
+
+	Message globalReload(const MachineModel _model, const uint8_t _slot)
+	{
+		return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_setStatus,
+			static_cast<uint8_t>(StatusParameter::Global), static_cast<uint8_t>(_slot & 0x07), 0xf7};
+	}
+
+	std::optional<GlobalSync> parseGlobalSync(const MachineModel _model,
+		const MessageView _message)
+	{
+		if(!parseGlobalDump(_model, _message))
+			return std::nullopt;
+		if(_model == MachineModel::Machinedrum)
+		{
+			if(_message.size() != g_mdGlobalSize)
+				return std::nullopt;
+			const auto sync = _message[g_mdSyncPosition];
+			return GlobalSync{(sync & g_mdClockIn) != 0, (sync & g_mdTransportInOff) == 0};
+		}
+		const auto decoded = decodeMonomachinePayload(_message);
+		if(!decoded || decoded->size() <= g_mmTransportInIndex)
+			return std::nullopt;
+		return GlobalSync{((*decoded)[g_mmSyncIndex] & g_mmClockIn) != 0,
+			(*decoded)[g_mmTransportInIndex] != 0};
+	}
+
+	std::optional<Message> withGlobalSync(const MachineModel _model,
+		const MessageView _message, const GlobalSync _sync)
+	{
+		if(!parseGlobalSync(_model, _message))
+			return std::nullopt;
+		if(_model == MachineModel::Machinedrum)
+		{
+			Message result(_message.begin(), _message.end() - 5);
+			auto& sync = result[g_mdSyncPosition];
+			sync = static_cast<uint8_t>((sync & ~(g_mdClockIn | g_mdTransportInOff))
+				| (_sync.clockIn ? g_mdClockIn : 0) | (_sync.transportIn ? 0 : g_mdTransportInOff));
+			finishDump(result);
+			return result;
+		}
+		auto decoded = *decodeMonomachinePayload(_message);
+		auto& sync = decoded[g_mmSyncIndex];
+		sync = static_cast<uint8_t>((sync & ~g_mmClockIn) | (_sync.clockIn ? g_mmClockIn : 0));
+		decoded[g_mmTransportInIndex] = _sync.transportIn ? 1 : 0;
+		Message result(_message.begin(), _message.begin() + 10);
+		const auto packed = encodeMonomachinePayload(decoded);
+		result.insert(result.end(), packed.begin(), packed.end());
+		finishDump(result);
+		return result;
 	}
 }

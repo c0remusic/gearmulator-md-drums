@@ -52,6 +52,19 @@ namespace md::automation::sysex
 		std::vector<ParameterChange> parameters;
 	};
 
+	// The receiving half of a Global's MIDI SYNC page.
+	struct GlobalSync
+	{
+		bool clockIn = false;
+		bool transportIn = false;
+
+		bool operator==(const GlobalSync& _other) const
+		{
+			return clockIn == _other.clockIn && transportIn == _other.transportIn;
+		}
+		bool operator!=(const GlobalSync& _other) const { return !(*this == _other); }
+	};
+
 	Message statusRequest(MachineModel _model, StatusParameter _parameter);
 	Message globalRequest(MachineModel _model, uint8_t _slot);
 	Message kitRequest(MachineModel _model, uint8_t _slot);
@@ -68,4 +81,16 @@ namespace md::automation::sysex
 		MessageView _message);
 	std::optional<KitDump> parseKitDump(
 		MachineModel _model, MessageView _message);
+
+	// SET STATUS for the Global slot: the firmware reloads that slot, which is how
+	// a Global dump written to the active slot takes effect.
+	Message globalReload(MachineModel _model, uint8_t _slot);
+
+	// CLOCK IN and TRANSPORT IN of a Global dump.
+	std::optional<GlobalSync> parseGlobalSync(MachineModel _model,
+		MessageView _message);
+	// The same Global dump with CLOCK IN and TRANSPORT IN replaced, everything
+	// else kept, and its checksum and length recomputed.
+	std::optional<Message> withGlobalSync(MachineModel _model,
+		MessageView _message, GlobalSync _sync);
 }

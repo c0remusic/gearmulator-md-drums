@@ -17,6 +17,7 @@ set(SOURCES
 	mdfrontpanel.cpp mdfrontpanel.h
 	mdhardware.cpp mdhardware.h
 	mdhostclock.h
+	mdhostsync.cpp mdhostsync.h
 	mdmc.cpp mdmc.h
 	mdmemorymap.h
 	mdmidiprotocol.h
