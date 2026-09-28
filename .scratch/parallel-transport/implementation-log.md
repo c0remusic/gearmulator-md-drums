@@ -517,6 +517,66 @@ latence du plug-in 2 blocs (réglage de l'utilisateur, conservé).
 - Accords au panneau à la souris : Shift maintenu, le premier contrôle cliqué
   reste tenu jusqu'au relâchement de Shift (`ShiftPanelLatch`).
 
+## Option « Follow host tempo » (2026-09-28)
+
+Le plug-in envoyait déjà l'horloge de l'hôte (`synthLib::MidiClock` : 24 PPQN,
+START, SPP, STOP, seulement transport en lecture), mais les machines l'ignorent
+en réglage usine. L'option règle leur réception MIDI SYNC.
+
+Offsets vérifiés contre firmware, en changeant la valeur dans le menu de la
+machine puis en comparant les dumps Global :
+
+- MM OS 1.32b, Global version 3.1, 264 octets décodés (7 bits + RLE) :
+  [5] bit 0 = TEMPO SYNC EXT MIDI CLK, [6] = TRANSPORT ACCEPT (octet entier).
+  Menu : FUNCTION + KIT → GLOBAL n EDIT → CONTROL → CONTROL IN. Usine : 0 / 0.
+- MD OS 1.63, Global version 6.1, 197 octets bruts : octet 0xB2, bit 0 = TEMPO
+  SOURCE EXTERNAL, bit 4 = CTRL IN **OFF** (inversé par rapport à mididuino,
+  qui décrit la version 5). Menu : FUNCTION + PATTERN/SONG → GLOBAL → SYNC.
+  Usine : horloge interne, CTRL IN on.
+
+Écriture :
+
+- MD : Global patché envoyé tel quel puis SET STATUS (0x71 01 slot) pour
+  recharger le slot ; sans rechargement le Global est stocké mais pas actif.
+- MM : un dump Global n'est accepté qu'en mode SYSEX RECEIVE, et même reçu il
+  ne remplace pas les réglages actifs ; écrire la RAM du Global actif
+  (0x001162A0) ne les change pas non plus. Reste le menu : macro panneau
+  (`md::monomachineSyncMacro`), curseurs ramenés en butée avant chaque choix,
+  valeurs bornées (deux appuis = idempotent). ~3 s d'écran de menu.
+
+Architecture : `md::HostSync` (machine à états, vérifie sur un dump frais,
+abandonne après deux essais) vit dans `md::Device`, servi dans `readMidiOut`
+sur le thread de rendu. Pas de `withDeviceLocked` : il met le rendu async en
+pause, impensable à 60 Hz. UI ↔ Device par `md::HostSyncControl` (atomiques).
+
+Témoin du test firmware (`hostSyncFirmwareTest`) : les LED du séquenceur, pas
+l'audio (le patch SUPERWAVES du MM tient ses notes quand le séquenceur gèle).
+La LED TEMPO bat avec l'horloge reçue même arrêté : bancs 0x23 (MD) et 0x26
+(MM) exclus, ainsi que 0x28 (MM, clignote seul).
+
+Boot : le MM répond au SysEx 1,06 s après la mise sous tension
+(`isFirmwareMidiReady`) mais affiche encore son logo et ignore le panneau.
+Mesuré (temps émulé) : macro lancée 7 s après « MIDI prêt » = échec, 8 s =
+réussite. HostSync ne touche donc à rien pendant les 10 premières secondes
+d'une machine, et fait au plus trois tentatives. Le test plug-in
+(`mdHostSyncPluginTest`, vrai processor + controller) l'a révélé : l'état
+était lu à 2,4 s et la macro partait dans le logo.
+
+## Monomodule (Shnolk, 2026-09-26)
+
+Autre émulateur Monomachine, AGPL v3 : dsp56300 seulement, sans émulation du
+ColdFire (séquenceur et UI natifs), le moteur son vient du fichier OS `.syx`.
+Son patch dsp56300 corrige : saturation SR.SM, MPYRI et PFLUSH, extension de
+signe des immédiats 24 bits dans le JIT, vecteurs d'interruption traités comme
+du code, échec JIT récupérable, et sous Win64 la sauvegarde XMM6-15 sur 128
+bits plus un spill mort vers un XMM callee-saved.
+
+Notre fork a déjà MPYRI, PFLUSH/PFLUSHUN, l'extension de signe
+(`getSignedOpWordB`) et `SR_SM`. L'écart XMM existe chez nous mais reste
+latent : `JitStackHelper` sauve et restaure les XMM en `movq` (64 bits sur des
+emplacements de 16 octets), mais sous Win64 `g_spillToNonVolatileXmms = false`
+tient XMM6-15 hors des blocs. À durcir (`movdqu`) avant de réactiver ce spill.
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
