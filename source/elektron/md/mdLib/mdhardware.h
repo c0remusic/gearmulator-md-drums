@@ -588,9 +588,10 @@ namespace md
 		RealtimeHostAudioQueue m_schedHostAudio;
 		std::atomic<uint64_t> m_schedHostAudioOverflow{0};
 		std::atomic<uint64_t> m_schedHostAudioUnderrun{0};
-		// Audio thread: the pair handoff happened, the next processAudio puts
-		// the host queue's cushion in.
-		bool m_hostAudioCushionPending = false;
+		// Pair worker: the date of each codec frame the mixer emits, the codec
+		// clock's tick that sent it, in the order of its ESSI1 output ring
+		// (onEssiCallbackMixer, schedDrainCodecOutput).
+		dsp56k::RingBuffer<uint64_t, dsp56k::Audio::RingBufferSize, false, false> m_codecFrameCycles;
 		bool     m_schedHostAudioActive = false;	// retain drained frames for a host callback
 		bool     m_schedBoundedJit = true;		// cycle-bounded DSP background slices
 		TransportMode m_transportMode = TransportMode::Serial;

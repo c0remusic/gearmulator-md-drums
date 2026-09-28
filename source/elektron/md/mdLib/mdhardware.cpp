@@ -40,12 +40,13 @@ namespace md
 	// The UC is granted g_ucClockHz/44100, about 907.03 cycles per frame.
 	constexpr uint64_t g_dsp1CyclesPerEsaiFrame  = 2304;
 
-	// Pair mode: silent frames the host queue keeps ahead of the codec. A
-	// block takes the frames the mixer worker has emitted when the audio
-	// thread drains; with the worker at the block target, the block's last
-	// frame may not be out yet, and the block came out one frame short. The
-	// cushion absorbs that frame, for 45 us more latency.
-	constexpr size_t g_pairHostAudioCushionFrames = 2;
+	// Pair mode: a block takes the mixer's frames dated up to this many frames
+	// before its target (schedDrainCodecOutput), 45 us of latency. Taking
+	// whatever the worker had emitted made the count depend on how far ahead
+	// it ran: with the worker right at the target, the block's last frame
+	// could still be missing and the block came out one frame short (GND SIN
+	// clicks). A frame reaches the ring up to 0.7 frame after its date.
+	constexpr uint64_t g_pairCodecCutFrames = 2;
 
 	Rom initRom(const std::vector<uint8_t>& _romData, const std::string& _romName,
 		const MachineModel _model)
@@ -1499,9 +1500,15 @@ namespace md
 		// codec ring immediately so its blocking producer can never park that thread.
 		// A mixer on the pair worker leaves the ring to the audio thread,
 		// which drains it at the end of each advance: the ring is the SPSC
-		// hand-over between the two.
+		// hand-over between the two. It dates the frame with the codec clock's
+		// tick that sent it (schedDrainCodecOutput): this callback runs when
+		// the peripherals are next serviced, up to 0.7 frame later (measured).
 		if(!m_dspThreaded[0].load(std::memory_order_relaxed))
+		{
 			schedDrainCodecOutput();
+			return;
+		}
+		m_codecFrameCycles.push_back(m_dspMixer.getPeriph().getEssiClock().getLastClock());
 	}
 
 	void Hardware::ensureBufferSize(const uint32_t _frames)
@@ -1565,13 +1572,6 @@ namespace md
 		// immediately, then copy them into the plug-in's six output channels.
 		for(auto& output : m_audioOutputs)
 			std::fill_n(output.data(), _frames, dsp56k::TWord(0));
-
-		if(m_hostAudioCushionPending)
-		{
-			m_hostAudioCushionPending = false;
-			for(size_t i = 0; i < g_pairHostAudioCushionFrames; ++i)
-				m_schedHostAudio.push({});
-		}
 
 		m_schedHostAudioActive = true;
 		size_t unfilled = 0;
@@ -1666,10 +1666,23 @@ namespace md
 	void Hardware::schedDrainCodecOutput()
 	{
 		// Pop everything the mixer (DSP1) ESSI1 TX produced so its blocking push
-		// can never park the single scheduler thread.
+		// can never park the single scheduler thread. A mixer on the pair worker
+		// may have run past the block target: only its frames dated up to
+		// g_pairCodecCutFrames before the target belong to this block, so every
+		// block gets the same count however far ahead the worker got.
 		auto& out = m_dspMixer.getPeriph().getEssi1().getAudioOutputs();
+		const bool dated = m_dspThreaded[0].load(std::memory_order_acquire);
+		const uint64_t cut = dated ? schedFrameToDspCycles(0, m_schedFramesTotal - g_pairCodecCutFrames) : 0;
 		while(!out.empty())
 		{
+			if(dated)
+			{
+				// The worker dates a frame right after emitting it: one not
+				// dated yet was emitted past the target, so past the cut too.
+				if(m_codecFrameCycles.empty() || m_codecFrameCycles.front() > cut)
+					break;
+				m_codecFrameCycles.pop_front();
+			}
 			auto frame = out.pop_front();
 
 
@@ -2143,7 +2156,6 @@ namespace md
 		if(m_transportTrace)
 			std::fprintf(stderr, "[pair] handoff at uc=%llu\n", static_cast<unsigned long long>(m_schedUcCyclesDone));
 		schedDrainCodecOutput();
-		m_hostAudioCushionPending = true;
 		m_dspMixer.enterThreadedHostTransport();
 		m_dspProducer.enterThreadedHostTransport();
 		m_dspMixer.publishHostStatus();
