@@ -41,8 +41,24 @@ $env:MDMM_TRANSPORT = 'pair'
 # Default lead and placement: the configuration a user gets.
 Remove-Item Env:MD_PAIR_LEAD_US, Env:MD_PAIR_UC_LEAD_US, Env:MDMM_PAIR_AFFINITY, Env:MD_PAIR_HOLD_DSP2_US -ErrorAction SilentlyContinue
 
-$load = (Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average
-Write-Host ("CPU load before start: {0:N0}%" -f $load)
+# Average over a few seconds from GetSystemTimes: Win32_Processor's
+# LoadPercentage is one instant sample (it read 14 to 96% a second apart on
+# an idle machine), and the performance counters' names are localized.
+Add-Type -Namespace Bench -Name Kernel -MemberDefinition @'
+[DllImport("kernel32.dll")]
+public static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
+'@
+function Get-CpuLoad([int]$seconds)
+{
+	$i0 = 0L; $k0 = 0L; $u0 = 0L; $i1 = 0L; $k1 = 0L; $u1 = 0L
+	[void][Bench.Kernel]::GetSystemTimes([ref]$i0, [ref]$k0, [ref]$u0)
+	Start-Sleep -Seconds $seconds
+	[void][Bench.Kernel]::GetSystemTimes([ref]$i1, [ref]$k1, [ref]$u1)
+	$total = ($k1 - $k0) + ($u1 - $u0)	# kernel time includes idle time
+	return 100.0 * (1.0 - ($i1 - $i0) / [double]$total)
+}
+$load = Get-CpuLoad 5
+Write-Host ("CPU load before start (5 s average): {0:N1}%" -f $load)
 if($load -gt $MaxIdleLoad -and -not $Force)
 {
 	throw "machine not idle ($load% > $MaxIdleLoad%). Close other work or pass -Force."
@@ -55,7 +71,7 @@ $benchArgs = @('--model', 'mm', '--rate', '44100', '--mode', 'parallel', '--pace
 function Invoke-Bench([bool]$hold)
 {
 	if($hold) { $env:MD_PAIR_HOLD_DSP2_US = "$HoldUs" }
-	else { Remove-Item Env:MD_PAIR_HOLD_DSP2_US -ErrorAction SilentlyContinue }
+	else { $env:MD_PAIR_HOLD_DSP2_US = '-1' }	# the hold is on by default
 	$out = [IO.Path]::GetTempFileName()
 	$err = [IO.Path]::GetTempFileName()
 	try
