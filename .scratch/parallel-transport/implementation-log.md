@@ -787,6 +787,19 @@ repos) ; remplacé par une moyenne `GetSystemTimes` sur 5 s.
 
 Gates verts (15/15) avec la retenue par défaut.
 
+Base à 102 % : pas une régression. Banc alterné `HEAD` (retenue coupée)
+contre un build de `7f9e71b0` (worktree, option `-CompareExe` du script),
+fenêtre calme (charge 5,2 % au départ) : médiane 101,9 % contre 104,1 %
+(écarts par paire +9,1, −0,4, +0,7, +8,3, +2,8 en faveur de `HEAD`). Le code
+mesuré à 89 % tourne donc lui aussi à ~104 % aujourd'hui : l'écart vient de
+la machine (fréquence, alimentation, charge de fond, réglages du banc non
+notés alors). Un premier essai sur machine qui se calmait (build neuf,
+tests Sift en fond) allait de 154 à 104 % dans les deux bras : la charge de
+fond pèse sur le temps mur, d'où le seuil de charge du script.
+
+Reste : le MM paire ne tient pas le temps réel en banc non cadencé sur cette
+machine (~102-104 %).
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche

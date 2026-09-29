@@ -10,7 +10,11 @@
 # Run it on an idle machine: close the DAW, browsers, builds. The script
 # refuses to start above -MaxIdleLoad percent CPU unless -Force is given.
 #
+# -CompareExe <path> replaces the hold arm with another build of the bench,
+# both arms without the hold: a regression check against an older commit.
+#
 # Usage: .\bench-hold-dsp2.ps1 [-Runs 5] [-Seconds 60] [-Warmup 15] [-HoldUs 30] [-Build]
+#        [-CompareExe <older mdParallelTransportBenchmark.exe>]
 
 param(
 	[int]$Runs = 5,
@@ -18,6 +22,7 @@ param(
 	[int]$Warmup = 15,
 	[double]$HoldUs = 30,
 	[int]$MaxIdleLoad = 10,
+	[string]$CompareExe,
 	[switch]$Build,
 	[switch]$Force
 )
@@ -34,6 +39,8 @@ if($Build)
 	if($LASTEXITCODE -ne 0) { throw "build failed (exit $LASTEXITCODE)" }
 }
 if(-not (Test-Path $exe)) { throw "missing $exe (run with -Build)" }
+if($CompareExe -and -not (Test-Path $CompareExe)) { throw "missing $CompareExe" }
+$armB = if($CompareExe) { 'compare' } else { "hold $HoldUs" }
 
 # The bench finds the MM ROM next to the MD one (--model mm).
 $env:GEARMULATOR_MD_FIRMWARE_BIN = Join-Path $romDir 'elektron_sps1-1uw_os1.63.bin'
@@ -70,13 +77,14 @@ $benchArgs = @('--model', 'mm', '--rate', '44100', '--mode', 'parallel', '--pace
 
 function Invoke-Bench([bool]$hold)
 {
-	if($hold) { $env:MD_PAIR_HOLD_DSP2_US = "$HoldUs" }
+	$runExe = if($hold -and $CompareExe) { $CompareExe } else { $exe }
+	if($hold -and -not $CompareExe) { $env:MD_PAIR_HOLD_DSP2_US = "$HoldUs" }
 	else { $env:MD_PAIR_HOLD_DSP2_US = '-1' }	# the hold is on by default
 	$out = [IO.Path]::GetTempFileName()
 	$err = [IO.Path]::GetTempFileName()
 	try
 	{
-		$p = Start-Process -FilePath $exe -ArgumentList $benchArgs -NoNewWindow -PassThru `
+		$p = Start-Process -FilePath $runExe -ArgumentList $benchArgs -NoNewWindow -PassThru `
 			-RedirectStandardOutput $out -RedirectStandardError $err
 		if(-not $p.WaitForExit($timeoutMs))
 		{
@@ -111,7 +119,7 @@ for($r = 1; $r -le $Runs; ++$r)
 	{
 		$value = Invoke-Bench $hold
 		if($hold) { $on += $value } else { $off += $value }
-		Write-Host ("run {0}/{1} {2,-9} realtime={3:N1}%" -f $r, $Runs, ($(if($hold) { "hold $HoldUs" } else { 'no hold' })), $value)
+		Write-Host ("run {0}/{1} {2,-9} realtime={3:N1}%" -f $r, $Runs, ($(if($hold) { $armB } else { 'no hold' })), $value)
 	}
 }
 
@@ -119,5 +127,5 @@ $mOff = Get-Median $off
 $mOn = Get-Median $on
 Write-Host ''
 Write-Host ("median no hold    {0:N1}%  (min {1:N1}, max {2:N1})" -f $mOff, ($off | Measure-Object -Minimum).Minimum, ($off | Measure-Object -Maximum).Maximum)
-Write-Host ("median hold {0,-5} {1:N1}%  (min {2:N1}, max {3:N1})" -f $HoldUs, $mOn, ($on | Measure-Object -Minimum).Minimum, ($on | Measure-Object -Maximum).Maximum)
-Write-Host ("cost {0:+0.0;-0.0} points (rule: enable if <= ~5)" -f ($mOn - $mOff))
+Write-Host ("median {0,-11}{1:N1}%  (min {2:N1}, max {3:N1})" -f $armB, $mOn, ($on | Measure-Object -Minimum).Minimum, ($on | Measure-Object -Maximum).Maximum)
+Write-Host ("{0} minus no hold: {1:+0.0;-0.0} points" -f $armB, ($mOn - $mOff))
