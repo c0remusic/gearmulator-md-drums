@@ -282,7 +282,7 @@ namespace md
 		while(!m_hostTxTakes.empty()
 			&& m_hardware.hostToDspDeadline(m_index, m_hostTxTakes.front()) <= m_dsp.getCycles())
 		{
-			m_hostTxTakes.pop_front();
+			m_lastHostTxTakeUc = m_hostTxTakes.pop_front();
 			// The UC read the latch this word went to: HOTX frees at that time,
 			// as when the serial bridge moved the word out.
 			if(hdi08().hasTX())

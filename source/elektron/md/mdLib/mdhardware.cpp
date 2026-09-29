@@ -2183,6 +2183,13 @@ namespace md
 		m_pairUcLeadFrames = ucLeadUs >= 0.0 ? usToFrames(ucLeadUs) : m_pairQuantumFrames;
 		if(const char* const minChunk = std::getenv("MD_PAIR_MIN_CHUNK"))
 			m_pairMinChunkCycles = std::max<uint64_t>(1, std::strtoull(minChunk, nullptr, 10));
+		// Experiment, off by default: MD_PAIR_HOLD_DSP2_US=<window> holds both
+		// DSPs at the UC while a DSP2 word is out to the UC and for that many
+		// microseconds of UC time after the UC took it (pairDspLeadUc).
+		const double holdDsp2Us = isMonomachine() ? envUs("MD_PAIR_HOLD_DSP2_US") : -1.0;
+		m_pairHoldDsp2 = holdDsp2Us >= 0.0;
+		m_pairHoldDsp2Uc = m_pairHoldDsp2
+			? static_cast<uint64_t>(usToFrames(holdDsp2Us) * schedUcCyclesPerFrame()) : 0;
 		// Placement. auto keeps this (UC) thread on the physical core it runs on
 		// and the worker on the other cores sharing its last-level cache: on a
 		// Ryzen 3700X that is ~80% of real time for the Monomachine against
@@ -2252,7 +2259,7 @@ namespace md
 		// Lead over the UC (spec §3 gate 3, L_lead): see the gate constants in
 		// schedTryHandoffPair.
 		const uint64_t gate = std::min(schedFrameToDspCycles(i, limit),
-			hostToDspDeadline(i, ucCycles + m_pairDspLeadUc));
+			hostToDspDeadline(i, ucCycles + pairDspLeadUc(ucCycles)));
 		// Where the serial bridge ran a DSP past the UC, its head item lets it
 		// pass the gates by the same envelope: an item due but blocked on HRX
 		// or on the previous command (writeWordToDsp, hdiSendIrqToDSP), and a
@@ -2318,6 +2325,24 @@ namespace md
 		}
 		setBackpressured(true);
 		return std::min(gate, d.dsp().getCycles());
+	}
+
+	uint64_t Hardware::pairDspLeadUc(const uint64_t _ucCycles) const
+	{
+		if(!m_pairHoldDsp2)
+			return m_pairDspLeadUc;
+		// DSP2 exchanges four words with the UC per link burst, each answered
+		// by a host command. A DSP running ahead receives every answer that
+		// much late, which stretches the whole exchange until DSP2 misses a
+		// burst to the mixer. Holding DSP2 alone lets the mixer run ahead and
+		// starve the link, so both DSPs are held (implementation log,
+		// 2026-09-29). Both run on this worker: DSP2's state reads are local.
+		if(m_dspProducer.hostTxInFlight())
+			return 0;
+		const uint64_t take = m_dspProducer.lastHostTxTakeUcCycle();
+		if(take && _ucCycles < take + m_pairHoldDsp2Uc)
+			return 0;
+		return m_pairDspLeadUc;
 	}
 
 	void Hardware::runPairChunk(const uint32_t _dspIndex, const uint64_t _targetCyc)
@@ -2467,8 +2492,8 @@ namespace md
 			return PairIdle::Gathering;
 		const uint64_t targetGate = schedFrameToDspCycles(i,
 			static_cast<double>(m_schedTargetFrames.load(std::memory_order_relaxed)) + m_pairQuantumFrames);
-		const uint64_t ucGate = hostToDspDeadline(i,
-			m_schedPublished.ucCycles.load(std::memory_order_relaxed) + m_pairDspLeadUc);
+		const uint64_t ucCycles = m_schedPublished.ucCycles.load(std::memory_order_relaxed);
+		const uint64_t ucGate = hostToDspDeadline(i, ucCycles + pairDspLeadUc(ucCycles));
 		return targetGate <= ucGate ? PairIdle::BlockTarget : PairIdle::UcGate;
 	}
 

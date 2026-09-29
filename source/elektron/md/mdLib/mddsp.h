@@ -130,6 +130,11 @@ namespace md
 		// read needs (HF2/HF3, HORX depth). The UC reads it without waiting
 		// for the DSP (hdiUcReadIsr), at most the UC's lead over the DSPs stale.
 		void publishHostStatus();
+		// DSP context, threaded MM: whether a HOTX word is out to the UC (a
+		// staged copy whose take the DSP has not acknowledged yet), and the UC
+		// cycle of the latest acknowledged take, 0 before the first.
+		bool hostTxInFlight() const { return m_mmTxStaged; }
+		uint64_t lastHostTxTakeUcCycle() const { return m_lastHostTxTakeUc; }
 		// DSP context: the cycle the oldest pending item becomes applicable,
 		// or UINT64_MAX when nothing is pending.
 		uint64_t hostToDspHeadDeadline() const;
@@ -167,6 +172,7 @@ namespace md
 		// then, as the serial bridge freed it when the UC read the latch).
 		dsp56k::RingBuffer<uint64_t, 16, false, true> m_hostTxTakes;
 		bool m_mmTxStaged = false;			// DSP context: the HOTX word has a staged copy
+		uint64_t m_lastHostTxTakeUc = 0;	// DSP context: UC cycle of the latest acknowledged take
 		// Published host-port state: HF2/HF3 bits in the low byte, HORX depth
 		// above (publishHostStatus).
 		alignas(64) std::atomic<uint32_t> m_hostStatus{0};

@@ -555,6 +555,9 @@ namespace md
 		// reads it - the form a wait predicate may use, since predicates run
 		// under the signal's mutex and must not notify.
 		uint64_t pairGateCycles(uint32_t _dspIndex, bool _update = true);
+		// Pair worker: the DSPs' lead over the UC at UC cycle _ucCycles, in UC
+		// cycles. 0 during a held DSP2 round trip (MD_PAIR_HOLD_DSP2_US).
+		uint64_t pairDspLeadUc(uint64_t _ucCycles) const;
 		// One chunk of a DSP toward _targetCyc on the pair worker.
 		void     runPairChunk(uint32_t _dspIndex, uint64_t _targetCyc);
 		// Audio thread, pair mode: wait until the mixer has produced the codec
@@ -618,6 +621,8 @@ namespace md
 		std::atomic<bool> m_pairPlacementAllowed{false};	// the scheduler runs on a thread the device owns
 		uint64_t m_pairDspLeadUc = 0;			// DSP lead over the UC, in UC cycles (MD_PAIR_LEAD_US)
 		double   m_pairUcLeadFrames = 0.0;		// UC lead over the slower DSP (MD_PAIR_UC_LEAD_US)
+		bool     m_pairHoldDsp2 = false;		// hold both DSPs at the UC during DSP2's round trips (MD_PAIR_HOLD_DSP2_US)
+		uint64_t m_pairHoldDsp2Uc = 0;			// hold window after the UC takes a DSP2 word, in UC cycles
 		size_t   m_pairBpThreshold = 0;
 		uint64_t m_pairBpRelease = 0;
 		alignas(64) std::atomic<bool> m_producerParked{false};
