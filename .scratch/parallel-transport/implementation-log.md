@@ -800,7 +800,42 @@ fond pèse lourd sur le temps mur (un binaire de tests d'un autre projet à
 
 Reste : MM paire à ~89 % du temps réel en banc non cadencé, marge mince.
 
+### Où passe le temps du worker paire (2026-09-29)
+
+Le même binaire mesure de 68 à 94 % selon le moment de la soirée : seuls les
+A/B d'une même séance comparent quelque chose.
+
+Trace (`MDMM_TRANSPORT_TRACE`, ~70 %) : le worker est le goulot. Chunks 84-86 %
+du mur à 2,9-3,7 ns par cycle DSP ; 2 × 101,6 MHz × 2,9 ns / 0,86 ≈ 68 %,
+ce que mesure le banc. L'UC attend le worker 45-48 % du temps (`UC waits
+lead`). Hors chunks, le worker perd ~13 % (`gather` 9 %, `turn` 3 %,
+`ucGate` 1,5 %) : au mieux ~7 points.
+
+Profil PC émulé (`--profile`) : la temporisation `p:$100162` (`do #$c80` +
+`nop`) prend 24-30 % des cycles de chaque DSP ; les scrutations de
+périphériques ~15 % (producer : `$00018d` DDR0, `$000195` PDRC, `$00020a`
+HI08) et ~9 % (mixer : `$00017f` DSR1, `$000237` HI08). Coût hôte de la
+temporisation, mesuré en ramenant son compteur à `#$10` (diagnostic, retiré) :
+~2 points (A/B, 3 paires : 69,4/70,7/71,3 % contre 68,6/68,9/69,2 %). Le JIT
+l'exécute presque gratuitement ; le temps libéré part dans les scrutations.
+
+Profil hôte (`--host-profile`) du worker : `[jit]` 15 %, `waitFor` 26 %,
+`pairGateCycles` 18,6 %, `dspCatchupDeadline` 13,6 %. **Non fiable** : la
+mesure TSC directe de `runPairChunk` (diagnostic, retiré) donne
+`execUntilCycles` = 99,3 % du chunk, `notify()` 0,2 % (52 ticks par chunk,
+1,57 M réveils de l'UC pour 4,0 M chunks), service et publication 0,5 %,
+~12,6 ticks TSC (~3,5 ns) par cycle DSP. Le prédicat d'attente appelle
+`pairGateCycles` 10 fois plus que le chemin avant chunk (50,8 M contre 5,5 M) :
+ces calculs brûlent du CPU pendant l'attente, pas du débit.
+
+Suite : répartir `execUntilCycles` entre code JIT, périphériques (ESSI, DMA,
+HI08, horloge) et rappels du lien, par sondes TSC dans `source/dsp56300`.
+
 ## Leçons dures
+
+- `--host-profile` du banc (RIP échantillonné, sans pile) se trompe sur le
+  worker paire : JIT 15 % là où la mesure TSC en trouve ~99 % dans
+  `execUntilCycles`. Vérifier toute piste du profil hôte par une sonde TSC.
 
 - `mdParallelTransportBenchmark --mode X` écrase `MDMM_TRANSPORT`. MM :
   `--mode pair`, et vérifier `active=1` dans la sortie. Une soirée de mesures
