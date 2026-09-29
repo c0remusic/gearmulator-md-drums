@@ -44,7 +44,8 @@ $armB = if($CompareExe) { 'compare' } else { "hold $HoldUs" }
 
 # The bench finds the MM ROM next to the MD one (--model mm).
 $env:GEARMULATOR_MD_FIRMWARE_BIN = Join-Path $romDir 'elektron_sps1-1uw_os1.63.bin'
-$env:MDMM_TRANSPORT = 'pair'
+# The bench writes --mode into MDMM_TRANSPORT itself: --mode pair below.
+# 'parallel' never engages on the Monomachine and left the machine serial.
 # Default lead and placement: the configuration a user gets.
 Remove-Item Env:MD_PAIR_LEAD_US, Env:MD_PAIR_UC_LEAD_US, Env:MDMM_PAIR_AFFINITY, Env:MD_PAIR_HOLD_DSP2_US -ErrorAction SilentlyContinue
 
@@ -72,14 +73,14 @@ if($load -gt $MaxIdleLoad -and -not $Force)
 }
 
 $timeoutMs = ($Warmup + $Seconds + 120) * 1000
-$benchArgs = @('--model', 'mm', '--rate', '44100', '--mode', 'parallel', '--paced', '0',
+$benchArgs = @('--model', 'mm', '--rate', '44100', '--mode', 'pair', '--paced', '0',
 	'--warmup', $Warmup, '--seconds', $Seconds)
 
 function Invoke-Bench([bool]$hold)
 {
 	$runExe = if($hold -and $CompareExe) { $CompareExe } else { $exe }
 	if($hold -and -not $CompareExe) { $env:MD_PAIR_HOLD_DSP2_US = "$HoldUs" }
-	else { $env:MD_PAIR_HOLD_DSP2_US = '-1' }	# the hold is on by default
+	else { $env:MD_PAIR_HOLD_DSP2_US = '-1' }	# whatever the policy's default
 	$out = [IO.Path]::GetTempFileName()
 	$err = [IO.Path]::GetTempFileName()
 	try
@@ -93,6 +94,11 @@ function Invoke-Bench([bool]$hold)
 		}
 		$line = Select-String -Path $out -Pattern 'realtime=([\d.]+)%' | Select-Object -Last 1
 		if(-not $line) { throw "no realtime line (exit $($p.ExitCode)): $(Get-Content $err -Raw)" }
+		# A serial run measures nothing the hold touches.
+		if(-not (Select-String -Path $out -Pattern 'parallel requested=1 active=1' -Quiet))
+		{
+			throw "pair transport not active in $runExe"
+		}
 		return [double]$line.Matches[0].Groups[1].Value
 	}
 	finally

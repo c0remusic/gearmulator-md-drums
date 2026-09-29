@@ -41,11 +41,12 @@ namespace md
 		// word landed that late. At one quantum (30 us) the GND SIN gates
 		// failed now and then (silent note, clicks), at 45 and 60 us always;
 		// at 10 us the throughput is the same and 0 costs about 25 points.
-		// Monomachine DSP2 hold: a 30 us window took the lone-mixer listening
-		// pattern at a 60 us lead from 8207 dropouts to 10, for +0.2 points of
-		// real time at the 10 us lead (median of 5 alternated runs). The
+		// DSP2 hold, off: a 30 us window takes the lone-mixer listening pattern
+		// at a 60 us lead from 8207 dropouts to 0-10, but costs +12.7 points of
+		// real time at the 10 us lead (88.6% -> 101.3%, median of 5 alternated
+		// pair-mode runs), and at 10 us that pattern drops nothing anyway. The
 		// Machinedrum firmware has no such exchange.
-		inline constexpr TransportPolicy g_monomachinePolicy{30.0, 100'000, 1, 16, 4, 200'000, true, 1.0, 10.0, 30.0};
+		inline constexpr TransportPolicy g_monomachinePolicy{30.0, 100'000, 1, 16, 4, 200'000, true, 1.0, 10.0, -1.0};
 		inline constexpr TransportPolicy g_machinedrumPolicy{125.0, 100'000, 3, 16, 4, 200'000, false, 1.0, 125.0, -1.0};
 	}
 

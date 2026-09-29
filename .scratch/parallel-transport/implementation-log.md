@@ -759,48 +759,52 @@ documenté (test de stress ~1 run sur 80 ; écoute réaliste 0 trou en 28 min ;
 motif dur 0 en 120 s à 10 µs). Ensuite : mesurer la retenue DSP2 sur machine
 au repos, l'activer si elle coûte au plus ~5 points.
 
-### Retenue DSP2 active par défaut (2026-09-29)
+### Retenue DSP2 : mesurée, laissée désactivée (2026-09-29)
 
 Retenue reconstruite (le code d'expérience n'avait jamais été commité) :
 `pairDspLeadUc` rend une avance nulle aux deux DSP tant qu'un mot de DSP2 est
 en vol vers l'UC (copie posée, prise pas encore acquittée par le DSP), puis
 pendant la fenêtre en temps UC après la prise. Tout est lu dans le worker
-paire, qui possède les deux DSP. Politique MM : fenêtre 30 µs
-(`pairHoldDsp2Microseconds`) ; MD : désactivée. `MD_PAIR_HOLD_DSP2_US`
-surcharge, une valeur négative la coupe.
+paire, qui possède les deux DSP. Réglage `pairHoldDsp2Microseconds` de la
+politique, négatif = désactivée (MM et MD) ; `MD_PAIR_HOLD_DSP2_US`
+surcharge.
 
 Contrôle, motif dur `MM_LISTEN_LONE_MIXER`, paire, 120 s : avance 60 µs sans
 retenue 8 207 trous ; avec retenue 30 µs 10 puis 0 (log précédent : 1) ;
-avance par défaut 0.
+avance par défaut 0 avec ou sans retenue.
 
-Coût (`bench-hold-dsp2.ps1`, banc non cadencé, MM paire, 44,1 kHz, avance
-10 µs, 5 paires de runs de 60 s alternées) : médiane 102,4 % sans retenue,
-102,6 % avec, soit +0,2 point (écarts par paire +0,4, +2,2, +0,2, −31,1,
-+1,1 ; la paire 4 a une pointe machine dans le bras sans retenue). Réserve :
-la base est à 102 % contre 89 % dans les mesures précédentes, cause non
-cherchée ; les runs 4-5 montent à 123-132 % dans les deux bras. L'écart A/B
-reste valable, les bras étant alternés.
+Coût (`bench-hold-dsp2.ps1`, banc non cadencé, MM paire active, 44,1 kHz,
+avance 10 µs, 5 paires de runs de 60 s alternées, charge 5,8 % au départ) :
+médiane 88,6 % sans retenue, 101,3 % avec, soit **+12,7 points** (chaque
+paire entre +10 et +15). Règle : au plus ~5 points. Retenue laissée
+désactivée : elle fait passer le MM au-dessus du temps réel, et elle ne
+corrige que le motif amplifié à 60 µs, qui ne perd rien à l'avance par
+défaut.
+
+Fausse piste de la même soirée, à ne pas refaire : `mdParallelTransportBenchmark`
+écrit sa propre option `--mode` dans `MDMM_TRANSPORT` et écrase la variable.
+Lancé avec `--mode parallel`, qui ne s'enclenche jamais sur le MM
+(`parallel requested=1 active=0`), il mesurait le MM en SÉRIE (~102-104 %).
+Ces mesures donnaient +0,2 point pour la retenue (sans objet : elle n'agit
+qu'en paire), ont fait activer la retenue par défaut (`49dd22e7`, défait
+depuis), et ont fait chercher une « régression » de 89 % à 102 % qui
+n'était que la différence entre paire et série. Le banc HEAD contre
+`7f9e71b0` (option `-CompareExe`) a bien montré l'égalité des deux, mais en
+série. Le script passe désormais `--mode pair` et échoue sans `active=1`.
 
 Mesure de charge du script : `Win32_Processor.LoadPercentage` est un
 échantillon instantané (14 à 96 % d'une seconde à l'autre sur machine au
-repos) ; remplacé par une moyenne `GetSystemTimes` sur 5 s.
+repos) ; remplacé par une moyenne `GetSystemTimes` sur 5 s. La charge de
+fond pèse lourd sur le temps mur (un binaire de tests d'un autre projet à
+12 % a fait monter des runs série de 104 à 154 %).
 
-Gates verts (15/15) avec la retenue par défaut.
-
-Base à 102 % : pas une régression. Banc alterné `HEAD` (retenue coupée)
-contre un build de `7f9e71b0` (worktree, option `-CompareExe` du script),
-fenêtre calme (charge 5,2 % au départ) : médiane 101,9 % contre 104,1 %
-(écarts par paire +9,1, −0,4, +0,7, +8,3, +2,8 en faveur de `HEAD`). Le code
-mesuré à 89 % tourne donc lui aussi à ~104 % aujourd'hui : l'écart vient de
-la machine (fréquence, alimentation, charge de fond, réglages du banc non
-notés alors). Un premier essai sur machine qui se calmait (build neuf,
-tests Sift en fond) allait de 154 à 104 % dans les deux bras : la charge de
-fond pèse sur le temps mur, d'où le seuil de charge du script.
-
-Reste : le MM paire ne tient pas le temps réel en banc non cadencé sur cette
-machine (~102-104 %).
+Reste : MM paire à ~89 % du temps réel en banc non cadencé, marge mince.
 
 ## Leçons dures
+
+- `mdParallelTransportBenchmark --mode X` écrase `MDMM_TRANSPORT`. MM :
+  `--mode pair`, et vérifier `active=1` dans la sortie. Une soirée de mesures
+  perdue en série sans le voir (2026-09-29).
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
   PAS le trafic du Controller (status/dump requests, retries wall-clock 2 s)
