@@ -37,6 +37,20 @@ namespace
 			<< " mixerGate=" << hardware.transportWaitClamps(Site::MixerGate)
 			<< " hostAudio unfilled=" << hardware.hostAudioUnderrunCount()
 			<< " dropped=" << hardware.hostAudioOverflowCount() << '\n';
+		// MD_TRANSPORT_DIAGNOSTICS builds: what became of the frames DSP2 sent
+		// DSP1 over the link.
+		const auto score = const_cast<md::Hardware&>(hardware).getTransportScorecard();
+		if(score.enabled)
+		{
+			const auto& l = score.link[1];
+			out << "link DSP2->DSP1 tx=" << l.transmitFrames << " accepted=" << l.acceptedFrames
+				<< " mixerDmaOff=" << l.mmMixerDmaInactiveDrops << " producerDmaOff=" << l.mmProducerDmaInactiveDrops
+				<< " retainedPrefix=" << l.mmRetainedPrefixDrops << " oldEpoch=" << l.mmStrobeChangedDuringCatchUpDrops
+				<< " ringFull=" << l.ringFullDrops << " rxDisabled=" << l.receiverDisabledDrops
+				<< " popped=" << l.poppedFrames << " empty=" << l.emptyReads << " stallPurged=" << l.stallPurgedFrames
+				<< " strobePurged=" << l.mmStrobePurgedFrames << " maxDepth=" << l.maximumRingDepth
+				<< " strobeEpoch=" << score.mmStrobeEpoch << '\n';
+		}
 	}
 
 	void reportLastRender(std::ostream& out)
@@ -222,6 +236,151 @@ namespace
 		tap(hardware, md::PanelControl::Exit);
 	}
 
+	// Long listening run (MM_LISTEN_SECONDS, default 600): the six GND SIN
+	// tracks retriggered like a sequenced clip, with automation-rate CC
+	// traffic, rendered block by block as a DAW does. Counts dropouts: runs
+	// of exact zeros on both channels with sound on both sides, the trace of
+	// a missed link burst (16 frames).
+	int listen(md::Hardware& hardware)
+	{
+		const char* const secondsEnv = std::getenv("MM_LISTEN_SECONDS");
+		const uint64_t totalFrames = (secondsEnv ? std::strtoull(secondsEnv, nullptr, 10) : 600) * md::g_samplerate;
+		std::array<std::array<float, 256>, 2> samples{};
+		synthLib::TAudioOutputs outputs{};
+		outputs[0] = samples[0].data();
+		outputs[1] = samples[1].data();
+		const auto send = [&](const uint8_t _status, const uint8_t _a, const uint8_t _b)
+		{
+			require(hardware.sendMidi(synthLib::SMidiEvent(synthLib::MidiEventSource::Host, _status, _a, _b)),
+				"listen MIDI rejected");
+		};
+		// Peak of both channels per frame, from frame 'base' on.
+		std::vector<float> level;
+		uint64_t base = 0, scanned = 0, dropouts = 0;
+		std::array<uint64_t, 5> lengths{};	// 8-15, 16, 17-31, 32, 33-64 frames
+		const auto rms = [&](const uint64_t _from, const uint64_t _to)
+		{
+			double sum = 0;
+			for(uint64_t f = _from; f < _to; ++f)
+				sum += double(level[f - base]) * level[f - base];
+			return std::sqrt(sum / double(_to - _from));
+		};
+		// A 32-step loop of 16th notes at 120 BPM (4 s): 16 dense steps, each
+		// retriggering one track, then all notes off for a second of silence
+		// (the link idles), then a lone note for the last second. A CC burst
+		// on all tracks starts each part, as a DAW sends when a clip starts.
+		constexpr uint64_t stepFrames = 5512;
+		constexpr uint64_t ccFrames = 1024;		// automation rate
+		// MM_LISTEN_LONE_MIXER: instead, a 1 s loop of half a second of
+		// silence and a lone note on a mixer DSP track (4-6) while DSP2 plays
+		// nothing, the state of the one residual GND SIN failure (track 6
+		// alone after silence). It drops link bursts constantly once the DSPs
+		// lead the UC by 60 us.
+		const bool loneMixer = std::getenv("MM_LISTEN_LONE_MIXER") != nullptr;
+		std::array<uint8_t, 6> held{};
+		uint64_t nextStep = 0, nextCc = 0, step = 0, cc = 0;
+		const auto noteOff = [&](const uint8_t _track)
+		{
+			if(held[_track])
+				send(static_cast<uint8_t>(0x80 | _track), held[_track], 0);
+			held[_track] = 0;
+		};
+		const auto noteOn = [&](const uint8_t _track)
+		{
+			noteOff(_track);
+			held[_track] = static_cast<uint8_t>(48 + (step * 7) % 25);
+			send(static_cast<uint8_t>(0x90 | _track), held[_track], 100);
+		};
+		const auto burst = [&]
+		{
+			for(uint8_t track = 0; track < 6; ++track)
+				send(static_cast<uint8_t>(0xb0 | track), 7, static_cast<uint8_t>(100 + (step + track) % 28));
+		};
+		for(uint64_t frame = 0; frame < totalFrames; frame += 256)
+		{
+			if(loneMixer && frame >= nextStep)
+			{
+				const uint64_t inLoop = step % 8;
+				const auto track = static_cast<uint8_t>(3 + (step / 8) % 3);
+				if(inLoop == 4)
+				{
+					burst();
+					noteOn(track);
+				}
+				else if(inLoop == 0 && step)
+					noteOff(static_cast<uint8_t>(3 + (step / 8 - 1) % 3));
+				++step;
+				nextStep += stepFrames;
+			}
+			else if(frame >= nextStep)
+			{
+				const uint64_t inLoop = step % 32;
+				if(inLoop == 0 || inLoop == 16 || inLoop == 24)
+					burst();
+				const auto lone = static_cast<uint8_t>((step / 32) % 6);
+				if(inLoop < 16)
+					noteOn(static_cast<uint8_t>(step % 6));
+				else if(inLoop == 16)
+					for(uint8_t track = 0; track < 6; ++track)
+						noteOff(track);
+				else if(inLoop == 24)
+					noteOn(lone);
+				else if(inLoop == 31)
+					noteOff(lone);
+				++step;
+				nextStep += stepFrames;
+			}
+			if(frame >= nextCc)
+			{
+				send(static_cast<uint8_t>(0xb0 | (cc % 6)), 7, static_cast<uint8_t>(90 + (cc * 5) % 38));
+				++cc;
+				nextCc += ccFrames;
+			}
+			hardware.processAudio(outputs, 256, 0);
+			for(size_t i = 0; i < 256; ++i)
+			{
+				require(std::isfinite(samples[0][i]) && std::isfinite(samples[1][i]), "non-finite MM audio");
+				level.push_back(std::max(std::abs(samples[0][i]), std::abs(samples[1][i])));
+			}
+			const uint64_t end = base + level.size();
+			while(scanned + 128 <= end)
+			{
+				if(level[scanned - base] != 0.0f)
+				{
+					++scanned;
+					continue;
+				}
+				uint64_t stop = scanned;
+				while(stop < end && level[stop - base] == 0.0f)
+					++stop;
+				const uint64_t length = stop - scanned;
+				if(stop + 64 > end && length <= 64)
+					break;	// judge once the sound after it is rendered
+				if(length >= 8 && length <= 64 && scanned >= base + 64
+					&& rms(scanned - 64, scanned) > 1e-4 && rms(stop, stop + 64) > 1e-4)
+				{
+					++dropouts;
+					++lengths[length < 16 ? 0 : length == 16 ? 1 : length < 32 ? 2 : length == 32 ? 3 : 4];
+					std::cout << "dropout at frame " << scanned << " (" << double(scanned) / md::g_samplerate
+						<< " s, block " << scanned / 256 << '+' << scanned % 256 << ") length " << length << '\n';
+				}
+				scanned = stop;
+			}
+			if(scanned > base + 16384)
+			{
+				level.erase(level.begin(), level.begin() + 8192);
+				base += 8192;
+			}
+			if(frame % (md::g_samplerate * 60) < 256)
+				std::cout << "listen " << frame / md::g_samplerate << " s, dropouts " << dropouts << '\n' << std::flush;
+		}
+		std::cout << "listen seconds=" << totalFrames / md::g_samplerate << " dropouts=" << dropouts
+			<< " lengths 8-15=" << lengths[0] << " 16=" << lengths[1] << " 17-31=" << lengths[2]
+			<< " 32=" << lengths[3] << " 33-64=" << lengths[4] << '\n';
+		reportExpiredWaits(std::cout, hardware);
+		return dropouts ? 1 : 0;
+	}
+
 	void testAudioInput(md::Hardware& hardware)
 	{
 		const auto settle = [&](uint32_t frames) {
@@ -289,7 +448,8 @@ int main(int argc, char** argv)
 	const bool sine = sineMidi || (argc == 2 && std::string_view(argv[1]) == "--sine");
 	const bool ensemble = argc == 2 && std::string_view(argv[1]) == "--digipro-ensemble";
 	const bool digipro = ensemble || (argc == 2 && std::string_view(argv[1]) == "--digipro");
-	if(argc != 1 && !sine && !digipro && !input)
+	const bool listening = argc == 2 && std::string_view(argv[1]) == "--listen";
+	if(argc != 1 && !sine && !digipro && !input && !listening)
 		return 2;
 	const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
 	if(!path || !*path)
@@ -308,9 +468,11 @@ int main(int argc, char** argv)
 		auto& hardware = *machine;
 		advance(hardware, md::g_samplerate * 20);
 		require(hardware.isAudioReady() && hardware.isFirmwareMidiReady(), "MM boot incomplete");
-		if(sine || digipro || input)
+		if(sine || digipro || input || listening)
 			loadEmptyKit(hardware);
 		if(input) { testAudioInput(hardware); return 0; }
+		if(listening)
+			return listen(hardware);
 		if(sineMidi)
 		{
 			// Manufacturer manual, Appendix C: machine 01 is GND-SIN, and
