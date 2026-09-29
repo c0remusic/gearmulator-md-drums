@@ -2183,11 +2183,11 @@ namespace md
 		m_pairUcLeadFrames = ucLeadUs >= 0.0 ? usToFrames(ucLeadUs) : m_pairQuantumFrames;
 		if(const char* const minChunk = std::getenv("MD_PAIR_MIN_CHUNK"))
 			m_pairMinChunkCycles = std::max<uint64_t>(1, std::strtoull(minChunk, nullptr, 10));
-		// Experiment, off by default: MD_PAIR_HOLD_DSP2_US=<window> holds both
-		// DSPs at the UC while a DSP2 word is out to the UC and for that many
-		// microseconds of UC time after the UC took it (pairDspLeadUc).
-		const double holdDsp2Us = isMonomachine() ? envUs("MD_PAIR_HOLD_DSP2_US") : -1.0;
-		m_pairHoldDsp2 = holdDsp2Us >= 0.0;
+		// DSP2 round-trip hold (pairDspLeadUc), window in microseconds of UC
+		// time. MD_PAIR_HOLD_DSP2_US overrides the policy; negative disables.
+		const char* const holdEnv = std::getenv("MD_PAIR_HOLD_DSP2_US");
+		const double holdDsp2Us = holdEnv ? std::atof(holdEnv) : policy.pairHoldDsp2Microseconds;
+		m_pairHoldDsp2 = isMonomachine() && holdDsp2Us >= 0.0;
 		m_pairHoldDsp2Uc = m_pairHoldDsp2
 			? static_cast<uint64_t>(usToFrames(holdDsp2Us) * schedUcCyclesPerFrame()) : 0;
 		// Placement. auto keeps this (UC) thread on the physical core it runs on

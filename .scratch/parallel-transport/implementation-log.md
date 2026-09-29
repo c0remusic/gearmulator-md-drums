@@ -759,6 +759,34 @@ documenté (test de stress ~1 run sur 80 ; écoute réaliste 0 trou en 28 min ;
 motif dur 0 en 120 s à 10 µs). Ensuite : mesurer la retenue DSP2 sur machine
 au repos, l'activer si elle coûte au plus ~5 points.
 
+### Retenue DSP2 active par défaut (2026-09-29)
+
+Retenue reconstruite (le code d'expérience n'avait jamais été commité) :
+`pairDspLeadUc` rend une avance nulle aux deux DSP tant qu'un mot de DSP2 est
+en vol vers l'UC (copie posée, prise pas encore acquittée par le DSP), puis
+pendant la fenêtre en temps UC après la prise. Tout est lu dans le worker
+paire, qui possède les deux DSP. Politique MM : fenêtre 30 µs
+(`pairHoldDsp2Microseconds`) ; MD : désactivée. `MD_PAIR_HOLD_DSP2_US`
+surcharge, une valeur négative la coupe.
+
+Contrôle, motif dur `MM_LISTEN_LONE_MIXER`, paire, 120 s : avance 60 µs sans
+retenue 8 207 trous ; avec retenue 30 µs 10 puis 0 (log précédent : 1) ;
+avance par défaut 0.
+
+Coût (`bench-hold-dsp2.ps1`, banc non cadencé, MM paire, 44,1 kHz, avance
+10 µs, 5 paires de runs de 60 s alternées) : médiane 102,4 % sans retenue,
+102,6 % avec, soit +0,2 point (écarts par paire +0,4, +2,2, +0,2, −31,1,
++1,1 ; la paire 4 a une pointe machine dans le bras sans retenue). Réserve :
+la base est à 102 % contre 89 % dans les mesures précédentes, cause non
+cherchée ; les runs 4-5 montent à 123-132 % dans les deux bras. L'écart A/B
+reste valable, les bras étant alternés.
+
+Mesure de charge du script : `Win32_Processor.LoadPercentage` est un
+échantillon instantané (14 à 96 % d'une seconde à l'autre sur machine au
+repos) ; remplacé par une moyenne `GetSystemTimes` sur 5 s.
+
+Gates verts (15/15) avec la retenue par défaut.
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
