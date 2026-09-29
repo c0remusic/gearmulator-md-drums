@@ -831,7 +831,67 @@ ces calculs brûlent du CPU pendant l'attente, pas du débit.
 Suite : répartir `execUntilCycles` entre code JIT, périphériques (ESSI, DMA,
 HI08, horloge) et rappels du lien, par sondes TSC dans `source/dsp56300`.
 
+### Sondes TSC, sauts dans les rattrapages, PFLUSH (2026-09-30)
+
+Sondes TSC dans `source/dsp56300` (option CMake `DSP56K_TSC_PROBES`,
+désactivée par défaut ; build `temp/cmake_probe`, `DSP56K_PROBE_LEVEL` 0 =
+racines seules, 1 = tout). Chaque `rdtsc` impute le temps écoulé à la portée
+la plus interne ; le coût des sondes est calibré et retiré au rapport. Coût
+au mur : niveau 0 +5,6 %, niveau 1 +9,7 %.
+
+Répartition du worker paire (niveau 0, avant correctifs) : producer 36,7 % du
+mur (2,90 ns/cycle), mixer propre 28,1 % (2,99), mixer rattrapé dans une
+livraison de lien 16,7 % à 5,13 ns/cycle (359 k rattrapages/s), parking
+14,75 %, hors chunks 2,5 %. Niveau 1 : JIT natif et dispatch ~1,5 ns/cycle
+(~31 %), périphériques ~27 % (1,1 à 1,9 M appels/s, 63 à 97 ns), PFLUSH
+1,1 µs par appel (~2,2 %), vérification de mode ~0,8 %.
+
+Cause du surcoût des rattrapages : `skipNopLoop` et `skipPollLoop` sont bornés
+par `m_skipLimitCycles`, non nul seulement dans `execUntilCycles`. La boucle
+de rattrapage MM avance le consommateur bloc par bloc avec `exec()` : aucun
+saut n'y franchissait une sortie vers le dispatcher (13 M appels imbriqués de
+`skipPollLoop`, 0 actif), chaque itération de scrutation y coûtait un bloc.
+
+Correctifs :
+- A : `DSP::setSkipLimitCycles`. La boucle de rattrapage MM borne les sauts au
+  plus proche de sa cible, de son clamp et du prochain item hôte, seuls points
+  où elle agit entre deux blocs.
+- B : PFLUSH n'émet plus rien. Le cache d'instructions n'est jamais lu
+  (`InstructionCache::fetch` jamais appelé).
+- Relecture adverse : A et B exacts. Elle a trouvé PDRD (`$ffffad`) parmi les
+  registres scrutables, alors que le port D de DSP2 suit son compteur
+  d'instructions (horloge simulée pour la sonde de rôle du boot) : une boucle
+  de scrutation sur PDRD sortait trop tard. Défaut antérieur, PDRD retiré ;
+  aucune boucle PDRD en régime (moins de 1 % des lectures).
+
+Mesures (banc non cadencé, MM paire active, 44,1 kHz, paires de 30 s
+alternées contre le binaire d'avant les correctifs ; charge de fond 17 à
+26 %, un serveur vite d'un autre projet sur 2,7 à 3,9 cœurs, stable) :
+- A+B : médiane 78,7 % → 74,5 % (−4,2 points), chacune des 6 paires gagne
+  (2,0 à 7,5).
+- A+B+PDRD, livré : 73,6 % → 70,5 % (−3,1 points), chacune des 6 paires
+  gagne (0,9 à 4,7).
+- Sondes niveau 0, A+B : rattrapé 17,0 % → 13,3 % du mur, 5,21 → 3,93
+  ns/cycle, cycles sautés 20 → 35 % (comme en propre), scrutations sautées
+  0 → 1,3 M, lectures MMIO imbriquées 626 k/s → 313 k/s. Parking 14,5 → 18 % :
+  le worker attend davantage l'UC.
+- Écoute du motif dur (`MM_LISTEN_LONE_MIXER`, paire, avance par défaut,
+  120 s) : 0 trou et 0 attente expirée, sur A+B comme sur le livré.
+
+Reste : un cycle rattrapé coûte encore 6,1 ns par cycle exécuté contre 4,4 en
+propre (boucle bloc par bloc, contrôle du backlog à chaque bloc). Suite :
+répartir les périphériques (~27 %).
+
 ## Leçons dures
+
+- PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
+  une variable VIDE que l'enfant voit (`getenv` rend `""`). Avec
+  `MD_PAIR_LEAD_US=""` et `MD_PAIR_UC_LEAD_US=""`, les deux avances de paire
+  valent 0 : UC et worker s'attendent à la bascule, le MM se fige au boot.
+  `MDMM_TRANSPORT=""` vaut Serial. Chaque appel d'outil part d'un
+  environnement vierge : ne rien « effacer », ou `Remove-Item Env:`. Une
+  soirée de fausse régression, bissectée à tort dans le code (2026-09-30).
+
 
 - `--host-profile` du banc (RIP échantillonné, sans pile) se trompe sur le
   worker paire : JIT 15 % là où la mesure TSC en trouve ~99 % dans
