@@ -41,6 +41,9 @@ namespace md
 		, m_dsp(m_memory, &m_periphX, &m_periphNop)
 		, m_boot(m_dsp)
 	{
+#ifdef DSP56K_TSC_PROBES
+		m_dsp.setProbeId(_index & 1);
+#endif
 		if(!_hw.isValid())
 			return;
 

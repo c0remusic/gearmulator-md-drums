@@ -2358,7 +2358,20 @@ namespace md
 		const uint64_t hostEvent = d.nextHostTransportCycle();
 		if(hostEvent > now)
 			stopCyc = std::min(stopCyc, hostEvent);
+#ifdef DSP56K_TSC_PROBES
+		const uint64_t probeCycles[2] = {m_dspMixer.dsp().getCycles(), m_dspProducer.dsp().getCycles()};
+		{
+			DSP_PROBE_SCOPE(0, Exec, i);
+			d.dsp().execUntilCycles(stopCyc);
+		}
+		if(auto* const probeCtx = dsp56k::probe::t_ctx)
+		{
+			probeCtx->cycles[i][0] += ((i == 0) ? m_dspMixer : m_dspProducer).dsp().getCycles() - probeCycles[i];
+			probeCtx->cycles[i ^ 1][1] += ((i == 0) ? m_dspProducer : m_dspMixer).dsp().getCycles() - probeCycles[i ^ 1];
+		}
+#else
 		d.dsp().execUntilCycles(stopCyc);
+#endif
 		// Both: the link catch-ups inside may have run the other DSP too.
 		m_dspMixer.publishHostStatus();
 		m_dspProducer.publishHostStatus();
@@ -2366,6 +2379,133 @@ namespace md
 		m_schedPublished.dspCycles[1].store(m_dspProducer.dsp().getCycles(), std::memory_order_release);
 		m_signal.notify();
 	}
+
+#ifdef DSP56K_TSC_PROBES
+	namespace
+	{
+		// Pair worker TSC probe session (dsp56kBase/tscprobe.h): installed for the
+		// worker's lifetime, reported to stderr when the worker exits.
+		struct PairProbeSession
+		{
+			dsp56k::probe::Ctx ctx;
+			dsp56k::DSP* dsps[2];
+			dsp56k::probe::Counters start[2];
+			uint64_t tscStart = 0;
+			std::chrono::steady_clock::time_point wallStart;
+
+			PairProbeSession(dsp56k::DSP& _mixer, dsp56k::DSP& _producer) : dsps{&_mixer, &_producer}
+			{
+				const char* const level = std::getenv("DSP56K_PROBE_LEVEL");
+				ctx.level = static_cast<uint8_t>(level ? std::atoi(level) : 1);
+				dsp56k::probe::t_ctx = &ctx;
+				dsp56k::probe::calibrate(ctx);
+				start[0] = _mixer.probeCounters();
+				start[1] = _producer.probeCounters();
+				wallStart = std::chrono::steady_clock::now();
+				tscStart = dsp56k::probe::now();
+				ctx.last = tscStart;
+			}
+
+			~PairProbeSession()
+			{
+				using namespace dsp56k::probe;
+				const uint64_t tscEnd = now();
+				ctx.bucket(ctx.curDsp, ctx.curCat).self += tscEnd - ctx.last;
+				t_ctx = nullptr;
+				const double wallNs = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+					std::chrono::steady_clock::now() - wallStart).count());
+				const double ticks = static_cast<double>(tscEnd - tscStart);
+				const double nsPerTick = wallNs / ticks;
+				// Calibrate again on a warm core and keep the cheaper cost: the
+				// corrected figures stay upper bounds either way.
+				Ctx late{ctx.level};
+				calibrate(late);
+				const double startIn = ctx.kIn, startOut = ctx.kOut;
+				ctx.kIn = std::min(ctx.kIn, late.kIn);
+				ctx.kOut = std::min(ctx.kOut, late.kOut);
+				uint32_t clamped = 0;
+				const auto corrected = [&](const Bucket& _b)
+				{
+					const double v = static_cast<double>(_b.self) - static_cast<double>(_b.calls) * ctx.kIn
+						- static_cast<double>(_b.childEnters) * ctx.kOut;
+					if(v < 0.0)
+						++clamped;
+					return std::max(0.0, v);
+				};
+				std::fprintf(stderr, "[probe] level=%u wall=%.2fs ticks/ns=%.3f kIn=%.1f kOut=%.1f ticks (start %.1f/%.1f, end %.1f/%.1f)\n",
+					ctx.level, wallNs * 1e-9, 1.0 / nsPerTick, ctx.kIn, ctx.kOut, startIn, startOut, late.kIn, late.kOut);
+				double sumCorrected = 0.0;
+				for(uint32_t d = 0; d < 2; ++d)
+					for(uint32_t n = 0; n < 2; ++n)
+						for(uint32_t c = 0; c < Calib; ++c)
+							sumCorrected += corrected(ctx.acc[d][n][c]);
+				std::fprintf(stderr, "[probe] corrected ticks cover %.1f%% of wall (rest: probe cost)\n", 100.0 * sumCorrected / ticks);
+				std::fprintf(stderr, "[probe] worker: park wall%%=%.2f (%llu parks) | outside chunks wall%%=%.2f\n",
+					100.0 * corrected(ctx.acc[0][0][Park]) / ticks, static_cast<unsigned long long>(ctx.acc[0][0][Park].calls),
+					100.0 * corrected(ctx.acc[0][0][Outside]) / ticks);
+				static const char* const dspNames[2] = {"mixer", "producer"};
+				for(uint32_t d = 0; d < 2; ++d)
+				{
+					const auto& e = dsps[d]->probeCounters();
+					const auto& s = start[d];
+					const auto diff = [](const uint64_t _a, const uint64_t _b) { return static_cast<unsigned long long>(_a - _b); };
+					for(uint32_t n = 0; n < 2; ++n)
+					{
+						const uint32_t k = n ? 0 : 1;	// skip counters are indexed [nested, own]
+						const double cyc = static_cast<double>(ctx.cycles[d][n]);
+						const double skipped = static_cast<double>(diff(e.nopSkipped[k], s.nopSkipped[k]) + diff(e.pollSkipped[k], s.pollSkipped[k]));
+						const double executed = std::max(1.0, cyc - skipped);
+						double dspSum = 0.0;
+						for(uint32_t c = Exec; c < Calib; ++c)
+							dspSum += corrected(ctx.acc[d][n][c]);
+						std::fprintf(stderr, "[probe] %s %s: cycles=%.0f (%.1f M/s, %.1f%% skipped) wall share=%.1f%% ns/cycle=%.3f ns/executed cycle=%.3f\n",
+							dspNames[d], n ? "nested" : "own", cyc, cyc / wallNs * 1e3, cyc > 0 ? 100.0 * skipped / cyc : 0.0,
+							100.0 * dspSum / ticks, cyc > 0 ? dspSum * nsPerTick / cyc : 0.0, cyc > 0 ? dspSum * nsPerTick / executed : 0.0);
+						for(uint32_t c = Exec; c < Calib; ++c)
+						{
+							const auto& b = ctx.acc[d][n][c];
+							if(!b.calls && !b.self)
+								continue;
+							const double v = corrected(b);
+							std::fprintf(stderr, "[probe]   %-10s calls=%12llu (%8.0f/s) wall%%=%6.2f ns/call=%8.1f ns/cycle=%6.3f\n",
+								catName(c), static_cast<unsigned long long>(b.calls), static_cast<double>(b.calls) / wallNs * 1e9,
+								100.0 * v / ticks, b.calls ? v * nsPerTick / static_cast<double>(b.calls) : 0.0,
+								cyc > 0 ? v * nsPerTick / cyc : 0.0);
+						}
+					}
+					std::fprintf(stderr, "[probe] %s callbacks: periph=%llu intr=%llu prevent=%llu nop=%llu | periphDue=%llu intrEmpty=%llu intrMasked=%llu modeChecks=%llu\n",
+						dspNames[d], diff(e.checks[0], s.checks[0]), diff(e.checks[1], s.checks[1]), diff(e.checks[2], s.checks[2]),
+						diff(e.checks[3], s.checks[3]), diff(e.periphDue, s.periphDue), diff(e.intrEmpty, s.intrEmpty),
+						diff(e.intrMasked, s.intrMasked), diff(e.modeChecks, s.modeChecks));
+					std::fprintf(stderr, "[probe] %s untimed scope entries (level too low):", dspNames[d]);
+					for(uint32_t c = Exec; c < Calib; ++c)
+						if(ctx.untimedCalls[d][c])
+							std::fprintf(stderr, " %s=%llu", catName(c), static_cast<unsigned long long>(ctx.untimedCalls[d][c]));
+					std::fprintf(stderr, "\n");
+					for(uint32_t n = 0; n < 2; ++n)
+					{
+						const uint32_t k = n ? 0 : 1;	// counters are indexed [nested, own]
+						std::fprintf(stderr, "[probe] %s %s skips: nop calls=%llu skippedCycles=%llu | poll calls=%llu acted=%llu skippedCycles=%llu\n",
+							dspNames[d], n ? "nested" : "own", diff(e.nopCalls[k], s.nopCalls[k]), diff(e.nopSkipped[k], s.nopSkipped[k]),
+							diff(e.pollCalls[k], s.pollCalls[k]), diff(e.pollActed[k], s.pollActed[k]), diff(e.pollSkipped[k], s.pollSkipped[k]));
+						uint64_t reads = 0;
+						for(uint32_t r = 0; r < 128; ++r)
+							reads += ctx.mmioReads[d][n][r];
+						std::fprintf(stderr, "[probe] %s %s mmio reads=%llu (%.0f/s):", dspNames[d], n ? "nested" : "own",
+							static_cast<unsigned long long>(reads), static_cast<double>(reads) / wallNs * 1e9);
+						for(uint32_t r = 0; r < 128; ++r)
+						{
+							if(ctx.mmioReads[d][n][r] && ctx.mmioReads[d][n][r] * 100 >= reads)
+								std::fprintf(stderr, " $ffff%02x=%llu", 0x80 + r, static_cast<unsigned long long>(ctx.mmioReads[d][n][r]));
+						}
+						std::fprintf(stderr, "\n");
+					}
+				}
+				std::fprintf(stderr, "[probe] buckets clamped by the correction: %u\n", clamped);
+			}
+		};
+	}
+#endif
 
 	void Hardware::pairWorkerLoop()
 	{
@@ -2384,6 +2524,9 @@ namespace md
 		dsp56k::ThreadTools::setCurrentThreadName("MD DSPs");
 		if(m_pairWorkerAffinity)
 			dsp56k::ThreadTools::setCurrentThreadAffinity(m_pairWorkerAffinity);
+#ifdef DSP56K_TSC_PROBES
+		PairProbeSession probeSession(m_dspMixer.dsp(), m_dspProducer.dsp());
+#endif
 		const bool trace = m_transportTrace;
 		std::array<uint64_t, 2> gate{};
 		const auto runnable = [&](const uint32_t _i)
@@ -2440,10 +2583,13 @@ namespace md
 					return ((_i == 0) ? m_dspMixer : m_dspProducer).dsp().getCycles() + minChunk
 						<= pairGateCycles(_i, false);
 				};
-				m_signal.waitFor(std::chrono::microseconds(500), [&]
 				{
-					return m_workerExit.load(std::memory_order_acquire) || wouldRun(0) || wouldRun(1);
-				});
+					DSP_PROBE_SCOPE(0, Park, 0);
+					m_signal.waitFor(std::chrono::microseconds(500), [&]
+					{
+						return m_workerExit.load(std::memory_order_acquire) || wouldRun(0) || wouldRun(1);
+					});
+				}
 				if(trace)
 				{
 					m_timeTrace.workerParks.fetch_add(1, std::memory_order_relaxed);
@@ -3179,6 +3325,9 @@ namespace md
 			score.requestedCycles += requested;
 			score.maximumRequestedCycles = std::max(score.maximumRequestedCycles, requested););
 		m_schedInLinkDelivery = true;
+#ifdef DSP56K_TSC_PROBES
+		const auto probeToken = dsp56k::probe::enter(0, dsp56k::probe::CatchUp, c);
+#endif
 		const bool bpGate = isMonomachine();
 		// A consumer on the pair worker gets its UC items through the dated
 		// stream: land them on the way at their deadlines, as its own chunks do.
@@ -3234,6 +3383,9 @@ namespace md
 			}
 			d.dsp().setSkipLimitCycles(0);
 		}
+#ifdef DSP56K_TSC_PROBES
+		dsp56k::probe::leave(probeToken);
+#endif
 		m_schedInLinkDelivery = false;
 		MD_TRANSPORT_RECORD(const auto executed = d.dsp().getCycles() - startCyc;
 			score.executedCycles += executed;
