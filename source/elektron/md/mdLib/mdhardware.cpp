@@ -3204,6 +3204,19 @@ namespace md
 		}
 		else
 		{
+			// Between two blocks this loop acts only at targetCyc, clampStop and
+			// nextHostItem. The consumer grows the host backlog only by writing
+			// HOTX, which NOP and polling loops never do; in pair mode the UC
+			// thread moves it too, but at no particular DSP cycle, so checking it
+			// at every block never pinned that down either. Let those loops skip
+			// up to the nearest of the three, as the consumer's own chunks let
+			// them skip up to the chunk target. Without it every polling
+			// iteration of a catch-up ran as a block of its own.
+			const auto skipLimit = [&]
+			{
+				return std::min(std::min(targetCyc, clampStop), nextHostItem);
+			};
+			d.dsp().setSkipLimitCycles(skipLimit());
 			while(d.dsp().getCycles() < targetCyc && d.dsp().getCycles() < clampStop
 				&& d.hostTxBacklog() <= policy.hostTransmitBackpressureThresholdWords)
 			{
@@ -3215,9 +3228,11 @@ namespace md
 					// chunk or HRX read edge, not at every instruction.
 					if(nextHostItem <= d.dsp().getCycles())
 						nextHostItem = std::numeric_limits<uint64_t>::max();
+					d.dsp().setSkipLimitCycles(skipLimit());
 				}
 				d.dsp().exec();
 			}
+			d.dsp().setSkipLimitCycles(0);
 		}
 		m_schedInLinkDelivery = false;
 		MD_TRANSPORT_RECORD(const auto executed = d.dsp().getCycles() - startCyc;
