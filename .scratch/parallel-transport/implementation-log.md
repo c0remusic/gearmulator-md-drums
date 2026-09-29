@@ -695,6 +695,70 @@ Trafic mesuré, run complet du test : ~570 000 commandes et ~18 M mots de
 données par DSP ; 65 commandes par run attendent plus de 256 trames (vidange
 HORX jusqu'à l'échéance de 4 clamps).
 
+### Écoute longue et mécanisme (2026-09-28/29)
+
+Retenue levée à la réponse de l'UC (première poussée vers le DSP après la
+prise) au lieu d'une fenêtre fixe : pas moins chère (banc à avance 10 µs :
+94-99 % contre 89 % sans retenue et 89-96 % en fenêtre fixe). Les échanges
+forment des chaînes : lever la retenue à chaque commande rend l'avance au DSP,
+que le mot suivant reprend aussitôt.
+
+Protocole mesuré (statistiques des prises côté UC) : DSP2 envoie ~2 500 fois
+par seconde (une fois par rafale de 16 trames) la suite de mots 02, 00, 01,
+fe ; l'UC répond par les commandes hôte 0c (toujours, 2,1 µs), 14 (une fois
+sur deux, 15 µs), 10 (5 µs), 12 (7,4 µs). DSP1 envoie ~2 700 mots par
+seconde (015c, 21ff-3155...), réponses 10/12/14 une fois sur deux. Après un mot de DSP2, l'UC pousse
+aussi vers DSP1 en 0,8-3,2 µs.
+
+Nouveau mode `mmAudioFirmwareTest --listen` (`MM_LISTEN_SECONDS`) : six pistes
+GND SIN en boucle de 4 s (partie dense, seconde de silence, note seule), CC7
+toutes les 23 ms, rendu continu ; compte les trous (zéros exacts sur les deux
+canaux, 8 à 64 trames, du son de part et d'autre). Contrôle positif à avance
+60 µs : 71-73 trous en 120 s, tous de 16 trames. Sans silences dans le motif :
+0 trou même à 60 µs (le lien ne passe jamais au repos). Avance 10 µs (défaut) :
+0 trou en 2 × 840 s ; série : 0 en 660 s.
+
+`MM_LISTEN_LONE_MIXER` : boucle de 1 s, demi-seconde de silence puis note seule
+sur une piste de DSP1 (4 à 6, DSP2 sans voix), l'état du seul échec résiduel
+du test sine (piste 6 seule après un silence). Avance 60 µs : ~10 000 trous en
+120 s ; 30 µs : 1 ; 20 µs : 0 ; 10 µs : 0.
+
+Écarté sur ce déclencheur à 60 µs :
+- Strobe vu tard par DSP2 (boîte aux lettres non datée, DSP2 en avance sur
+  DSP1) : plafonner DSP2 à la position de DSP1 supprime les retards, pas les
+  trous (8 587).
+- DMA1 armé tard : de la lecture du strobe à l'armement, toujours moins d'un
+  quart de trame.
+- Écart entre DSP1 et DSP2 : borné à 0,25 ou 0,5 trame, ~7 700 trous.
+- DSP2 attendant un mot de l'UC : file vide, aucune commande en cours dans
+  97 % des échantillons pendant les retards.
+- Allers-retours de DSP1 : les retenir ne change rien (4 040).
+
+Retenue sur les allers-retours de DSP2, appliquée aux deux DSP : fenêtre fixe
+30 µs → 1 trou ; fenêtre 8 µs levée à la commande → 46 ; 2 µs → 42 962 (la
+retenue cesse juste avant la réponse, qui atterrit alors avec tout le retard).
+Appliquée à DSP1 seul : 5 021 ; à DSP2 seul : 54 657 (DSP1 part devant et
+affame le lien). Filtrée sur un seul mot : 00 → 1 717, 02, 01, fe → aucun
+effet. Mécanisme : l'avance du DSP étire toute la séquence d'échanges de DSP2
+avec l'UC (quatre allers-retours par rafale, chacun en retard de l'avance).
+Coût de la retenue DSP2 à avance 10 µs : non mesuré proprement (machine
+chargée par ailleurs, base à 97-99 % au lieu de 89 %).
+
+Code d'expérience retiré (retenues `MD_PAIR_REPLY_*`, avance par DSP, borne
+d'écart, plafond de DSP2, sondes strobe et statistiques de prises) ; le mode
+`--listen` reste dans le test.
+
+Comparaison : les autres émulateurs du dépôt couplent l'UC bien plus
+lâchement (microQ/XT : resynchro toutes les 8 trames, dérive jusqu'à 16 ;
+N2X : 16 et 32) ou ne l'émulent pas (Virus) ; Monomodule non plus (séquenceur
+et UI natifs). Le firmware MM ne tolère pas ce lâche : rendez-vous UC ↔ DSP2
+à chaque rafale.
+
+Décision (2026-09-29) : merge vers `release/md-mm-alpha` avec ce résiduel
+documenté (test de stress ~1 run sur 80 ; écoute réaliste 0 trou en 28 min ;
+motif dur 0 en 120 s à 10 µs). Ensuite : mesurer la retenue DSP2 sur machine
+au repos, l'activer si elle coûte au plus ~5 points.
+
 ## Leçons dures
 
 - Le test firmware `mdAudioFirmwareTest` passe en parallel : il ne déclenche
