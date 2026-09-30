@@ -1,9 +1,9 @@
 # Implémentation du transport parallèle — journal de reprise
 
-Branche : `feat/transport-step0-dating` (base `release/md-mm-alpha`), HEAD
-`415aa404` le 2026-09-23. Submodule `source/dsp56300` : fork
-`c0remusic/dsp56300-md-mm`, branche `feat/dma-de-observer` (`27d17af`),
-`.gitmodules` pointe sur le fork.
+Branche : `release/md-mm-alpha`, où `feat/transport-step0-dating` est
+fusionnée. Submodule `source/dsp56300` : fork `c0remusic/dsp56300-md-mm`,
+branche `feat/dma-de-observer`, `.gitmodules` pointe sur le fork (commit
+épinglé : `git ls-tree HEAD source/dsp56300`).
 
 Spec de référence : `docs/design/parallel-transport-spec.md`.
 
@@ -18,6 +18,7 @@ Spec de référence : `docs/design/parallel-transport-spec.md`.
 | 2a miroirs/seams/SPSC | `ee006203` | vert |
 | 2b datation HI08 MD + garde inline | `d5a4ccad` | vert |
 | 2c worker DSP2 (`MDMM_TRANSPORT=parallel`) | `520ab7a8`…HEAD | expérimental, opt-in ; reproducteur ADC vert, perf < série |
+| 3 worker paire (`MDMM_TRANSPORT=pair`) | `417faab5`…HEAD | défaut MM quand le transport parallèle est actif (`Device::preferredTransport`) ; banc MM paire 70,5 % du temps réel (2026-09-30) |
 
 Le mode série (défaut) = 94 % realtime (pluginTester 30 s), identique à la
 baseline du ticket 01. Gates série vertes à chaque commit.
@@ -881,6 +882,57 @@ alternées contre le binaire d'avant les correctifs ; charge de fond 17 à
 Reste : un cycle rattrapé coûte encore 6,1 ns par cycle exécuté contre 4,4 en
 propre (boucle bloc par bloc, contrôle du backlog à chaque bloc). Suite :
 répartir les périphériques (~27 %).
+
+### Avances de paire nulles : plancher de l'avance UC (2026-09-30)
+
+Avec `MD_PAIR_LEAD_US` et `MD_PAIR_UC_LEAD_US` à 0 (vides ou « 0 »), le MM
+se figeait à la bascule paire : l'UC attend que le DSP le plus lent le
+dépasse (`dspMin + ucLead > ucPos`), et sans avance DSP la porte UC d'un DSP
+l'arrête au plus à la position de l'UC (`dspCatchupDeadline` arrondit vers
+le bas). Trace (`MDMM_TRANSPORT_TRACE`) : bascule à `uc=16177844`, égal au
+`oUc` du mixer, porte du mixer à 0, `ucLead=0.000`, UC dans l'attente
+« lead » 99 % du temps, ~0 % CPU. La retenue DSP2 (`MD_PAIR_HOLD_DSP2_US`
+≥ 0) ramène l'avance DSP à 0 pendant un aller-retour : avec une avance UC
+nulle, même blocage tôt dans le boot.
+
+Correctif 09737e8d : quand l'avance DSP peut être nulle (`m_pairDspLeadUc`
+nul ou retenue DSP2 active), `schedTryHandoffPair` porte l'avance UC à au
+moins un chunk worker plus le cycle arrondi (1153 cycles DSP, 11,35 µs) et
+le signale sur stderr (`[pair] UC lead raised …`) : le DSP le plus lent a
+toujours un chunk entier à courir pendant que l'UC attend. Politique livrée
+(avance DSP 10 µs, retenue coupée) inchangée. Plancher tranché par Antoine :
+chunk + 1. Écartés : 2 cycles DSP (vivant, mais UC et worker en ping-pong à
+chaque instruction ; estimé à des centaines de secondes pour 10 s d'écoute,
+non mesuré) et le quantum de 30 µs (« 0 » redeviendrait l'avance par défaut
+et masquerait l'expérience). Au passage : `MDMM_TRANSPORT_TRACE` vide
+n'active plus la trace, `MDMM_PAIR_AFFINITY` vide garde le placement par
+défaut, un côté sans chiffres de `u,w` n'épingle plus sur le CPU 0, et
+`MDMM_TRANSPORT` vide laisse le mode par défaut.
+
+Mesures (`mmAudioFirmwareTest --listen`, paire, `MM_LISTEN_LONE_MIXER`,
+10 s d'écoute après les 20 s de boot, garde 90 s) :
+
+| Avances | Avant | Après |
+|---|---|---|
+| deux vides | figé, tué à 90 s (1,1 s CPU) | 26,0 s, 0 trou |
+| deux à 0 | figé, tué à 90 s (1,2 s CPU) | 39,6 s, 0 trou |
+| retenue 30 µs, UC à 0 | figé, tué à 90 s (1,8 s CPU) | 35,0 s, 0 trou |
+| non définies (témoin) | 28,5 s, 0 trou | 26,9 s, 0 trou |
+
+Garde-fous ctest (64210a93, 8552974c) : `mmPairZeroLeadFirmwareTest` et
+`mmPairHoldZeroUcLeadFirmwareTest` (écoute de 2 s, délai 120 s), ~30 s
+chacun ; sur le binaire d'avant correctif, tous deux expirent à 120 s.
+`mmAudioFirmwareTest` échoue désormais si `MDMM_TRANSPORT=pair` est défini
+sans que le worker paire démarre : un test resté en série passerait sans
+exercer les portes.
+
+Reste :
+- `MDMM_TRANSPORT` inconnu (faute de frappe, « pairs ») vaut toujours Serial
+  en silence, et la vérification de `mmAudioFirmwareTest` ne le voit pas
+  (elle ne vise que « pair » exact). Arbitrage laissé : inconnu = non
+  défini, erreur, ou Serial comme aujourd'hui.
+- Coût du plancher pour les expériences à avances nulles : 39,6 s contre
+  26,9 s pour la même écoute (×1,5).
 
 ### Surcharges d'environnement vides : lecteurs de mdLib corrigés (2026-09-30)
 
