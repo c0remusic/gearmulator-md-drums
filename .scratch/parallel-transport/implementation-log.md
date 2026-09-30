@@ -1009,6 +1009,15 @@ Leviers :
    estimés, invasif.
 3. Rattrapage : un cycle rattrapé coûte encore 2,9 ns contre 1,9 en propre.
 
+Levier 1 fait : avec un seul thread pour les deux DSP, la sonde de
+disponibilité RX laisse au `blockingPop` du même slot sa disposition et la
+position du consommateur, et `pushToInput` passe au rattrapage la position du
+producer déjà calculée pour l'échéance du mot. Exact (mêmes entrées, mêmes
+doubles). A/B, 6 paires de 30 s : 74,0 % → 72,9 % (−1,0 point ; écarts par
+paire de −0,6 à +2,3). Moins que les 3 à 5 points estimés : les ~110 ns par
+mot tiennent surtout ailleurs (logique de slot ESSI, transfert DMA déclenché
+à chaque slot, `std::function`, copies d'entrée de 64 octets).
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
