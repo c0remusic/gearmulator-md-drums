@@ -11,6 +11,7 @@
 #include "juceRmlUi/rmlInterfaces.h"
 
 #include "jucePluginLib/controller.h"
+#include "mdAutomationTestSupport.h"
 #include "mdController.h"
 #include "mdLib/mdmachines.h"
 
@@ -21,11 +22,24 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+namespace mdJucePlugin
+{
+	// Lets the controller accept a pattern read without booted firmware.
+	struct ControllerAutomationTestAccess
+	{
+		static void useSyntheticFirmware(Controller& _controller)
+		{
+			_controller.m_syntheticFirmwareReadyForTests = true;
+		}
+	};
+}
 
 namespace juceRmlUi
 {
@@ -88,6 +102,33 @@ namespace
 			collectBound(*_e.GetChild(i), _out);
 	}
 
+	// The blocks of a view tile it: rows whose blocks share one height, each row
+	// 12 columns wide (1068 dp with its gutters) and the next row 12 dp below.
+	void requireTiled(Rml::Element& _view, const std::string& _label)
+	{
+		Rml::ElementList blocks;
+		_view.GetElementsByClassName(blocks, "mdEdBlock");
+		require(!blocks.empty(), _label + ": no blocks");
+		std::map<int, std::vector<Rml::Element*>> rows;
+		for(auto* b : blocks)
+			rows[static_cast<int>(std::lround(b->GetAbsoluteOffset(Rml::BoxArea::Border).y))].push_back(b);
+		int nextTop = rows.begin()->first;
+		for(const auto& [top, row] : rows)
+		{
+			require(top == nextTop, _label + ": gap or overlap above the row at y " + std::to_string(top));
+			const auto height = std::lround(row.front()->GetBox().GetSize(Rml::BoxArea::Border).y);
+			long width = -12;
+			for(auto* b : row)
+			{
+				require(std::lround(b->GetBox().GetSize(Rml::BoxArea::Border).y) == height,
+					_label + ": blocks of the row at y " + std::to_string(top) + " differ in height");
+				width += std::lround(b->GetBox().GetSize(Rml::BoxArea::Border).x) + 12;
+			}
+			require(width == 1068, _label + ": row at y " + std::to_string(top) + " does not span the 12 columns");
+			nextTop = top + static_cast<int>(height) + 12;
+		}
+	}
+
 	struct Block
 	{
 		const char* id;
@@ -132,11 +173,12 @@ namespace
 	constexpr Block g_blocks[] = {
 		{"mdEdSteps", 16, 16, 1068, 88},
 		{"mdEdMachine", 16, 116, 1068, 88},
+		// two rows whose blocks share one height
 		{"mdEdSource", 16, 216, 438, 384},
-		{"mdEdFilter", 466, 216, 348, 356},
-		{"mdEdColour", 466, 584, 348, 132},
-		{"mdEdMix", 826, 216, 258, 276},
-		{"mdEdLfo", 16, 728, 1068, 184},
+		{"mdEdFilter", 466, 216, 348, 384},
+		{"mdEdMix", 826, 216, 258, 384},
+		{"mdEdColour", 16, 612, 348, 272},
+		{"mdEdLfo", 376, 612, 708, 272},
 	};
 #endif
 }
@@ -178,6 +220,7 @@ int main()
 		constexpr float pageTop = 570 + 56 + 48;
 		for(const auto& b : g_blocks)
 			requireRect(element(doc, b.id), b.x, pageTop + b.y, b.w, b.h, b.id);
+		requireTiled(element(doc, "mdEdTrackView"), "SON");
 		const auto& first = g_blocks[0];
 
 		// every editor control with a param found its parameter (the binding writes min/max on the element);
@@ -214,6 +257,7 @@ int main()
 		element(doc, "editMaster").Click();
 		context.Update();
 		require(visible(element(doc, "mdEdMasterView")) && !visible(element(doc, "mdEdTrackView")), "MASTER tab did not show the master effects");
+		requireTiled(element(doc, "mdEdMasterView"), "MASTER");
 		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 16, 528, 272, "RHYTHM ECHO (6 columns)");
 		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 300, 528, 272, "DYNAMIX (6 columns)");
 		require(controller.getCurrentPart() == 0, "MASTER tab changed the edited part");
@@ -282,10 +326,57 @@ int main()
 			require(element(doc, "mdEdMachineName").GetInnerRML() == g_pickName, "MACHINE block lost the machine of track 1");
 		}
 
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+		// PAS: RELIRE reads the current pattern; the grid shows the edited track's
+		// trigs and length, and a focused step shows its locked values.
+		{
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			const auto text = [&](const char* _id) { return std::string(element(doc, _id).GetInnerRML()); };
+			require(text("mdEdStepsInfo").find("en attente") != std::string::npos, "PAS block claims a pattern before any read");
+			mdJucePlugin::ControllerAutomationTestAccess::useSyntheticFirmware(md);
+			element(doc, "mdEdStepsRefresh").Click();
+			context.Update();
+			require(text("mdEdStepsInfo").find("lecture") != std::string::npos, "RELIRE did not start a pattern read");
+
+			std::array<uint32_t, 16> trigs{};
+			trigs[0] = 0x11;           // track 1: steps 1 and 5
+			trigs[1] = 0x80000000u;    // track 2: step 32, beyond the 24-step length
+			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 18, 0xf7}, synthLib::MidiEventSource::Device);
+			md.parseSysexMessage(mdAutomationTest::makeMdPatternDump(18, 24, trigs, 99), synthLib::MidiEventSource::Device);
+			element(doc, "editTrack0").Click();
+			context.Update();
+			const auto step = [&](int _s) -> Rml::Element& { return element(doc, "mdEdStep" + std::to_string(_s)); };
+			require(step(0).IsClassSet("mdEdStepTrig") && step(4).IsClassSet("mdEdStepTrig")
+				&& !step(1).IsClassSet("mdEdStepTrig"), "PAS grid does not show track 1's trigs");
+			require(step(24).IsClassSet("mdEdStepOut") && !step(23).IsClassSet("mdEdStepOut"), "PAS grid ignores the pattern length");
+			require(text("mdEdStepsInfo").find("B03") != std::string::npos && text("mdEdStepsInfo").find("24 pas") != std::string::npos,
+				"PAS line does not name pattern B03 and its length");
+
+			step(0).Click();
+			context.Update();
+			require(step(0).IsClassSet("mdEdStepFocus"), "clicked step not focused");
+			require(visible(element(doc, "mdEdLock_MachineParameter1")) && text("mdEdLock_MachineParameter1") == "99"
+				&& element(doc, "mdEdVal_MachineParameter1").IsClassSet("mdEdHidden"), "locked value not shown on the focused step");
+			require(element(doc, "mdEdCtl_FilterBase").IsClassSet("mdEdDim") && !element(doc, "mdEdCtl_MachineParameter1").IsClassSet("mdEdDim"),
+				"unlocked controls not dimmed on the focused step");
+
+			element(doc, "editTrack1").Click();
+			context.Update();
+			require(!step(0).IsClassSet("mdEdStepTrig") && !step(31).IsClassSet("mdEdStepTrig") && !visible(element(doc, "mdEdLock_MachineParameter1")),
+				"PAS grid kept track 1 on track 2");
+			element(doc, "editTrack0").Click();
+			step(0).Click();
+			context.Update();
+			require(!step(0).IsClassSet("mdEdStepFocus") && !element(doc, "mdEdCtl_FilterBase").IsClassSet("mdEdDim")
+				&& !visible(element(doc, "mdEdLock_MachineParameter1")), "second click did not clear the focus");
+		}
+#endif
+
 		// categories: MIX replaces SON
 		tabButton(doc, "mdEdit", "1").Click();
 		context.Update();
 		require(visible(element(doc, "mdEdPageMix")) && !visible(element(doc, "mdEdPageSound")), "MIX tab did not switch pages");
+		requireTiled(element(doc, "mdEdPageMix"), "MIX");
 		tabButton(doc, "mdEdit", "0").Click();
 		context.Update();
 		require(visible(element(doc, "mdEdPageSound")) && !visible(element(doc, "mdEdPageMix")), "SON tab did not switch back");
@@ -327,6 +418,11 @@ int main()
 			tabButton(doc, "mdEdit", "0").Click();
 			element(doc, "mdPanelFold").Click();
 			snap("-son-folded");
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			element(doc, "mdEdStep0").Click();
+			snap("-steps-folded");
+			element(doc, "mdEdStep0").Click();
+#endif
 			element(doc, "mdEdMachineChange").Click();
 			snap("-picker-folded");
 			element(doc, "mdEdMachineChange").Click();

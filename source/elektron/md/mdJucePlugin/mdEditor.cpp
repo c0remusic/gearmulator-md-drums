@@ -2,6 +2,7 @@
 
 #include "mdController.h"
 #include "mdMachinePicker.h"
+#include "mdStepGrid.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -713,6 +714,8 @@ namespace mdJucePlugin
 				setCurrentPart(static_cast<uint8_t>(track));
 				if(m_machinePicker)
 					m_machinePicker->update();
+				if(m_stepGrid)
+					m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
 			});
 		}
 
@@ -721,6 +724,14 @@ namespace mdJucePlugin
 		{
 			m_machinePicker = std::make_unique<MachinePicker>(m_controller, getModel(), *document);
 			m_machinePicker->update();
+		}
+
+		// The PAS block (Machinedrum) shows the edited track in the current pattern.
+		if(auto* const document = getDocument(); document && getModel() == md::MachineModel::Machinedrum
+			&& document->GetElementById("mdEdStep0"))
+		{
+			m_stepGrid = std::make_unique<StepGrid>(m_controller, *document);
+			m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
 		}
 
 		if(getModel() == md::MachineModel::Machinedrum)
@@ -2100,7 +2111,9 @@ namespace mdJucePlugin
 		if(m_lcdCanvas && m_lcdChanged)
 			m_lcdCanvas->repaint();
 
-		if(m_machinePicker && m_machinePicker->update())
+		const bool machineChanged = m_machinePicker && m_machinePicker->update();
+		const bool stepsChanged = m_stepGrid && m_stepGrid->update(nowMilliseconds);
+		if(machineChanged || stepsChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

@@ -4,6 +4,7 @@
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
 #include "mdLib/mdmachines.h"
+#include "mdLib/mdsysexautomation.h"
 #include "mdLib/mdtypes.h"
 #include "mdRealtimeQueue.h"
 
@@ -12,6 +13,7 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <optional>
 
 namespace mdJucePlugin
 {
@@ -87,6 +89,15 @@ namespace mdJucePlugin
 		// and the editor keep the same values whatever the assignment did to them.
 		// False for a track or machine the model does not have.
 		bool assignMachine(uint8_t _part, uint16_t _machine);
+
+		// Machinedrum only: asks the firmware for the current pattern number, then
+		// for that pattern's dump. False on the Monomachine or while the firmware is
+		// not ready. A pattern selected through SET STATUS is read again by itself.
+		bool requestPattern();
+		// The pattern as last read, nullopt before the first dump.
+		std::optional<md::automation::sysex::PatternDump> getPattern() const;
+		// Increments whenever a new pattern dump is stored.
+		uint64_t getPatternRevision() const { return m_patternRevision.load(std::memory_order_acquire); }
 		void requestAutomationState();
 		std::vector<uint8_t> createAutomationSnapshot() const;
 		bool restoreAutomationSnapshot(const std::vector<uint8_t>& _snapshot);
@@ -169,6 +180,7 @@ namespace mdJucePlugin
 		// An applied dump replaces every track's machine; an inspection dump only
 		// fills tracks whose machine is still unknown.
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
+		void sendEditorSysex(const md::automation::sysex::Message& _message) const;
 		void onControllerTimer() override;
 		void sendMissingSynchronizationRequests();
 		void sendSynchronizationRequest(const pluginLib::SysEx& _message) const;
@@ -203,6 +215,11 @@ namespace mdJucePlugin
 		std::atomic<uint8_t> m_currentKit{0xff};
 		std::array<std::atomic<uint16_t>, md::automation::machinedrum::TrackCount> m_trackMachines{};
 		std::atomic<uint64_t> m_machineRevision{0};
+		mutable std::mutex m_patternMutex;
+		std::optional<md::automation::sysex::PatternDump> m_pattern;
+		std::atomic<uint64_t> m_patternRevision{0};
+		std::atomic<bool> m_patternWanted{false};
+		std::atomic<uint8_t> m_patternRequestedSlot{0xff};
 		std::deque<AutomationSlot> m_automationSlots;
 		std::map<Address, size_t> m_automationSlotIndices;
 		RealtimeQueue<QueuedAutomationChange,

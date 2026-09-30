@@ -46,6 +46,7 @@ namespace mdJucePlugin
 {
 	class Controller;
 	class MachinePicker;
+	class StepGrid;
 	class PixelPerfectPanel;
 	struct EditorIdentityTestAccess;
 
@@ -171,6 +172,7 @@ namespace mdJucePlugin
 		const md::MachineModel m_model;
 		juceRmlUi::ElemCanvas* m_lcdCanvas = nullptr;
 		std::unique_ptr<MachinePicker> m_machinePicker;
+		std::unique_ptr<StepGrid> m_stepGrid;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;
 		md::FrontPanel m_frontPanelSnapshot;
 		bool m_frontPanelSnapshotValid = false;

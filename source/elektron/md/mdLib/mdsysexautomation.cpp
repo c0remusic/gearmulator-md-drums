@@ -14,6 +14,8 @@ namespace md::automation::sysex
 		constexpr uint8_t g_kitDump = 0x52;
 		constexpr uint8_t g_kitRequest = 0x53;
 		constexpr uint8_t g_kitSave = 0x59;
+		constexpr uint8_t g_patternDump = 0x67;
+		constexpr uint8_t g_patternRequest = 0x68;
 		constexpr uint8_t g_assignMachine = 0x5b;
 		constexpr uint8_t g_statusRequest = 0x70;
 		constexpr uint8_t g_setStatus = 0x71;
@@ -178,6 +180,28 @@ namespace md::automation::sysex
 			return packed;
 		}
 
+		// Reads _count bytes packed in 7-bit groups (a byte of top bits, MSB first,
+		// then up to seven bytes) starting at _position, which it advances.
+		bool read7Bit(const MessageView _message, size_t& _position, const size_t _count, uint8_t* _out)
+		{
+			for(size_t done = 0; done < _count;)
+			{
+				if(_position >= _message.size())
+					return false;
+				const auto highBits = _message[_position++];
+				for(uint8_t bit = 0; bit < 7 && done < _count; ++bit, ++done)
+				{
+					if(_position >= _message.size())
+						return false;
+					auto value = _message[_position++];
+					if(highBits & (1u << (6u - bit)))
+						value |= 0x80;
+					_out[done] = value;
+				}
+			}
+			return true;
+		}
+
 		// Appends checksum, length and F7 to a dump that ends with its payload.
 		void finishDump(Message& _message)
 		{
@@ -225,6 +249,79 @@ namespace md::automation::sysex
 		return request(_model, g_kitRequest, _slot);
 	}
 
+	Message patternRequest(const MachineModel _model, const uint8_t _slot)
+	{
+		return request(_model, g_patternRequest, _slot);
+	}
+
+	bool PatternDump::hasTrig(const uint8_t _track, const uint8_t _step) const
+	{
+		return _track < 16 && _step < 32 && (trigs[_track] >> _step) & 1u;
+	}
+
+	std::optional<uint8_t> PatternDump::lock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step) const
+	{
+		if(_track >= 16 || _parameter >= 24 || _step >= 32 || !((lockMasks[_track] >> _parameter) & 1u))
+			return std::nullopt;
+		size_t row = 0;
+		for(uint8_t t = 0; t < _track; ++t)
+			for(uint8_t p = 0; p < 24; ++p)
+				row += (lockMasks[t] >> p) & 1u;
+		for(uint8_t p = 0; p < _parameter; ++p)
+			row += (lockMasks[_track] >> p) & 1u;
+		if(row >= lockRows.size() || lockRows[row][_step] >= 0x80)
+			return std::nullopt;
+		return lockRows[row][_step];
+	}
+
+	std::optional<PatternDump> parseMdPatternDump(const MessageView _message)
+	{
+		// 32-step form 0xacb bytes; the 64-step form appends the second half.
+		if(!validDump(MachineModel::Machinedrum, _message, g_patternDump)
+			|| (_message.size() != 0xacb && _message.size() != 0x1522))
+			return std::nullopt;
+		PatternDump result;
+		result.slot = _message[9];
+		if(result.slot >= 128)
+			return std::nullopt;
+
+		// Trig and lock-row masks: 16 big-endian 32-bit values each, in their own 7-bit runs.
+		size_t position = 0x0a;
+		std::array<uint8_t, 64> raw{};
+		for(auto* target : {&result.trigs, &result.lockMasks})
+		{
+			if(!read7Bit(_message, position, raw.size(), raw.data()))
+				return std::nullopt;
+			for(size_t track = 0; track < 16; ++track)
+				(*target)[track] = static_cast<uint32_t>(raw[track * 4]) << 24 | static_cast<uint32_t>(raw[track * 4 + 1]) << 16
+					| static_cast<uint32_t>(raw[track * 4 + 2]) << 8 | raw[track * 4 + 3];
+		}
+		// Accent, slide and swing patterns and the swing amount, then six plain bytes:
+		// accent amount, length, double tempo, scale, kit, locked rows.
+		std::array<uint8_t, 16> skipped{};
+		if(!read7Bit(_message, position, skipped.size(), skipped.data()))
+			return std::nullopt;
+		// The row count byte is not needed: rows follow the masks, as on the machine.
+		result.length = _message[position + 1];
+		position += 6;
+		if(result.length == 0 || result.length > 64)
+			return std::nullopt;
+
+		std::vector<uint8_t> locks(64 * 32);
+		if(!read7Bit(_message, position, locks.size(), locks.data()))
+			return std::nullopt;
+		for(size_t row = 0; row < 64; ++row)
+		{
+			std::array<uint8_t, 32> values{};
+			std::copy_n(locks.begin() + row * 32, 32, values.begin());
+			result.lockRows.push_back(values);
+		}
+		// Parameters 24 and up belong to lock rows the classic format does not have.
+		for(auto& mask : result.lockMasks)
+			mask &= 0x00ffffffu;
+		return result;
+	}
+
 	bool isReadOnlyRequest(const MachineModel _model, const MessageView _message)
 	{
 		if(_message.size() != 9
@@ -239,6 +336,8 @@ namespace md::automation::sysex
 		case g_kitRequest:
 			return _message[7]
 				< (_model == MachineModel::Monomachine ? 128 : 64);
+		case g_patternRequest:
+			return _message[7] < 128;
 		case g_statusRequest:
 			return _message[7] == static_cast<uint8_t>(StatusParameter::Global)
 					|| _message[7] == static_cast<uint8_t>(StatusParameter::Kit)

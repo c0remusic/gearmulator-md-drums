@@ -2,6 +2,7 @@
 
 #include "mdautomation.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -54,6 +55,23 @@ namespace md::automation::sysex
 		std::vector<uint16_t> machines;
 	};
 
+	// The first 32 steps of a Machinedrum pattern, as far as the editor shows them.
+	struct PatternDump
+	{
+		uint8_t slot = 0;      // 0..127, A01..H16
+		uint8_t length = 16;   // steps, 1..64
+		std::array<uint32_t, 16> trigs{};      // bit n: a trig on step n + 1
+		std::array<uint32_t, 16> lockMasks{};  // bit p: parameter p (0..23) has a lock row
+		// The 64 lock rows: row k belongs to the k-th set bit of the masks, in
+		// track then parameter order; 128 and above means no lock on that step.
+		std::vector<std::array<uint8_t, 32>> lockRows;
+
+		bool hasTrig(uint8_t _track, uint8_t _step) const;
+		// Locked value of parameter _parameter (0..23: synthesis, effects, routing)
+		// on a step, or nullopt.
+		std::optional<uint8_t> lock(uint8_t _track, uint8_t _parameter, uint8_t _step) const;
+	};
+
 	// The receiving half of a Global's MIDI SYNC page.
 	struct GlobalSync
 	{
@@ -70,6 +88,7 @@ namespace md::automation::sysex
 	Message statusRequest(MachineModel _model, StatusParameter _parameter);
 	Message globalRequest(MachineModel _model, uint8_t _slot);
 	Message kitRequest(MachineModel _model, uint8_t _slot);
+	Message patternRequest(MachineModel _model, uint8_t _slot);
 	// These requests only inspect firmware state. They may be sent while the UW
 	// factory image is being learned without making that image user-modified.
 	bool isReadOnlyRequest(MachineModel _model, MessageView _message);
@@ -87,6 +106,8 @@ namespace md::automation::sysex
 		MessageView _message);
 	std::optional<KitDump> parseKitDump(
 		MachineModel _model, MessageView _message);
+	// Machinedrum pattern dump ($67), 32- or 64-step form; only the first 32 steps are kept.
+	std::optional<PatternDump> parseMdPatternDump(MessageView _message);
 
 	// SET STATUS for the Global slot: the firmware reloads that slot, which is how
 	// a Global dump written to the active slot takes effect.

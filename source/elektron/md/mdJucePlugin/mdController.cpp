@@ -305,9 +305,7 @@ namespace mdJucePlugin
 		if(!message)
 			return false;
 
-		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
-		event.sysex = toPluginSysex(*message);
-		sendMidiEvent(event);
+		sendEditorSysex(*message);
 
 		// Before the first synchronization the cache holds no firmware values, so
 		// there is nothing trustworthy to re-send.
@@ -327,6 +325,30 @@ namespace mdJucePlugin
 		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
 			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
 		return true;
+	}
+
+	void Controller::sendEditorSysex(const md::automation::sysex::Message& _message) const
+	{
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex = toPluginSysex(_message);
+		sendMidiEvent(event);
+	}
+
+	bool Controller::requestPattern()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		m_patternWanted.store(true, std::memory_order_release);
+		sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+			md::automation::sysex::StatusParameter::Pattern));
+		return true;
+	}
+
+	std::optional<md::automation::sysex::PatternDump> Controller::getPattern() const
+	{
+		const std::lock_guard lock(m_patternMutex);
+		return m_pattern;
 	}
 
 	void Controller::requestKitState()
@@ -447,6 +469,11 @@ namespace mdJucePlugin
 					md::automation::sysex::statusRequest(m_model,
 						md::automation::sysex::StatusParameter::Kit)));
 			}
+			// Once a pattern is shown, notice another one selected on the front panel.
+			if(m_model == md::MachineModel::Machinedrum
+				&& m_patternRevision.load(std::memory_order_acquire) > 0)
+				sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+					md::automation::sysex::StatusParameter::Pattern));
 			return;
 		}
 		sendMissingSynchronizationRequests();
@@ -914,6 +941,19 @@ namespace mdJucePlugin
 				return true;
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
+				// A status reply leads to a dump when requestPattern asked for one, or
+				// when the pattern shown is no longer the current one.
+				if(m_model == md::MachineModel::Machinedrum && !m_patternWanted.load(std::memory_order_acquire))
+				{
+					const std::lock_guard lock(m_patternMutex);
+					if(m_pattern && m_pattern->slot != status->value)
+						m_patternWanted.store(true, std::memory_order_release);
+				}
+				if(m_patternWanted.load(std::memory_order_acquire))
+				{
+					m_patternRequestedSlot.store(status->value, std::memory_order_release);
+					sendEditorSysex(md::automation::sysex::patternRequest(m_model, status->value));
+				}
 				return true;
 			}
 		}
@@ -963,6 +1003,24 @@ namespace mdJucePlugin
 			return true;
 		}
 
+		if(m_model == md::MachineModel::Machinedrum)
+		{
+			if(auto pattern = md::automation::sysex::parseMdPatternDump(_message))
+			{
+				if(m_patternWanted.load(std::memory_order_acquire)
+					&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
+				{
+					{
+						const std::lock_guard lock(m_patternMutex);
+						m_pattern = std::move(*pattern);
+					}
+					m_patternWanted.store(false, std::memory_order_release);
+					m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
+				return true;
+			}
+		}
+
 		// External SET STATUS messages can change the active Global, selected Kit,
 		// or Pattern without going through the controller. Refresh after the firmware
 		// consumes the same queued MIDI event.
@@ -980,6 +1038,10 @@ namespace mdJucePlugin
 				|| status->parameter == md::automation::sysex::StatusParameter::Pattern)
 			{
 				requestKitState();
+				// A pattern already shown follows the new selection.
+				if(status->parameter == md::automation::sysex::StatusParameter::Pattern
+					&& m_patternRevision.load(std::memory_order_acquire) > 0)
+					requestPattern();
 			}
 		}
 		return false;

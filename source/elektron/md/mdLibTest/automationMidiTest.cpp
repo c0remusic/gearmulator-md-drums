@@ -459,6 +459,72 @@ namespace
 			"accepted corrupt MM Kit checksum");
 	}
 
+	// Appends _data packed in 7-bit groups, as Elektron dumps do.
+	void append7Bit(md::automation::sysex::Message& _message, const std::vector<uint8_t>& _data)
+	{
+		for(size_t group = 0; group < _data.size(); group += 7)
+		{
+			const auto count = std::min<size_t>(7, _data.size() - group);
+			uint8_t highBits = 0;
+			for(size_t bit = 0; bit < count; ++bit)
+				if(_data[group + bit] & 0x80)
+					highBits |= static_cast<uint8_t>(1u << (6u - bit));
+			_message.push_back(highBits);
+			for(size_t bit = 0; bit < count; ++bit)
+				_message.push_back(_data[group + bit] & 0x7f);
+		}
+	}
+
+	void testMachinedrumPattern()
+	{
+		using namespace md::automation::sysex;
+		require(patternRequest(md::MachineModel::Machinedrum, 17) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x68, 17, 0xf7},
+			"wrong MD pattern request");
+		require(isReadOnlyRequest(md::MachineModel::Machinedrum, patternRequest(md::MachineModel::Machinedrum, 17)),
+			"pattern request not treated as read-only");
+
+		// Track 1: trigs on steps 1, 5 and 32. Track 3: step 2. Locks: track 1
+		// parameters 0 and 9, track 3 parameter 23; one value each on a few steps.
+		const auto be32 = [](std::vector<uint8_t>& _out, const uint32_t _v)
+		{
+			_out.insert(_out.end(), {uint8_t(_v >> 24), uint8_t(_v >> 16), uint8_t(_v >> 8), uint8_t(_v)});
+		};
+		std::vector<uint8_t> trigs, masks;
+		for(uint8_t track = 0; track < 16; ++track)
+		{
+			be32(trigs, track == 0 ? 0x80000011u : track == 2 ? 0x2u : 0u);
+			be32(masks, track == 0 ? (1u << 0 | 1u << 9) : track == 2 ? 1u << 23 : 0u);
+		}
+		std::vector<uint8_t> locks(64 * 32, 0xff);
+		locks[0 * 32 + 4] = 100;   // row 0: track 1, parameter 0, step 5
+		locks[1 * 32 + 31] = 7;    // row 1: track 1, parameter 9, step 32
+		locks[2 * 32 + 1] = 64;    // row 2: track 3, parameter 23, step 2
+
+		Message pattern{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x67, 0x03, 0x01, 18};
+		append7Bit(pattern, trigs);
+		append7Bit(pattern, masks);
+		append7Bit(pattern, std::vector<uint8_t>(16, 0));
+		pattern.insert(pattern.end(), {0, 24, 0, 0, 5, 3});
+		append7Bit(pattern, locks);
+		append7Bit(pattern, std::vector<uint8_t>(204, 0));
+		finishDump(pattern);
+		require(pattern.size() == 0xacb, "test pattern has the wrong size");
+
+		const auto parsed = parseMdPatternDump(pattern);
+		require(parsed && parsed->slot == 18 && parsed->length == 24, "wrong MD pattern slot or length");
+		require(parsed->hasTrig(0, 0) && parsed->hasTrig(0, 4) && parsed->hasTrig(0, 31) && !parsed->hasTrig(0, 1)
+			&& parsed->hasTrig(2, 1) && !parsed->hasTrig(1, 0), "wrong MD pattern trigs");
+		require(parsed->lock(0, 0, 4) == uint8_t{100} && parsed->lock(0, 9, 31) == uint8_t{7}
+			&& parsed->lock(2, 23, 1) == uint8_t{64}, "wrong MD pattern lock values");
+		require(!parsed->lock(0, 0, 3) && !parsed->lock(0, 1, 4) && !parsed->lock(1, 0, 4),
+			"MD pattern reported a lock that is not there");
+
+		pattern[200] ^= 1;
+		require(!parseMdPatternDump(pattern), "accepted corrupt MD pattern checksum");
+		pattern.resize(100);
+		require(!parseMdPatternDump(pattern), "accepted truncated MD pattern");
+	}
+
 	void testMachineAssignment()
 	{
 		using md::automation::sysex::Message;
@@ -540,6 +606,12 @@ namespace
 				require(parsed->slot == message[9],
 					"real Kit dump reported its format version as its slot");
 				++kitCount;
+			}
+			else if(message.size() > 6 && message[6] == 0x67 && _model == md::MachineModel::Machinedrum)
+			{
+				const auto parsed = md::automation::sysex::parseMdPatternDump(message);
+				require(parsed.has_value(), "could not parse real MD pattern dump");
+				require(parsed->slot == message[9], "real pattern dump reported the wrong slot");
 			}
 			begin = end + 1;
 		}
@@ -791,6 +863,7 @@ int main(const int _argc, const char* const* _argv)
 	testMachinedrumDumps();
 	testMonomachineDumps();
 	testMachineAssignment();
+	testMachinedrumPattern();
 	testDumpRequestOrdering();
 	testGlobalSync();
 	testHostSync();

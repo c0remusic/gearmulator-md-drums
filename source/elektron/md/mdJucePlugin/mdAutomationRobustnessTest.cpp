@@ -1287,6 +1287,43 @@ namespace
 		require(controller.getTrackMachine(2) == first, "state load kept a machine its Kit does not hold");
 	}
 
+	// requestPattern asks for the current pattern number, then that pattern's dump;
+	// other dumps are ignored, and the 5 s status poll notices another pattern.
+	void verifyPatternReading(Harness& _harness)
+	{
+		auto& controller = _harness.controller;
+		using Status = md::automation::sysex::StatusParameter;
+		if(_harness.model == md::MachineModel::Monomachine)
+		{
+			require(!controller.requestPattern(), "Monomachine accepted a pattern read");
+			return;
+		}
+		std::array<uint32_t, 16> trigs{};
+		trigs[0] = 0x11;
+		require(controller.getPatternRevision() == 0 && !controller.getPattern(), "pattern known before any read");
+		require(controller.requestPattern(), "pattern read refused on a ready controller");
+		controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 18), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeMdPatternDump(5, 16, trigs), synthLib::MidiEventSource::Device);
+		require(controller.getPatternRevision() == 0, "dump of a pattern that was not asked for was stored");
+		controller.parseSysexMessage(makeMdPatternDump(18, 24, trigs, 99), synthLib::MidiEventSource::Device);
+		const auto pattern = controller.getPattern();
+		require(controller.getPatternRevision() == 1 && pattern && pattern->slot == 18 && pattern->length == 24
+			&& pattern->hasTrig(0, 0) && pattern->hasTrig(0, 4) && pattern->lock(0, 0, 0) == uint8_t{99},
+			"requested pattern dump was not stored");
+
+		controller.parseSysexMessage(makeMdPatternDump(18, 16, trigs), synthLib::MidiEventSource::Device);
+		require(controller.getPatternRevision() == 1, "unsolicited pattern dump replaced the stored one");
+
+		// Periodic poll: the same pattern does not lead to a dump, another one does.
+		controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 18), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeMdPatternDump(18, 16, trigs), synthLib::MidiEventSource::Device);
+		require(controller.getPatternRevision() == 1, "status for the shown pattern led to a new read");
+		controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 20), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeMdPatternDump(20, 16, trigs), synthLib::MidiEventSource::Device);
+		require(controller.getPatternRevision() == 2 && controller.getPattern()->slot == 20,
+			"another current pattern was not read");
+	}
+
 	void verifyArchitecture(const md::MachineModel _model)
 	{
 		verifyRetriedKitSynchronization(_model, false);
@@ -1302,6 +1339,7 @@ namespace
 		verifyStateLoadReplacesSameSlotBaseline(harness);
 		verifyMuteOwnership(harness);
 		verifyMachineAssignment(harness);
+		verifyPatternReading(harness);
 		verifyOrderedIntentArchitecture(harness);
 		verifyAdversarialRestoreSynchronization(harness);
 		verifyConcurrentPublicationArchitecture(harness);

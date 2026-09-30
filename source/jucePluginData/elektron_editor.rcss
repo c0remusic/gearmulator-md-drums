@@ -150,6 +150,16 @@
 	background-color: #2a2c30;
 }
 .mdEdStepBeat { background-color: #3a3d42; }
+.mdEdStep { cursor: pointer; }
+.mdEdStep:hover { color: #f4f1ea; }
+.mdEdStepTrig, .mdEdStepBeat.mdEdStepTrig { background-color: #f4f1ea; color: #141516; }
+.mdEdStepOut { opacity: 0.3; }
+.mdEdStepFocus { border: 2dp #ff6b1f; }
+
+/* focused step: locked values in orange over the bound value, the other controls dimmed */
+.mdEdLockValue { color: #ff6b1f; font-weight: bold; }
+.mdEdHidden { visibility: hidden; }
+.mdEdDim { opacity: 0.35; }
 
 .mdEdPicto { box-sizing: border-box; width: 40dp; height: 32dp; line-height: 30dp; border: 1dp #8a8d93; border-radius: 3dp;
 	font-size: 10dp; font-weight: bold; text-align: center; color: #f4f1ea; }

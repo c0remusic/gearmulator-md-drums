@@ -9,6 +9,8 @@
 
 #include "juce_events/juce_events.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstdint>
 #include <iostream>
@@ -320,6 +322,48 @@ namespace mdAutomationTest
 		std::vector<uint8_t> decoded(0xa6, 0);
 		decoded[0xa3] = _base;
 		return makeDump(_model, 0x50, _slot, decoded);
+	}
+
+	// A 32-step Machinedrum pattern dump: _trigs[track] as bits, one lock value
+	// _lock for track 1 parameter 0 on step 1 when given, everything else empty.
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint32_t, 16>& _trigs, const int _lock = -1)
+	{
+		const auto pack = [](md::automation::sysex::Message& _out, const std::vector<uint8_t>& _data)
+		{
+			for(size_t group = 0; group < _data.size(); group += 7)
+			{
+				const auto count = std::min<size_t>(7, _data.size() - group);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+					if(_data[group + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				_out.push_back(highBits);
+				for(size_t bit = 0; bit < count; ++bit)
+					_out.push_back(_data[group + bit] & 0x7f);
+			}
+		};
+		std::vector<uint8_t> trigs, masks;
+		for(size_t track = 0; track < 16; ++track)
+		{
+			for(const auto shift : {24, 16, 8, 0})
+			{
+				trigs.push_back(static_cast<uint8_t>(_trigs[track] >> shift));
+				masks.push_back(static_cast<uint8_t>(track == 0 && _lock >= 0 && shift == 0 ? 1 : 0));
+			}
+		}
+		std::vector<uint8_t> locks(64 * 32, 0xff);
+		if(_lock >= 0)
+			locks[0] = static_cast<uint8_t>(_lock);
+		md::automation::sysex::Message result{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x67, 0x03, 0x01, _slot};
+		pack(result, trigs);
+		pack(result, masks);
+		pack(result, std::vector<uint8_t>(16, 0));
+		result.insert(result.end(), {0, _length, 0, 0, 0, static_cast<uint8_t>(_lock >= 0 ? 1 : 0)});
+		pack(result, locks);
+		pack(result, std::vector<uint8_t>(204, 0));
+		finishDump(result);
+		return {result.begin(), result.end()};
 	}
 
 	// _machines, when given, holds one machine id per track.

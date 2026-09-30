@@ -477,29 +477,29 @@
 								<div class="jucePos mdEdGraph" style="left: 16dp; top: 40dp; width: 316dp; height: 128dp;">
 									<div class="mdEdGraphCaption">forme d'onde · à venir</div>
 								</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisA" style="left: 16dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{SynthesisA_text}}</div>
+								<knob id="mdEdCtl_SynthesisA" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisA" style="left: 16dp; top: 180dp;"/>
+								<div id="mdEdVal_SynthesisA" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{SynthesisA_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 240dp; width: 78dp;">SYN A</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisB" style="left: 106dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{SynthesisB_text}}</div>
+								<knob id="mdEdCtl_SynthesisB" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisB" style="left: 106dp; top: 180dp;"/>
+								<div id="mdEdVal_SynthesisB" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{SynthesisB_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 240dp; width: 78dp;">SYN B</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisC" style="left: 196dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{SynthesisC_text}}</div>
+								<knob id="mdEdCtl_SynthesisC" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisC" style="left: 196dp; top: 180dp;"/>
+								<div id="mdEdVal_SynthesisC" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{SynthesisC_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 240dp; width: 78dp;">SYN C</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisD" style="left: 286dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{SynthesisD_text}}</div>
+								<knob id="mdEdCtl_SynthesisD" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisD" style="left: 286dp; top: 180dp;"/>
+								<div id="mdEdVal_SynthesisD" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{SynthesisD_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 240dp; width: 78dp;">SYN D</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisE" style="left: 16dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{SynthesisE_text}}</div>
+								<knob id="mdEdCtl_SynthesisE" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisE" style="left: 16dp; top: 264dp;"/>
+								<div id="mdEdVal_SynthesisE" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{SynthesisE_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 324dp; width: 78dp;">SYN E</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisF" style="left: 106dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{SynthesisF_text}}</div>
+								<knob id="mdEdCtl_SynthesisF" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisF" style="left: 106dp; top: 264dp;"/>
+								<div id="mdEdVal_SynthesisF" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{SynthesisF_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 324dp; width: 78dp;">SYN F</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisG" style="left: 196dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{SynthesisG_text}}</div>
+								<knob id="mdEdCtl_SynthesisG" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisG" style="left: 196dp; top: 264dp;"/>
+								<div id="mdEdVal_SynthesisG" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{SynthesisG_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 324dp; width: 78dp;">SYN G</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisH" style="left: 286dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{SynthesisH_text}}</div>
+								<knob id="mdEdCtl_SynthesisH" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisH" style="left: 286dp; top: 264dp;"/>
+								<div id="mdEdVal_SynthesisH" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{SynthesisH_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 324dp; width: 78dp;">SYN H</div>
 							</div>
 							<div id="mdEdAmp" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 376dp; top: 116dp; width: 348dp; height: 356dp;">
@@ -508,29 +508,29 @@
 								<div class="jucePos mdEdGraph" style="left: 16dp; top: 40dp; width: 316dp; height: 128dp;">
 									<div class="mdEdGraphCaption">enveloppe ADHR · à venir</div>
 								</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpAttack" style="left: 16dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{AmpAttack_text}}</div>
+								<knob id="mdEdCtl_AmpAttack" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpAttack" style="left: 16dp; top: 180dp;"/>
+								<div id="mdEdVal_AmpAttack" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{AmpAttack_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 240dp; width: 78dp;">ATK</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpHold" style="left: 106dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{AmpHold_text}}</div>
+								<knob id="mdEdCtl_AmpHold" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpHold" style="left: 106dp; top: 180dp;"/>
+								<div id="mdEdVal_AmpHold" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{AmpHold_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 240dp; width: 78dp;">HOLD</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDecay" style="left: 196dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{AmpDecay_text}}</div>
+								<knob id="mdEdCtl_AmpDecay" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDecay" style="left: 196dp; top: 180dp;"/>
+								<div id="mdEdVal_AmpDecay" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{AmpDecay_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 240dp; width: 78dp;">DEC</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpRelease" style="left: 286dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{AmpRelease_text}}</div>
+								<knob id="mdEdCtl_AmpRelease" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpRelease" style="left: 286dp; top: 180dp;"/>
+								<div id="mdEdVal_AmpRelease" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{AmpRelease_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 240dp; width: 78dp;">REL</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDistortion" style="left: 16dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{AmpDistortion_text}}</div>
+								<knob id="mdEdCtl_AmpDistortion" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDistortion" style="left: 16dp; top: 264dp;"/>
+								<div id="mdEdVal_AmpDistortion" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{AmpDistortion_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 324dp; width: 78dp;">DIST</div>
-								<input type="range" orientation="vertical" class="jucePos mdEdFader" param="AmpVolume" style="left: 123dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{AmpVolume_text}}</div>
+								<input id="mdEdCtl_AmpVolume" type="range" orientation="vertical" class="jucePos mdEdFader" param="AmpVolume" style="left: 123dp; top: 264dp;"/>
+								<div id="mdEdVal_AmpVolume" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{AmpVolume_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 324dp; width: 78dp;">VOL</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPan" style="left: 196dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{AmpPan_text}}</div>
+								<knob id="mdEdCtl_AmpPan" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPan" style="left: 196dp; top: 264dp;"/>
+								<div id="mdEdVal_AmpPan" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{AmpPan_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 324dp; width: 78dp;">PAN</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPortamento" style="left: 286dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{AmpPortamento_text}}</div>
+								<knob id="mdEdCtl_AmpPortamento" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPortamento" style="left: 286dp; top: 264dp;"/>
+								<div id="mdEdVal_AmpPortamento" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{AmpPortamento_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 324dp; width: 78dp;">PORT</div>
 							</div>
 							<div id="mdEdFilter" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 736dp; top: 116dp; width: 348dp; height: 356dp;">
@@ -538,29 +538,29 @@
 								<div class="jucePos mdEdGraph" style="left: 16dp; top: 40dp; width: 316dp; height: 128dp;">
 									<div class="mdEdGraphCaption">réponse du filtre · à venir</div>
 								</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBase" style="left: 16dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{FilterBase_text}}</div>
+								<knob id="mdEdCtl_FilterBase" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBase" style="left: 16dp; top: 180dp;"/>
+								<div id="mdEdVal_FilterBase" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{FilterBase_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 240dp; width: 78dp;">BASE</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidth" style="left: 106dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{FilterWidth_text}}</div>
+								<knob id="mdEdCtl_FilterWidth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidth" style="left: 106dp; top: 180dp;"/>
+								<div id="mdEdVal_FilterWidth" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{FilterWidth_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 240dp; width: 78dp;">WDTH</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterHighpassQ" style="left: 196dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{FilterHighpassQ_text}}</div>
+								<knob id="mdEdCtl_FilterHighpassQ" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterHighpassQ" style="left: 196dp; top: 180dp;"/>
+								<div id="mdEdVal_FilterHighpassQ" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{FilterHighpassQ_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 240dp; width: 78dp;">HPQ</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterLowpassQ" style="left: 286dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{FilterLowpassQ_text}}</div>
+								<knob id="mdEdCtl_FilterLowpassQ" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterLowpassQ" style="left: 286dp; top: 180dp;"/>
+								<div id="mdEdVal_FilterLowpassQ" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{FilterLowpassQ_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 240dp; width: 78dp;">LPQ</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterAttack" style="left: 16dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{FilterAttack_text}}</div>
+								<knob id="mdEdCtl_FilterAttack" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterAttack" style="left: 16dp; top: 264dp;"/>
+								<div id="mdEdVal_FilterAttack" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{FilterAttack_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 324dp; width: 78dp;">ATK</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterDecay" style="left: 106dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{FilterDecay_text}}</div>
+								<knob id="mdEdCtl_FilterDecay" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterDecay" style="left: 106dp; top: 264dp;"/>
+								<div id="mdEdVal_FilterDecay" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{FilterDecay_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 324dp; width: 78dp;">DEC</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBaseOffset" style="left: 196dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{FilterBaseOffset_text}}</div>
+								<knob id="mdEdCtl_FilterBaseOffset" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBaseOffset" style="left: 196dp; top: 264dp;"/>
+								<div id="mdEdVal_FilterBaseOffset" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{FilterBaseOffset_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 324dp; width: 78dp;">BOFS</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidthOffset" style="left: 286dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{FilterWidthOffset_text}}</div>
+								<knob id="mdEdCtl_FilterWidthOffset" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidthOffset" style="left: 286dp; top: 264dp;"/>
+								<div id="mdEdVal_FilterWidthOffset" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{FilterWidthOffset_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 324dp; width: 78dp;">WOFS</div>
 							</div>
 							<div id="mdEdEffects" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 484dp; width: 348dp; height: 356dp;">
@@ -569,29 +569,29 @@
 								<div class="jucePos mdEdGraph" style="left: 16dp; top: 40dp; width: 316dp; height: 128dp;">
 									<div class="mdEdGraphCaption">delay et EQ · à venir</div>
 								</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayTime" style="left: 16dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{EffectsDelayTime_text}}</div>
+								<knob id="mdEdCtl_EffectsDelayTime" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayTime" style="left: 16dp; top: 180dp;"/>
+								<div id="mdEdVal_EffectsDelayTime" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 226dp; width: 78dp;">{{EffectsDelayTime_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 240dp; width: 78dp;">DTIM</div>
-								<input type="range" orientation="vertical" class="jucePos mdEdFader" param="EffectsDelaySend" style="left: 123dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{EffectsDelaySend_text}}</div>
+								<input id="mdEdCtl_EffectsDelaySend" type="range" orientation="vertical" class="jucePos mdEdFader" param="EffectsDelaySend" style="left: 123dp; top: 180dp;"/>
+								<div id="mdEdVal_EffectsDelaySend" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 226dp; width: 78dp;">{{EffectsDelaySend_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 240dp; width: 78dp;">DSND</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayFeedback" style="left: 196dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{EffectsDelayFeedback_text}}</div>
+								<knob id="mdEdCtl_EffectsDelayFeedback" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayFeedback" style="left: 196dp; top: 180dp;"/>
+								<div id="mdEdVal_EffectsDelayFeedback" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 226dp; width: 78dp;">{{EffectsDelayFeedback_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 240dp; width: 78dp;">DFB</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsSampleRate" style="left: 286dp; top: 180dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{EffectsSampleRate_text}}</div>
+								<knob id="mdEdCtl_EffectsSampleRate" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsSampleRate" style="left: 286dp; top: 180dp;"/>
+								<div id="mdEdVal_EffectsSampleRate" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 226dp; width: 78dp;">{{EffectsSampleRate_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 240dp; width: 78dp;">SRR</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqGain" style="left: 16dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{EffectsEqGain_text}}</div>
+								<knob id="mdEdCtl_EffectsEqGain" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqGain" style="left: 16dp; top: 264dp;"/>
+								<div id="mdEdVal_EffectsEqGain" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 310dp; width: 78dp;">{{EffectsEqGain_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 324dp; width: 78dp;">EQG</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqFrequency" style="left: 106dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{EffectsEqFrequency_text}}</div>
+								<knob id="mdEdCtl_EffectsEqFrequency" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqFrequency" style="left: 106dp; top: 264dp;"/>
+								<div id="mdEdVal_EffectsEqFrequency" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 310dp; width: 78dp;">{{EffectsEqFrequency_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 324dp; width: 78dp;">EQF</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayBase" style="left: 196dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{EffectsDelayBase_text}}</div>
+								<knob id="mdEdCtl_EffectsDelayBase" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayBase" style="left: 196dp; top: 264dp;"/>
+								<div id="mdEdVal_EffectsDelayBase" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 310dp; width: 78dp;">{{EffectsDelayBase_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 324dp; width: 78dp;">DBAS</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayWidth" style="left: 286dp; top: 264dp;"/>
-								<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{EffectsDelayWidth_text}}</div>
+								<knob id="mdEdCtl_EffectsDelayWidth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayWidth" style="left: 286dp; top: 264dp;"/>
+								<div id="mdEdVal_EffectsDelayWidth" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 310dp; width: 78dp;">{{EffectsDelayWidth_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 324dp; width: 78dp;">DWID</div>
 							</div>
 							<div id="mdEdLfo" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 376dp; top: 484dp; width: 708dp; height: 356dp;">
@@ -604,83 +604,83 @@
 								<button id="mmLfoTab2" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmLfo" tabbutton="2" style="left: 618dp; top: 8dp;">LFO 3</button>
 								<div id="mmLfoPage0" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="0" style="left: 360dp; top: 40dp; width: 348dp; height: 308dp;">
 									<div class="jucePos juceLabel mdEdNote" style="left: 0dp; top: 0dp; width: 332dp;">LFO 1 : page {{Lfo1Page_text}}, destination {{Lfo1Destination_text}}, forme {{Lfo1Waveform_text}}, déclenchement {{Lfo1Trigger_text}}</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Page" style="left: 16dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo1Page_text}}</div>
+									<knob id="mdEdCtl_Lfo1Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Page" style="left: 16dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo1Page" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo1Page_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">PAGE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Destination" style="left: 106dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo1Destination_text}}</div>
+									<knob id="mdEdCtl_Lfo1Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Destination" style="left: 106dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo1Destination" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo1Destination_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">DEST</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Trigger" style="left: 196dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo1Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo1Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Trigger" style="left: 196dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo1Trigger" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo1Trigger_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">TRIG</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Waveform" style="left: 286dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo1Waveform_text}}</div>
+									<knob id="mdEdCtl_Lfo1Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Waveform" style="left: 286dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo1Waveform" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo1Waveform_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">WAVE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Multiplier" style="left: 16dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo1Multiplier_text}}</div>
+									<knob id="mdEdCtl_Lfo1Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Multiplier" style="left: 16dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo1Multiplier" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo1Multiplier_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">MULT</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Speed" style="left: 106dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo1Speed_text}}</div>
+									<knob id="mdEdCtl_Lfo1Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Speed" style="left: 106dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo1Speed" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo1Speed_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 184dp; width: 78dp;">SPD</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Interlace" style="left: 196dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo1Interlace_text}}</div>
+									<knob id="mdEdCtl_Lfo1Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Interlace" style="left: 196dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo1Interlace" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo1Interlace_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 184dp; width: 78dp;">INTL</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Depth" style="left: 286dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo1Depth_text}}</div>
+									<knob id="mdEdCtl_Lfo1Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Depth" style="left: 286dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo1Depth" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo1Depth_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 184dp; width: 78dp;">DEP</div>
 								</div>
 								<div id="mmLfoPage1" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="1" style="left: 360dp; top: 40dp; width: 348dp; height: 308dp;">
 									<div class="jucePos juceLabel mdEdNote" style="left: 0dp; top: 0dp; width: 332dp;">LFO 2 : page {{Lfo2Page_text}}, destination {{Lfo2Destination_text}}, forme {{Lfo2Waveform_text}}, déclenchement {{Lfo2Trigger_text}}</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Page" style="left: 16dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo2Page_text}}</div>
+									<knob id="mdEdCtl_Lfo2Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Page" style="left: 16dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo2Page" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo2Page_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">PAGE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Destination" style="left: 106dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo2Destination_text}}</div>
+									<knob id="mdEdCtl_Lfo2Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Destination" style="left: 106dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo2Destination" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo2Destination_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">DEST</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Trigger" style="left: 196dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo2Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo2Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Trigger" style="left: 196dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo2Trigger" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo2Trigger_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">TRIG</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Waveform" style="left: 286dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo2Waveform_text}}</div>
+									<knob id="mdEdCtl_Lfo2Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Waveform" style="left: 286dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo2Waveform" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo2Waveform_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">WAVE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Multiplier" style="left: 16dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo2Multiplier_text}}</div>
+									<knob id="mdEdCtl_Lfo2Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Multiplier" style="left: 16dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo2Multiplier" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo2Multiplier_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">MULT</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Speed" style="left: 106dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo2Speed_text}}</div>
+									<knob id="mdEdCtl_Lfo2Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Speed" style="left: 106dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo2Speed" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo2Speed_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 184dp; width: 78dp;">SPD</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Interlace" style="left: 196dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo2Interlace_text}}</div>
+									<knob id="mdEdCtl_Lfo2Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Interlace" style="left: 196dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo2Interlace" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo2Interlace_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 184dp; width: 78dp;">INTL</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Depth" style="left: 286dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo2Depth_text}}</div>
+									<knob id="mdEdCtl_Lfo2Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Depth" style="left: 286dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo2Depth" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo2Depth_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 184dp; width: 78dp;">DEP</div>
 								</div>
 								<div id="mmLfoPage2" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="2" style="left: 360dp; top: 40dp; width: 348dp; height: 308dp;">
 									<div class="jucePos juceLabel mdEdNote" style="left: 0dp; top: 0dp; width: 332dp;">LFO 3 : page {{Lfo3Page_text}}, destination {{Lfo3Destination_text}}, forme {{Lfo3Waveform_text}}, déclenchement {{Lfo3Trigger_text}}</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Page" style="left: 16dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo3Page_text}}</div>
+									<knob id="mdEdCtl_Lfo3Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Page" style="left: 16dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo3Page" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Lfo3Page_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">PAGE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Destination" style="left: 106dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo3Destination_text}}</div>
+									<knob id="mdEdCtl_Lfo3Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Destination" style="left: 106dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo3Destination" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{Lfo3Destination_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">DEST</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Trigger" style="left: 196dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo3Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo3Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Trigger" style="left: 196dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo3Trigger" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{Lfo3Trigger_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">TRIG</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Waveform" style="left: 286dp; top: 40dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo3Waveform_text}}</div>
+									<knob id="mdEdCtl_Lfo3Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Waveform" style="left: 286dp; top: 40dp;"/>
+									<div id="mdEdVal_Lfo3Waveform" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{Lfo3Waveform_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">WAVE</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Multiplier" style="left: 16dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo3Multiplier_text}}</div>
+									<knob id="mdEdCtl_Lfo3Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Multiplier" style="left: 16dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo3Multiplier" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Lfo3Multiplier_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">MULT</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Speed" style="left: 106dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo3Speed_text}}</div>
+									<knob id="mdEdCtl_Lfo3Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Speed" style="left: 106dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo3Speed" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{Lfo3Speed_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 184dp; width: 78dp;">SPD</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Interlace" style="left: 196dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo3Interlace_text}}</div>
+									<knob id="mdEdCtl_Lfo3Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Interlace" style="left: 196dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo3Interlace" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{Lfo3Interlace_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 184dp; width: 78dp;">INTL</div>
-									<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Depth" style="left: 286dp; top: 124dp;"/>
-									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo3Depth_text}}</div>
+									<knob id="mdEdCtl_Lfo3Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Depth" style="left: 286dp; top: 124dp;"/>
+									<div id="mdEdVal_Lfo3Depth" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo3Depth_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 184dp; width: 78dp;">DEP</div>
 								</div>
 							</div>
@@ -697,7 +697,7 @@
 			<div id="mdEdPageMix" class="mdEdPage" tabgroup="mdEdit" tabpage="1">
 				<div class="mdEdScroll">
 					<div class="mdEdContent" style="height: 488dp;">
-						<div id="mdEdLevels" class="jucePos mdEdBlock" style="left: 16dp; top: 16dp; width: 708dp; height: 292dp;">
+						<div id="mdEdLevels" class="jucePos mdEdBlock" style="left: 16dp; top: 16dp; width: 708dp; height: 456dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 676dp;">NIVEAUX</div>
 							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 8dp; width: 676dp;">une colonne par champ</div>
 							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 16dp; top: 40dp; width: 70dp;">PISTE</div>
@@ -772,7 +772,7 @@
 								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 4dp; width: 30dp;">CD</div>
 								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 4dp; width: 30dp;">EF</div>
 								</div>
-							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 264dp; width: 676dp;">MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir.</div>
+							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 428dp; width: 676dp;">MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir.</div>
 						</div>
 						<div id="mdEdOutputs" class="jucePos mdEdBlock" style="left: 736dp; top: 16dp; width: 348dp; height: 456dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 316dp;">SORTIES</div>
