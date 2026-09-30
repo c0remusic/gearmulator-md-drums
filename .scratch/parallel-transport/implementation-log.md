@@ -972,6 +972,43 @@ Reste :
 - Mineur : une valeur illisible de `MDMM_LATENCY_BLOCKS` avertit deux fois
   (device puis plugin).
 
+### Périphériques : répartition fine, lien toujours occupé (2026-09-30)
+
+Sondes niveau 2 (`DSP56K_PROBE_LEVEL=2`), dans les périphériques : horloge
+série (`esxiClock`, sans les slots qu'elle lance), slots ESSI TX et RX par
+port (callbacks de trame compris), HDI08, timers, DMA (sondé à l'appel dans
+`Peripherals56303::exec` : `Dma` ne garde pas de référence au DSP). Compteurs
+de slots ESSI par port : slots actifs, trames rendues à l'hôte, slots RX sans
+mot. Coût : 37 % du mur au niveau 2 (couverture 63 à 65 %) contre 10 % au
+niveau 1 ; figures corrigées, répartition à lire en relatif.
+
+Mesures (banc non cadencé, MM paire ; charge de fond : vite d'un autre projet
+sur 4 cœurs) :
+- Niveau 1 : périphériques 33 % du mur worker (mixer 132 à 142 ns par passe,
+  producer 108 ns).
+- Niveau 2, par passe. Mixer : RX lien ESSI0 ~54 %, reste propre ~12 %, RX
+  codec ~10 %, horloge ~9 %, HDI08 ~9 %. Producer : TX lien ESSI0 ~44 %,
+  HDI08 ~17 %, reste propre ~15 %, horloge ~10 %, DMA ~8 %. HDI08 coûte 27 ns
+  par passe dans les rattrapages contre 9 à 12 en propre (non expliqué).
+- Lien : un slot toutes les 96 cycles, ~1,04 M mots par seconde émulée. Le
+  producer rend une trame à chaque slot (46,8 M slots, 46,8 M trames sur le
+  run), le mixer reçoit un mot sur 93,6 % de ses slots : le lien n'est jamais
+  inactif, sauter les slots vides ne rapporterait rien. Chaque slot
+  échantillonne le registre TX que le DMA écrit à cet instant : une passe
+  périphérique par slot et par DSP est intrinsèque.
+- Coût : ~46 ns par mot côté TX (producer), ~63 ns côté RX (mixer), plus
+  ~35 ns de frais fixes par passe (reste propre, horloge, HDI08, timers,
+  DMA) sur ~2,9 M passes par seconde émulée.
+
+Leviers :
+1. Chemin par mot côté MD (`pushToInput`, `blockingPop`, `linkRxAvailable`) :
+   deux dispositions par mot, ~4 divisions en double, date du consommateur
+   recalculée. Refactor pur, 3 à 5 points estimés.
+2. Passes sans travail : HDI08, timers et DMA servis à chaque passe.
+   Échéance par périphérique, réveil HDI08 à l'arrivée d'un mot hôte. 5 à 8 %
+   estimés, invasif.
+3. Rattrapage : un cycle rattrapé coûte encore 2,9 ns contre 1,9 en propre.
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
