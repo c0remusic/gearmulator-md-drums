@@ -183,6 +183,10 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 
 /* blocks */
 
+/* the curve row under SON (mdCurveView.cpp); its canvases fill the areas */
+.mdEdCurves { display: block; }
+.mdEdCurveArea { background-color: #151618; border: 1dp #2e3034; border-radius: 2dp; }
+
 .mdEdBlock
 {
 	background-color: #232427;

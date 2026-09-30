@@ -16,6 +16,7 @@ add_compile_definitions(MDMM_DIAGNOSTICS_REVISION="${MDMM_DIAGNOSTICS_REVISION}"
 
 set(SOURCES
 	mdController.cpp mdController.h
+	mdCurveView.cpp mdCurveView.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h

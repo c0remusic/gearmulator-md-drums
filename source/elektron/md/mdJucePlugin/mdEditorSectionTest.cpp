@@ -14,6 +14,7 @@
 #include "jucePluginLib/controller.h"
 #include "mdAutomationTestSupport.h"
 #include "mdController.h"
+#include "mdCurveView.h"
 #include "mdLib/mdmachines.h"
 
 #include "RmlUi/Core/Context.h"
@@ -112,7 +113,8 @@ namespace
 		require(!blocks.empty(), _label + ": no blocks");
 		std::map<int, std::vector<Rml::Element*>> rows;
 		for(auto* b : blocks)
-			rows[static_cast<int>(std::lround(b->GetAbsoluteOffset(Rml::BoxArea::Border).y))].push_back(b);
+			if(b->IsVisible(true))
+				rows[static_cast<int>(std::lround(b->GetAbsoluteOffset(Rml::BoxArea::Border).y))].push_back(b);
 		int nextTop = rows.begin()->first;
 		for(const auto& [top, row] : rows)
 		{
@@ -220,6 +222,38 @@ int main()
 		// ÉDITEUR replaces the front panel: track strip, then the page
 		element(doc, "mdViewEditor").Click();
 		context.Update();
+
+		// COURBES: hidden in the 606 dp window, under SON once the page has room for it.
+		{
+			using Curve = mdJucePlugin::CurveView;
+			require(!visible(element(doc, "mdEdCurves")), "curves shown in the 606 dp window");
+			const auto roomy = element(doc, "mdEdTrackView").GetAttribute("roomyheight")->Get<float>(doc.GetCoreInstance(), 0.0f);
+			const auto window = static_cast<int>(roomy + g_pageTop);
+			component->setSize(1100, window - 1);
+			context.Update();
+			require(!visible(element(doc, "mdEdCurves")), "curves shown one dp short of their room");
+			component->setSize(1100, window);
+			context.Update();
+			require(visible(element(doc, "mdEdCurves")) && visible(element(doc, "mdEdCurvesFilter")) && visible(element(doc, "mdEdCurvesEq")),
+				"curves not shown when the page has room");
+			require(std::lround(element(doc, "mdEdTrackView").GetBox().GetSize(Rml::BoxArea::Border).y) == std::lround(roomy),
+				"SON did not grow by the curve row");
+			requireTiled(element(doc, "mdEdTrackView"), "SON with curves");
+			component->setSize(1100, 606);
+			context.Update();
+			require(!visible(element(doc, "mdEdCurves")), "curves still shown after the window shrank");
+
+			// The shapes: a pass band between BASE and BASE + WIDTH, a bell at EQF, attack, hold, decay.
+			const std::vector<int> band{40, 40, 0, 0};
+			require(Curve::level(Curve::Curve::Filter, band, 60.0f / 127.0f) > -3.0f
+				&& Curve::level(Curve::Curve::Filter, band, 0.05f) < -20.0f && Curve::level(Curve::Curve::Filter, band, 0.95f) < -20.0f,
+				"filter curve does not pass its band only");
+			require(Curve::level(Curve::Curve::Eq, {64, 127}, 0.5f) > 17.0f && std::fabs(Curve::level(Curve::Curve::Eq, {64, 64}, 0.5f)) < 0.01f
+				&& Curve::level(Curve::Curve::Eq, {64, 127}, 0.05f) < 1.0f, "EQ curve is not a bell at its frequency");
+			require(Curve::level(Curve::Curve::Amp, {0, 0, 126}, 0.0f) == 0.0f && Curve::level(Curve::Curve::Amp, {126, 0, 0}, 0.9f) < 1.0f
+				&& Curve::level(Curve::Curve::Amp, {10, 107, 10}, 0.5f) == 1.0f && Curve::level(Curve::Curve::Amp, {10, 10, 107}, 1.0f) == 0.0f,
+				"amp curve is not attack, hold and decay");
+		}
 		require(visible(element(doc, "mdEditor")) && !visible(element(doc, "mdFrontPanel")), "ÉDITEUR did not replace the front panel");
 		requireRect(element(doc, "mdEditor"), 0, 36, 1100, 570, "editor");
 		constexpr int lastTrack = g_trackCount - 1;
@@ -503,6 +537,10 @@ int main()
 			snap("-panel");
 			component->setSize(1100, 1200);
 			snap("-stacked");
+			element(doc, "mdViewEditor").Click();
+			component->setSize(1100, 740);
+			snap("-curves");
+			element(doc, "mdViewPanel").Click();
 			component->setSize(1100, 606);
 			element(doc, "mdViewEditor").Click();
 			component->setLookAndFeel(nullptr);

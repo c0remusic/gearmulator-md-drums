@@ -460,7 +460,7 @@
 				</div>
 				<div class="mdEdScroll">
 					<div class="mdEdContent" data-model="tabgroup_mdTrack">
-						<div id="mdEdTrackView" class="mdEdView" style="height: 528dp;">
+						<div id="mdEdTrackView" class="mdEdView" roomyheight="668" style="height: 528dp;">
 							<div id="mdEdMachine" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 64dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">MACHINE</div>
 								<button id="mdEdMachineChange" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 902dp; top: 4dp; width: 150dp;">CHANGER DE MACHINE</button>
@@ -664,6 +664,23 @@
 									<knob id="mdEdCtl_Lfo3Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Depth" style="left: 646dp; top: 84dp;"/>
 									<div id="mdEdVal_Lfo3Depth" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 130dp; width: 78dp;">{{Lfo3Depth_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 630dp; top: 144dp; width: 78dp;">DEP</div>
+								</div>
+							</div>
+							<div id="mdEdCurves" class="mdEdCurves" style="display: none;">
+								<div id="mdEdCurvesAmp" class="jucePos mdEdBlock" style="left: 16dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">AMPLI</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">ATK, HOLD, DEC · proportions</div>
+									<div id="mdEdCurveAmp" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
+								</div>
+								<div id="mdEdCurvesFilter" class="jucePos mdEdBlock" style="left: 376dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">FILTRE</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">BASE, WDTH, HPQ, LPQ · allure</div>
+									<div id="mdEdCurveFilter" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
+								</div>
+								<div id="mdEdCurvesEq" class="jucePos mdEdBlock" style="left: 736dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">EQ</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">EQF, EQG · allure</div>
+									<div id="mdEdCurveEq" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
 								</div>
 							</div>
 							<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: 16dp; top: 80dp; width: 1068dp; display: none;">

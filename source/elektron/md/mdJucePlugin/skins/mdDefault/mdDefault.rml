@@ -496,7 +496,7 @@
 				</div>
 				<div class="mdEdScroll">
 					<div class="mdEdContent" data-model="tabgroup_mdTrack">
-						<div id="mdEdTrackView" class="mdEdView" data-if="page != 16" style="height: 444dp;">
+						<div id="mdEdTrackView" class="mdEdView" data-if="page != 16" roomyheight="584" style="height: 444dp;">
 							<div id="mdEdSteps" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 708dp; height: 64dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 676dp;">PAS</div>
 								<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 60dp; top: 4dp; width: 562dp;">pattern : en attente</div>
@@ -631,6 +631,18 @@
 								<div id="mdEdVal_LFOAmount" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{LFOAmount_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">DEPTH</div>
 								<div class="jucePos juceLabel mdEdNote" style="left: 286dp; top: 44dp; width: 766dp;">LFO forme {{LFOShape_text}} · vitesse {{LFOSpeed_text}} · profondeur {{LFOAmount_text}} · destination : à venir</div>
+							</div>
+							<div id="mdEdCurves" class="mdEdCurves" style="display: none;">
+								<div id="mdEdCurvesFilter" class="jucePos mdEdBlock" style="left: 16dp; top: 444dp; width: 528dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">FILTRE</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">BASE, WIDTH, Q · allure, pas une mesure</div>
+									<div id="mdEdCurveFilter" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 496dp; height: 88dp;"/>
+								</div>
+								<div id="mdEdCurvesEq" class="jucePos mdEdBlock" style="left: 556dp; top: 444dp; width: 528dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">EQ</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">EQF, EQG · allure, pas une mesure</div>
+									<div id="mdEdCurveEq" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 496dp; height: 88dp;"/>
+								</div>
 							</div>
 							<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: 16dp; top: 80dp; width: 1068dp; display: none;">
 								<div id="mdEdPickerFamilies" class="mdEdPickerRow"/>

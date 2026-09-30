@@ -4,6 +4,7 @@
 #include "mdMachinePicker.h"
 #include "mdStepGrid.h"
 #include "mdViewLayout.h"
+#include "mdCurveView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -723,6 +724,10 @@ namespace mdJucePlugin
 		// The top bar shows the front panel or the editor, or both in a tall window.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
 			m_viewLayout = std::make_unique<ViewLayout>(*document);
+
+		// The COURBES row under SON, when the window leaves room for it.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdCurves"))
+			m_curveView = std::make_unique<CurveView>(m_controller, getModel(), *document);
 
 		// The MACHINE block shows and assigns the edited track's machine.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMachineName"))
@@ -2118,7 +2123,8 @@ namespace mdJucePlugin
 
 		const bool machineChanged = m_machinePicker && m_machinePicker->update();
 		const bool stepsChanged = m_stepGrid && m_stepGrid->update(nowMilliseconds);
-		if(machineChanged || stepsChanged)
+		const bool curvesChanged = m_curveView && m_curveView->update();
+		if(machineChanged || stepsChanged || curvesChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 
