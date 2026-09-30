@@ -882,15 +882,55 @@ Reste : un cycle rattrapé coûte encore 6,1 ns par cycle exécuté contre 4,4 e
 propre (boucle bloc par bloc, contrôle du backlog à chaque bloc). Suite :
 répartir les périphériques (~27 %).
 
+### Surcharges d'environnement vides : lecteurs de mdLib corrigés (2026-09-30)
+
+Suite de la leçon PowerShell (Leçons dures). Toute surcharge MD/MM de mdLib
+passe désormais par `source/elektron/md/mdLib/mdenv.h` (`envOverride`,
+`envNumber`, `envCount<T>`) : non définie, vide ou illisible = non définie ;
+une valeur illisible donne une ligne `[MD] ... ignored` sur stderr. Commits :
+09737e8d (mdhardware.cpp, avances de paire) ; e2baad0d (fusion b31de12a) pour
+`MD_JIT_OPTIMIZER`, `MDMM_LATENCY_BLOCKS` (device et plugin via
+`Device::latencyBlocksFromEnvironment()`), `MDMM_RENDER_SPIN_US`,
+`MD_MAX_DO_ITERATIONS` et `DSP56K_PROBE_LEVEL` ; 8135e012 (fusion bb1b3991)
+retire les copies locales de mdhardware.cpp. Ne jamais recréer de copie
+locale dans un fichier qui inclut mdenv.h : les appels non qualifiés
+deviennent ambigus.
+
+Mesuré avant correctif, variable vide créée par
+`SetEnvironmentVariable($n, $null)` : `MD_JIT_OPTIMIZER` activait
+l'optimiseur (défaut : coupé), `MDMM_LATENCY_BLOCKS` donnait à une
+configuration MD neuve une latence de 0 au lieu de 2 blocs,
+`DSP56K_PROBE_LEVEL` valait 0 au lieu de 1. Hors vide :
+`MDMM_LATENCY_BLOCKS=-1` donnait 4294967295 blocs et
+`MD_MAX_DO_ITERATIONS=64abc` valait 64 ; les deux sont désormais ignorées.
+
+Reste :
+- Lecteurs de test et de banc qui lisent encore `""` comme une valeur :
+  `MM_LISTEN_SECONDS` (mmAudioFirmwareTest.cpp:246, `strtoull("") = 0` :
+  `--listen` ne rend rien et passe), `MM_LISTEN_LONE_MIXER` (:279, présence :
+  vide = activé), `MDMM_BENCH_TIMELINE` et `MDMM_BENCH_JOBSERIES`
+  (mdParallelTransportBenchmark.cpp:789 et 817, présence), `DSP_LOG_INVALIDOP`
+  (sous-module, jitblock.cpp:245, présence). Les entrées ctest fixent
+  `MM_LISTEN_SECONDS=2` et ne sont pas concernées ; un lancement à la main
+  avec une variable vide l'est.
+- Arbitrage laissé : `MD_JIT_OPTIMIZER` garde la convention des drapeaux du
+  code (toute valeur non vide qui ne commence pas par `0` active, « false » et
+  « off » compris). Option stricte : `envNumber`, non-nombre ignoré avec
+  avertissement.
+- Mineur : une valeur illisible de `MDMM_LATENCY_BLOCKS` avertit deux fois
+  (device puis plugin).
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
   une variable VIDE que l'enfant voit (`getenv` rend `""`). Avec
   `MD_PAIR_LEAD_US=""` et `MD_PAIR_UC_LEAD_US=""`, les deux avances de paire
-  valent 0 : UC et worker s'attendent à la bascule, le MM se fige au boot.
-  `MDMM_TRANSPORT=""` vaut Serial. Chaque appel d'outil part d'un
+  valaient 0 : UC et worker s'attendaient à la bascule, le MM se figeait au
+  boot. `MDMM_TRANSPORT=""` valait Serial. Chaque appel d'outil part d'un
   environnement vierge : ne rien « effacer », ou `Remove-Item Env:`. Une
   soirée de fausse régression, bissectée à tort dans le code (2026-09-30).
+  mdLib lit désormais le vide comme non défini (section « Surcharges
+  d'environnement vides ») ; l'habitude reste, les lecteurs de test non.
 
 
 - `--host-profile` du banc (RIP échantillonné, sans pile) se trompe sur le
