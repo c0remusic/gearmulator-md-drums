@@ -1,0 +1,565 @@
+<title>MD/MM Editor Wireframes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of numbered wireframe boards (grey boxes on paper), each with a short annotation list.
+   Boards are drawn on the editor's own 12-column grid so spans can be read off directly. Low fidelity on purpose. */
+:root {
+  --paper: #f3f4f1; --board: #ffffff; --line: #b9bdb6; --fill: #e4e6e1; --fill-2: #d3d6cf;
+  --ink: #23262a; --ink-dim: #666b70; --note: #c2410c; --cool: #2f5fc4;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #17191c; --board: #1f2226; --line: #4a4f55; --fill: #2b2f34; --fill-2: #363b41; --ink: #e5e7e9; --ink-dim: #9aa0a6; --note: #fb923c; --cool: #7aa2ff; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper: #17191c; --board: #1f2226; --line: #4a4f55; --fill: #2b2f34; --fill-2: #363b41; --ink: #e5e7e9; --ink-dim: #9aa0a6; --note: #fb923c; --cool: #7aa2ff; color-scheme: dark; }
+body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; padding-inline: 16px; padding-block: 28px 48px; }
+.wrap { max-width: 1180px; margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+header h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; text-wrap: balance; }
+header p { margin: 0; color: var(--ink-dim); max-width: 78ch; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font: 13px var(--mono); }
+.toc a { color: var(--ink); }
+section { display: grid; gap: 12px; }
+section h2 { margin: 0; font-size: 18px; font-weight: 600; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+section h2 small { font: 12px var(--mono); color: var(--ink-dim); font-weight: 400; }
+.status { font: 11px var(--mono); border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px; color: var(--ink-dim); }
+.status.v1 { border-color: var(--ink); color: var(--ink); }
+.cols { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) { .cols { grid-template-columns: minmax(0, 1fr) 300px; } }
+.board-wrap { overflow-x: auto; }
+.board { background: var(--board); border: 1px solid var(--line); border-radius: 4px; padding: 12px; display: grid; gap: 8px; min-width: 680px; font-size: 12px; }
+/* the 12-column grid, as in the editor */
+.g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.g12.ruled { background-image: repeating-linear-gradient(to right, color-mix(in srgb, var(--note) 9%, transparent) 0 calc((100% - 88px) / 12), transparent calc((100% - 88px) / 12) calc((100% - 88px) / 12 + 8px)); }
+.s1 { grid-column: span 1; } .s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; } .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: 1 / -1; }
+.r2 { grid-row: span 2; }
+.box { background: var(--fill); border: 1px solid var(--line); border-radius: 2px; padding: 6px 8px; color: var(--ink-dim); display: grid; align-content: start; gap: 4px; min-width: 0; }
+.box b { color: var(--ink); font-weight: 500; }
+.box.dark { background: var(--fill-2); }
+.box.x { background: repeating-linear-gradient(135deg, var(--fill) 0 8px, var(--fill-2) 8px 9px); }
+.box .t { font: 500 11px var(--mono); color: var(--ink); display: flex; justify-content: space-between; gap: 6px; }
+.box .t span { color: var(--ink-dim); font-weight: 400; }
+.graph { height: 44px; border: 1px dashed var(--line); border-radius: 2px; background: linear-gradient(to top right, transparent 49%, var(--line) 50%, transparent 51%); }
+.vals { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 4px; }
+.vals i { height: 18px; border-bottom: 3px solid var(--fill-2); font: normal 10px var(--mono); color: var(--ink-dim); }
+.vals i.lk { border-color: var(--note); color: var(--note); }
+/* typed controls (set by script from the label): encoder, centred encoder, fader */
+.vals i[data-k] { height: auto; border: 0; display: grid; justify-items: start; gap: 2px; font-style: normal; text-transform: uppercase; letter-spacing: .06em; }
+.vals i[data-k]::before { content: ""; display: block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--fill-2); border-top-color: var(--ink-dim); border-right-color: var(--ink-dim); transform: rotate(-45deg); }
+.vals i[data-k="centred"]::before { border-color: var(--fill-2); border-top-color: var(--ink-dim); transform: none; }
+.vals i[data-k="fader"]::before { width: 4px; height: 18px; border-radius: 2px; border: 0; background: linear-gradient(var(--fill-2) 0 45%, var(--ink-dim) 45% 60%, var(--fill-2) 60%); transform: none; }
+.vals i.lk[data-k]::before { border-top-color: var(--note); border-right-color: var(--note); }
+.vals i.lk[data-k="fader"]::before { background: linear-gradient(var(--fill-2) 0 45%, var(--note) 45% 60%, var(--fill-2) 60%); }
+.vals i.dim { opacity: .45; }
+.segw { display: inline-flex; border: 1px solid var(--line); font: 10px var(--mono); }
+.segw span { padding: 1px 5px; border-left: 1px solid var(--line); color: var(--ink-dim); }
+.segw span:first-child { border-left: 0; }
+.segw span.on { background: var(--ink-dim); color: var(--board); }
+.ledw { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fill-2); vertical-align: -1px; }
+.ledw.on { background: var(--note); }
+.legend { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.legend .box { align-content: start; min-height: 96px; }
+.tabs { display: flex; gap: 2px; font: 11px var(--mono); flex-wrap: wrap; }
+.tabs span { border: 1px solid var(--line); padding: 2px 6px; border-radius: 2px; color: var(--ink-dim); }
+.tabs span.on { background: var(--fill-2); color: var(--ink); }
+.pin { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: var(--board); font: 600 10.5px var(--mono); flex: none; }
+.lbl { display: flex; gap: 6px; align-items: center; }
+/* time grid rows: column 1 = label, columns 2..12 = 32 steps */
+.trow { display: contents; }
+.trow > .tl { grid-column: 1; font: 10px var(--mono); color: var(--ink-dim); align-self: center; white-space: nowrap; overflow: hidden; }
+.trow > .tr { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(32, minmax(0, 1fr)); gap: 1px; }
+.tr i { display: block; height: 10px; background: var(--fill); border: 1px solid var(--line); border-radius: 1px; }
+.tr i.on { background: var(--ink-dim); }
+.tr i.acc { background: var(--note); border-color: var(--note); }
+.tr i.lk { outline: 2px solid var(--cool); outline-offset: -2px; }
+.tr.tall i { height: 40px; background: var(--board); position: relative; }
+.tr.tall i b { position: absolute; left: 2px; right: 2px; bottom: 0; background: var(--fill-2); }
+.tr.tall i b.lk { background: var(--note); }
+.tr.mid i { height: 22px; background: var(--board); position: relative; }
+.tr.mid i b { position: absolute; left: 2px; right: 2px; bottom: 0; background: var(--fill-2); }
+.roll { position: relative; height: 96px; border: 1px solid var(--line); background: repeating-linear-gradient(to bottom, var(--board) 0 11px, var(--fill) 11px 12px); }
+.roll i { position: absolute; height: 8px; border-radius: 2px; background: var(--cool); }
+.roll i.acc { background: var(--note); }
+.meter { width: 8px; height: 44px; background: linear-gradient(to top, var(--ink-dim) 0 var(--m, 60%), var(--fill-2) var(--m, 60%)); border-radius: 1px; }
+.fdr { display: grid; justify-items: center; gap: 2px; font: 10px var(--mono); color: var(--ink-dim); }
+.fdr div { width: 6px; height: 44px; background: var(--fill-2); border-radius: 3px; }
+ol.notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; align-content: start; }
+ol.notes li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; font-size: 13.5px; }
+ol.notes li b { font-weight: 600; }
+.aside { font-size: 13px; color: var(--ink-dim); border-left: 2px solid var(--note); padding-left: 10px; margin: 0; max-width: 84ch; }
+.mono { font-family: var(--mono); }
+table.src { display: block; overflow-x: auto; border-collapse: collapse; font-size: 13px; width: 100%; max-width: 980px; }
+table.src th, table.src td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.src th { font: 500 11px var(--mono); color: var(--ink-dim); }
+.ok { color: var(--ink); } .todo { color: var(--note); }
+a:focus-visible { outline: 2px solid var(--note); outline-offset: 2px; }
+/* board 0: the window to scale (1100 × 1000 dp drawn at 32 %) */
+.wins { display: flex; gap: 32px; flex-wrap: wrap; }
+.winfig { margin: 0; display: grid; grid-template-columns: 352px 36px; grid-template-rows: auto 320px auto; gap: 4px; }
+.winfig figcaption { grid-column: 1 / -1; font: 500 11px var(--mono); color: var(--ink); }
+.win1000 { position: relative; width: 352px; height: 320px; border: 1px solid var(--ink-dim); background: var(--board); overflow: hidden; }
+.wz { position: absolute; left: 0; right: 0; border-bottom: 1px solid var(--line); background: var(--fill); padding: 1px 6px; font-size: 10.5px; line-height: 14px; color: var(--ink-dim); overflow: hidden; }
+.wz .pin { width: 14px; height: 14px; font-size: 9px; }
+.wz.dark { background: var(--fill-2); }
+.wz.x { background: repeating-linear-gradient(135deg, var(--fill) 0 8px, var(--fill-2) 8px 9px); }
+.wz.page { background: repeating-linear-gradient(to bottom, var(--board) 0 18px, var(--fill) 18px 20px); border-bottom: 0; }
+.wz .sb { position: absolute; right: 2px; top: 4px; width: 4px; height: 40%; border-radius: 2px; background: var(--ink-dim); }
+.dim-w { grid-column: 1; grid-row: 3; text-align: center; font: 10px var(--mono); color: var(--ink-dim); border-top: 1px solid var(--line); }
+.dim-h { grid-column: 2; grid-row: 2; writing-mode: vertical-rl; text-align: center; font: 10px var(--mono); color: var(--ink-dim); border-left: 1px solid var(--line); }
+.ruler { position: relative; height: 48px; border: 1px solid var(--line); background: var(--board); margin-top: 4px; }
+.ruler i { position: absolute; top: 0; height: 18px; background: color-mix(in srgb, var(--note) 18%, transparent); border-left: 1px solid var(--note); }
+.ruler i b { position: absolute; top: 19px; left: 0; font: 9px var(--mono); color: var(--note); font-weight: 400; }
+.ruler .rl { position: absolute; right: 6px; bottom: 1px; font: 10px var(--mono); color: var(--ink-dim); }
+.ruler.steps { height: 40px; }
+.ruler.steps i { background: var(--fill-2); border-left: 0; height: 14px; top: 2px; }
+.ruler.steps .rl { display: flex; gap: 6px; align-items: center; }
+.ico { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; flex: none; }
+.ico .f { fill: currentColor; stroke: none; }
+.box .ico { color: var(--ink); }
+.tabs span .ico { width: 12px; height: 12px; margin-right: 3px; vertical-align: -2px; }
+.mbtn { display: flex; gap: 6px; align-items: center; justify-content: center; font: 11px var(--mono); color: var(--ink); padding: 4px 6px; border: 1px solid var(--line); border-radius: 2px; background: var(--board); }
+.mbtn.on { border-color: var(--note); }
+.slotg { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+.slotg i { display: grid; justify-items: center; font: normal 9px/12px var(--mono); color: var(--ink-dim); border: 1px solid var(--line); border-radius: 2px; padding: 2px 0; background: var(--board); }
+.slotg i b { font: 500 10px/13px var(--mono); color: var(--ink); }
+.slotg i.e b { color: var(--ink-dim); font-weight: 400; }
+.slotg i.on { border-color: var(--note); }
+.slotg i.on b { color: var(--note); }
+.fams { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 8px; }
+.fam { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 10px; background: var(--board); border: 1px solid var(--line); border-radius: 3px; padding: 10px; font-size: 13px; }
+.fam .ico { width: 28px; height: 28px; grid-row: span 3; color: var(--note); }
+.fam b { font: 600 13px var(--mono); }
+.fam span { color: var(--ink-dim); }
+.fam em { font-style: normal; font: 11px var(--mono); color: var(--ink-dim); }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>MD/MM Editor Wireframes</h1>
+  <p>L'éditeur tel qu'il est dans la maquette, en basse fidélité. Fenêtre de plug-in JUCE de 1100 × 1000 dp, rendue par RmlUi : face avant repliable en haut, éditeur en dessous. Catégories, grille de 12 colonnes de 78 dp, contrôles par type de paramètre, routage des sorties, piano roll et lanes. Look retenu : Châssis (anthracite, sérigraphie en capitales condensées, orange réservé aux locks et aux LED). Deux plug-ins séparés, Gearmulator MD et Gearmulator MM, partagent le même éditeur ; chacun n'affiche que sa machine. Tout est en lecture seule en v1. Les points orange renvoient aux notes à droite de chaque planche.</p>
+  <nav class="toc" aria-label="Sommaire">
+    <a href="#grid">0 Fenêtre 1100 × 1000 et grille</a><a href="#controls">0b Contrôles</a><a href="#jouer">1 JOUER · pattern</a><a href="#mdlanes">2 JOUER · lanes MD</a><a href="#mmroll">3 JOUER · piano roll MM</a><a href="#mdson">4 SON · piste MD</a><a href="#machine">4b SON · machine et samples</a><a href="#familles">4c Familles</a><a href="#master">5 SON · MASTER</a><a href="#mmson">6 SON · piste MM</a><a href="#mix">7 MIX</a><a href="#biblio">8 BIBLIO</a><a href="#daw">9 Depuis le DAW</a><a href="#system">10 SYSTÈME</a><a href="#sources">Sources</a>
+  </nav>
+</header>
+
+<!-- 0 window + grid -->
+<section id="grid">
+  <h2>0 · Fenêtre et grille <small>1100 × 1000 dp, éditeur sous la face avant</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="wins">
+        <figure class="winfig"><figcaption>Face avant dépliée</figcaption><div class="win1000">
+          <div class="wz x" style="top:0;height:57%"><span class="lbl"><span class="pin">1</span><b>Face avant</b> 570 dp · skin actuel</span></div>
+          <div class="wz dark" style="top:57%;height:5.6%"><span class="lbl"><span class="pin">2</span><b>En-tête</b> 56 dp</span></div>
+          <div class="wz" style="top:62.6%;height:4.8%"><span class="lbl"><span class="pin">3</span><b>Pistes</b> 48 dp (SON)</span></div>
+          <div class="wz page" style="top:67.4%;bottom:0"><span class="lbl"><span class="pin">4</span><b>Page de l'éditeur</b> 326 dp · défile</span><i class="sb"></i></div>
+        </div><span class="dim-w">1100 dp</span><span class="dim-h">1000 dp</span></figure>
+        <figure class="winfig"><figcaption>Face avant repliée</figcaption><div class="win1000">
+          <div class="wz x" style="top:0;height:3.2%"><span class="lbl"><b>Face avant</b> 32 dp · bandeau</span></div>
+          <div class="wz dark" style="top:3.2%;height:5.6%"><span class="lbl"><b>En-tête</b> 56 dp</span></div>
+          <div class="wz" style="top:8.8%;height:4.8%"><span class="lbl"><b>Pistes</b> 48 dp (SON)</span></div>
+          <div class="wz page" style="top:13.6%;bottom:0"><span class="lbl"><b>Page de l'éditeur</b> 864 dp · défile</span><i class="sb"></i></div>
+        </div><span class="dim-w">1100 dp</span><span class="dim-h">1000 dp</span></figure>
+      </div>
+      <div class="ruler" aria-label="Grille de 12 colonnes sur 1100 dp"><i style="left:1.455%;width:7.091%"><b>16</b></i><i style="left:9.636%;width:7.091%"><b>106</b></i><i style="left:17.818%;width:7.091%"><b>196</b></i><i style="left:26.000%;width:7.091%"><b>286</b></i><i style="left:34.182%;width:7.091%"><b>376</b></i><i style="left:42.364%;width:7.091%"><b>466</b></i><i style="left:50.545%;width:7.091%"><b>556</b></i><i style="left:58.727%;width:7.091%"><b>646</b></i><i style="left:66.909%;width:7.091%"><b>736</b></i><i style="left:75.091%;width:7.091%"><b>826</b></i><i style="left:83.273%;width:7.091%"><b>916</b></i><i style="left:91.455%;width:7.091%"><b>1006</b></i><span class="rl">marge 16 · colonne 78 · gouttière 12 · marge 16 (scrollbar 8 dans la marge droite)</span></div>
+      <div class="ruler steps" aria-label="Grille des 32 pas"><i style="left:9.636%;width:2.545%"></i><i style="left:12.364%;width:2.545%"></i><i style="left:15.091%;width:2.545%"></i><i style="left:17.818%;width:2.545%"></i><i style="left:20.545%;width:2.545%"></i><i style="left:23.273%;width:2.545%"></i><i style="left:26.000%;width:2.545%"></i><i style="left:28.727%;width:2.545%"></i><i style="left:31.455%;width:2.545%"></i><i style="left:34.182%;width:2.545%"></i><i style="left:36.909%;width:2.545%"></i><i style="left:39.636%;width:2.545%"></i><i style="left:42.364%;width:2.545%"></i><i style="left:45.091%;width:2.545%"></i><i style="left:47.818%;width:2.545%"></i><i style="left:50.545%;width:2.545%"></i><i style="left:53.273%;width:2.545%"></i><i style="left:56.000%;width:2.545%"></i><i style="left:58.727%;width:2.545%"></i><i style="left:61.455%;width:2.545%"></i><i style="left:64.182%;width:2.545%"></i><i style="left:66.909%;width:2.545%"></i><i style="left:69.636%;width:2.545%"></i><i style="left:72.364%;width:2.545%"></i><i style="left:75.091%;width:2.545%"></i><i style="left:77.818%;width:2.545%"></i><i style="left:80.545%;width:2.545%"></i><i style="left:83.273%;width:2.545%"></i><i style="left:86.000%;width:2.545%"></i><i style="left:88.727%;width:2.545%"></i><i style="left:91.455%;width:2.545%"></i><i style="left:94.182%;width:2.545%"></i><span class="rl"><span class="pin">5</span> 32 pas × 30 dp = 960 dp, de x = 106 (colonne 2) à 1066</span></div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span><b>Face avant</b> : le skin actuel, 1100 × 570 dp, inchangé. Un bouton la replie en un bandeau de 32 dp ; la fenêtre garde sa taille et l'éditeur remonte.</span></li>
+      <li><span class="pin">2</span><span><b>En-tête</b>, 56 dp : nom du plug-in (modèle fixé à la compilation), écran avec kit et pattern, cinq catégories, ⚙ pour les options (horloge du DAW, LCD net, glisser sur le LCD, échelle).</span></li>
+      <li><span class="pin">3</span><span><b>Onglets de pistes</b>, 48 dp, seulement dans SON. MD : 17 onglets de 60 dp (16 pistes + MASTER) séparés de 3 dp. MM : 6 onglets de 2 colonnes.</span></li>
+      <li><span class="pin">4</span><span><b>Page de l'éditeur</b> : seule zone qui défile (<span class="mono">overflow-y: auto</span>, barre stylée en RCSS). Hauteur en SON : 326 dp dépliée, 864 repliée ; 374 et 912 dans les autres vues.</span></li>
+      <li><span class="pin">5</span><span><b>Grille</b> : 16 + 12 × 78 + 11 × 12 + 16 = 1100 dp. Chaque bloc prend des colonnes entières, donc x, largeur et hauteur tombent sur des dp entiers, à recopier en <span class="mono">left/top/width/height</span> dans le RML. Blocs courants : 12 colonnes = 1068, 5 = 438, 4 = 348, 3 = 258. Contenu à 16 dp du bord du bloc. Vues dans le temps : libellés en colonne 1, pas de 30 dp alignés partout.</span></li>
+    </ol>
+  </div>
+  <p class="aside">Hauteurs : bouton 24 dp, onglet 32, valeur 48 (chiffre, contrôle, libellé), graphique ou faders 128, ligne de liste 32, case de pas 32. Échelle : le réglage d'échelle existant du plug-in agrandit ou réduit l'ensemble ; 1000 dp tiennent sur un écran 1080p à 100 %.</p>
+  <p class="aside">Contraintes RmlUi 6.1, vérifiées dans les sources du plug-in et la doc (dépôt RmlUiDoc) : ni grille CSS ni <span class="mono">calc()</span>, flexbox sans <span class="mono">order</span>, positionnement absolu en dp comme dans <span class="mono">mdDefault.rml</span>. Pas de SVG (plugin <span class="mono">RMLUI_SVG_PLUGIN</span> désactivé) : courbes, lanes, piano roll et pictogrammes seront des composants JUCE ou des images.</p>
+</section>
+
+<!-- 0b controls -->
+<section id="controls">
+  <h2>0b · Contrôles <small>un contrôle par type de paramètre, partout</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="legend">
+        <div class="box"><b>Encodeur</b><div class="vals" style="--n:1"><i>DEC</i></div><span>réglage de son</span></div>
+        <div class="box"><b>Encodeur centré</b><div class="vals" style="--n:1"><i>PAN</i></div><span>pan, gains d'EQ</span></div>
+        <div class="box"><b>Fader</b><div class="vals" style="--n:1"><i>VOL</i></div><span>niveaux, envois</span></div>
+        <div class="box"><b>Sélecteur</b><span class="segw"><span>TRI</span><span class="on">SINE</span><span>SQR</span></span><span>choix : sortie, bus, forme, déclenchement</span></div>
+        <div class="box"><b>LED</b><span><span class="ledw on"></span> <span class="ledw"></span></span><span>marche/arrêt : piste, note reçue, options</span></div>
+        <div class="box"><b>Case</b><div class="g12" style="grid-template-columns:repeat(4,1fr);gap:1px"><div class="trow"><div class="tr" style="grid-column:1/-1;grid-template-columns:repeat(4,1fr)"><i class="on"></i><i></i><i class="on lk"></i><i></i></div></div></div><span>pas</span></div>
+      </div>
+      <div class="legend" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="box"><b>État normal</b><div class="vals" style="--n:3"><i>BASE</i><i>PAN</i><i>VOL</i></div></div>
+        <div class="box"><b>Lock sur le pas sélectionné</b><div class="vals" style="--n:3"><i class="lk">BASE</i><i class="lk">PAN</i><i class="lk">VOL</i></div></div>
+        <div class="box"><b>Valeur du kit (pas sélectionné) ou inactif</b><div class="vals" style="--n:3"><i class="dim">BASE</i><i class="dim">PAN</i><i class="dim">VOL</i></div></div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Le type de contrôle dit ce que fait le paramètre : on reconnaît un niveau ou un pan sans lire son nom.</span></li>
+      <li><span class="pin">2</span><span>Trois états seulement : normal (gris clair), lock (orange), valeur du kit ou inactif (grisé). L'orange ne sert à rien d'autre, sauf aux LED.</span></li>
+      <li><span class="pin">3</span><span>Chaque contrôle tient dans une colonne de 78 dp : 48 dp de contrôle + 16 dp de libellé. En RmlUi, ce sont les <span class="mono">juceRotary</span> et <span class="mono">juceButton</span> du skin actuel (atlas PNG).</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 1 jouer -->
+<section id="jouer">
+  <h2>1 · JOUER · pattern <small>toutes les pistes, 32 pas</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="box"><span class="lbl"><span class="pin">1</span><b>PATTERN A04</b> · 32 pas · 1/16 · séquenceur interne</span></div>
+      <div class="g12" style="row-gap:2px" data-pattern="md"></div>
+      <div class="box"><span class="lbl"><span class="pin">2</span>Légende : trig · orange = accent · cadre bleu = lock · MM : lettre = note du pas</span></div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Une ligne par piste (16 MD, 6 MM), colonne 1 = nom, colonnes 2–12 = 32 pas. Tête de lecture verte. Clic sur un nom = la piste dans SON.</span></li>
+      <li><span class="pin">2</span><span>Sur le MM chaque pas porte sa note ; la grille l'écrit en lettre. Sous ce bloc : lanes (MD, planche 2) ou piano roll (MM, planche 3), sur les mêmes colonnes.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 2 md lanes -->
+<section id="mdlanes">
+  <h2>2 · JOUER · lanes MD <small>une piste, un paramètre</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="lbl"><span class="pin">1</span><span class="tabs"><span>01 BD</span><span class="on">02 SD · 3</span><span>03 HT</span><span>04 MT</span><span>05 CH · 7</span><span>…</span><span>08 VOX · 2</span><span>…</span><span>16 SUB</span></span></div>
+      <div class="lbl"><span class="pin">2</span><span class="tabs"><span>PTCH</span><span>DEC</span><span>BUMP</span><span>BENV</span><span class="on">SNAP · 1</span><span>TONE</span><span>TUNE</span><span>CLIP</span><span>FLTF · 2</span><span>FLTW</span><span>FLTQ</span><span>SRR</span><span>DIST</span><span>VOL</span><span>PAN</span><span>DEL</span><span>REV</span></span></div>
+      <div class="g12" style="row-gap:4px">
+        <div class="trow"><span class="tl">TRIGS</span><div class="tr" data-steps="4,12,20,28" data-locks="12,20,28"></div></div>
+        <div class="trow"><span class="tl">SNAP 0–127</span><div class="tr tall" data-bars="4:100,12:96L,20:100,28:100"></div></div>
+      </div>
+      <div class="box"><span class="lbl"><span class="pin">3</span>Pas 13 · SNAP <b>096</b> (lock) · 1 lock sur ce pas · [OUVRIR CE PAS DANS SON]</span></div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Choix de la piste. Le chiffre compte ses locks : on voit d'un coup d'œil ce qui est automatisé.</span></li>
+      <li><span class="pin">2</span><span>Les 8 paramètres de la machine de la piste, puis effets et routage. Ouvre sur le premier paramètre qui a des locks.</span></li>
+      <li><span class="pin">3</span><span>Barre grise = valeur du kit, orange + point = lock. Clic sur un pas = sa valeur ; le bouton ouvre la page SON avec ce pas focalisé.</span></li>
+    </ol>
+  </div>
+  <p class="aside">Pas de ligne de vélocité : le MD n'en a pas par pas. L'accent y est un réglage du pattern (de mémoire, non vérifié dans le manuel).</p>
+</section>
+
+<!-- 3 mm roll -->
+<section id="mmroll">
+  <h2>3 · JOUER · piano roll MM <small>notes, vélocité, lane</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="lbl"><span class="pin">1</span><span class="tabs"><span class="on">01 BASS</span><span>02 LEAD</span><span>03 PAD</span><span>04 ARP</span><span>05 NOIS</span><span>06 PERC</span></span></div>
+      <div class="g12" style="row-gap:4px">
+        <div class="trow"><span class="tl">C3<br><br><br><br>C2</span><div class="tr" style="display:block"><div class="roll">
+          <i class="acc" style="left:0%;width:9%;top:62px"></i><i style="left:12.5%;width:12%;top:40px"></i><i style="left:25%;width:3%;top:50px"></i><i style="left:37.5%;width:3%;top:62px"></i><i class="acc" style="left:50%;width:12%;top:84px"></i><i style="left:62.5%;width:6%;top:40px"></i><i style="left:75%;width:6%;top:40px"></i><i style="left:87.5%;width:6%;top:50px"></i><i class="acc" style="left:94%;width:3%;top:84px"></i>
+        </div></div></div>
+        <div class="trow"><span class="tl"><span class="pin">2</span> VÉLO.</span><div class="tr mid" data-bars="0:110L,4:70,8:80,12:75,16:90L,20:85,24:80,28:60,30:100L"></div></div>
+        <div class="trow"><span class="tl"><span class="pin">3</span> BASE</span><div class="tr tall" data-bars="0:41,4:41,8:90L,12:41,16:41,20:41,24:30L,28:110L,30:41"></div></div>
+      </div>
+      <div class="lbl"><span class="tabs"><span class="on">FILTRE BASE · 3</span><span>FILTRE WIDTH</span><span>AMPLI VOL · 1</span><span>AMPLI PAN</span><span>DELAY SEND · 1</span><span>SYN C</span></span></div>
+      <div class="box"><span class="lbl"><span class="pin">4</span>Pas 001 · note D#2 · durée 3 pas · accent · slide vers la note suivante</span></div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Une piste à la fois. Deux octaves ; chaque note est une barre à sa hauteur, sa longueur = sa durée en pas. Orange = accent, pointillé = slide.</span></li>
+      <li><span class="pin">2</span><span>Vélocité par pas, sur les mêmes colonnes.</span></li>
+      <li><span class="pin">3</span><span>Lane de paramètre, comme sur le MD : kit en gris, locks en orange.</span></li>
+      <li><span class="pin">4</span><span>Clic sur une note ou une barre = ses valeurs ; roll et lanes restent synchronisés.</span></li>
+    </ol>
+  </div>
+  <p class="aside">À confirmer dans le chapitre Sequencer du manuel MM : durée, slide, accent et vélocité réglables par pas. Saisie sur la face avant (clavier du SFX-6, touches de pas en mode clavier sur le SFX-60).</p>
+</section>
+
+<!-- 4 md son -->
+<section id="mdson">
+  <h2>4 · SON · piste MD <small>blocs par fonction, pas focalisé</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12" style="row-gap:4px">
+        <div class="trow"><span class="tl"><span class="pin">1</span> 32 PAS</span><div class="tr" data-steps="0,4,8,12,16,20,24,28,30" data-locks="12"></div></div>
+      </div>
+      <div class="g12 ruled">
+        <div class="box s5 r2"><div class="t">SOURCE <span>TRX-SD · synthèse analogique modélisée</span></div><div class="graph"></div><div class="vals" style="--n:5"><i>PTCH</i><i>DEC</i><i>BUMP</i><i>BENV</i><i class="lk">SNAP</i><i>TONE</i><i>TUNE</i><i>CLIP</i></div><span class="lbl"><span class="pin">2</span>ROM : slot, début, fin</span></div>
+        <div class="box s4"><div class="t">FILTRE <span>passe-bande + EQ</span></div><div class="graph"></div><div class="vals"><i>BASE</i><i>WIDTH</i><i>Q</i><i>EQF</i><i>EQG</i></div></div>
+        <div class="box s3 r2"><div class="t">MIX <span>sortie</span></div><div class="vals" style="--n:3"><i>VOL</i><i>DEL</i><i>REV</i><i>PAN</i></div><span class="lbl"><span class="pin">3</span><span class="segw"><span class="on">MAIN</span><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></span></span></div>
+        <div class="box s4"><div class="t">COULEUR <span>distorsion, lo-fi, AM</span></div><div class="vals"><i>DIST</i><i>SRR</i><i>AMD</i><i>AMF</i></div></div>
+        <div class="box s8"><div class="t">MODULATION <span>LFO</span></div><div class="graph"></div></div>
+        <div class="box s4"><span class="segw"><span>TRI</span><span>SINE</span><span class="on">SQR</span><span>SAW</span><span>EXP</span></span><b>LFO SQR → T05 FLTF · profondeur</b><div class="vals" style="--n:2"><i>SPEED</i><i>DEPTH</i></div></div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Clic sur un pas = pas focalisé : les valeurs verrouillées passent en orange dans tous les blocs, les autres sont grisées.</span></li>
+      <li><span class="pin">2</span><span>SOURCE 5 colonnes, FILTRE 4, MIX 3, COULEUR 4, MODULATION 8 + 4. Une valeur par colonne.</span></li>
+      <li><span class="pin">3</span><span>Sortie de la piste : MAIN ou une seule sortie A à F. Hors MAIN, la piste est mono et à sec : pan, DEL, REV et master grisés.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 4b machine picker + sample explorer -->
+<section id="machine">
+  <h2>4b · SON · machine et samples <small>une machine par piste, choisie par famille</small> <span class="status v1">v1 · import de samples plus tard</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled">
+        <div class="box s12"><div class="t">MACHINE <span>piste 01 BD · 16 pistes, une machine chacune</span></div>
+          <div class="lbl"><svg class="ico" data-ico="TRX" style="width:24px;height:24px"></svg><b style="font-size:15px">TRX-BD</b><span>synthèse analogique modélisée</span><span class="pin" style="margin-left:auto">1</span><span class="segw"><span class="on">CHANGER DE MACHINE</span></span></div>
+          <div class="lbl"><span class="pin">2</span><span class="tabs" data-famtabs="GND,TRX,EFM,E12,P-I,INP,MID,CTR,NFX,ROM,RAM" data-on="EFM"></span></div>
+        </div>
+        <div class="mbtn s2 on"><svg class="ico" data-ico="EFM"></svg>EFM-BD</div><div class="mbtn s2"><svg class="ico" data-ico="EFM"></svg>EFM-SD</div><div class="mbtn s2"><svg class="ico" data-ico="EFM"></svg>EFM-XT</div><div class="mbtn s2"><svg class="ico" data-ico="EFM"></svg>EFM-CP</div><div class="mbtn s2"><svg class="ico" data-ico="EFM"></svg>EFM-RS</div><div class="mbtn s2"><svg class="ico" data-ico="EFM"></svg>EFM-CB</div>
+        <div class="box s12"><span class="lbl"><span class="pin">3</span><b>EFM · FM d'Elektron : opérateurs et rétroaction</b> · survol d'une machine = ses 8 paramètres</span><span class="lbl"><span class="pin">4</span><span class="mono">Assigner : F0 00 20 3C 02 00 5B 00 20 00 01 F7</span> · Ableton : rien, la machine n'est pas un paramètre hôte</span></div>
+      </div>
+      <div class="g12 ruled">
+        <div class="box s12"><div class="t">MACHINE · onglet ROM · UW <span>explorateur de la banque de samples</span></div>
+          <span class="lbl"><span class="pin">5</span>24 slots occupés sur 48 · ● = joué par une piste du kit</span>
+          <div class="slotg" data-slots="1:K808,2:K909,3:CHOP●,4:SN12,5:CLP1,6:HAT2,7:MTLH,8:RIDE,9:BELL,10:TOM1,11:RIM3,12:VXAH●,13:VXOH,14:BASS,15:STAB,16:PAD1,17:NOIZ,18:TAPE,19:GLTC,20:DRNK,24:LOOP,25:BRK1,33:FX01,34:FX02" data-on="12"></div>
+          <div class="lbl"><b>Slot choisi : ROM-12 VXAH · 1,10 s</b><span class="pin" style="margin-left:auto">6</span><span class="segw"><span>IMPORTER UN WAV…</span><span>RENOMMER</span></span></div>
+        </div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Bloc MACHINE en tête de SON, 12 colonnes : pictogramme de famille, nom de la machine, type de synthèse. Fermé par défaut ; le bouton ouvre le sélecteur.</span></li>
+      <li><span class="pin">2</span><span>Une famille par onglet, avec son pictogramme. MD : 11 familles ; MM : GND, SID, SWAVE, DPRO, FM+, VO, FX.</span></li>
+      <li><span class="pin">3</span><span>Les machines de la famille, 2 colonnes chacune (6 par ligne). Un clic assigne la machine à la piste ; SOURCE, les lanes et le bandeau des pistes suivent.</span></li>
+      <li><span class="pin">4</span><span>Assigner = SysEx « assign machine » ($5B) du manuel, déjà envoyé par les tests firmware du plug-in. Les automations « Machine Parameter 1…8 » restent et changent de sens.</span></li>
+      <li><span class="pin">5</span><span>Sur le MD, une machine ROM <i>est</i> un slot : l'onglet ROM · UW devient l'explorateur des 48 slots (12 par ligne), avec nom sur 4 caractères, durée, et les slots joués par le kit.</span></li>
+      <li><span class="pin">6</span><span>Import d'un WAV par Sample Dump (SDS, déjà présent dans le plug-in pour les .syx), nom par SysEx $73. Hors v1 : écrase le slot et peut arrêter le séquenceur, donc derrière une confirmation.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 4c families -->
+<section id="familles">
+  <h2>4c · Familles de machines <small>pictogramme et type de synthèse</small></h2>
+  <div class="fams" data-fams></div>
+  <p class="aside">Pictogrammes dessinés pour l'éditeur : l'écran du MD et du MM affiche le nom de la machine en texte, sans icône. Types de synthèse d'après les descriptions publiques d'Elektron reprises par la presse ; noms des familles et machines d'après l'annexe SysEx des manuels.</p>
+</section>
+
+<!-- 5 master -->
+<section id="master">
+  <h2>5 · SON · MASTER <small>effets master du MD</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled">
+        <div class="box s6"><div class="t">RHYTHM ECHO <span>envois : SD 31, OH 44…</span></div><div class="graph"></div><div class="vals" style="--n:6"><i>TIME</i><i>FB</i><i>LEV</i></div></div>
+        <div class="box s6"><div class="t">GATE BOX REVERB <span>envois : BD 19…</span></div><div class="graph"></div><div class="vals" style="--n:6"><i>DEC</i><i>DAMP</i><i>LEV</i></div></div>
+        <div class="box s6"><div class="t">EQ</div><div class="graph"></div><div class="vals" style="--n:6"><i>LF</i><i>LG</i><i>HF</i><i>HG</i></div></div>
+        <div class="box s6"><div class="t">DYNAMIX</div><div class="graph"></div><div class="vals" style="--n:6"><i>TRHD</i><i>RAT</i><i>KNEE</i><i>OUT</i></div></div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Quatre blocs de 6 colonnes, chacun avec sa courbe. Le titre dit quelles pistes envoient vers l'écho et la reverb.</span></li>
+      <li><span class="pin">2</span><span>Seules les pistes en MAIN passent par ces effets (voir planche 7).</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 6 mm son -->
+<section id="mmson">
+  <h2>6 · SON · piste MM <small>7 pages de 8 regroupées en blocs</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="lbl"><span class="tabs"><span class="on">01 BASS · SID-6581</span><span>02 LEAD</span><span>03 PAD</span><span>04 ARP</span><span>05 NOIS</span><span>06 PERC</span></span></div>
+      <div class="g12 ruled">
+        <div class="box s4"><div class="t">OSCILLATEUR <span>SID-6581 · synthèse SID</span></div><div class="graph"></div><div class="vals"><i>PW</i><i>PWAD</i><i>PWRS</i><i>WAVE</i><i>MOD</i><i>MSRC</i><i>MFRQ</i><i>TUNE</i></div></div>
+        <div class="box s4"><div class="t">AMPLI <span>ADHR</span></div><div class="graph"></div><div class="vals"><i>ATK</i><i>HOLD</i><i>DEC</i><i>REL</i><i>DIST</i><i>VOL</i><i>PAN</i><i>PORT</i></div></div>
+        <div class="box s4"><div class="t">FILTRE</div><div class="graph"></div><div class="vals"><i class="lk">BASE</i><i>WDTH</i><i>HPQ</i><i>LPQ</i><i>ATK</i><i>DEC</i></div></div>
+        <div class="box s4"><div class="t">EFFETS <span>EQ, lo-fi, delay</span></div><div class="graph"></div><div class="vals"><i>DTIM</i><i>DSND</i><i>DFB</i><i>SRR</i><i>EQG</i></div></div>
+        <div class="box s8"><div class="t">MODULATION <span class="tabs"><span class="on">LFO 1</span><span>LFO 2</span><span>LFO 3</span></span></div><div class="g12" style="grid-template-columns:repeat(8,1fr)"><div class="graph s5" style="grid-column:span 5"></div><div style="grid-column:span 3;display:grid;gap:4px"><span class="segw"><span>TRI</span><span class="on">SINE</span><span>SQR</span><span>SAW</span><span>EXP</span></span><span class="segw"><span class="on">FREE</span><span>TRIG</span><span>HOLD</span></span><span class="lbl"><span class="pin">1</span><b>LFO 1 SINE → AMP PAN · FREE</b></span></div></div></div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Les pages LFO sont du routage : une phrase remplace 8 boutons. Trois onglets LFO dans le bloc.</span></li>
+      <li><span class="pin">2</span><span>Trois blocs de 4 colonnes, puis EFFETS 4 et MODULATION 8. Pas de MASTER ni de SAMPLES sur le MM. Au-dessus, le bloc MACHINE de la planche 4b ; les 8 boutons de synthèse portent les noms de la machine (ici SID-6581), l'hôte garde « Synthesis A…H ».</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7 mix -->
+<section id="mix">
+  <h2>7 · MIX <small>niveaux et sorties</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled">
+        <div class="box s8">
+          <div class="t">NIVEAUX <span>une colonne par champ</span></div>
+          <div class="g12" style="grid-template-columns:repeat(8,1fr); font:10px var(--mono)">
+            <span>PISTE</span><span>NIVEAU</span><span>VOL</span><span>PAN</span><span>DEL</span><span>REV</span><span style="grid-column:span 2">SORTIE</span>
+            <b><span class="ledw on"></span> 01 BD</b><span>▬▬▬▭</span><span>089</span><span>L20</span><span>000</span><span>019</span><span style="grid-column:span 2" class="segw"><span class="on">MAIN</span><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></span>
+            <b><span class="ledw on"></span> 13 BD3</b><span>▬▬▬▬</span><span>109</span><span>—</span><span>—</span><span>—</span><span style="grid-column:span 2" class="segw"><span>MAIN</span><span>A</span><span>B</span><span class="on">C</span><span>D</span><span>E</span><span>F</span></span>
+            <s><span class="ledw"></span> 14 FX1</s><span>▬▬▬▬</span><span>115</span><span>—</span><span>—</span><span>—</span><span style="grid-column:span 2" class="segw"><span>MAIN</span><span>A</span><span>B</span><span class="on">C</span><span>D</span><span>E</span><span>F</span></span>
+          </div>
+          <span class="lbl"><span class="pin">1</span>MM : colonne BUS, cases <b>AB CD EF</b> cumulables</span>
+        </div>
+        <div class="s4" style="display:grid; gap:6px">
+          <div class="box"><div class="t">MAIN A/B <span>actif dans le DAW</span></div><div style="display:flex;gap:24px"><div class="meter" style="--m:70%"></div><div class="meter" style="--m:65%"></div></div><span>A · B : 12 pistes en MAIN</span></div>
+          <div class="box"><div class="t">OUT C/D <span style="color:var(--note)">désactivé</span></div><div style="display:flex;gap:24px"><div class="meter" style="--m:0%"></div><div class="meter" style="--m:0%"></div></div><span>C : 13 BD3 ●, 14 FX1 ● · D : 15 FX2 ●</span><span class="lbl"><span class="pin">2</span><span style="color:var(--note)">Pistes muettes : activer Out C/D dans le DAW</span></span></div>
+          <div class="box"><div class="t">OUT E/F <span>actif</span></div><div style="display:flex;gap:24px"><div class="meter" style="--m:40%"></div><div class="meter" style="--m:0%"></div></div><span>E : 16 SUB ●</span></div>
+        </div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span><b>MD</b> : 7 choix par piste, MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F (mono, à sec). <b>MM</b> : trois bus stéréo AB, CD, EF ; une piste peut aller sur plusieurs, et garde son pan. Piste coupée = nom barré.</span></li>
+      <li><span class="pin">2</span><span>Le plug-in expose trois paires stéréo au DAW. Une piste sur C sort sur le canal gauche d'Out C/D (dans Ableton : Utility pour garder ce canal). Un vu-mètre par canal, pas par piste : le DSP mélange en interne. En standalone, seule A/B existe.</span></li>
+    </ol>
+  </div>
+  <p class="aside">Choisir la sortie modifie un réglage de la machine (global sur le MD, par kit sur le MM d'après un émulateur tiers) : ce sera pour la phase écriture. Passer à six sorties mono dans le DAW changerait l'interface du plug-in et casserait les projets existants.</p>
+</section>
+
+<!-- 8 biblio -->
+<section id="biblio">
+  <h2>8 · BIBLIO <small>kits, samples UW, tags</small> <span class="status">v1 lecture · chargement et import plus tard</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled">
+        <div class="box s12"><div class="t">BIBLIOTHÈQUE <span class="tabs"><span class="on">KITS</span><span>SAMPLES UW</span></span></div><span class="lbl"><span class="pin">1</span><span class="tabs"><span>Kick</span><span class="on">Dub</span><span>Techno</span><span>Glitch</span><span>FM</span><span>Lofi</span><span>…</span></span></span></div>
+        <div class="box s8"><div class="t">KITS <span>10 sur 10</span></div>
+          <div class="g12" style="grid-template-columns:repeat(8,1fr); font:10px var(--mono)"><span>N°</span><span style="grid-column:span 3">NOM</span><span style="grid-column:span 2">TAGS</span><span style="grid-column:span 2">PATTERNS</span>
+          <b>12</b><b style="grid-column:span 3">BROKEN DUB ●</b><span style="grid-column:span 2">Dub Kick</span><span style="grid-column:span 2">A04 A05</span>
+          <span>02</span><span style="grid-column:span 3">TECHNO 1</span><span style="grid-column:span 2">Techno Kick</span><span style="grid-column:span 2">A01 A02</span></div>
+        </div>
+        <div class="box s4"><div class="t">BROKEN DUB <span>kit 12 · chargé</span></div><div class="vals" style="--n:2;font:10px var(--mono)"><i>01 TRX-BD</i><i>02 TRX-SD</i><i>03 TRX-XT</i><i>…</i></div><span class="lbl"><span class="pin">2</span>[CHARGER] [EN FIN DE MESURE]</span></div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Tags gardés par le plug-in (le MD n'en a pas), dans l'état du projet ou un fichier. Filtre la liste.</span></li>
+      <li><span class="pin">2</span><span>Aperçu des 16 machines sans charger. Chargement plus tard (geste face avant ou SysEx). En SAMPLES UW : forme d'onde, durée, pistes qui l'utilisent ; import par SDS plus tard.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 9 daw -->
+<section id="daw">
+  <h2>9 · Séquencer depuis le DAW <small>séquenceur interne arrêté</small> <span class="status v1">v1</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled">
+        <div class="box s12"><div class="t">SÉQUENCER DEPUIS LE DAW <span>bloc sous le pattern, page JOUER</span></div>
+          <div class="vals" style="--n:8;font:10px var(--mono)"><span><span class="ledw on"></span> BD · C2</span><span><span class="ledw"></span> SD · C#2</span><span><span class="ledw"></span> HT · D2</span><span><span class="ledw"></span> MT · D#2</span><span><span class="ledw on"></span> CH · E2</span><span><span class="ledw"></span> OH · F2</span><span><span class="ledw on"></span> BD2 · F#2</span><span><span class="ledw"></span> VOX · G2</span></div>
+          <span class="lbl"><span class="pin">1</span>Une case s'allume quand la note de la piste arrive</span>
+          <span class="lbl"><span class="pin">2</span>Automation : MD 26 paramètres × 16 pistes · MM 58 × 6</span>
+        </div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span><b>MD</b> : une note déclenche une piste selon la table de notes (réglage global). <b>MM</b> : chaque piste écoute son canal (canal de base + n°), une note la déclenche.</span></li>
+      <li><span class="pin">2</span><span>L'équivalent des locks côté DAW : l'automation, déjà exposée. Program change pour changer de pattern.</span></li>
+    </ol>
+  </div>
+  <p class="aside">À vérifier : les numéros de notes par défaut de la table du MD, et si le MM joue la piste à la hauteur reçue (l'annexe MIDI dit seulement « Trig amp, filter & lfo »).</p>
+</section>
+
+<!-- 10 system -->
+<section id="system">
+  <h2>10 · SYSTÈME <small>machine entière et plug-in</small> <span class="status">v1 : état · actions derrière confirmation</span></h2>
+  <div class="cols">
+    <div class="board-wrap"><div class="board">
+      <div class="g12 ruled" style="row-gap:4px">
+        <div class="box s3"><b>ENTRÉE AUDIO A/B</b></div><div class="box s7">niveau ▮▮▮▯▯▯</div><div class="box s2">IN-A (piste 14)</div>
+        <div class="box s3"><b>ENREGISTREMENT RAM</b></div><div class="box s7">fin complète ○ finalisation OS 1.63</div><div class="box s2">RAM 1 vide</div>
+        <div class="box s3"><b>TRANSFERT SYSEX</b></div><div class="box s7">kits_live.syx · TurboMIDI ▮▮▮▮▮▯ 72 %</div><div class="box s2">[ANNULER]</div>
+        <div class="box s3"><b>STOCKAGE MACHINE</b></div><div class="box s7">image 1 Mio · sauvegarde avant chargement</div><div class="box s2">[CHARGER…]</div>
+        <div class="box s3"><b>RÉGLAGES GLOBAUX</b></div><div class="box s7">canal MIDI · table de notes · sync · routage A–F</div><div class="box s2">face avant</div>
+        <div class="box s3"><b>PLUG-IN</b></div><div class="box s7">ports MIDI · MIDI Learn · échelle · LCD net · diagnostics</div><div class="box s2">aussi dans ⚙</div>
+      </div>
+    </div></div>
+    <ol class="notes">
+      <li><span class="pin">1</span><span>Une ligne par sujet : libellé 3 colonnes, état 7, action 2.</span></li>
+      <li><span class="pin">2</span><span>Tout existe déjà dans le plug-in, réparti entre menus et réglages ; ici regroupé, avec l'état visible.</span></li>
+    </ol>
+  </div>
+  <p class="aside">Non vérifié : si le MD a aussi le chargement d'image de stockage (vu seulement dans les réglages du MM).</p>
+</section>
+
+<!-- sources -->
+<section id="sources">
+  <h2>Sources et points ouverts <small>ce que les planches supposent</small></h2>
+  <table class="src">
+    <thead><tr><th>Point</th><th>État</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Deux plug-ins, MD et MM, modèle fixé à la compilation</td><td class="ok">vérifié</td><td class="mono">mdJucePlugin/CMakeLists.txt, mdPluginProcessor.cpp</td></tr>
+      <tr><td>Trois sorties stéréo Main A/B, Out C/D, Out E/F ; rien d'autre accepté</td><td class="ok">vérifié</td><td class="mono">createBusesProperties, isBusesLayoutSupported</td></tr>
+      <tr><td>MD : 7 routages par piste (A–F, MAIN)</td><td class="ok">annexe du manuel</td><td>annexe SysEx MD OS 1.63, transcription tierce</td></tr>
+      <tr><td>MD : sortie seule = mono, sans pan ni DEL/REV ni master</td><td class="todo">analyse du firmware</td><td>projet tiers, pas le manuel</td></tr>
+      <tr><td>MM : bus AB, CD, EF cumulables ; pas d'effet master</td><td class="ok">annexe du manuel</td><td>annexe SysEx MM OS 1.32, transcription tierce</td></tr>
+      <tr><td>MM : routage réglé par kit</td><td class="todo">à confirmer</td><td>émulateur tiers</td></tr>
+      <tr><td>MM : durée, slide, accent, vélocité par pas</td><td class="todo">à confirmer</td><td>chapitre Sequencer du manuel</td></tr>
+      <tr><td>MM : une note du DAW joue la piste à sa hauteur</td><td class="todo">à confirmer</td><td>annexe MIDI : « Trig amp, filter & lfo »</td></tr>
+      <tr><td>Assigner une machine = SysEx $5B, par piste</td><td class="ok">vérifié</td><td class="mono">annexe SysEx ; mdUwFirmwareTest, mmAudioFirmwareTest</td></tr>
+      <tr><td>Liste et numéros des machines</td><td class="ok">annexe du manuel</td><td>annexe SysEx MD 1.63 / MM, transcription tierce (c7)</td></tr>
+      <tr><td>Noms des 8 paramètres par machine</td><td class="todo">à confirmer</td><td>données du projet c7, pas le manuel</td></tr>
+      <tr><td>GND-SW, GND-PU, TRX-S2, NFX-* dans l'OS 1.63</td><td class="todo">à confirmer</td><td>absentes de la table SysEx officielle</td></tr>
+      <tr><td>UW : 48 slots (mkII), noms sur 4 caractères, import SDS</td><td class="ok">annexe du manuel</td><td>annexe SysEx ($73) ; transfert SDS dans mdEditor.cpp</td></tr>
+      <tr><td>Fenêtre 1100 dp de large, widgets placés en dp absolus</td><td class="ok">vérifié</td><td class="mono">skins/mdDefault/mdDefault.rml</td></tr>
+      <tr><td>RmlUi 6.1 : pas de grille CSS ni de calc(), flexbox, tables</td><td class="ok">vérifié</td><td>sources RmlUi du dépôt ; RmlUiDoc (GitHub)</td></tr>
+      <tr><td>Plugin SVG de RmlUi désactivé</td><td class="ok">vérifié</td><td class="mono">RMLUI_SVG_PLUGIN OFF, jamais activé</td></tr>
+      <tr><td>Hauteur 1000 dp et face avant repliable</td><td class="todo">choix de conception</td><td>à tester dans le plug-in</td></tr>
+      <tr><td>Pictogrammes des familles</td><td class="todo">création maquette</td><td>aucune icône officielle connue</td></tr>
+      <tr><td>MD : accent au niveau du pattern</td><td class="todo">de mémoire</td><td>manuel MD</td></tr>
+    </tbody>
+  </table>
+  <p class="aside">Les manuels complets n'ont pas pu être lus : le site d'Elektron est bloqué par le proxy de cet environnement. Autoriser cdn.www.elektron.se permettrait de citer les pages.</p>
+</section>
+</div>
+
+<script>
+(() => {
+  // Family pictograms drawn for this mock-up: the machines' LCDs show machine names as text, there is no official icon set.
+  const ICO = {
+    sine: '<path d="M2 12 C5 3 8 3 12 12 S19 21 22 12"/>',
+    trx: '<path d="M3 20 H21"/><path d="M4 20 V4 C6 13 10 17 21 18"/>',
+    fm: '<circle cx="7" cy="14" r="3.5"/><circle cx="17" cy="14" r="3.5"/><path d="M10.5 14 H13.5"/><path d="M17 10.5 C17 4 22 4 21.5 10"/>',
+    e12: '<path d="M4 19 V9 M8 19 V5 M12 19 V9 M16 19 V13 M20 19 V16"/>',
+    pi: '<ellipse cx="12" cy="16" rx="8.5" ry="3"/><path d="M6 10 Q12 5 18 10"/><path d="M9 6.5 Q12 4.5 15 6.5"/>',
+    inp: '<path d="M2 12 H13"/><path d="M9 8 L13 12 L9 16"/><path d="M17 4 V20"/><path d="M21 8 V16"/>',
+    mid: '<circle cx="12" cy="12" r="9"/><circle class="f" cx="7.5" cy="13" r="1.1"/><circle class="f" cx="9" cy="9" r="1.1"/><circle class="f" cx="12" cy="7.5" r="1.1"/><circle class="f" cx="15" cy="9" r="1.1"/><circle class="f" cx="16.5" cy="13" r="1.1"/>',
+    ctr: '<path d="M6 3 V21 M12 3 V21 M18 3 V21"/><rect class="f" x="4" y="13" width="4" height="3"/><rect class="f" x="10" y="6" width="4" height="3"/><rect class="f" x="16" y="10" width="4" height="3"/>',
+    fx: '<rect x="7" y="6" width="10" height="12" rx="1"/><path d="M2 12 H7 M17 12 H22"/><path d="M9 12 Q10.5 8 12 12 T15 12"/>',
+    rom: '<path d="M4 12 V12 M6.5 9 V15 M9 6 V18 M11.5 9.5 V14.5 M14 4 V20 M16.5 8 V16 M19 10.5 V13.5"/>',
+    ram: '<circle class="f" cx="5.5" cy="12" r="3"/><path d="M11 10 V14 M13.5 7 V17 M16 9 V15 M18.5 5 V19 M21 10 V14"/>',
+    sid: '<rect x="6" y="4" width="12" height="16" rx="1"/><path d="M2 8 H6 M2 12 H6 M2 16 H6 M18 8 H22 M18 12 H22 M18 16 H22"/>',
+    swave: '<path d="M2 17 L8 7 V17 L14 7 V17 L20 7 V17"/><path d="M4 20 L10 10 V20 L16 10 V20 L22 10" opacity=".5"/>',
+    dpro: '<path d="M2 14 H5 V8 H8 V4 H11 V11 H14 V18 H17 V13 H20 V9 H22"/>',
+    vo: '<path d="M4 5 H20 V15 H11 L7 19 V15 H4 Z"/><path d="M8 10 Q10 7 12 10 T16 10"/>',
+  };
+  const FAM_ICO = { GND: "sine", TRX: "trx", EFM: "fm", E12: "e12", "P-I": "pi", INP: "inp", MID: "mid", CTR: "ctr", NFX: "fx", ROM: "rom", RAM: "ram", SID: "sid", SWAVE: "swave", DPRO: "dpro", "FM+": "fm", VO: "vo", FX: "fx" };
+  const icon = (fam, px = 16) => `<svg class="ico" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true">${ICO[FAM_ICO[fam]] || ""}</svg>`;
+  const FAMS = [
+    ["GND","Machinedrum","générateur","Formes d'onde de base : sinus, dent de scie, impulsion, bruit."],
+    ["TRX","Machinedrum","synthèse analogique modélisée","Modélise les boîtes à rythmes analogiques TR de Roland."],
+    ["EFM","Machinedrum","synthèse FM","FM d'Elektron : opérateurs et rétroaction, percussions métalliques."],
+    ["E12","Machinedrum","sample 12 bits intégré","Samples 12 bits de boîtes à rythmes vintage."],
+    ["P-I","Machinedrum","modélisation physique","Percussions acoustiques : tension, dureté, amortissement."],
+    ["INP","Machinedrum","entrée audio","Gate, filtre enveloppé, compresseur sur l'entrée."],
+    ["MID","Machinedrum","piste MIDI","Envoie notes et contrôleurs, pas de son."],
+    ["CTR","Machinedrum","contrôle","Pilote d'autres pistes ou un effet master."],
+    ["NFX","Machinedrum","effet de piste","Enveloppe, compresseur… (OS 1.63 à confirmer)."],
+    ["ROM","Machinedrum UW","sample utilisateur","48 slots ; la machine ROM-nn est le slot nn."],
+    ["RAM","Machinedrum UW","enregistrement et relecture","RAM-R enregistre, RAM-P rejoue."],
+    ["SID","Monomachine","synthèse SID 6581","Puce SID du Commodore 64 : ring mod, sync."],
+    ["SWAVE","Monomachine","synthèse superwave","Dents de scie ou impulsions empilées ; ENS en accords."],
+    ["DPRO","Monomachine","synthèse DigiPRO","Formes d'onde numériques ; BBOX façon E12."],
+    ["FM+","Monomachine","synthèse FM","2 ou 3 opérateurs, pensée pour rester jouable."],
+    ["VO","Monomachine","synthèse vocale","Formants : voyelles et consonnes."],
+    ["FX","Monomachine","effet sur un bus","Reverb, chorus, dynamique, ring mod, phaser, flanger."]];
+  document.querySelectorAll("svg[data-ico]").forEach(el => { el.setAttribute("viewBox", "0 0 24 24"); el.setAttribute("aria-hidden", "true"); el.innerHTML = ICO[FAM_ICO[el.dataset.ico]] || ""; });
+  const fc = document.querySelector("[data-fams]");
+  if (fc) fc.innerHTML = FAMS.map(([f, m, k, d]) => `<div class="fam">${icon(f, 28)}<b>${f} <em>${m}</em></b><span>${k}</span><span>${d}</span></div>`).join("");
+  document.querySelectorAll("[data-famtabs]").forEach(el => { el.innerHTML = el.dataset.famtabs.split(",").map(f => `<span class="${f === el.dataset.on ? "on" : ""}">${icon(f, 12)}${f === "ROM" || f === "RAM" ? f + " · UW" : f}</span>`).join(""); });
+  document.querySelectorAll("[data-slots]").forEach(el => {
+    const m = Object.fromEntries(el.dataset.slots.split(",").map(x => { const [n, v] = x.split(":"); return [+n, v]; }));
+    el.innerHTML = Array.from({ length: 48 }, (_, i) => { const n = i + 1, v = m[n]; return `<i class="${v ? "" : "e"}${n === +el.dataset.on ? " on" : ""}">${String(n).padStart(2, "0")}<b>${v || "vide"}</b></i>`; }).join("");
+  });
+  // control kind from the label, same rule as the editor
+  const FADERS = ["VOL", "DEL", "REV", "LEV", "OUT", "DSND"], CENTRED = ["PAN", "EQG", "LG", "HG"];
+  document.querySelectorAll(".vals i").forEach(i => { const l = i.textContent.trim().split(" ")[0]; i.dataset.k = FADERS.includes(l) ? "fader" : CENTRED.includes(l) ? "centred" : "knob"; });
+  // pattern rows (board 1)
+  const rows = [["01 BD","0,4,8,12,16,20,24,28,30","","0,8,16,24"],["02 SD","4,12,20,28","12,20,28",""],["03 HT","6,14,22",""," "],["04 MT","10,26","",""],["05 CH","0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30","2,6,10,14,18,22,26",""],["06 OH","2,10,18,26","",""],["07 BD2","0,7,16,23","",""],["08 VOX","3,19","19",""],["…","","",""],["16 SUB","0,16","",""]];
+  const list = s => s.trim() ? s.split(",").map(Number) : [];
+  const cells = (on, lk, acc) => Array.from({ length: 32 }, (_, i) => `<i class="${on.includes(i) ? "on" : ""}${lk.includes(i) ? " lk" : ""}${acc.includes(i) ? " acc" : ""}"></i>`).join("");
+  const pat = document.querySelector("[data-pattern]");
+  pat.innerHTML = rows.map(([n, on, lk, acc]) => `<div class="trow"><span class="tl">${n}</span><div class="tr">${cells(list(on), list(lk), list(acc))}</div></div>`).join("");
+  document.querySelectorAll("[data-steps]").forEach(el => { el.innerHTML = cells(list(el.dataset.steps), list(el.dataset.locks || ""), []); });
+  document.querySelectorAll("[data-bars]").forEach(el => {
+    const m = Object.fromEntries(el.dataset.bars.split(",").map(x => { const [s, v] = x.split(":"); return [+s, v]; }));
+    el.innerHTML = Array.from({ length: 32 }, (_, i) => { const v = m[i]; if (!v) return "<i></i>"; const lk = v.endsWith("L"); return `<i><b class="${lk ? "lk" : ""}" style="height:${parseInt(v) / 127 * 100}%"></b></i>`; }).join("");
+  });
+})();
+</script>

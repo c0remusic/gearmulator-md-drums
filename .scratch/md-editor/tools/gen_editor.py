@@ -1,0 +1,369 @@
+# Generates the editor part of skins/mdDefault/mdDefault.rml (md) and skins/mmSfx60/mmSfx60.rml (mm).
+# Compact layout: the window is 1100 x 606 dp, a 36 dp bar on top of either the front panel (570 dp)
+# or the editor (a 32 dp track strip and a 538 dp page). Every SON, MASTER and MIX view fits the page
+# without scrolling. When the window is made taller, the front panel and the editor are stacked.
+# Grid: 16 dp margins, 12 columns of 78 dp, 12 dp gutters (16 + 12*78 + 11*12 + 16 = 1100 dp).
+import sys
+MODEL = sys.argv[1]
+MD = MODEL == "md"
+COL, GUT, M = 78, 12, 16
+def colx(c): return M + c * (COL + GUT)       # absolute x of column c
+def bx(c): return c * (COL + GUT)             # x of column c relative to a block starting at column 0
+def span(n): return n * COL + (n - 1) * GUT
+KNOB, ROW, TOP = 46, 84, 32
+PAGE_H = 538
+
+out = []
+w = out.append
+def ind(n): return "\t" * n
+
+# ---------- controls ----------
+
+def knob(d, x, y, param, name, off=False, cw=COL):
+    cls = "jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" + (" mdEdOff" if off else "")
+    p = f' param="{param}"' if param and not off else ""
+    cid = f' id="mdEdCtl_{param}"' if p else ""
+    vid = f' id="mdEdVal_{param}"' if p else ""
+    w(f'{ind(d)}<knob{cid} class="{cls}"{p} style="left: {x + (cw - KNOB) // 2}dp; top: {y}dp;"/>')
+    value = f"{{{{{param}_text}}}}" if param and not off else "—"
+    w(f'{ind(d)}<div{vid} class="jucePos juceLabel mdEdValue{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + KNOB}dp; width: {cw}dp;">{value}</div>')
+    w(f'{ind(d)}<div class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + KNOB + 14}dp; width: {cw}dp;">{name}</div>')
+
+def fader(d, x, y, param, name, off=False, fh=KNOB, cw=COL):
+    # vertical fader in a knob cell; orientation="vertical" puts the maximum at the top
+    cls = "jucePos mdEdFader" + (" mdEdOff" if off else "")
+    p = f' param="{param}"' if param and not off else ""
+    # an unbound fader rests at the bottom (value 100 of the default 0-100 range)
+    rest = "" if p else ' value="100"'
+    cid = f' id="mdEdCtl_{param}"' if p else ""
+    vid = f' id="mdEdVal_{param}"' if p else ""
+    tall = f" height: {fh}dp;" if fh != KNOB else ""
+    w(f'{ind(d)}<input{cid} type="range" orientation="vertical" class="{cls}"{p}{rest} style="left: {x + (cw - 12) // 2}dp; top: {y}dp;{tall}"/>')
+    value = f"{{{{{param}_text}}}}" if param and not off else "—"
+    w(f'{ind(d)}<div{vid} class="jucePos juceLabel mdEdValue{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + fh}dp; width: {cw}dp;">{value}</div>')
+    w(f'{ind(d)}<div class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + fh + 14}dp; width: {cw}dp;">{name}</div>')
+
+def control(d, x, y, item):
+    kind, param, name = item
+    (fader if kind == "f" else knob)(d, x, y, param, name, kind == "x")
+
+def selector(d, x, y, labels, widths):
+    # segmented selector drawn inactive: the choice is not a host parameter yet
+    for label, sw in zip(labels, widths):
+        w(f'{ind(d)}<div class="jucePos mdEdSeg mdEdOff" style="left: {x}dp; top: {y}dp; width: {sw}dp;">{label}</div>')
+        x += sw
+
+def block_open(d, bid, title, sub, c0, ncols, y, h, model=None):
+    m = f' data-model="{model}"' if model else ""
+    w(f'{ind(d)}<div id="{bid}" class="jucePos mdEdBlock"{m} style="left: {colx(c0)}dp; top: {y}dp; width: {span(ncols)}dp; height: {h}dp;">')
+    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: {span(ncols) - 32}dp;">{title}</div>')
+    if sub:
+        w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: {span(ncols) - 32}dp;">{sub}</div>')
+
+def block_close(d):
+    w(f'{ind(d)}</div>')
+
+def rows_height(rows):
+    return TOP + rows * ROW + 8
+
+def controls_block(d, bid, title, sub, c0, ncols, y, items, model="partCurrent", height=None):
+    rows = (len(items) + ncols - 1) // ncols
+    h = height if height else rows_height(rows)
+    block_open(d, bid, title, sub, c0, ncols, y, h, model)
+    for i, item in enumerate(items):
+        control(d + 1, bx(i % ncols), TOP + (i // ncols) * ROW, item)
+    return h
+
+# ---------- blocks shared by the SON pages ----------
+
+ROW_A = TOP + 24 + 8
+
+def steps_block(d, y, ncols):
+    # StepGrid (mdStepGrid.cpp) fills the steps and the line on the right from the current pattern.
+    width = span(ncols)
+    pitch = (width - 32 + 2) // 32
+    block_open(d, "mdEdSteps", "PAS", "", 0, ncols, y, ROW_A)
+    w(f'{ind(d + 1)}<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 60dp; top: 4dp; width: {width - 60 - 16 - 70}dp;">pattern : en attente</div>')
+    w(f'{ind(d + 1)}<button id="mdEdStepsRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {width - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
+    for s in range(32):
+        beat = " mdEdStepBeat" if s % 4 == 0 else ""
+        w(f'{ind(d + 1)}<div id="mdEdStep{s}" class="jucePos mdEdStep{beat}" style="left: {16 + pitch * s}dp; top: {TOP}dp; width: {pitch - 2}dp;">{s + 1}</div>')
+    block_close(d)
+
+def machine_block(d, y, c0, ncols):
+    width = span(ncols)
+    block_open(d, "mdEdMachine", "MACHINE", "", c0, ncols, y, ROW_A)
+    # Filled by MachinePicker (mdMachinePicker.cpp): family tag, machine name, synthesis type.
+    w(f'{ind(d + 1)}<button id="mdEdMachineChange" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {width - 16 - 150}dp; top: 4dp; width: 150dp;">CHANGER DE MACHINE</button>')
+    w(f'{ind(d + 1)}<div id="mdEdMachineFamily" class="jucePos mdEdPicto" style="left: 16dp; top: {TOP}dp;">—</div>')
+    w(f'{ind(d + 1)}<div id="mdEdMachineName" class="jucePos juceLabel mdEdMachineName" style="left: 64dp; top: {TOP}dp; width: 100dp;">—</div>')
+    w(f'{ind(d + 1)}<div id="mdEdMachineInfo" class="jucePos juceLabel mdEdSub" style="left: 166dp; top: {TOP + 6}dp; width: {width - 166 - 16}dp;">machine inconnue : en attente du kit</div>')
+    block_close(d)
+
+def machine_picker(d, y):
+    # Opens under MACHINE, over the blocks below; MachinePicker fills the families and machines.
+    w(f'{ind(d)}<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: {colx(0)}dp; top: {y}dp; width: {span(12)}dp; display: none;">')
+    w(f'{ind(d + 1)}<div id="mdEdPickerFamilies" class="mdEdPickerRow"/>')
+    w(f'{ind(d + 1)}<div id="mdEdPickerMachines" class="mdEdPickerRow"/>')
+    w(f'{ind(d + 1)}<div id="mdEdPickerInfo" class="mdEdPickerInfo"/>')
+    w(f'{ind(d)}</div>')
+
+CURVE_H = TOP + 88 + 8
+
+def curves_row(d, y, blocks):
+    # A row of curve blocks under the SON view, shown by CurveView (mdCurveView.cpp) only when the
+    # page has room for it; each block's area gets a canvas drawn from the edited track's parameters.
+    w(f'{ind(d)}<div id="mdEdCurves" class="mdEdCurves" style="display: none;">')
+    for bid, title, sub, c0, ncols in blocks:
+        block_open(d + 1, f"mdEdCurves{bid}", title, sub, c0, ncols, y, CURVE_H)
+        w(f'{ind(d + 2)}<div id="mdEdCurve{bid}" class="jucePos mdEdCurveArea" style="left: 16dp; top: {TOP}dp; width: {span(ncols) - 32}dp; height: 88dp;"/>')
+        block_close(d + 1)
+    w(f'{ind(d)}</div>')
+    return CURVE_H
+
+# ---------- MD ----------
+
+def md_sound(d):
+    # the SON content switches between the track view (tabs 1-16) and MASTER (tab 17) on the mdTrack tab group's page
+    w(f'{ind(d)}<div class="mdEdContent" data-model="tabgroup_mdTrack">')
+    d += 1
+    w(f'{ind(d)}<div id="mdEdTrackView" class="mdEdView" data-if="page != 16" roomyheight="{{ROOMY_H}}" style="height: {{TRACK_H}}dp;">')
+    # Row A: PAS (8) | MACHINE (4)
+    y = 12
+    steps_block(d + 1, y, 8)
+    machine_block(d + 1, y, 8, 4)
+    picker_y = y + ROW_A + 4
+    # Row B: SOURCE (4) | FILTRE (3) | COULEUR (2) | MIX (3), two rows of knobs each
+    y += ROW_A + GUT
+    hb = rows_height(2)
+    source = [("k", f"MachineParameter{i}", f"PARAM {i}") for i in range(1, 9)]
+    controls_block(d + 1, "mdEdSource", "SOURCE", "synthèse de la machine", 0, 4, y, source)
+    block_close(d + 1)
+    filt = [("k", "FilterBase", "BASE"), ("k", "FilterWidth", "WIDTH"), ("k", "FilterQ", "Q"), ("k", "EQFrequency", "EQF"), ("k", "EQGain", "EQG")]
+    controls_block(d + 1, "mdEdFilter", "FILTRE", "passe-bande + EQ", 4, 3, y, filt, height=hb)
+    block_close(d + 1)
+    colour = [("k", "Distortion", "DIST"), ("k", "SampleRateReduction", "SRR"), ("k", "AMDepth", "AMD"), ("k", "AMRate", "AMF")]
+    controls_block(d + 1, "mdEdColour", "COULEUR", "", 7, 2, y, colour, height=hb)
+    block_close(d + 1)
+    # MIX: three tall faders and the pan in four 56 dp cells
+    cw = (span(3) - 16) // 4
+    fh = hb - TOP - 28 - 8
+    block_open(d + 1, "mdEdMix", "MIX", "", 9, 3, y, hb, "partCurrent")
+    for i, (param, name) in enumerate([("Volume", "VOL"), ("DelaySend", "DEL"), ("ReverbSend", "REV")]):
+        fader(d + 2, 8 + i * cw, TOP, param, name, fh=fh, cw=cw)
+    knob(d + 2, 8 + 3 * cw, TOP, "Pan", "PAN", cw=cw)
+    block_close(d + 1)
+    # Row C: MODULATION, the three LFO controls and what they do
+    y += hb + GUT
+    hc = rows_height(1)
+    block_open(d + 1, "mdEdLfo", "MODULATION", "LFO de la piste", 0, 12, y, hc, "partCurrent")
+    for i, item in enumerate([("k", "LFOShape", "FORME"), ("k", "LFOSpeed", "SPEED"), ("k", "LFOAmount", "DEPTH")]):
+        control(d + 2, bx(i), TOP, item)
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: {bx(3) + 16}dp; top: {TOP + 12}dp; width: {span(9) - 32}dp;">LFO forme {{{{LFOShape_text}}}} · vitesse {{{{LFOSpeed_text}}}} · profondeur {{{{LFOAmount_text}}}} · destination : à venir</div>')
+    block_close(d + 1)
+    track_h = y + hc + 12
+    roomy_h = track_h + curves_row(d + 1, y + hc + GUT, [
+        ("Filter", "FILTRE", "BASE, WIDTH, Q · allure, pas une mesure", 0, 6),
+        ("Eq", "EQ", "EQF, EQG · allure, pas une mesure", 6, 6)]) + GUT
+    machine_picker(d + 1, picker_y)
+    w(f'{ind(d)}</div>')
+
+    # MASTER: the MD master effects (board 5). Not host parameters yet, so the controls are inactive.
+    w(f'{ind(d)}<div id="mdEdMasterView" class="mdEdView" data-if="page == 16" style="height: {{MASTER_H}}dp;">')
+    fx = [("mdEdEcho", "RHYTHM ECHO", [("x", None, "TIME"), ("x", None, "FB"), ("f", None, "LEV")]),
+          ("mdEdReverb", "GATE BOX REVERB", [("x", None, "DEC"), ("x", None, "DAMP"), ("f", None, "LEV")]),
+          ("mdEdEq", "EQ", [("x", None, "LF"), ("x", None, "LG"), ("x", None, "HF"), ("x", None, "HG")]),
+          ("mdEdDynamix", "DYNAMIX", [("x", None, "TRHD"), ("x", None, "RAT"), ("x", None, "KNEE"), ("f", None, "OUT")])]
+    h = rows_height(1)
+    for i, (bid, title, items) in enumerate(fx):
+        yb = 12 + (i // 2) * (h + GUT)
+        block_open(d + 1, bid, title, "envois : à venir" if i < 2 else "", 6 * (i % 2), 6, yb, h)
+        for j, (k, p, n) in enumerate(items):
+            (fader if k == "f" else knob)(d + 2, bx(j), TOP, None, n, True)
+        block_close(d + 1)
+    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: {12 + 2 * (h + GUT)}dp; width: 1036dp;">Effets master du kit : ils ne sont pas encore des paramètres du plug-in. Seules les pistes en MAIN passent par ces effets.</div>')
+    master_h = 12 + 2 * (h + GUT) + 28
+    w(f'{ind(d)}</div>')
+    w(f'{ind(d - 1)}</div>')
+    return track_h, master_h, roomy_h
+
+# ---------- MM ----------
+
+def mm_sound(d):
+    w(f'{ind(d)}<div class="mdEdContent" data-model="tabgroup_mdTrack">')
+    d += 1
+    w(f'{ind(d)}<div id="mdEdTrackView" class="mdEdView" roomyheight="{{ROOMY_H}}" style="height: {{TRACK_H}}dp;">')
+    y = 12
+    machine_block(d + 1, y, 0, 12)
+    picker_y = y + ROW_A + 4
+    y += ROW_A + GUT
+    h = rows_height(2)
+    osc = [("k", f"Synthesis{c}", f"SYN {c}") for c in "ABCDEFGH"]
+    controls_block(d + 1, "mdEdOsc", "OSCILLATEUR", "synthèse de la machine", 0, 4, y, osc)
+    block_close(d + 1)
+    amp = [("k", "AmpAttack", "ATK"), ("k", "AmpHold", "HOLD"), ("k", "AmpDecay", "DEC"), ("k", "AmpRelease", "REL"),
+           ("k", "AmpDistortion", "DIST"), ("f", "AmpVolume", "VOL"), ("k", "AmpPan", "PAN"), ("k", "AmpPortamento", "PORT")]
+    controls_block(d + 1, "mdEdAmp", "AMPLI", "ADHR", 4, 4, y, amp)
+    block_close(d + 1)
+    filt = [("k", "FilterBase", "BASE"), ("k", "FilterWidth", "WDTH"), ("k", "FilterHighpassQ", "HPQ"), ("k", "FilterLowpassQ", "LPQ"),
+            ("k", "FilterAttack", "ATK"), ("k", "FilterDecay", "DEC"), ("k", "FilterBaseOffset", "BOFS"), ("k", "FilterWidthOffset", "WOFS")]
+    controls_block(d + 1, "mdEdFilter", "FILTRE", "", 8, 4, y, filt)
+    block_close(d + 1)
+    y += h + GUT
+    eff = [("k", "EffectsDelayTime", "DTIM"), ("f", "EffectsDelaySend", "DSND"), ("k", "EffectsDelayFeedback", "DFB"), ("k", "EffectsSampleRate", "SRR"),
+           ("k", "EffectsEqGain", "EQG"), ("k", "EffectsEqFrequency", "EQF"), ("k", "EffectsDelayBase", "DBAS"), ("k", "EffectsDelayWidth", "DWID")]
+    controls_block(d + 1, "mdEdEffects", "EFFETS", "EQ, lo-fi, delay", 0, 4, y, eff)
+    block_close(d + 1)
+    # MODULATION, 8 columns: LFO 1-3 tabs in the title row, the LFO's summary on the left, its 8 controls on the right
+    block_open(d + 1, "mdEdLfo", "MODULATION", "", 4, 8, y, h, "partCurrent")
+    rx = bx(4)
+    for n in range(3):
+        w(f'{ind(d + 2)}<button id="mmLfoTab{n}" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmLfo" tabbutton="{n}" style="left: {rx + n * 84}dp; top: 4dp;">LFO {n + 1}</button>')
+    for n in range(3):
+        L = f"Lfo{n + 1}"
+        w(f'{ind(d + 2)}<div id="mmLfoPage{n}" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="{n}" style="left: 0dp; top: {TOP}dp; width: {span(8)}dp; height: {h - TOP - 8}dp;">')
+        w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 8dp; width: {span(4) - 32}dp;">LFO {n + 1} : page {{{{{L}Page_text}}}}, destination {{{{{L}Destination_text}}}}, forme {{{{{L}Waveform_text}}}}, déclenchement {{{{{L}Trigger_text}}}}</div>')
+        items = [("k", f"{L}Page", "PAGE"), ("k", f"{L}Destination", "DEST"), ("k", f"{L}Trigger", "TRIG"), ("k", f"{L}Waveform", "WAVE"),
+                 ("k", f"{L}Multiplier", "MULT"), ("k", f"{L}Speed", "SPD"), ("k", f"{L}Interlace", "INTL"), ("k", f"{L}Depth", "DEP")]
+        for i, item in enumerate(items):
+            control(d + 3, rx + bx(i % 4), (i // 4) * ROW, item)
+        w(f'{ind(d + 2)}</div>')
+    block_close(d + 1)
+    track_h = y + h + 12
+    roomy_h = track_h + curves_row(d + 1, y + h + GUT, [
+        ("Amp", "AMPLI", "ATK, HOLD, DEC · proportions", 0, 4),
+        ("Filter", "FILTRE", "BASE, WDTH, HPQ, LPQ · allure", 4, 4),
+        ("Eq", "EQ", "EQF, EQG · allure", 8, 4)]) + GUT
+    machine_picker(d + 1, picker_y)
+    w(f'{ind(d)}</div>')
+    w(f'{ind(d - 1)}</div>')
+    return track_h, None, roomy_h
+
+# ---------- MIX (board 7) ----------
+
+def mix_page(d, tracks):
+    w(f'{ind(d)}<div class="mdEdContent" style="height: {{MIX_H}}dp;">')
+    d += 1
+    heads_top, row_h = TOP, 26
+    rows_top = heads_top + 16
+    note_h = 24
+    # NIVEAUX and SORTIES share one height; the output panels split what SORTIES has
+    lh = max(rows_top + tracks * row_h + 8 + note_h, TOP + 3 * 96 + 2 * 8 + 8)
+    block_open(d, "mdEdLevels", "NIVEAUX", "une colonne par champ", 0, 8, 12, lh)
+    if MD:
+        cols = [("PISTE", 0), ("NIVEAU", 1), ("VOL", 2), ("PAN", 3), ("DEL", 4), ("REV", 5), ("SORTIE", 6)]
+        fields = [("Volume", 2), ("Pan", 3), ("DelaySend", 4), ("ReverbSend", 5)]
+    else:
+        cols = [("PISTE", 0), ("NIVEAU", 1), ("VOL", 2), ("PAN", 3), ("DEL", 4), ("BUS", 5)]
+        fields = [("AmpVolume", 2), ("AmpPan", 3), ("EffectsDelaySend", 4)]
+    for label, c in cols:
+        w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: {bx(c) + 16}dp; top: {heads_top}dp; width: 70dp;">{label}</div>')
+    for t in range(tracks):
+        y = rows_top + t * row_h
+        w(f'{ind(d + 1)}<div id="mdEdLevelRow{t}" class="jucePos mdEdRow" data-model="part{t}" style="left: 0dp; top: {y}dp; width: {span(8)}dp; height: {row_h}dp;">')
+        # LED on = the track plays; clicking it mutes the track (Mute is 1 when muted)
+        w(f'{ind(d + 2)}<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>')
+        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">{t + 1:02d}</div>')
+        w(f'{ind(d + 2)}<input type="range" class="jucePos mdEdHFader" param="Level" style="left: {bx(1) + 8}dp; top: 7dp;"/>')
+        for param, c in fields:
+            w(f'{ind(d + 2)}<knob class="jucePos mdEdNum" param="{param}" style="left: {bx(c)}dp; top: 1dp;">{{{{{param}_text}}}}</knob>')
+        if MD:
+            selector(d + 2, bx(6) + 16, 1, ["MAIN", "A", "B", "C", "D", "E", "F"], [40] + [16] * 6)
+        else:
+            selector(d + 2, bx(5) + 16, 1, ["AB", "CD", "EF"], [30, 30, 30])
+        w(f'{ind(d + 2)}</div>')
+    note = "MD : MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F. Choix de sortie : à venir." if MD else \
+           "MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir."
+    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lh - note_h}dp; width: {span(8) - 32}dp;">{note}</div>')
+    block_close(d)
+    # SORTIES: the three stereo pairs the plug-in exposes to the DAW
+    sh = lh
+    ph = (sh - TOP - 8 - 2 * 8) // 3
+    block_open(d, "mdEdOutputs", "SORTIES", "bus du plug-in", 8, 4, 12, sh)
+    for i, bus in enumerate(["MAIN A/B", "OUT C/D", "OUT E/F"]):
+        y = TOP + i * (ph + 8)
+        w(f'{ind(d + 1)}<div class="jucePos mdEdPanel" style="left: 16dp; top: {y}dp; width: {span(4) - 32}dp; height: {ph}dp;">')
+        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 200dp;">{bus}</div>')
+        for m in range(2):
+            w(f'{ind(d + 2)}<div class="jucePos mdEdMeter mdEdOff" style="left: {12 + m * 20}dp; top: 32dp; height: {ph - 44}dp;"/>')
+        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 64dp; top: 34dp; width: 220dp;">Vu-mètres et pistes routées : à venir</div>')
+        w(f'{ind(d + 2)}<div class="jucePos mdEdSeg mdEdOff" style="left: 64dp; top: {ph - 36}dp; width: 140dp;">ACTIF DANS LE DAW</div>')
+        w(f'{ind(d + 1)}</div>')
+    block_close(d)
+    return 12 + max(lh, sh) + 12
+
+# ---------- page assembly ----------
+
+TRACKS = 16 if MD else 6
+LOGO = "GEARMULATOR MD" if MD else "GEARMULATOR MM"
+
+w('\t\t\t<!-- SON: the selected track. Its controls are bound to partCurrent, which the track tabs set. -->')
+w('\t\t\t<div id="mdEdPageSound" class="mdEdPage" tabgroup="mdEdit" tabpage="0">')
+w('\t\t\t\t<div class="mdEdStrip">')
+for t in range(TRACKS):
+    if MD:
+        w(f'\t\t\t\t\t<button id="editTrack{t}" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="{t}" style="left: {M + t * 63}dp;">{t + 1:02d}</button>')
+    else:
+        w(f'\t\t\t\t\t<button id="editTrack{t}" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="{t}" style="left: {colx(2 * t)}dp; width: {span(2)}dp;">PISTE {t + 1:02d}</button>')
+if MD:
+    w(f'\t\t\t\t\t<button id="editMaster" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="16" style="left: {M + 16 * 63}dp;">MASTER</button>')
+w('\t\t\t\t</div>')
+w('\t\t\t\t<div class="mdEdScroll">')
+marker = len(out)
+track_h, master_h, roomy_h = (md_sound if MD else mm_sound)(5)
+w('\t\t\t\t</div>')
+w('\t\t\t</div>')
+for i in range(marker, len(out)):
+    out[i] = out[i].replace("{TRACK_H}", str(track_h)).replace("{ROOMY_H}", str(roomy_h)).replace("{MASTER_H}", str(master_h))
+
+w('\t\t\t<!-- MIX: one row per track, each bound to its own part; outputs on the right. -->')
+w('\t\t\t<div id="mdEdPageMix" class="mdEdPage" tabgroup="mdEdit" tabpage="1">')
+w('\t\t\t\t<div class="mdEdScroll">')
+marker = len(out)
+mix_h = mix_page(5, TRACKS)
+for i in range(marker, len(out)):
+    out[i] = out[i].replace("{MIX_H}", str(mix_h))
+w('\t\t\t\t\t</div>')
+w('\t\t\t\t</div>')
+w('\t\t\t</div>')
+
+play_text = ("Pattern, lanes et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation." if MD else
+             "Pattern, piano roll et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation.")
+lib_text = "Kits et banque de samples UW : à venir." if MD else "Kits et formes d'onde DigiPRO : à venir."
+for idx, pid, title, text in [
+    (2, "mdEdPagePlay", "JOUER", play_text),
+    (3, "mdEdPageLibrary", "BIBLIO", lib_text),
+    (4, "mdEdPageSystem", "SYSTÈME", "Réglages de la machine et du plug-in : à venir."),
+]:
+    w(f'\t\t\t<div id="{pid}" class="mdEdPage" tabgroup="mdEdit" tabpage="{idx}">')
+    w(f'\t\t\t\t<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">')
+    w(f'\t\t\t\t\t<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">{title}</div>')
+    w(f'\t\t\t\t\t<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">{text}</div>')
+    w('\t\t\t\t</div></div>')
+    w('\t\t\t</div>')
+
+for name, h in [("SON", track_h), ("MASTER", master_h), ("MIX", mix_h)]:
+    if h and h > PAGE_H:
+        sys.exit(f"{MODEL} {name} is {h} dp, more than the {PAGE_H} dp page")
+
+# The top bar, then the editor; the front panel sits between them in the skin (see ViewLayout, mdViewLayout.cpp).
+topbar = f'''		<!-- ===== Top bar: name, the FACE AVANT / ÉDITEUR switch, kit/pattern screen, categories, options. ===== -->
+		<div id="mdTopBar" class="mdEdTopBar">
+			<div class="jucePos juceLabel mdEdLogo" style="left: 16dp; top: 6dp; width: 168dp;">{LOGO}</div>
+			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(2)}dp;">FACE AVANT</button>
+			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(3)}dp;">ÉDITEUR</button>
+			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: {colx(4)}dp; top: 4dp; width: {span(2)}dp;">KIT —  ·  PATTERN —</div>
+			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: {colx(6)}dp;">JOUER</button>
+			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: {colx(7)}dp;">SON</button>
+			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: {colx(8)}dp;">MIX</button>
+			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: {colx(9)}dp;">BIBLIO</button>
+			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: {colx(10)}dp;">SYSTÈME</button>
+			<div class="jucePos mdEdSeg mdEdOff" style="left: {colx(11)}dp; top: 6dp; width: {COL}dp;">OPTIONS</div>
+		</div>
+'''
+editor = '''		<!-- ===== Editor: shown instead of the front panel, or below it when the window is tall enough. ===== -->
+		<div id="mdEditor" class="mdEdRoot">
+''' + "\n".join(out) + "\n\t\t</div>\n"
+open(f"topbar_{MODEL}.rml.txt", "w").write(topbar)
+open(f"editor_{MODEL}.rml.txt", "w").write(editor)
+print(MODEL, "SON", track_h, "with curves", roomy_h, "MASTER", master_h, "MIX", mix_h)
