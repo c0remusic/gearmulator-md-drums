@@ -138,6 +138,11 @@ namespace md
 		// DSP context: the cycle the oldest pending item becomes applicable,
 		// or UINT64_MAX when nothing is pending.
 		uint64_t hostToDspHeadDeadline() const;
+		// DSP context, MM link catch-up (Hardware::schedCatchUpDspToDsp):
+		// while set, a HOTX write makes the running execUntilCycles return
+		// once its block completes, so the catch-up checks the host backlog
+		// there, as it would stepping block by block.
+		void setExecExitOnHostTx(const bool _exit) { m_execExitOnHostTx = _exit; }
 
 	private:
 		void    onUCRxEmpty(bool _needMoreData);
@@ -219,6 +224,7 @@ namespace md
 		std::atomic<bool> m_schedRunnable{false};
 
 		uint64_t m_mmHostTxCycle = 0;
+		bool m_execExitOnHostTx = false;	// DSP context, see setExecExitOnHostTx
 		TimedHostRx m_timedHostRx;
 
 	};

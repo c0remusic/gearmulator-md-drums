@@ -1,9 +1,9 @@
 # Implémentation du transport parallèle — journal de reprise
 
-Branche : `feat/transport-step0-dating` (base `release/md-mm-alpha`), HEAD
-`415aa404` le 2026-09-23. Submodule `source/dsp56300` : fork
-`c0remusic/dsp56300-md-mm`, branche `feat/dma-de-observer` (`27d17af`),
-`.gitmodules` pointe sur le fork.
+Branche : `release/md-mm-alpha`, où `feat/transport-step0-dating` est
+fusionnée. Submodule `source/dsp56300` : fork `c0remusic/dsp56300-md-mm`,
+branche `feat/dma-de-observer`, `.gitmodules` pointe sur le fork (commit
+épinglé : `git ls-tree HEAD source/dsp56300`).
 
 Spec de référence : `docs/design/parallel-transport-spec.md`.
 
@@ -18,6 +18,7 @@ Spec de référence : `docs/design/parallel-transport-spec.md`.
 | 2a miroirs/seams/SPSC | `ee006203` | vert |
 | 2b datation HI08 MD + garde inline | `d5a4ccad` | vert |
 | 2c worker DSP2 (`MDMM_TRANSPORT=parallel`) | `520ab7a8`…HEAD | expérimental, opt-in ; reproducteur ADC vert, perf < série |
+| 3 worker paire (`MDMM_TRANSPORT=pair`) | `417faab5`…HEAD | défaut MM quand le transport parallèle est actif (`Device::preferredTransport`) ; banc MM paire 70,5 % du temps réel (2026-09-30) |
 
 Le mode série (défaut) = 94 % realtime (pluginTester 30 s), identique à la
 baseline du ticket 01. Gates série vertes à chaque commit.
@@ -882,6 +883,60 @@ Reste : un cycle rattrapé coûte encore 6,1 ns par cycle exécuté contre 4,4 e
 propre (boucle bloc par bloc, contrôle du backlog à chaque bloc). Suite :
 répartir les périphériques (~27 %).
 
+### Avances de paire nulles : plancher de l'avance UC (2026-09-30)
+
+Avec `MD_PAIR_LEAD_US` et `MD_PAIR_UC_LEAD_US` à 0 (vides ou « 0 »), le MM
+se figeait à la bascule paire : l'UC attend que le DSP le plus lent le
+dépasse (`dspMin + ucLead > ucPos`), et sans avance DSP la porte UC d'un DSP
+l'arrête au plus à la position de l'UC (`dspCatchupDeadline` arrondit vers
+le bas). Trace (`MDMM_TRANSPORT_TRACE`) : bascule à `uc=16177844`, égal au
+`oUc` du mixer, porte du mixer à 0, `ucLead=0.000`, UC dans l'attente
+« lead » 99 % du temps, ~0 % CPU. La retenue DSP2 (`MD_PAIR_HOLD_DSP2_US`
+≥ 0) ramène l'avance DSP à 0 pendant un aller-retour : avec une avance UC
+nulle, même blocage tôt dans le boot.
+
+Correctif 09737e8d : quand l'avance DSP peut être nulle (`m_pairDspLeadUc`
+nul ou retenue DSP2 active), `schedTryHandoffPair` porte l'avance UC à au
+moins un chunk worker plus le cycle arrondi (1153 cycles DSP, 11,35 µs) et
+le signale sur stderr (`[pair] UC lead raised …`) : le DSP le plus lent a
+toujours un chunk entier à courir pendant que l'UC attend. Politique livrée
+(avance DSP 10 µs, retenue coupée) inchangée. Plancher tranché par Antoine :
+chunk + 1. Écartés : 2 cycles DSP (vivant, mais UC et worker en ping-pong à
+chaque instruction ; estimé à des centaines de secondes pour 10 s d'écoute,
+non mesuré) et le quantum de 30 µs (« 0 » redeviendrait l'avance par défaut
+et masquerait l'expérience). Au passage : `MDMM_TRANSPORT_TRACE` vide
+n'active plus la trace, `MDMM_PAIR_AFFINITY` vide garde le placement par
+défaut, un côté sans chiffres de `u,w` n'épingle plus sur le CPU 0, et
+`MDMM_TRANSPORT` vide laisse le mode par défaut.
+
+Mesures (`mmAudioFirmwareTest --listen`, paire, `MM_LISTEN_LONE_MIXER`,
+10 s d'écoute après les 20 s de boot, garde 90 s) :
+
+| Avances | Avant | Après |
+|---|---|---|
+| deux vides | figé, tué à 90 s (1,1 s CPU) | 26,0 s, 0 trou |
+| deux à 0 | figé, tué à 90 s (1,2 s CPU) | 39,6 s, 0 trou |
+| retenue 30 µs, UC à 0 | figé, tué à 90 s (1,8 s CPU) | 35,0 s, 0 trou |
+| non définies (témoin) | 28,5 s, 0 trou | 26,9 s, 0 trou |
+
+Garde-fous ctest (64210a93, 8552974c) : `mmPairZeroLeadFirmwareTest` et
+`mmPairHoldZeroUcLeadFirmwareTest` (écoute de 2 s, délai 120 s), ~30 s
+chacun ; sur le binaire d'avant correctif, tous deux expirent à 120 s.
+`mmAudioFirmwareTest` échoue désormais si `MDMM_TRANSPORT=pair` est défini
+sans que le worker paire démarre : un test resté en série passerait sans
+exercer les portes.
+
+Tranché le même jour (Antoine) : un `MDMM_TRANSPORT` inconnu (faute de
+frappe, « pairs », « Pair ») compte comme non défini, avec l'avertissement
+`[MD] MDMM_TRANSPORT="…" ignored: not serial, parallel or pair` ; il valait
+Serial en silence. Seuls `serial`, `parallel` et `pair` choisissent un mode.
+Test unitaire `mdTransportModeTest` (fixture de `mdAudioQueueTest`, donc dans
+la gate).
+
+Reste :
+- Coût du plancher pour les expériences à avances nulles : 39,6 s contre
+  26,9 s pour la même écoute (×1,5).
+
 ### Surcharges d'environnement vides : lecteurs de mdLib corrigés (2026-09-30)
 
 Suite de la leçon PowerShell (Leçons dures). Toute surcharge MD/MM de mdLib
@@ -919,6 +974,119 @@ Reste :
   avertissement.
 - Mineur : une valeur illisible de `MDMM_LATENCY_BLOCKS` avertit deux fois
   (device puis plugin).
+
+### Périphériques : répartition fine, lien toujours occupé (2026-09-30)
+
+Sondes niveau 2 (`DSP56K_PROBE_LEVEL=2`), dans les périphériques : horloge
+série (`esxiClock`, sans les slots qu'elle lance), slots ESSI TX et RX par
+port (callbacks de trame compris), HDI08, timers, DMA (sondé à l'appel dans
+`Peripherals56303::exec` : `Dma` ne garde pas de référence au DSP). Compteurs
+de slots ESSI par port : slots actifs, trames rendues à l'hôte, slots RX sans
+mot. Coût : 37 % du mur au niveau 2 (couverture 63 à 65 %) contre 10 % au
+niveau 1 ; figures corrigées, répartition à lire en relatif.
+
+Mesures (banc non cadencé, MM paire ; charge de fond : vite d'un autre projet
+sur 4 cœurs) :
+- Niveau 1 : périphériques 33 % du mur worker (mixer 132 à 142 ns par passe,
+  producer 108 ns).
+- Niveau 2, par passe. Mixer : RX lien ESSI0 ~54 %, reste propre ~12 %, RX
+  codec ~10 %, horloge ~9 %, HDI08 ~9 %. Producer : TX lien ESSI0 ~44 %,
+  HDI08 ~17 %, reste propre ~15 %, horloge ~10 %, DMA ~8 %. HDI08 coûte 27 ns
+  par passe dans les rattrapages contre 9 à 12 en propre (non expliqué).
+- Lien : un slot toutes les 96 cycles, ~1,04 M mots par seconde émulée. Le
+  producer rend une trame à chaque slot (46,8 M slots, 46,8 M trames sur le
+  run), le mixer reçoit un mot sur 93,6 % de ses slots : le lien n'est jamais
+  inactif, sauter les slots vides ne rapporterait rien. Chaque slot
+  échantillonne le registre TX que le DMA écrit à cet instant : une passe
+  périphérique par slot et par DSP est intrinsèque.
+- Coût : ~46 ns par mot côté TX (producer), ~63 ns côté RX (mixer), plus
+  ~35 ns de frais fixes par passe (reste propre, horloge, HDI08, timers,
+  DMA) sur ~2,9 M passes par seconde émulée.
+
+Leviers :
+1. Chemin par mot côté MD (`pushToInput`, `blockingPop`, `linkRxAvailable`) :
+   deux dispositions par mot, ~4 divisions en double, date du consommateur
+   recalculée. Refactor pur, 3 à 5 points estimés.
+2. Passes sans travail : HDI08, timers et DMA servis à chaque passe.
+   Échéance par périphérique, réveil HDI08 à l'arrivée d'un mot hôte. 5 à 8 %
+   estimés, invasif.
+3. Rattrapage : un cycle rattrapé coûte encore 2,9 ns contre 1,9 en propre.
+
+Levier 1 fait : avec un seul thread pour les deux DSP, la sonde de
+disponibilité RX laisse au `blockingPop` du même slot sa disposition et la
+position du consommateur, et `pushToInput` passe au rattrapage la position du
+producer déjà calculée pour l'échéance du mot. Exact (mêmes entrées, mêmes
+doubles). A/B, 6 paires de 30 s : 74,0 % → 72,9 % (−1,0 point ; écarts par
+paire de −0,6 à +2,3). Moins que les 3 à 5 points estimés : les ~110 ns par
+mot tiennent surtout ailleurs (logique de slot ESSI, transfert DMA déclenché
+à chaque slot, `std::function`, copies d'entrée de 64 octets).
+
+Découpage d'un mot de lien après levier 1 (niveau 2, nouvelles catégories
+`essiHostTx`, `essiHostProbe`, `essiHostRx`, `essiDmaRequest` ; 2 runs sous la
+charge du build d'une autre session, répartition stable) : ~120 ns par mot.
+Callback MD TX (`pushToInput`, tentative de rattrapage comprise) ~34 ns,
+sonde RX (`linkRxAvailable`) ~21, pop RX (`blockingPop`) ~22, transfert DMA
+du slot TX ~17 et du slot RX ~22, logique de slot ESSI elle-même ~2 à 3.
+Côté MD ~77 ns, les deux tiers ; l'anneau n'a pas d'instruction verrouillée.
+HDI08 coûte 26 à 34 ns par passe dans les rattrapages contre 11 à 15 en
+propre. Pistes : fusionner sonde et pop RX en un appel hôte (~2 points),
+chemin court DMA pour les transferts d'un mot déclenchés par ESSI (~1 à 2),
+entrée construite dans l'anneau et test rapide du rattrapage (~1).
+
+### Rattrapage MM sous `execUntilCycles`, fin de la série (2026-09-30)
+
+Levier 3 ci-dessus. La boucle de rattrapage MM (`schedCatchUpDspToDsp`,
+branche `bpGate`) avançait le consommateur bloc par bloc avec `exec()` pour
+tester le backlog hôte entre deux blocs. Elle passe sous
+`execUntilCycles(min(cible, clamp, prochain item hôte))`, comme la branche MD.
+Côté DSP, le backlog ne croît que par une écriture HOTX : pendant le
+rattrapage (`Dsp::setExecExitOnHostTx`), le callback d'écriture TX du MM
+appelle `DSP::requestExecExit()`, et le trampoline rend la main après le bloc
+en cours, là où la boucle bloc par bloc testait le backlog.
+
+Sous-module : la cible d'`execUntilCycles` quitte la pile du trampoline x86
+(le registre `g_counter` sur ARM) pour un membre du DSP, `m_execTargetCycles`,
+relu après chaque bloc (autant d'instructions sur x86, un `ldr` de plus sur
+ARM). `requestExecExit()` la met à 0 et coupe `m_skipLimitCycles` : aucun saut
+NOP ou de scrutation ne franchit la sortie demandée. `setSkipLimitCycles`
+(correctif A) disparaît, sans appelant. Test unitaire `execExitRequest`
+(`jitunittests.cpp`, dans `dsp56300_unitTests`) : une écriture HOTX dont le
+callback demande la sortie arrête `execUntilCycles` dans l'état du pas à pas
+par `execJit()`, loin de sa cible.
+
+Au passage : avec le correctif A, un saut de scrutation pouvait franchir une
+écriture HOTX faite dans la même passe par le dispatch d'interruption (vecteur
+rapide avant le bloc de scrutation), puisque la boucle ne testait le backlog
+qu'après la passe. `requestExecExit` coupe ce saut. Cas non rencontré par le
+test d'exactitude ci-dessous.
+
+Exactitude : `mmAudioFirmwareTest` en série (`MDMM_TRANSPORT=serial`) est
+déterministe (deux runs HEAD identiques) ; ses 18 valeurs imprimées (RMS au
+repos, RMS, RMS à niveau nul et rugosité des six pistes) sont identiques à
+HEAD sur deux runs. Chemin ARM relu, non compilé ici.
+
+Mesures (sondes niveau 0, banc non cadencé, MM paire, 3 paires alternées de
+30 s contre `f60b882a` ; machine chargée par le vite d'un autre projet,
+réel ~97 %) :
+- Rattrapé : 5,27 → 5,03 ns/cycle (−4,6 % ; chaque run nouveau sous chaque
+  run de référence, 4,92 à 5,11 contre 5,19 à 5,38), 478 → 456 ns par
+  rattrapage, part du mur worker 13,8 → 13,3 %.
+- Propre (mixer, producer) : inchangé, 3,80 à 3,85 ns/cycle pour le mixer.
+- Temps réel du banc : 96,7 → 96,8 %, dans le bruit.
+
+Moins que les 2 à 3 points estimés. Un rattrapage exécute ~90 cycles
+(12,6 M rattrapages pour 1,14 G cycles), un slot de lien : quelques blocs à
+peine, la boucle par bloc pesait peu. L'écart restant entre rattrapé et
+propre (5,0 contre 3,8 ns/cycle sous cette charge, ~3 % du mur) est un coût
+fixe par rattrapage (~110 ns : entrée, dates en double, garde, backlog,
+service hôte), à attaquer seulement en rattrapant moins souvent, ce qui
+change la synchronisation.
+
+Série arrêtée ici (Antoine, 2026-09-30) : MM paire ~70-73 % du temps réel sur
+cette machine hors charge, rendements décroissants. Pistes identifiées non
+menées : HDI08 servi seulement à l'arrivée d'un mot hôte (1 à 2 points,
+invasif), chemin court DMA pour les transferts d'un mot déclenchés par ESSI
+(~1 point), coût fixe par rattrapage (ci-dessus).
 
 ## Leçons dures
 

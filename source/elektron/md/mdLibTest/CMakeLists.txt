@@ -252,6 +252,19 @@ if(BUILD_TESTING)
 		FIXTURES_REQUIRED MdTransportScorecard)
 endif()
 
+add_executable(mdTransportModeTest transportModeTest.cpp)
+target_link_libraries(mdTransportModeTest PRIVATE mdLib)
+add_test(NAME mdTransportModeTest COMMAND mdTransportModeTest)
+set_tests_properties(mdTransportModeTest PROPERTIES
+	LABELS "UnitTest;Transport" TIMEOUT 10 FIXTURES_SETUP MdTransportMode)
+set_property(TARGET mdTransportModeTest PROPERTY FOLDER "Elektron/test")
+if(BUILD_TESTING)
+	add_dependencies(mdLibTest mdTransportModeTest)
+	add_dependencies(mdAudioQueueTest mdTransportModeTest)
+	set_property(TEST mdLibTests mdAudioQueueTest APPEND PROPERTY
+		FIXTURES_REQUIRED MdTransportMode)
+endif()
+
 if(MD_TRANSPORT_DIAGNOSTICS)
 	add_executable(mdTransportScorecardFirmwareTest
 		transportScorecardFirmwareTest.cpp)

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <mutex>
@@ -58,19 +59,24 @@ namespace md
 		Pair,
 	};
 
-	// MDMM_TRANSPORT's value (std::getenv's result). None when unset or empty,
-	// so the caller keeps its default: PowerShell's
-	// [Environment]::SetEnvironmentVariable($name, $null) leaves an empty
-	// variable that child processes see. Any other value selects Serial.
+	// MDMM_TRANSPORT's value (std::getenv's result): serial, parallel or pair.
+	// Anything else counts as unset, so the caller keeps its default: unset,
+	// empty (PowerShell's [Environment]::SetEnvironmentVariable($name, $null)
+	// leaves an empty variable that child processes see) and any other value,
+	// which also prints a warning. A typo such as "pairs" used to select
+	// Serial without a word.
 	inline std::optional<TransportMode> parseTransportMode(const char* _mode)
 	{
 		if(!_mode || !*_mode)
 			return std::nullopt;
+		if(std::strcmp(_mode, "serial") == 0)
+			return TransportMode::Serial;
 		if(std::strcmp(_mode, "parallel") == 0)
 			return TransportMode::Parallel;
 		if(std::strcmp(_mode, "pair") == 0)
 			return TransportMode::Pair;
-		return TransportMode::Serial;
+		std::fprintf(stderr, "[MD] MDMM_TRANSPORT=\"%s\" ignored: not serial, parallel or pair\n", _mode);
+		return std::nullopt;
 	}
 
 	struct FactoryFlashSnapshot
@@ -481,6 +487,7 @@ namespace md
 		// +infinity before its origin is latched (undated boot traffic).
 		double linkConsumerNow(uint32_t _consumer);
 		bool linkHeadDue(uint32_t _consumer);
+		bool linkHeadDue(uint32_t _consumer, double _now);	// _now = linkConsumerNow(_consumer)
 		void onEssiCallbackMixer();		// master clock: advance the ESSI frame counter
 		void pumpMidiIngress();
 
@@ -524,6 +531,15 @@ namespace md
 		// serial wire has no memory, so everything queued while the receiver
 		// was disabled dies when it enables.
 		std::array<PerDsp<bool>, 2> m_linkRxWasEnabled{};
+		// What the RX availability probe of a receive slot leaves to the pop
+		// that follows it in the same slot, when one thread runs both DSPs:
+		// the disposal is done, and the consumer's position is this.
+		struct LinkRxTick
+		{
+			uint64_t cycles = ~0ull;	// consumer getCycles() at the probe, ~0 = none
+			double now = 0.0;			// linkConsumerNow() there
+		};
+		std::array<PerDsp<LinkRxTick>, 2> m_linkRxTick{};
 		std::array<PerDsp<std::array<std::atomic<bool>, 6>>, 2> m_dmaEnabled{};
 		std::array<PerDsp<std::atomic<size_t>>, 2> m_ucRxDepth{};
 		// Producer->mixer content offset in codec frames (TransportPolicy,
@@ -591,7 +607,8 @@ namespace md
 		bool     waitSignalOrHelp(std::chrono::microseconds _timeout, const std::function<bool()>& _ready);
 		void     stopProducerWorker();
 		void     schedDrainCodecOutput();		// pop the mixer ESSI1 output ring so its TX never blocks
-		void     schedCatchUpDspToDsp(uint32_t _consumer, uint32_t _producer);
+		// _producerPos: schedDspFramePos(_producer), when the caller has it
+		void     schedCatchUpDspToDsp(uint32_t _consumer, uint32_t _producer, std::optional<double> _producerPos = {});
 		// Compact, preallocated host-facing storage keeps codec draining bounded.
 		// Overflow retains the newest frames and is explicit telemetry; processAudio
 		// drains the queue every callback so stale audio cannot accumulate between blocks.

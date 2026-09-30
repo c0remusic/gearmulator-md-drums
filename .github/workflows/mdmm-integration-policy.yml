@@ -46,8 +46,7 @@ jobs:
             git fetch --quiet --no-tags origin "refs/pull/$PR_NUMBER/head"
             test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
           fi
-          for entry in 'dsp56300 dsp56300-md-mm' 'mc68k mc68k-md-mm'; do
-            read -r directory repository <<< "$entry"
+          for directory in dsp56300 mc68k; do
             path="source/$directory"
             read -r mode type pin ignored <<< "$(git ls-tree "$HEAD_SHA" -- "$path")"
             if [[ "$mode" != 160000 || "$type" != commit ]]; then
@@ -55,8 +54,16 @@ jobs:
               exit 1
             fi
             old_pin=$(git rev-parse "refs/audit/release:$path")
+            # The dependency is the repository the release branch's own
+            # .gitmodules names (trusted base content, never the PR's): a fork
+            # that moves a submodule to its own repository is checked there.
+            url=$(git config --blob refs/audit/release:.gitmodules --get "submodule.$path.url")
+            if [[ "$url" != https://github.com/* ]]; then
+              echo "::error::$path: the release .gitmodules names no GitHub repository ('$url')"
+              exit 1
+            fi
             git init -q "$audit_dir/$directory"
-            git -C "$audit_dir/$directory" fetch --quiet --no-tags "https://github.com/joelanders/$repository.git" refs/heads/release/md-mm-alpha:refs/remotes/origin/release
+            git -C "$audit_dir/$directory" fetch --quiet --no-tags "$url" refs/heads/release/md-mm-alpha:refs/remotes/origin/release
             git -C "$audit_dir/$directory" rev-list --first-parent refs/remotes/origin/release > "$audit_dir/$directory-first-parent"
             if ! grep -Fx "$pin" "$audit_dir/$directory-first-parent"; then
               echo "::error::$path must pin a resulting release commit, not a dependency feature commit. Merge the dependency first."

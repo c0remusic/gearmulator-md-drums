@@ -4,30 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gearmulator is a low-level IC emulator that recreates classic virtual analog synthesizers (Access Virus, Waldorf microQ/XT, Clavia Nord Lead 2x, Roland JP-8000, Ensoniq VFX/TS-10) by emulating original DSP56300 and MC68K processors and running authentic firmware ROMs as audio plugins (FST, VST3, AU, CLAP, LV2).
+Gearmulator is a low-level IC emulator that recreates classic virtual analog synthesizers (Access Virus, Waldorf microQ/XT, Clavia Nord Lead 2x, Roland JP-8000, Elektron Machinedrum/Monomachine) by emulating original DSP56300 and MC68K processors and running authentic firmware ROMs as audio plugins (FST, VST3, AU, CLAP, LV2).
 
 ## Build Commands
 
-**Current dev setup uses `temp/cmake_vs26` with Visual Studio 2026.**
+**Current dev setup uses `temp/cmake_vs22` with Visual Studio 2022.**
 
 ```bash
 # Configure (Windows)
-cmake . -B temp/cmake_vs26 -G "Visual Studio 17 2022"
+cmake . -B temp/cmake_vs22 -G "Visual Studio 17 2022"
 
 # Build (use Debug for quick compile checks, Release for full optimization)
-cmake --build temp/cmake_vs26 --config Debug -j 4
-cmake --build temp/cmake_vs26 --config Release -j 4
+cmake --build temp/cmake_vs22 --config Debug -j 4
+cmake --build temp/cmake_vs22 --config Release -j 4
 
 # Package
-cd temp/cmake_vs26 && cpack -G ZIP
+cd temp/cmake_vs22 && cpack -G ZIP
 
 # Run tests
 ctest -C Release
 ```
 
-Per-synth CMake flags: `-Dgearmulator_SYNTH_OSIRUS=ON`, `_OSTIRUS`, `_VAVRA`, `_XENIA`, `_NODALRED2X`, `_JE8086`, `_VFX`, `_TS10`. Plugin format flags: `gearmulator_BUILD_JUCEPLUGIN`, `_CLAP`, `_LV2`, `gearmulator_BUILD_FX_PLUGIN`.
+Gate before commit/push (MD/MM): the targeted build and ctest list in `.scratch/parallel-transport/implementation-log.md` § "Commandes"; ctest only if build_exit=0.
+
+Firmware tests exit 77 (ctest: Skipped, not failed) without `GEARMULATOR_MD_FIRMWARE_BIN` / `GEARMULATOR_MM_FIRMWARE_BIN`: set both (paths in the log § "Commandes") or the gate proves nothing.
+
+Run firmware executables by hand only under a wall-clock guard (`Start-Process -PassThru` + `WaitForExit(ms)`, kill on timeout).
+
+`jucePluginLib/pluginVersion.cpp` recompiles on every build (version timestamp, MSB8065 by design): a build with no changes still compiles one file.
+
+Per-synth CMake flags: `-Dgearmulator_SYNTH_OSIRUS=ON`, `_OSTIRUS`, `_VAVRA`, `_XENIA`, `_NODALRED2X`, `_JE8086`, `_ELEKTRON` (all default ON). Plugin format flags: `gearmulator_BUILD_JUCEPLUGIN`, `_CLAP`, `_LV2`, `gearmulator_BUILD_FX_PLUGIN`.
 
 Convenience scripts: `build_win64.bat`, `build_linux.sh`, `build_mac.sh`.
+
+Worktrees (`.claude/worktrees/*`) have no submodules or build dir: `git -c protocol.file.allow=always -c submodule.<name>.url=<main>/.git/modules/<path> submodule update --init --recursive`, then configure a fresh `temp/cmake_vs22`.
+
+`#ifdef DSP56K_TSC_PROBES` code: configure with `-DDSP56K_TSC_PROBES=ON` and compile one file via `MSBuild <proj>.vcxproj -t:ClCompile -p:Configuration=Release -p:Platform=x64 -p:SelectedFiles=<abs path>` (one file per call).
 
 ## Architecture
 
@@ -42,6 +54,7 @@ Convenience scripts: `build_win64.bat`, `build_linux.sh`, `build_mac.sh`.
 | Xenia | Waldorf MW II/XT | `xtLib/` | `xtJucePlugin/` |
 | Nodal Red 2x | Nord Lead/Rack 2x | `nord/n2x/` | `nord/n2x/n2xJucePlugin/` |
 | JE-8086 | Roland JP-8000 | `ronaldo/je8086/` | `ronaldo/je8086/jeJucePlugin/` |
+| Gearmulator MD / MM | Elektron Machinedrum / Monomachine | `elektron/md/mdLib/` | `elektron/md/mdJucePlugin/` |
 
 **Shared libraries:**
 - `synthLib/` — Device base class, DAC, resampling, MIDI routing
@@ -67,7 +80,8 @@ Convenience scripts: `build_win64.bat`, `build_linux.sh`, `build_mac.sh`.
 
 - Do NOT include `Co-authored-by` trailers in commit messages
 - Do NOT commit without explicit user approval
-- Git remotes: `gearmulator` (public OSS), `private` (development), also `nas`, `codeberg`, `EvilDragon`
+- Git remote: `origin` (github.com/c0remusic/gearmulator-md-mm)
+- Parallel Claude sessions (`.claude/worktrees/*`, sometimes the main checkout) merge and push `release/md-mm-alpha` too: `git fetch` + `git worktree list` before a follow-up or push; stage with explicit pathspecs only
 - DSP submodule (`source/dsp56300/`) is also owned by user — changes there are fine
 
 ## Key Build Files
@@ -92,6 +106,7 @@ Convenience scripts: `build_win64.bat`, `build_linux.sh`, `build_mac.sh`.
 - **RmlUi threading:** DOM modifications MUST happen on JUCE message thread. Use `juce::MessageManager::callAsync` from audio/MIDI callbacks
 - **callAsync safety:** Use static instance-set pattern to guard lambdas against use-after-free
 - **Voice expansion (Xenia/Vavra):** Multiple DSP56300 instances connected via ESSI1 ring bus; main DSP is last (`g_mainDspIdx = g_dspCount - 1`)
+- **Environment overrides (`MD_*`, `MDMM_*`):** read through `mdLib/mdenv.h` (`envOverride`, `envNumber`, `envCount<T>`); unset, empty and unparsable count as unset. Never raw `getenv` + `atoi`/`strtoul`: PowerShell's `SetEnvironmentVariable($n, $null)` leaves an empty variable children see.
 
 ## Detailed Reference
 
