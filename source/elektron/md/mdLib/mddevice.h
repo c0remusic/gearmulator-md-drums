@@ -118,7 +118,8 @@ namespace md
 		// Monomachine's DSPs, on a worker thread. Turning it on takes effect at
 		// the scheduler's next safe point; turning it off only for a machine
 		// booted later, since the worker never hands the DSPs back. MDMM_TRANSPORT,
-		// when set, overrides this (tests, A/B runs). Call with the device paused.
+		// when set and not empty, overrides this (tests, A/B runs). Call with the
+		// device paused.
 		void setParallelTransport(bool _enabled);
 		bool isParallelTransportRequested() const { return preferredTransport() != TransportMode::Serial; }
 		bool isParallelTransportActive() const { return m_hardware->isProducerThreaded(); }

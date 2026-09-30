@@ -8,6 +8,7 @@
 #include <cstring>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -57,8 +58,14 @@ namespace md
 		Pair,
 	};
 
-	inline TransportMode parseTransportMode(const char* _mode)
+	// MDMM_TRANSPORT's value (std::getenv's result). None when unset or empty,
+	// so the caller keeps its default: PowerShell's
+	// [Environment]::SetEnvironmentVariable($name, $null) leaves an empty
+	// variable that child processes see. Any other value selects Serial.
+	inline std::optional<TransportMode> parseTransportMode(const char* _mode)
 	{
+		if(!_mode || !*_mode)
+			return std::nullopt;
 		if(std::strcmp(_mode, "parallel") == 0)
 			return TransportMode::Parallel;
 		if(std::strcmp(_mode, "pair") == 0)

@@ -7,6 +7,7 @@
 #include "synthLib/realtimeInstrumentation.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -47,6 +48,54 @@ namespace md
 	// could still be missing and the block came out one frame short (GND SIN
 	// clicks). A frame reaches the ring up to 0.7 frame after its date.
 	constexpr uint64_t g_pairCodecCutFrames = 2;
+
+	namespace
+	{
+		// Environment overrides are for experiments. Unset, empty and
+		// unparsable all count as unset: std::atof and std::strtoul read the
+		// last two as 0, which most overrides take as a real setting, and
+		// PowerShell's [Environment]::SetEnvironmentVariable($name, $null)
+		// leaves an empty variable that child processes see. Both pair leads
+		// read that way stopped the Monomachine at the pair handoff.
+		const char* envOverride(const char* _name)
+		{
+			const char* const value = std::getenv(_name);
+			return value && *value ? value : nullptr;
+		}
+
+		std::optional<double> envNumber(const char* _name)
+		{
+			const char* const value = envOverride(_name);
+			if(!value)
+				return std::nullopt;
+			char* end = nullptr;
+			const double number = std::strtod(value, &end);
+			const bool parsed = end != value;
+			while(std::isspace(static_cast<unsigned char>(*end)))
+				++end;
+			if(!parsed || *end || !std::isfinite(number))
+			{
+				std::fprintf(stderr, "[MD] %s=\"%s\" ignored: not a number\n", _name, value);
+				return std::nullopt;
+			}
+			return number;
+		}
+
+		// A count also fits T and is not negative (std::strtoul wraps "-1").
+		template<typename T>
+		std::optional<T> envCount(const char* _name)
+		{
+			const auto number = envNumber(_name);
+			if(!number)
+				return std::nullopt;
+			if(*number < 0.0 || *number >= std::ldexp(1.0, std::numeric_limits<T>::digits))
+			{
+				std::fprintf(stderr, "[MD] %s=%g ignored: not a count\n", _name, *number);
+				return std::nullopt;
+			}
+			return static_cast<T>(*number);
+		}
+	}
 
 	Rom initRom(const std::vector<uint8_t>& _romData, const std::string& _romName,
 		const MachineModel _model)
@@ -134,13 +183,13 @@ namespace md
 		const auto* const boundedJit = std::getenv("GEARMULATOR_MDMM_BOUNDED_JIT");
 		m_schedBoundedJit = boundedJit == nullptr || std::strcmp(boundedJit, "0") != 0;
 		m_linkPipelineDepthFrames = transportPolicy(m_model).linkPipelineDepthFrames;
-		if(const char* const depth = std::getenv("MD_LINK_PIPELINE_DEPTH"))
-			m_linkPipelineDepthFrames = std::max(0.0, std::atof(depth));
-		if(const char* const mode = std::getenv("MDMM_TRANSPORT"))
-			m_transportMode = parseTransportMode(mode);
-		if(const char* const help = std::getenv("MDMM_PRODUCER_HELP_US"))
-			m_producerHelpDelayUs = static_cast<uint32_t>(std::strtoul(help, nullptr, 10));
-		m_transportTrace = std::getenv("MDMM_TRANSPORT_TRACE") != nullptr;
+		if(const auto depth = envNumber("MD_LINK_PIPELINE_DEPTH"))
+			m_linkPipelineDepthFrames = std::max(0.0, *depth);
+		if(const auto mode = parseTransportMode(std::getenv("MDMM_TRANSPORT")))
+			m_transportMode = *mode;
+		if(const auto help = envCount<uint32_t>("MDMM_PRODUCER_HELP_US"))
+			m_producerHelpDelayUs = *help;
+		m_transportTrace = envOverride("MDMM_TRANSPORT_TRACE") != nullptr;
 		if(m_transportTrace)
 			startWatchdog();
 
@@ -1634,11 +1683,7 @@ namespace md
 		double schedQuantumFrames(const MachineModel _model)
 		{
 			// MD_BACKGROUND_QUANTUM_US overrides the policy for experiments.
-			static const double s_override = []
-			{
-				const char* const us = std::getenv("MD_BACKGROUND_QUANTUM_US");
-				return us ? std::atof(us) : 0.0;
-			}();
+			static const double s_override = envNumber("MD_BACKGROUND_QUANTUM_US").value_or(0.0);
 			const double us = s_override > 0.0 ? s_override : transportPolicy(_model).backgroundQuantumMicroseconds;
 			return us * static_cast<double>(g_samplerate) / 1.0e6;				// -> codec frames
 		}
@@ -2168,11 +2213,7 @@ namespace md
 		// scheduler it lands nearly every UC word at the full lead, plus up to
 		// a chunk (transportPolicy). MD_PAIR_LEAD_US and MD_PAIR_UC_LEAD_US
 		// override them.
-		const auto envUs = [](const char* _name)
-		{
-			const char* const value = std::getenv(_name);
-			return value ? std::atof(value) : -1.0;
-		};
+		const auto envUs = [](const char* _name) { return envNumber(_name).value_or(-1.0); };
 		const auto usToFrames = [](const double _us) { return _us * static_cast<double>(g_samplerate) / 1.0e6; };
 		const auto policy = transportPolicy(m_model);
 		m_pairQuantumFrames = schedQuantumFrames(m_model);
@@ -2181,15 +2222,33 @@ namespace md
 		m_pairDspLeadUc = static_cast<uint64_t>(dspLeadFrames * schedUcCyclesPerFrame());
 		const double ucLeadUs = envUs("MD_PAIR_UC_LEAD_US");
 		m_pairUcLeadFrames = ucLeadUs >= 0.0 ? usToFrames(ucLeadUs) : m_pairQuantumFrames;
-		if(const char* const minChunk = std::getenv("MD_PAIR_MIN_CHUNK"))
-			m_pairMinChunkCycles = std::max<uint64_t>(1, std::strtoull(minChunk, nullptr, 10));
+		if(const auto minChunk = envCount<uint64_t>("MD_PAIR_MIN_CHUNK"))
+			m_pairMinChunkCycles = std::max<uint64_t>(1, *minChunk);
 		// DSP2 round-trip hold (pairDspLeadUc), window in microseconds of UC
 		// time. MD_PAIR_HOLD_DSP2_US overrides the policy; negative disables.
-		const char* const holdEnv = std::getenv("MD_PAIR_HOLD_DSP2_US");
-		const double holdDsp2Us = holdEnv ? std::atof(holdEnv) : policy.pairHoldDsp2Microseconds;
+		const double holdDsp2Us = envNumber("MD_PAIR_HOLD_DSP2_US").value_or(policy.pairHoldDsp2Microseconds);
 		m_pairHoldDsp2 = isMonomachine() && holdDsp2Us >= 0.0;
 		m_pairHoldDsp2Uc = m_pairHoldDsp2
 			? static_cast<uint64_t>(usToFrames(holdDsp2Us) * schedUcCyclesPerFrame()) : 0;
+		// The gates must not close on each other. The UC waits until the slower
+		// DSP is within the UC lead of it; a DSP's UC gate lets it pass the UC
+		// by the DSP lead at most (hostToDspDeadline rounds down), and by
+		// nothing during a DSP2 hold. With both leads at zero the UC waits for
+		// a DSP to pass it, which the gate forbids, and the machine stops at
+		// the handoff. Where the DSP lead can be zero, the UC therefore leads
+		// by at least one worker chunk plus the cycle the deadline rounds away:
+		// the slower DSP then always has a whole chunk to run while the UC waits.
+		if(!m_pairDspLeadUc || m_pairHoldDsp2)
+		{
+			const double minUcLeadFrames = static_cast<double>(m_pairMinChunkCycles + 1)
+				/ static_cast<double>(g_dsp1CyclesPerEsaiFrame);
+			if(m_pairUcLeadFrames < minUcLeadFrames)
+			{
+				std::fprintf(stderr, "[pair] UC lead raised from %.2f to %.2f us: with no DSP lead the gates would close\n",
+					m_pairUcLeadFrames * 1.0e6 / g_samplerate, minUcLeadFrames * 1.0e6 / g_samplerate);
+				m_pairUcLeadFrames = minUcLeadFrames;
+			}
+		}
 		// Placement. auto keeps this (UC) thread on the physical core it runs on
 		// and the worker on the other cores sharing its last-level cache: on a
 		// Ryzen 3700X that is ~80% of real time for the Monomachine against
@@ -2198,7 +2257,7 @@ namespace md
 		// host's audio thread. MDMM_PAIR_AFFINITY overrides: auto, off, worker
 		// (the worker alone, which measured no gain), or u,w to pin this thread
 		// to logical CPU u and the worker to w.
-		const char* affinity = std::getenv("MDMM_PAIR_AFFINITY");
+		const char* affinity = envOverride("MDMM_PAIR_AFFINITY");
 		if(!affinity)
 			affinity = m_pairPlacementAllowed.load(std::memory_order_relaxed) ? "auto" : "off";
 		if(std::strcmp(affinity, "off") != 0)
@@ -2217,15 +2276,18 @@ namespace md
 			}
 			else
 			{
+				// A side without digits pins nothing: strtoul reads it as CPU 0.
 				char* end = nullptr;
 				const auto uc = std::strtoul(affinity, &end, 10);
+				const bool ucGiven = end != affinity;
 				if(end && *end == ',')
 				{
-					const auto worker = std::strtoul(end + 1, nullptr, 10);
-					if(worker < 64)
+					char* workerEnd = nullptr;
+					const auto worker = std::strtoul(end + 1, &workerEnd, 10);
+					if(workerEnd != end + 1 && worker < 64)
 						m_pairWorkerAffinity = uint64_t{1} << worker;
 				}
-				if(uc < 64)
+				if(ucGiven && uc < 64)
 					dsp56k::ThreadTools::setCurrentThreadAffinity(uint64_t{1} << uc);
 			}
 		}
@@ -2681,10 +2743,10 @@ namespace md
 
 	void Hardware::enableParallelTransport()
 	{
-		if(const char* const mode = std::getenv("MDMM_TRANSPORT"))
-			m_transportMode = parseTransportMode(mode);
-		if(const char* const help = std::getenv("MDMM_PRODUCER_HELP_US"))
-			m_producerHelpDelayUs = static_cast<uint32_t>(std::strtoul(help, nullptr, 10));
+		if(const auto mode = parseTransportMode(std::getenv("MDMM_TRANSPORT")))
+			m_transportMode = *mode;
+		if(const auto help = envCount<uint32_t>("MDMM_PRODUCER_HELP_US"))
+			m_producerHelpDelayUs = *help;
 	}
 
 	uint64_t Hardware::producerGateHint() const
@@ -2759,7 +2821,7 @@ namespace md
 			proAudio.task = dsp56k::ThreadTools::joinProAudioTask();
 		dsp56k::ThreadTools::setCurrentThreadName("MD DSP2");
 		auto& d = m_dspProducer;
-		const bool trace = std::getenv("MDMM_TRANSPORT_TRACE") != nullptr;
+		const bool trace = envOverride("MDMM_TRANSPORT_TRACE") != nullptr;
 		uint64_t chunks = 0, parks = 0;
 		// The audio thread may be executing the producer (tryHelpProducer):
 		// outside m_producerExec only published values are readable, so the

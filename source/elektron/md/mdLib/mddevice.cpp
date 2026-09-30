@@ -742,8 +742,8 @@ namespace md
 
 	TransportMode Device::preferredTransport() const
 	{
-		if(const char* const mode = std::getenv("MDMM_TRANSPORT"))
-			return parseTransportMode(mode);
+		if(const auto mode = parseTransportMode(std::getenv("MDMM_TRANSPORT")))
+			return *mode;
 		if(!m_parallelTransport)
 			return TransportMode::Serial;
 		// The Monomachine's DSPs exchange a strobe request and a burst reply on
