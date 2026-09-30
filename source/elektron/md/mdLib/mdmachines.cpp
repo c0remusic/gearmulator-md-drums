@@ -86,7 +86,9 @@ namespace md::machines
 				{188, "ROM-45", MdRom, true}, {189, "ROM-46", MdRom, true}, {190, "ROM-47", MdRom, true}, {191, "ROM-48", MdRom, true},
 			};
 
-			std::stable_sort(m.begin(), m.end(), [](const Machine& _a, const Machine& _b)
+			// Ids are unique, so a plain sort gives a fixed order. std::stable_sort would
+			// take a temporary buffer that ASan reports as an allocator mismatch.
+			std::sort(m.begin(), m.end(), [](const Machine& _a, const Machine& _b)
 			{
 				return _a.family != _b.family ? _a.family < _b.family : _a.id < _b.id;
 			});
