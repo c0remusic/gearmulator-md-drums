@@ -186,6 +186,15 @@ if(BUILD_TESTING)
 		LABELS "IntegrationTest;LcdInteraction;PointerInput")
 	set_property(TARGET mdLcdEditorPointerTest PROPERTY FOLDER "Elektron/test")
 
+	add_executable(mdEditorSectionTest mdEditorSectionTest.cpp)
+	target_include_directories(mdEditorSectionTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mdEditorSectionTest PRIVATE mdJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mdEditorSectionTest COMMAND mdEditorSectionTest)
+	set_tests_properties(mdEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
+	set_property(TARGET mdEditorSectionTest PROPERTY FOLDER "Elektron/test")
+
 	add_executable(mmLcdEditorPointerTest mdLcdEditorPointerTest.cpp)
 	target_compile_definitions(mmLcdEditorPointerTest PRIVATE MD_LCD_POINTER_TEST_MM=1)
 	target_include_directories(mmLcdEditorPointerTest PRIVATE

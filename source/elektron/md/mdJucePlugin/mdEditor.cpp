@@ -699,6 +699,20 @@ namespace mdJucePlugin
 			});
 		};
 
+		// Editor track tabs (editTrack0..N) choose the part that the editor's
+		// partCurrent controls edit. They do not change the machine's own track.
+		const int trackCount = getModel() == md::MachineModel::Machinedrum ? 16 : 6;
+		for(int track = 0; track < trackCount; ++track)
+		{
+			auto* element = findChild("editTrack" + std::to_string(track), false);
+			if(!element)
+				continue;
+			juceRmlUi::EventListener::Add(element, Rml::EventId::Click, [this, track](Rml::Event&)
+			{
+				setCurrentPart(static_cast<uint8_t>(track));
+			});
+		}
+
 		if(getModel() == md::MachineModel::Machinedrum)
 		{
 			for(int track = 0; track < 16; ++track)

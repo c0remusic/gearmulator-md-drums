@@ -8,8 +8,11 @@
 		<link type="text/rcss" href="mdKnobs.rcss"/>
 		<link type="text/rcss" href="mdDefault.rcss"/>
 		<link type="text/rcss" href="elektron_materials.rcss"/>
+		<link type="text/rcss" href="mdEditor.rcss"/>
 	</head>
-	<body id="Root" class="elektronPanel elektronPanel--md" style="left: 0dp; top: 0dp; width: 1100dp; height: 570dp;">
+	<body id="Root" class="elektronPanel elektronPanel--md" style="left: 0dp; top: 0dp; width: 1100dp; height: 1000dp; display: flex; flex-direction: column;">
+		<!-- The front panel, unchanged, 1100 × 570 dp. Page 0 of tab group mdPanel; page 1 is the folded bar below. -->
+		<div id="mdFrontPanel" class="mdFrontPanel" tabgroup="mdPanel" tabpage="0">
 		<div class="jucePos elektronAluminumPanel mdChassis" style="left: 0dp; top: 0dp; width: 1100dp; height: 570dp;"/>
 
 		<!-- Rear-connector legends printed along the hardware's upper faceplate. -->
@@ -452,6 +455,417 @@
 			</div>
 			<button id="btScale" class="juceButton elektronButton elektronKey elektronScaleButton" isToggle="0"/>
 			<div id="altScaleSetup" class="juceLabel elektronButtonCaption elektronScaleSetup elektronSecondary compact mdAffordance" title="FUNCTION + SCALE: Scale setup">SCALE SETUP</div>
+		</div>
+		</div>
+
+		<!-- ===== Editor, below the front panel. Window 1100 × 1000 dp; the front panel folds to a 32 dp bar. ===== -->
+		<div id="mdFrontPanelFolded" class="mdEdFoldedBar" tabgroup="mdPanel" tabpage="1">
+			<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 400dp;">FACE AVANT <span class="mdEdSub">repliée</span></div>
+			<button class="jucePos juceButton mdEdButton" isToggle="0" tabgroup="mdPanel" tabbutton="0" style="left: 924dp; top: 4dp; width: 160dp;">DÉPLIER</button>
+		</div>
+		<div id="mdEditor" class="mdEdRoot">
+			<div class="mdEdHeader">
+				<div class="jucePos juceLabel mdEdLogo" style="left: 16dp; top: 16dp; width: 168dp;">GEARMULATOR MD</div>
+				<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: 466dp;">JOUER</button>
+				<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: 556dp;">SON</button>
+				<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 646dp;">MIX</button>
+				<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: 736dp;">BIBLIO</button>
+				<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: 826dp;">SYSTÈME</button>
+				<button id="mdPanelFold" class="jucePos juceButton mdEdButton" isToggle="1" tabgroup="mdPanel" tabbutton="1" taboffpage="0" style="left: 924dp; top: 16dp; width: 160dp;">FACE AVANT</button>
+			</div>
+			<!-- SON: the selected track. Every control is bound to partCurrent, which the track tabs set. -->
+			<div id="mdEdPageSound" class="mdEdPage" tabgroup="mdEdit" tabpage="0">
+				<div class="mdEdStrip">
+					<button id="editTrack0" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="0" style="left: 16dp;">01</button>
+					<button id="editTrack1" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="1" style="left: 79dp;">02</button>
+					<button id="editTrack2" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="2" style="left: 142dp;">03</button>
+					<button id="editTrack3" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="3" style="left: 205dp;">04</button>
+					<button id="editTrack4" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="4" style="left: 268dp;">05</button>
+					<button id="editTrack5" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="5" style="left: 331dp;">06</button>
+					<button id="editTrack6" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="6" style="left: 394dp;">07</button>
+					<button id="editTrack7" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="7" style="left: 457dp;">08</button>
+					<button id="editTrack8" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="8" style="left: 520dp;">09</button>
+					<button id="editTrack9" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="9" style="left: 583dp;">10</button>
+					<button id="editTrack10" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="10" style="left: 646dp;">11</button>
+					<button id="editTrack11" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="11" style="left: 709dp;">12</button>
+					<button id="editTrack12" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="12" style="left: 772dp;">13</button>
+					<button id="editTrack13" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="13" style="left: 835dp;">14</button>
+					<button id="editTrack14" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="14" style="left: 898dp;">15</button>
+					<button id="editTrack15" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="15" style="left: 961dp;">16</button>
+				</div>
+				<div class="mdEdScroll">
+				<div class="mdEdContent" data-model="partCurrent" style="height: 392dp;">
+				<div id="mdEdSource" class="jucePos mdEdBlock" style="left: 16dp; top: 16dp; width: 438dp; height: 216dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 406dp;">SOURCE<span class="mdEdSub"> page machine, 8 paramètres</span></div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter1" style="left: 16dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{MachineParameter1_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">PARAM 1</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter2" style="left: 106dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{MachineParameter2_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">PARAM 2</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter3" style="left: 196dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{MachineParameter3_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">PARAM 3</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter4" style="left: 286dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{MachineParameter4_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">PARAM 4</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter5" style="left: 376dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 86dp; width: 78dp;">{{MachineParameter5_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 360dp; top: 100dp; width: 78dp;">PARAM 5</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter6" style="left: 16dp; top: 124dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{MachineParameter6_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">PARAM 6</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter7" style="left: 106dp; top: 124dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 170dp; width: 78dp;">{{MachineParameter7_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 184dp; width: 78dp;">PARAM 7</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="MachineParameter8" style="left: 196dp; top: 124dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 170dp; width: 78dp;">{{MachineParameter8_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 184dp; width: 78dp;">PARAM 8</div>
+				</div>
+				<div id="mdEdFilter" class="jucePos mdEdBlock" style="left: 466dp; top: 16dp; width: 348dp; height: 216dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 316dp;">FILTRE<span class="mdEdSub"> passe-bande + EQ</span></div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBase" style="left: 16dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{FilterBase_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">BASE</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidth" style="left: 106dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{FilterWidth_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">WIDTH</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterQ" style="left: 196dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{FilterQ_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">Q</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EQFrequency" style="left: 286dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{EQFrequency_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">EQF</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EQGain" style="left: 16dp; top: 124dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{EQGain_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">EQG</div>
+				</div>
+				<div id="mdEdMix" class="jucePos mdEdBlock" style="left: 826dp; top: 16dp; width: 258dp; height: 216dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 226dp;">MIX<span class="mdEdSub"> niveau, envois, pan</span></div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 16dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Volume_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">VOL</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 106dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{DelaySend_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">DEL</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 196dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{ReverbSend_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">REV</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 16dp; top: 124dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 170dp; width: 78dp;">{{Pan_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 184dp; width: 78dp;">PAN</div>
+				</div>
+				<div id="mdEdColour" class="jucePos mdEdBlock" style="left: 16dp; top: 244dp; width: 348dp; height: 132dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 316dp;">COULEUR<span class="mdEdSub"> distorsion, lo-fi, AM</span></div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Distortion" style="left: 16dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{Distortion_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">DIST</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SampleRateReduction" style="left: 106dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{SampleRateReduction_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">SRR</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AMDepth" style="left: 196dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{AMDepth_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">AMD</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AMRate" style="left: 286dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 86dp; width: 78dp;">{{AMRate_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 100dp; width: 78dp;">AMF</div>
+				</div>
+				<div id="mdEdLfo" class="jucePos mdEdBlock" style="left: 376dp; top: 244dp; width: 708dp; height: 132dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 676dp;">MODULATION<span class="mdEdSub"> LFO de la piste</span></div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOSpeed" style="left: 16dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 86dp; width: 78dp;">{{LFOSpeed_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 100dp; width: 78dp;">SPEED</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOAmount" style="left: 106dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 86dp; width: 78dp;">{{LFOAmount_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 90dp; top: 100dp; width: 78dp;">DEPTH</div>
+					<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOShape" style="left: 196dp; top: 40dp;"/>
+					<div class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 86dp; width: 78dp;">{{LFOShape_text}}</div>
+					<div class="jucePos juceLabel mdEdName" style="left: 180dp; top: 100dp; width: 78dp;">SHAPE</div>
+				</div>
+				</div>
+				</div>
+			</div>
+			<!-- MIX: the 16 tracks side by side. Each strip is bound to its own part (part0..part15). -->
+			<div id="mdEdPageMix" class="mdEdPage" tabgroup="mdEdit" tabpage="1">
+				<div class="mdEdScroll">
+				<div class="mdEdContent" style="height: 400dp;">
+					<div class="jucePos mdEdMixStrip" data-model="part0" style="left: 16dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">01</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part1" style="left: 79dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">02</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part2" style="left: 142dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">03</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part3" style="left: 205dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">04</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part4" style="left: 268dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">05</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part5" style="left: 331dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">06</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part6" style="left: 394dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">07</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part7" style="left: 457dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">08</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part8" style="left: 520dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">09</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part9" style="left: 583dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">10</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part10" style="left: 646dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">11</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part11" style="left: 709dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">12</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part12" style="left: 772dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">13</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part13" style="left: 835dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">14</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part14" style="left: 898dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">15</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+					<div class="jucePos mdEdMixStrip" data-model="part15" style="left: 961dp; top: 16dp; width: 60dp; height: 368dp;">
+						<div class="jucePos juceLabel mdEdStripName" style="left: 0dp; top: 8dp; width: 60dp;">16</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Volume" style="left: 7dp; top: 32dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 60dp;">{{Volume_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 60dp;">VOL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Pan" style="left: 7dp; top: 108dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 154dp; width: 60dp;">{{Pan_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 168dp; width: 60dp;">PAN</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="DelaySend" style="left: 7dp; top: 184dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 230dp; width: 60dp;">{{DelaySend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 244dp; width: 60dp;">DEL</div>
+						<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="ReverbSend" style="left: 7dp; top: 260dp;"/>
+						<div class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 306dp; width: 60dp;">{{ReverbSend_text}}</div>
+						<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 320dp; width: 60dp;">REV</div>
+						<button class="jucePos juceButton mdEdMute" isToggle="1" param="Mute" style="left: 6dp; top: 336dp;">MUTE</button>
+					</div>
+				</div>
+				</div>
+			</div>
+			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
+				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">JOUER</div>
+					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Pattern, lanes et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation.</div>
+				</div></div>
+			</div>
+			<div id="mdEdPageLibrary" class="mdEdPage" tabgroup="mdEdit" tabpage="3">
+				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">BIBLIO</div>
+					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Kits et banque de samples UW : à venir.</div>
+				</div></div>
+			</div>
+			<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">
+				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
+					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">SYSTÈME</div>
+					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Réglages de la machine et du plug-in : à venir.</div>
+				</div></div>
+			</div>
 		</div>
 	</body>
 </rml>
