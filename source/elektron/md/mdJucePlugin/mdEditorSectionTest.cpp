@@ -1,5 +1,6 @@
-// Loads the real Machinedrum skin headless and checks the editor below the front panel:
-// window size, dp geometry of the grid, parameter binding, tabs and the front-panel fold.
+// Loads the real Machinedrum skin (or the Monomachine skin with MD_EDITOR_SECTION_TEST_MM) headless
+// and checks the editor below the front panel: window size, dp geometry of the grid, parameter
+// binding, tabs and the front-panel fold.
 
 #include "mdEditor.h"
 #include "mdPluginEditorState.h"
@@ -75,6 +76,54 @@ namespace
 	{
 		return _e.IsVisible(true);
 	}
+
+	void collectBound(Rml::Element& _e, std::vector<Rml::Element*>& _out)
+	{
+		if(_e.GetAttribute("param"))
+			_out.push_back(&_e);
+		for(int i = 0; i < _e.GetNumChildren(); ++i)
+			collectBound(*_e.GetChild(i), _out);
+	}
+
+	struct Block
+	{
+		const char* id;
+		float x, y, w, h;
+	};
+
+	// Tops of the SON blocks are relative to the scrolling page.
+#if defined(MD_EDITOR_SECTION_TEST_MM)
+	constexpr auto g_model = md::MachineModel::Monomachine;
+	constexpr const char* g_name = "mmEditorSectionTest";
+	constexpr int g_trackCount = 6;
+	constexpr float g_trackTabPitch = 180, g_trackTabWidth = 168;
+	// SON: 54 knobs + 2 faders; MIX: 3 values, a level fader and a mute LED per track
+	constexpr size_t g_boundElements = 54 + 2 + 6 * 5;
+	constexpr Block g_blocks[] = {
+		{"mdEdMachine", 16, 16, 1068, 88},
+		{"mdEdOsc", 16, 116, 348, 356},
+		{"mdEdAmp", 376, 116, 348, 356},
+		{"mdEdFilter", 736, 116, 348, 356},
+		{"mdEdEffects", 16, 484, 348, 356},
+		{"mdEdLfo", 376, 484, 708, 356},
+	};
+#else
+	constexpr auto g_model = md::MachineModel::Machinedrum;
+	constexpr const char* g_name = "mdEditorSectionTest";
+	constexpr int g_trackCount = 16;
+	constexpr float g_trackTabPitch = 63, g_trackTabWidth = 60;
+	// SON: 21 knobs + 3 faders; MIX: 4 values, a level fader and a mute LED per track
+	constexpr size_t g_boundElements = 21 + 3 + 16 * 6;
+	constexpr Block g_blocks[] = {
+		{"mdEdSteps", 16, 16, 1068, 88},
+		{"mdEdMachine", 16, 116, 1068, 88},
+		{"mdEdSource", 16, 216, 438, 384},
+		{"mdEdFilter", 466, 216, 348, 356},
+		{"mdEdColour", 466, 584, 348, 132},
+		{"mdEdMix", 826, 216, 258, 276},
+		{"mdEdLfo", 16, 728, 1068, 184},
+	};
+#endif
 }
 
 int main()
@@ -83,7 +132,7 @@ int main()
 	{
 		juce::ScopedJuceInitialiser_GUI gui;
 
-		mdJucePlugin::AudioPluginAudioProcessor processor(md::MachineModel::Machinedrum,
+		mdJucePlugin::AudioPluginAudioProcessor processor(g_model,
 			mdJucePlugin::AudioPluginAudioProcessor::EphemeralConfig{std::string{}}, false);
 		processor.setForceSoftwareRendererForSession(true);
 
@@ -106,34 +155,73 @@ int main()
 		// front panel open: panel 570, header 56, track strip 48, then the scrolling page
 		requireRect(element(doc, "mdFrontPanel"), 0, 0, 1100, 570, "front panel");
 		require(!visible(element(doc, "mdFrontPanelFolded")), "folded bar visible while the panel is open");
-		requireRect(element(doc, "editTrack0"), 16, 570 + 56 + 8, 60, 40, "track tab 1");
-		requireRect(element(doc, "editTrack15"), 16 + 15 * 63, 570 + 56 + 8, 60, 40, "track tab 16");
+		constexpr int lastTrack = g_trackCount - 1;
+		requireRect(element(doc, "editTrack0"), 16, 570 + 56 + 8, g_trackTabWidth, 40, "first track tab");
+		requireRect(element(doc, "editTrack" + std::to_string(lastTrack)), 16 + lastTrack * g_trackTabPitch, 570 + 56 + 8,
+			g_trackTabWidth, 40, "last track tab");
+		require(doc.GetElementById("editTrack" + std::to_string(g_trackCount)) == nullptr, "more track tabs than tracks");
 		constexpr float pageTop = 570 + 56 + 48;
-		requireRect(element(doc, "mdEdSource"), 16, pageTop + 16, 438, 216, "SOURCE (5 columns)");
-		requireRect(element(doc, "mdEdFilter"), 466, pageTop + 16, 348, 216, "FILTRE (4 columns)");
-		requireRect(element(doc, "mdEdMix"), 826, pageTop + 16, 258, 216, "MIX (3 columns)");
-		requireRect(element(doc, "mdEdColour"), 16, pageTop + 244, 348, 132, "COULEUR (4 columns)");
-		requireRect(element(doc, "mdEdLfo"), 376, pageTop + 244, 708, 132, "MODULATION (8 columns)");
+		for(const auto& b : g_blocks)
+			requireRect(element(doc, b.id), b.x, pageTop + b.y, b.w, b.h, b.id);
+		const auto& first = g_blocks[0];
 
-		// every editor knob found its parameter (the binding writes min/max on the element)
-		Rml::ElementList knobs;
-		element(doc, "mdEditor").GetElementsByTagName(knobs, "knob");
-		require(knobs.size() == 24 + 16 * 4, "expected 88 editor knobs (24 in SON, 64 in MIX), found " + std::to_string(knobs.size()));
-		for(auto* k : knobs)
+		// every editor control with a param found its parameter (the binding writes min/max on the element);
+		// inactive controls (data not exposed yet) carry no param
+		std::vector<Rml::Element*> bound;
+		collectBound(element(doc, "mdEditor"), bound);
+		require(bound.size() == g_boundElements, "expected " + std::to_string(g_boundElements) + " bound editor controls, found "
+			+ std::to_string(bound.size()));
+		for(auto* e : bound)
 		{
-			const auto* p = k->GetAttribute("param");
-			require(p != nullptr, "editor knob without param");
-			require(k->GetAttribute("max") != nullptr, "knob not bound to parameter " + p->Get<Rml::String>(k->GetCoreInstance()));
+			require(e->GetAttribute("max") != nullptr,
+				"control not bound to parameter " + e->GetAttribute("param")->Get<Rml::String>(e->GetCoreInstance()));
 		}
 
 		// track tabs choose the part edited by partCurrent
 		auto& controller = processor.getController();
-		element(doc, "editTrack3").Click();
+		element(doc, "editTrack" + std::to_string(lastTrack)).Click();
 		context.Update();
-		require(controller.getCurrentPart() == 3, "track tab 4 did not select part 3");
+		require(controller.getCurrentPart() == lastTrack, "last track tab did not select the last part");
 		element(doc, "editTrack0").Click();
 		context.Update();
 		require(controller.getCurrentPart() == 0, "track tab 1 did not select part 0");
+
+#if defined(MD_EDITOR_SECTION_TEST_MM)
+		// MODULATION: LFO 1-3 tabs switch the knob pages
+		require(visible(element(doc, "mmLfoPage0")) && !visible(element(doc, "mmLfoPage1")), "LFO 1 page not shown first");
+		element(doc, "mmLfoTab1").Click();
+		context.Update();
+		require(visible(element(doc, "mmLfoPage1")) && !visible(element(doc, "mmLfoPage0")), "LFO 2 tab did not switch pages");
+		element(doc, "mmLfoTab0").Click();
+		context.Update();
+#else
+		// MASTER (17th tab) replaces the track view without changing the edited part
+		element(doc, "editMaster").Click();
+		context.Update();
+		require(visible(element(doc, "mdEdMasterView")) && !visible(element(doc, "mdEdTrackView")), "MASTER tab did not show the master effects");
+		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 16, 528, 272, "RHYTHM ECHO (6 columns)");
+		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 300, 528, 272, "DYNAMIX (6 columns)");
+		require(controller.getCurrentPart() == 0, "MASTER tab changed the edited part");
+		element(doc, "editTrack0").Click();
+		context.Update();
+		require(visible(element(doc, "mdEdTrackView")) && !visible(element(doc, "mdEdMasterView")), "track tab did not bring the track view back");
+#endif
+
+		// MIX: the LED of a row mutes its own track
+		{
+			auto* mute = controller.getParameter("Mute", 2);
+			require(mute != nullptr, "no Mute parameter for part 2");
+			const auto before = mute->getUnnormalizedValue();
+			Rml::ElementList leds;
+			element(doc, "mdEdLevelRow2").GetElementsByTagName(leds, "button");
+			require(!leds.empty(), "MIX row 3 has no mute LED");
+			leds.front()->Click();
+			context.Update();
+			require(mute->getUnnormalizedValue() != before, "mute LED of row 3 did not change Mute of part 2");
+			leds.front()->Click();
+			context.Update();
+			require(mute->getUnnormalizedValue() == before, "second click did not restore Mute of part 2");
+		}
 
 		// categories: MIX replaces SON
 		tabButton(doc, "mdEdit", "1").Click();
@@ -147,11 +235,11 @@ int main()
 		element(doc, "mdPanelFold").Click();
 		context.Update();
 		require(!visible(element(doc, "mdFrontPanel")) && visible(element(doc, "mdFrontPanelFolded")), "fold did not hide the front panel");
-		requireRect(element(doc, "mdEdSource"), 16, 32 + 56 + 48 + 16, 438, 216, "SOURCE with the panel folded");
+		requireRect(element(doc, first.id), first.x, 32 + 56 + 48 + first.y, first.w, first.h, "first block with the panel folded");
 		element(doc, "mdPanelFold").Click();
 		context.Update();
 		require(visible(element(doc, "mdFrontPanel")) && !visible(element(doc, "mdFrontPanelFolded")), "unfold did not restore the front panel");
-		requireRect(element(doc, "mdEdSource"), 16, pageTop + 16, 438, 216, "SOURCE after unfolding");
+		requireRect(element(doc, first.id), first.x, pageTop + first.y, first.w, first.h, "first block after unfolding");
 
 		// Optional: MD_EDITOR_TEST_PNG=<prefix> writes snapshots of the SON and MIX pages for review.
 		if(const char* png = std::getenv("MD_EDITOR_TEST_PNG"))
@@ -180,16 +268,24 @@ int main()
 			tabButton(doc, "mdEdit", "0").Click();
 			element(doc, "mdPanelFold").Click();
 			snap("-son-folded");
+			tabButton(doc, "mdEdit", "1").Click();
+			snap("-mix-folded");
+			tabButton(doc, "mdEdit", "0").Click();
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			element(doc, "editMaster").Click();
+			snap("-master-folded");
+			element(doc, "editTrack0").Click();
+#endif
 			element(doc, "mdPanelFold").Click();
 			component->setLookAndFeel(nullptr);
 		}
 
-		std::cout << "mdEditorSectionTest: PASS" << std::endl;
+		std::cout << g_name << ": PASS" << std::endl;
 		return 0;
 	}
 	catch(const std::exception& e)
 	{
-		std::cerr << "mdEditorSectionTest: FAIL: " << e.what() << std::endl;
+		std::cerr << g_name << ": FAIL: " << e.what() << std::endl;
 		return 1;
 	}
 }

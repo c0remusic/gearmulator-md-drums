@@ -53,7 +53,8 @@ set(COMMON_ASSETS
 	"parameterDescriptions_md.json"
 	"parameterDescriptions_mm.json"
 	"../../../jucePluginData/elektron_panel.rcss"
-	"../../../jucePluginData/elektron_materials.rcss")
+	"../../../jucePluginData/elektron_materials.rcss"
+	"../../../jucePluginData/elektron_editor.rcss")
 file(GLOB MD_SKIN_ASSETS CONFIGURE_DEPENDS
 	"skins/mdDefault/*.png" "skins/mdDefault/*.rml" "skins/mdDefault/*.rcss"
 	"skins/mdDefault/*.ttf" "skins/mdDefault/*.lua")
@@ -194,6 +195,16 @@ if(BUILD_TESTING)
 	add_test(NAME mdEditorSectionTest COMMAND mdEditorSectionTest)
 	set_tests_properties(mdEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
 	set_property(TARGET mdEditorSectionTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mmEditorSectionTest mdEditorSectionTest.cpp)
+	target_compile_definitions(mmEditorSectionTest PRIVATE MD_EDITOR_SECTION_TEST_MM=1)
+	target_include_directories(mmEditorSectionTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mmEditorSectionTest PRIVATE mmJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mmEditorSectionTest COMMAND mmEditorSectionTest)
+	set_tests_properties(mmEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
+	set_property(TARGET mmEditorSectionTest PROPERTY FOLDER "Elektron/test")
 
 	add_executable(mmLcdEditorPointerTest mdLcdEditorPointerTest.cpp)
 	target_compile_definitions(mmLcdEditorPointerTest PRIVATE MD_LCD_POINTER_TEST_MM=1)

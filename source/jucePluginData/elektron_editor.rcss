@@ -1,0 +1,220 @@
+/* Editor below the front panel (mdDefault.rml, mmSfx60.rml). Window 1100 × 1000 dp.
+   Grid: 16 dp margins, 12 columns of 78 dp, 12 dp gutters. Blocks are placed in dp by the RML.
+   Colours: anthracite chassis, cream text, orange only for active state. */
+
+.mdFrontPanel
+{
+	position: relative;
+	flex: 0 0 570dp;
+	width: 1100dp;
+	height: 570dp;
+}
+
+.mdEdFoldedBar
+{
+	position: relative;
+	box-sizing: border-box;
+	flex: 0 0 32dp;
+	height: 32dp;
+	background-color: #141516;
+	border-bottom: 1dp #2e3034;
+}
+
+.mdEdRoot
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	width: 1100dp;
+	display: flex;
+	flex-direction: column;
+	background-color: #1c1d1f;
+	font-family: Roboto;
+	color: #f4f1ea;
+}
+
+.mdEdHeader, .mdEdStrip
+{
+	position: relative;
+	box-sizing: border-box;
+	background-color: #141516;
+	border-bottom: 1dp #2e3034;
+}
+
+.mdEdHeader { flex: 0 0 56dp; height: 56dp; }
+.mdEdStrip { flex: 0 0 48dp; height: 48dp; }
+
+.mdEdPage
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	display: flex;
+	flex-direction: column;
+}
+
+/* the only scrolling area; its 8 dp scrollbar sits in the right margin */
+.mdEdScroll
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	overflow-y: auto;
+}
+
+.mdEdScroll scrollbarvertical { width: 8dp; }
+.mdEdScroll scrollbarvertical sliderbar { background-color: #3a3d42; border-radius: 4dp; }
+
+/* RCSS has no default styles: a div is inline unless told otherwise */
+.mdEdContent
+{
+	display: block;
+	position: relative;
+	width: 1092dp;
+}
+
+/* SON switches between the track view and MASTER; each view sets its own height */
+.mdEdView
+{
+	display: block;
+	position: relative;
+	width: 1092dp;
+}
+
+/* text */
+
+.mdEdLogo { height: 24dp; line-height: 24dp; font-size: 15dp; font-weight: bold; }
+.mdEdTitle { height: 24dp; line-height: 24dp; font-size: 13dp; font-weight: bold; color: #f4f1ea; }
+.mdEdSub { font-size: 11dp; font-weight: normal; color: #8a8d93; }
+.mdEdValue { height: 14dp; line-height: 14dp; font-size: 12dp; text-align: center; color: #f4f1ea; }
+.mdEdName { height: 14dp; line-height: 14dp; font-size: 10dp; font-weight: bold; text-align: center; color: #8a8d93; }
+.mdEdNote { font-size: 12dp; line-height: 16dp; color: #8a8d93; }
+.mdEdRight { text-align: right; }
+.mdEdLeft { text-align: left; }
+.mdEdMachineName { height: 32dp; line-height: 32dp; font-size: 20dp; font-weight: bold; }
+
+/* inactive: laid out, but the data behind it is not available yet (wireframe board 0b, third state) */
+.mdEdOff { opacity: 0.35; pointer-events: none; }
+
+/* header screen: kit and pattern */
+.mdEdScreen
+{
+	height: 32dp;
+	line-height: 30dp;
+	padding: 0dp 12dp;
+	box-sizing: border-box;
+	font-size: 13dp;
+	font-weight: bold;
+	color: #7a4a2c;
+	background-color: #101112;
+	border: 1dp #3a3d42;
+	border-radius: 3dp;
+}
+
+/* curve area inside a block (128 dp); drawn later by the plug-in */
+.mdEdGraph
+{
+	background-color: #151618;
+	border: 1dp #2e3034;
+	border-radius: 2dp;
+}
+.mdEdGraphCaption
+{
+	display: block;
+	margin: 8dp 10dp;
+	font-size: 10dp;
+	font-weight: bold;
+	color: #4a4d52;
+}
+
+/* segmented selector and inactive buttons */
+.mdEdSeg
+{
+	box-sizing: border-box;
+	height: 24dp;
+	line-height: 22dp;
+	font-size: 10dp;
+	font-weight: bold;
+	text-align: center;
+	color: #8a8d93;
+	border: 1dp #3a3d42;
+}
+
+/* steps: 28 × 32 dp on a 30 dp pitch */
+.mdEdStep
+{
+	box-sizing: border-box;
+	width: 28dp;
+	height: 32dp;
+	line-height: 32dp;
+	font-size: 10dp;
+	text-align: center;
+	color: #8a8d93;
+	background-color: #2a2c30;
+}
+.mdEdStepBeat { background-color: #3a3d42; }
+
+.mdEdPicto { width: 32dp; height: 32dp; border: 1dp #8a8d93; border-radius: 3dp; }
+
+/* vertical fader: 12 × 46 dp, maximum at the top */
+input.range.mdEdFader { width: 12dp; height: 46dp; }
+.mdEdFader slidertrack { margin: 0dp 4dp; background-color: #3a3d42; border-radius: 2dp; }
+.mdEdFader sliderbar { width: 12dp; height: 6dp; background-color: #f4f1ea; border-radius: 1dp; }
+.mdEdFader sliderarrowdec, .mdEdFader sliderarrowinc { width: 0dp; height: 0dp; }
+
+/* horizontal fader in a list row */
+input.range.mdEdHFader { width: 62dp; height: 12dp; }
+.mdEdHFader slidertrack { height: 4dp; margin-top: 4dp; background-color: #3a3d42; border-radius: 2dp; }
+.mdEdHFader sliderbar { width: 6dp; height: 12dp; background-color: #f4f1ea; border-radius: 1dp; }
+.mdEdHFader sliderarrowdec, .mdEdHFader sliderarrowinc { width: 0dp; height: 0dp; }
+
+/* list rows (MIX) */
+.mdEdRow { border-bottom: 1dp #2e3034; }
+.mdEdRowName { height: 32dp; line-height: 32dp; font-size: 12dp; font-weight: bold; }
+.mdEdMuted { color: #5a5d62; text-decoration: line-through; }
+/* a value you drag like a knob; the knob tag is reset to plain text */
+.mdEdNum { width: 78dp; height: 24dp; line-height: 24dp; font-size: 13dp; font-weight: bold; text-align: center; color: #f4f1ea; cursor: pointer;
+	decorator: none; background-color: transparent; border-width: 0dp; box-shadow: none; }
+.mdEdNum:hover { color: #ff6b1f; }
+
+/* output panels and meters */
+.mdEdPanel { background-color: #1c1d1f; border: 1dp #2e3034; border-radius: 3dp; }
+.mdEdMeter { width: 8dp; height: 64dp; background-color: #3a3d42; }
+
+/* blocks */
+
+.mdEdBlock
+{
+	background-color: #232427;
+	border: 1dp #2e3034;
+	border-radius: 4dp;
+}
+
+/* buttons */
+
+.mdEdCat, .mdEdTrackTab, .mdEdButton, .mdEdLed, .mdEdLfoTab
+{
+	border-width: 0dp;
+	box-shadow: none;
+	decorator: none;
+	text-align: center;
+	font-weight: bold;
+	color: #8a8d93;
+	cursor: pointer;
+}
+
+.mdEdCat { top: 12dp; width: 78dp; height: 32dp; line-height: 32dp; font-size: 12dp; border-radius: 3dp; }
+.mdEdCat:hover, .mdEdTrackTab:hover, .mdEdButton:hover, .mdEdLfoTab:hover { color: #f4f1ea; }
+.mdEdCat:checked { color: #f4f1ea; background-color: #26282b; }
+
+.mdEdTrackTab { top: 8dp; width: 60dp; height: 40dp; line-height: 40dp; font-size: 12dp; border-radius: 3dp 3dp 0dp 0dp; }
+.mdEdTrackTab:checked { color: #f4f1ea; background-color: #1c1d1f; }
+
+.mdEdButton { height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
+.mdEdButton:checked { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+
+/* mute LED in a MIX row: lit while the track plays */
+.mdEdLed { width: 12dp; height: 12dp; border-radius: 6dp; background-color: #3a3d42; }
+.mdEdLed:checked { background-color: #ff6b1f; }
+
+/* LFO 1-3 tabs inside MODULATION (MM) */
+.mdEdLfoTab { width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
+.mdEdLfoTab:checked { color: #f4f1ea; background-color: #2e3034; }
+.mdEdLfoPage { display: block; }
