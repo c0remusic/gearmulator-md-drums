@@ -1021,6 +1021,18 @@ paire de −0,6 à +2,3). Moins que les 3 à 5 points estimés : les ~110 ns par
 mot tiennent surtout ailleurs (logique de slot ESSI, transfert DMA déclenché
 à chaque slot, `std::function`, copies d'entrée de 64 octets).
 
+Découpage d'un mot de lien après levier 1 (niveau 2, nouvelles catégories
+`essiHostTx`, `essiHostProbe`, `essiHostRx`, `essiDmaRequest` ; 2 runs sous la
+charge du build d'une autre session, répartition stable) : ~120 ns par mot.
+Callback MD TX (`pushToInput`, tentative de rattrapage comprise) ~34 ns,
+sonde RX (`linkRxAvailable`) ~21, pop RX (`blockingPop`) ~22, transfert DMA
+du slot TX ~17 et du slot RX ~22, logique de slot ESSI elle-même ~2 à 3.
+Côté MD ~77 ns, les deux tiers ; l'anneau n'a pas d'instruction verrouillée.
+HDI08 coûte 26 à 34 ns par passe dans les rattrapages contre 11 à 15 en
+propre. Pistes : fusionner sonde et pop RX en un appel hôte (~2 points),
+chemin court DMA pour les transferts d'un mot déclenchés par ESSI (~1 à 2),
+entrée construite dans l'anneau et test rapide du rattrapage (~1).
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
