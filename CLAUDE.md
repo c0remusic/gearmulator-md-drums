@@ -27,6 +27,12 @@ ctest -C Release
 
 Gate before commit/push (MD/MM): the targeted build and ctest list in `.scratch/parallel-transport/implementation-log.md` § "Commandes"; ctest only if build_exit=0.
 
+Firmware tests exit 77 (ctest: Skipped, not failed) without `GEARMULATOR_MD_FIRMWARE_BIN` / `GEARMULATOR_MM_FIRMWARE_BIN`: set both (paths in the log § "Commandes") or the gate proves nothing.
+
+Run firmware executables by hand only under a wall-clock guard (`Start-Process -PassThru` + `WaitForExit(ms)`, kill on timeout).
+
+`jucePluginLib/pluginVersion.cpp` recompiles on every build (version timestamp, MSB8065 by design): a build with no changes still compiles one file.
+
 Per-synth CMake flags: `-Dgearmulator_SYNTH_OSIRUS=ON`, `_OSTIRUS`, `_VAVRA`, `_XENIA`, `_NODALRED2X`, `_JE8086`, `_ELEKTRON` (all default ON). Plugin format flags: `gearmulator_BUILD_JUCEPLUGIN`, `_CLAP`, `_LV2`, `gearmulator_BUILD_FX_PLUGIN`.
 
 Convenience scripts: `build_win64.bat`, `build_linux.sh`, `build_mac.sh`.
@@ -75,6 +81,7 @@ Worktrees (`.claude/worktrees/*`) have no submodules or build dir: `git -c proto
 - Do NOT include `Co-authored-by` trailers in commit messages
 - Do NOT commit without explicit user approval
 - Git remote: `origin` (github.com/c0remusic/gearmulator-md-mm)
+- Parallel Claude sessions (`.claude/worktrees/*`, sometimes the main checkout) merge and push `release/md-mm-alpha` too: `git fetch` + `git worktree list` before a follow-up or push; stage with explicit pathspecs only
 - DSP submodule (`source/dsp56300/`) is also owned by user — changes there are fine
 
 ## Key Build Files
