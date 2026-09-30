@@ -1,6 +1,7 @@
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
 #include "mdLib/mdhostsync.h"
+#include "mdLib/mdmachines.h"
 #include "mdLib/mdsysexautomation.h"
 #include "synthLib/midiBufferParser.h"
 
@@ -371,6 +372,32 @@ namespace
 					= static_cast<uint8_t>((track * 24 + parameter) & 0x7f);
 			kit[0x19a + track] = static_cast<uint8_t>(100 + track);
 		}
+		// Machine assignments: 16 big-endian 32-bit values in 7-bit groups at 0x1aa.
+		// Track 1 is ROM-33 (176, needs the top bit), track 2 TRX-BD with the TONAL
+		// flag in its upper bits, the others EFM-BD + track.
+		{
+			std::vector<uint8_t> raw;
+			for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+			{
+				const uint32_t value = track == 1 ? 176u : track == 2 ? 0x20000u | 16u : 32u + track;
+				raw.push_back(static_cast<uint8_t>(value >> 24));
+				raw.push_back(static_cast<uint8_t>(value >> 16));
+				raw.push_back(static_cast<uint8_t>(value >> 8));
+				raw.push_back(static_cast<uint8_t>(value));
+			}
+			size_t position = 0x1aa;
+			for(size_t group = 0; group < raw.size(); group += 7)
+			{
+				uint8_t highBits = 0;
+				const auto count = std::min<size_t>(7, raw.size() - group);
+				for(size_t bit = 0; bit < count; ++bit)
+					if(raw[group + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				kit[position++] = highBits;
+				for(size_t bit = 0; bit < count; ++bit)
+					kit[position++] = raw[group + bit] & 0x7f;
+			}
+		}
 		finishDump(kit);
 		const auto parsedKit = parseKitDump(md::MachineModel::Machinedrum, kit);
 		require(parsedKit && parsedKit->slot == 4
@@ -381,6 +408,10 @@ namespace
 		require(parsedKit->parameters[399]
 			== ParameterChange{machinedrum::Level, 15, 0, 115},
 			"wrong last MD Kit parameter");
+		require(parsedKit->machines.size() == machinedrum::TrackCount, "MD Kit machines missing");
+		require(parsedKit->machines[0] == 32 && parsedKit->machines[15] == 47, "wrong MD Kit machine ids");
+		require(parsedKit->machines[1] == 176, "MD ROM-33 lost the top bit of its 7-bit group");
+		require(parsedKit->machines[2] == 16, "MD TONAL flag leaked into the machine id");
 		kit[100] ^= 1;
 		require(!parseKitDump(md::MachineModel::Machinedrum, kit),
 			"accepted corrupt MD Kit checksum");
@@ -407,6 +438,8 @@ namespace
 				kitData[0x11 + track * 72 + parameter]
 					= static_cast<uint8_t>((track * 56 + parameter) & 0x7f);
 		}
+		for(uint8_t track = 0; track < monomachine::TrackCount; ++track)
+			kitData[0x11 + 6 * 72 + track] = static_cast<uint8_t>(track == 5 ? 33 : 3 + track);
 		kitData.back() = 0xe5;
 		auto kit = makeMmDump(0x52, kitData);
 		const auto parsedKit = parseKitDump(md::MachineModel::Monomachine, kit);
@@ -418,9 +451,56 @@ namespace
 		require(parsedKit->parameters[341]
 			== ParameterChange{monomachine::Level, 5, 0, 95},
 			"wrong last MM Kit parameter");
+		require(parsedKit->machines.size() == monomachine::TrackCount
+			&& parsedKit->machines[0] == 3 && parsedKit->machines[4] == 7
+			&& parsedKit->machines[5] == 33, "wrong MM Kit machine ids");
 		kit[12] ^= 1;
 		require(!parseKitDump(md::MachineModel::Monomachine, kit),
 			"accepted corrupt MM Kit checksum");
+	}
+
+	void testMachineAssignment()
+	{
+		using md::automation::sysex::Message;
+		using md::automation::sysex::assignMachine;
+		const auto md = md::MachineModel::Machinedrum;
+		const auto mm = md::MachineModel::Monomachine;
+		// Same wire form as the firmware tests: track, id, UW flag.
+		require(assignMachine(md, 3, 16) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5b, 3, 16, 0, 0xf7},
+			"wrong MD ASSIGN MACHINE for TRX-BD");
+		require(assignMachine(md, 0, 128) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5b, 0, 0, 1, 0xf7},
+			"wrong MD ASSIGN MACHINE for ROM-01");
+		require(assignMachine(md, 15, 191) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5b, 15, 63, 1, 0xf7},
+			"wrong MD ASSIGN MACHINE for ROM-48");
+		require(assignMachine(mm, 5, 32) == Message{0xf0, 0, 0x20, 0x3c, 3, 0, 0x5b, 5, 32, 0, 0xf7},
+			"wrong MM ASSIGN MACHINE for DPRO-DDRW");
+		require(!assignMachine(md, 16, 16), "MD accepted track 17");
+		require(!assignMachine(mm, 6, 3), "MM accepted track 7");
+		require(!assignMachine(md, 0, 6), "MD accepted an id that is no machine");
+		require(!assignMachine(md, 0, 4), "MD offered GND-SW, which the manual does not list");
+		require(!assignMachine(mm, 0, 18), "MM accepted an id that is no machine");
+
+		// Every family has machines, ids are unique, and lookups agree with the list.
+		for(const auto model : {md, mm})
+		{
+			const auto& list = md::machines::machines(model);
+			std::vector<uint16_t> ids;
+			for(const auto& machine : list)
+			{
+				ids.push_back(machine.id);
+				require(md::machines::find(model, machine.id) == &machine, "machine lookup mismatch");
+				require(machine.family < md::machines::families(model).size(), "machine family out of range");
+			}
+			std::sort(ids.begin(), ids.end());
+			require(std::adjacent_find(ids.begin(), ids.end()) == ids.end(), "duplicate machine id");
+			for(size_t family = 0; family < md::machines::families(model).size(); ++family)
+				require(std::any_of(list.begin(), list.end(), [family](const auto& _m) { return _m.family == family; }),
+					"machine family without machines");
+		}
+		require(md::machines::machines(md).size() == 142 && md::machines::machines(mm).size() == 20,
+			"unexpected machine count");
+		require(md::machines::find(mm, 11)->name == "VO-VO-6" && md::machines::find(md, 176)->name == "ROM-33",
+			"wrong machine names");
 	}
 
 	void testBackupFile(const char* const _path, const md::MachineModel _model)
@@ -455,6 +535,8 @@ namespace
 			{
 				const auto parsed = md::automation::sysex::parseKitDump(_model, message);
 				require(parsed.has_value(), "could not parse real Kit dump");
+				for(const auto machine : parsed->machines)
+					require(md::machines::find(_model, machine) != nullptr, "real Kit dump holds an unknown machine id");
 				require(parsed->slot == message[9],
 					"real Kit dump reported its format version as its slot");
 				++kitCount;
@@ -708,6 +790,7 @@ int main(const int _argc, const char* const* _argv)
 	testMidiRunningStatus();
 	testMachinedrumDumps();
 	testMonomachineDumps();
+	testMachineAssignment();
 	testDumpRequestOrdering();
 	testGlobalSync();
 	testHostSync();

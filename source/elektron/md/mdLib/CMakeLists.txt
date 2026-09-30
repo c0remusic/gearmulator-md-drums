@@ -19,6 +19,7 @@ set(SOURCES
 	mdhardware.cpp mdhardware.h
 	mdhostclock.h
 	mdhostsync.cpp mdhostsync.h
+	mdmachines.cpp mdmachines.h
 	mdmc.cpp mdmc.h
 	mdmemorymap.h
 	mdmidiprotocol.h

@@ -1,5 +1,7 @@
 #include "mdsysexautomation.h"
 
+#include "mdmachines.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -12,6 +14,7 @@ namespace md::automation::sysex
 		constexpr uint8_t g_kitDump = 0x52;
 		constexpr uint8_t g_kitRequest = 0x53;
 		constexpr uint8_t g_kitSave = 0x59;
+		constexpr uint8_t g_assignMachine = 0x5b;
 		constexpr uint8_t g_statusRequest = 0x70;
 		constexpr uint8_t g_setStatus = 0x71;
 		constexpr uint8_t g_statusResponse = 0x72;
@@ -325,7 +328,33 @@ namespace md::automation::sysex
 				result.push_back({machinedrum::Level, track, 0,
 					_message[levelPosition + track]});
 			}
-			return KitDump{slot, std::move(result)};
+
+			// Machine assignments follow the levels: 16 big-endian 32-bit values in
+			// 7-bit groups (a byte of top bits, MSB first, then up to seven bytes).
+			// The id is the low byte; the upper bits carry flags such as TONAL.
+			constexpr size_t machinePosition = 0x1aa;
+			constexpr size_t machineBytes = machinedrum::TrackCount * 4;
+			constexpr size_t machineEncoded = machineBytes + (machineBytes + 6) / 7;
+			std::vector<uint16_t> machines;
+			if(_message.size() >= machinePosition + machineEncoded + 5)
+			{
+				std::vector<uint8_t> raw;
+				raw.reserve(machineBytes);
+				for(size_t position = machinePosition; raw.size() < machineBytes;)
+				{
+					const auto highBits = _message[position++];
+					for(uint8_t bit = 0; bit < 7 && raw.size() < machineBytes; ++bit)
+					{
+						auto value = _message[position++];
+						if(highBits & (1u << (6u - bit)))
+							value |= 0x80;
+						raw.push_back(value);
+					}
+				}
+				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+					machines.push_back(raw[track * 4 + 3]);
+			}
+			return KitDump{slot, std::move(result), std::move(machines)};
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -351,7 +380,31 @@ namespace md::automation::sysex
 			result.push_back({monomachine::Level, track, 0,
 				(*decoded)[levelPosition + track]});
 		}
-		return KitDump{slot, std::move(result)};
+
+		// One machine id byte per track right after the parameters.
+		constexpr size_t machinePosition = parameterPosition + monomachine::TrackCount * parameterStride;
+		std::vector<uint16_t> machines;
+		if(decoded->size() >= machinePosition + monomachine::TrackCount)
+		{
+			for(uint8_t track = 0; track < monomachine::TrackCount; ++track)
+				machines.push_back((*decoded)[machinePosition + track]);
+		}
+		return KitDump{slot, std::move(result), std::move(machines)};
+	}
+
+	std::optional<Message> assignMachine(const MachineModel _model, const uint8_t _track,
+		const uint16_t _machine)
+	{
+		const auto trackCount = _model == MachineModel::Monomachine
+			? monomachine::TrackCount : machinedrum::TrackCount;
+		const auto* machine = machines::find(_model, _machine);
+		if(_track >= trackCount || !machine || !machine->assignable)
+			return std::nullopt;
+		if(_model == MachineModel::Monomachine)
+			return Message{0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_assignMachine,
+				_track, static_cast<uint8_t>(_machine), 0x00, 0xf7};
+		return Message{0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_assignMachine,
+			_track, static_cast<uint8_t>(_machine & 0x7f), static_cast<uint8_t>(_machine >= 128 ? 1 : 0), 0xf7};
 	}
 
 	Message globalReload(const MachineModel _model, const uint8_t _slot)

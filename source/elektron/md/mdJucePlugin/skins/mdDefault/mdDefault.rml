@@ -539,10 +539,10 @@
 							<div id="mdEdMachine" class="jucePos mdEdBlock" style="left: 16dp; top: 116dp; width: 1068dp; height: 88dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 1036dp;">MACHINE</div>
 								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 8dp; width: 1036dp;">piste {{page + 1}} · 16 pistes, une machine chacune</div>
-								<div class="jucePos mdEdPicto mdEdOff" style="left: 16dp; top: 44dp;"/>
-								<div class="jucePos juceLabel mdEdMachineName mdEdOff" style="left: 60dp; top: 44dp; width: 300dp;">—</div>
-								<div class="jucePos juceLabel mdEdNote" style="left: 196dp; top: 52dp; width: 560dp;">Nom, famille et type de synthèse de la machine : lecture à venir.</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 900dp; top: 48dp; width: 168dp;">CHANGER DE MACHINE</div>
+								<div id="mdEdMachineFamily" class="jucePos mdEdPicto" style="left: 16dp; top: 44dp;">—</div>
+								<div id="mdEdMachineName" class="jucePos juceLabel mdEdMachineName" style="left: 64dp; top: 44dp; width: 150dp;">—</div>
+								<div id="mdEdMachineInfo" class="jucePos juceLabel mdEdNote" style="left: 214dp; top: 52dp; width: 680dp;">machine inconnue : en attente du kit</div>
+								<button id="mdEdMachineChange" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 900dp; top: 48dp; width: 168dp;">CHANGER DE MACHINE</button>
 							</div>
 							<div id="mdEdSource" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 216dp; width: 438dp; height: 384dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 406dp;">SOURCE</div>
@@ -654,6 +654,11 @@
 								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOAmount" style="left: 916dp; top: 80dp;"/>
 								<div class="jucePos juceLabel mdEdValue" style="left: 900dp; top: 126dp; width: 78dp;">{{LFOAmount_text}}</div>
 								<div class="jucePos juceLabel mdEdName" style="left: 900dp; top: 140dp; width: 78dp;">DEPTH</div>
+							</div>
+							<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: 16dp; top: 208dp; width: 1068dp; display: none;">
+								<div id="mdEdPickerFamilies" class="mdEdPickerRow"/>
+								<div id="mdEdPickerMachines" class="mdEdPickerRow"/>
+								<div id="mdEdPickerInfo" class="mdEdPickerInfo"/>
 							</div>
 						</div>
 						<div id="mdEdMasterView" class="mdEdView" data-if="page == 16" style="height: 624dp;">

@@ -50,6 +50,8 @@ namespace md::automation::sysex
 	{
 		uint8_t slot;
 		std::vector<ParameterChange> parameters;
+		// Machine id per track (see mdmachines.h), empty when the dump is too short to hold them.
+		std::vector<uint16_t> machines;
 	};
 
 	// The receiving half of a Global's MIDI SYNC page.
@@ -72,6 +74,10 @@ namespace md::automation::sysex
 	// factory image is being learned without making that image user-modified.
 	bool isReadOnlyRequest(MachineModel _model, MessageView _message);
 	Message kitSave(MachineModel _model, uint8_t _slot);
+	// ASSIGN MACHINE ($5B) for a track of the live Kit. Machinedrum ids 128 and up
+	// go out as id - 128 with the UW flag; the Monomachine form asks for no page
+	// initialisation. Empty for a track or machine the model does not have.
+	std::optional<Message> assignMachine(MachineModel _model, uint8_t _track, uint16_t _machine);
 
 	std::optional<StatusResponse> parseStatusResponse(MachineModel _model,
 		MessageView _message);

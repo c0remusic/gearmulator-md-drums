@@ -11,12 +11,15 @@
 #include "juceRmlUi/rmlInterfaces.h"
 
 #include "jucePluginLib/controller.h"
+#include "mdController.h"
+#include "mdLib/mdmachines.h"
 
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/ElementDocument.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -94,6 +97,12 @@ namespace
 	// Tops of the SON blocks are relative to the scrolling page.
 #if defined(MD_EDITOR_SECTION_TEST_MM)
 	constexpr auto g_model = md::MachineModel::Monomachine;
+	// Picker: family 1 is SID, whose only machine is SID-6581 (3); family 0 (GND) holds GND-SIN (1).
+	constexpr uint16_t g_pickMachine = 3;
+	constexpr const char* g_pickName = "SID-6581";
+	constexpr const char* g_pickFamily = "SID";
+	constexpr uint16_t g_otherFamilyMachine = 1;
+	constexpr float g_pickerTop = 16 + 88 + 4;
 	constexpr const char* g_name = "mmEditorSectionTest";
 	constexpr int g_trackCount = 6;
 	constexpr float g_trackTabPitch = 180, g_trackTabWidth = 168;
@@ -109,6 +118,12 @@ namespace
 	};
 #else
 	constexpr auto g_model = md::MachineModel::Machinedrum;
+	// Picker: family 1 is TRX; TRX-BD is 16. Family 0 (GND) holds GND-SN (1).
+	constexpr uint16_t g_pickMachine = 16;
+	constexpr const char* g_pickName = "TRX-BD";
+	constexpr const char* g_pickFamily = "TRX";
+	constexpr uint16_t g_otherFamilyMachine = 1;
+	constexpr float g_pickerTop = 116 + 88 + 4;
 	constexpr const char* g_name = "mdEditorSectionTest";
 	constexpr int g_trackCount = 16;
 	constexpr float g_trackTabPitch = 63, g_trackTabWidth = 60;
@@ -223,6 +238,50 @@ int main()
 			require(mute->getUnnormalizedValue() == before, "second click did not restore Mute of part 2");
 		}
 
+		// MACHINE: the picker opens under the block, a family tab filters the machines,
+		// a click assigns the machine to the edited track and closes the picker.
+		{
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			auto& picker = element(doc, "mdEdMachinePicker");
+			require(!visible(picker), "machine picker open before it was asked for");
+			require(element(doc, "mdEdMachineName").GetInnerRML() == "—", "unknown machine not shown as unknown");
+			element(doc, "mdEdMachineChange").Click();
+			context.Update();
+			require(visible(picker), "CHANGER DE MACHINE did not open the picker");
+			requireRect(picker, 16, pageTop + g_pickerTop, 1068, picker.GetBox().GetSize(Rml::BoxArea::Border).y, "machine picker");
+			Rml::ElementList tabs;
+			element(doc, "mdEdPickerFamilies").GetElementsByTagName(tabs, "div");
+			const auto& machines = md::machines::machines(g_model);
+			size_t offered = 0;
+			for(size_t family = 0; family < md::machines::families(g_model).size(); ++family)
+				offered += std::any_of(machines.begin(), machines.end(), [family](const auto& _m) { return _m.family == family && _m.assignable; }) ? 1 : 0;
+			require(tabs.size() == offered, "picker does not show one tab per family with machines to offer");
+			require(offered == (g_model == md::MachineModel::Machinedrum ? 10u : 7u), "unexpected family tab count");
+			require(visible(element(doc, "mdEdMachine" + std::to_string(g_otherFamilyMachine)))
+				&& !visible(element(doc, "mdEdMachine" + std::to_string(g_pickMachine))), "family 1 shown before its tab was chosen");
+			element(doc, "mdEdFamily1").Click();
+			context.Update();
+			require(visible(element(doc, "mdEdMachine" + std::to_string(g_pickMachine)))
+				&& !visible(element(doc, "mdEdMachine" + std::to_string(g_otherFamilyMachine))), "family tab did not filter the machines");
+			require(doc.GetElementById("mdEdMachine4") == nullptr || g_model == md::MachineModel::Monomachine,
+				"picker offers GND-SW, which the manual does not list");
+
+			element(doc, "mdEdMachine" + std::to_string(g_pickMachine)).Click();
+			context.Update();
+			require(md.getTrackMachine(0) == g_pickMachine, "picking a machine did not assign it to the edited track");
+			require(md.getTrackMachine(1) == md::machines::g_unknown, "picking a machine touched another track");
+			require(!visible(picker), "picker stayed open after the assignment");
+			require(element(doc, "mdEdMachineName").GetInnerRML() == g_pickName
+				&& element(doc, "mdEdMachineFamily").GetInnerRML() == g_pickFamily, "MACHINE block does not show the assigned machine");
+
+			element(doc, "editTrack1").Click();
+			context.Update();
+			require(element(doc, "mdEdMachineName").GetInnerRML() == "—", "MACHINE block kept the previous track's machine");
+			element(doc, "editTrack0").Click();
+			context.Update();
+			require(element(doc, "mdEdMachineName").GetInnerRML() == g_pickName, "MACHINE block lost the machine of track 1");
+		}
+
 		// categories: MIX replaces SON
 		tabButton(doc, "mdEdit", "1").Click();
 		context.Update();
@@ -268,6 +327,9 @@ int main()
 			tabButton(doc, "mdEdit", "0").Click();
 			element(doc, "mdPanelFold").Click();
 			snap("-son-folded");
+			element(doc, "mdEdMachineChange").Click();
+			snap("-picker-folded");
+			element(doc, "mdEdMachineChange").Click();
 			tabButton(doc, "mdEdit", "1").Click();
 			snap("-mix-folded");
 			tabButton(doc, "mdEdit", "0").Click();

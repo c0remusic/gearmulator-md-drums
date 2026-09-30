@@ -39,6 +39,8 @@ namespace mdJucePlugin
 			? "parameterDescriptions_mm.json" : "parameterDescriptions_md.json")
 		, m_model(_p.getModel())
 	{
+		for(auto& machine : m_trackMachines)
+			machine.store(md::machines::g_unknown, std::memory_order_relaxed);
 		registerParams(_p, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
 			return _nonPartSensitive ? juce::String("Global")
@@ -269,6 +271,62 @@ namespace mdJucePlugin
 		m_kitSynchronization.reset();
 		m_kitDumpRequestRevision.store(0, std::memory_order_release);
 		sendMissingSynchronizationRequests();
+	}
+
+	uint16_t Controller::getTrackMachine(const uint8_t _part) const
+	{
+		return _part < getPartCount() ? m_trackMachines[_part].load(std::memory_order_acquire)
+			: md::machines::g_unknown;
+	}
+
+	void Controller::storeKitMachines(const std::vector<uint16_t>& _machines,
+		const bool _authoritative)
+	{
+		const auto count = std::min<size_t>(_machines.size(), getPartCount());
+		for(size_t track = 0; track < count; ++track)
+		{
+			auto& stored = m_trackMachines[track];
+			const auto previous = stored.load(std::memory_order_acquire);
+			if(!_authoritative && previous != md::machines::g_unknown)
+				continue;
+			if(previous == _machines[track])
+				continue;
+			stored.store(_machines[track], std::memory_order_release);
+			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		}
+	}
+
+	bool Controller::assignMachine(const uint8_t _part, const uint16_t _machine)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_part >= getPartCount())
+			return false;
+		const auto message = md::automation::sysex::assignMachine(m_model, _part, _machine);
+		if(!message)
+			return false;
+
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex = toPluginSysex(*message);
+		sendMidiEvent(event);
+
+		// Before the first synchronization the cache holds no firmware values, so
+		// there is nothing trustworthy to re-send.
+		if(m_automationReady.load(std::memory_order_acquire))
+		{
+			const auto lastMachinePage = m_model == md::MachineModel::Monomachine
+				? md::automation::monomachine::Lfo3 : md::automation::machinedrum::Routing;
+			for(const auto& slot : m_automationSlots)
+			{
+				if(slot.address.track != _part || slot.address.page > lastMachinePage)
+					continue;
+				transmitParameterChange({slot.address.page, slot.address.track, slot.address.index,
+					publicationValue(slot.publication.load(std::memory_order_acquire))});
+			}
+		}
+
+		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
+			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
 	}
 
 	void Controller::requestKitState()
@@ -882,9 +940,13 @@ namespace mdJucePlugin
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
 			if(m_applyRequestedKitDump.exchange(false, std::memory_order_acq_rel))
+			{
 				applyKitParameters(kit->parameters);
+				storeKitMachines(kit->machines, true);
+			}
 			else
 			{
+				storeKitMachines(kit->machines, false);
 				// Even when the stored dump must not replace the live cache, retain its
 				// raw values for firmware-backed diagnostics.
 				for(const auto& change : kit->parameters)

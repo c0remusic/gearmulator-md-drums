@@ -151,7 +151,8 @@
 }
 .mdEdStepBeat { background-color: #3a3d42; }
 
-.mdEdPicto { width: 32dp; height: 32dp; border: 1dp #8a8d93; border-radius: 3dp; }
+.mdEdPicto { box-sizing: border-box; width: 40dp; height: 32dp; line-height: 30dp; border: 1dp #8a8d93; border-radius: 3dp;
+	font-size: 10dp; font-weight: bold; text-align: center; color: #f4f1ea; }
 
 /* vertical fader: 12 × 46 dp, maximum at the top */
 input.range.mdEdFader { width: 12dp; height: 46dp; }
@@ -218,3 +219,35 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 .mdEdLfoTab { width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
 .mdEdLfoTab:checked { color: #f4f1ea; background-color: #2e3034; }
 .mdEdLfoPage { display: block; }
+
+/* machine picker: opens under MACHINE, over the blocks below (mdMachinePicker.cpp fills it) */
+.mdEdPicker
+{
+	box-sizing: border-box;
+	padding: 12dp 12dp 8dp 12dp;
+	background-color: #1c1d1f;
+	border: 1dp #3a3d42;
+	border-radius: 4dp;
+	z-index: 10;
+}
+.mdEdPickerRow { display: flex; flex-wrap: wrap; margin-bottom: 6dp; }
+.mdEdPickerFamily, .mdEdPickerMachine
+{
+	box-sizing: border-box;
+	height: 28dp;
+	line-height: 26dp;
+	margin: 0dp 6dp 6dp 0dp;
+	font-size: 11dp;
+	font-weight: bold;
+	text-align: center;
+	color: #8a8d93;
+	border: 1dp #3a3d42;
+	border-radius: 2dp;
+	cursor: pointer;
+}
+.mdEdPickerFamily { padding: 0dp 12dp; }
+.mdEdPickerMachine { width: 167dp; background-color: #232427; }
+.mdEdPickerFamily:hover, .mdEdPickerMachine:hover { color: #f4f1ea; border-color: #8a8d93; }
+.mdEdPickerFamily.mdEdSelected { color: #f4f1ea; background-color: #2e3034; }
+.mdEdPickerMachine.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdEdPickerInfo { display: block; font-size: 12dp; line-height: 16dp; color: #8a8d93; }

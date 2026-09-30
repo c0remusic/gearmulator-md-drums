@@ -1,6 +1,7 @@
 #include "mdEditor.h"
 
 #include "mdController.h"
+#include "mdMachinePicker.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -710,7 +711,16 @@ namespace mdJucePlugin
 			juceRmlUi::EventListener::Add(element, Rml::EventId::Click, [this, track](Rml::Event&)
 			{
 				setCurrentPart(static_cast<uint8_t>(track));
+				if(m_machinePicker)
+					m_machinePicker->update();
 			});
+		}
+
+		// The MACHINE block shows and assigns the edited track's machine.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMachineName"))
+		{
+			m_machinePicker = std::make_unique<MachinePicker>(m_controller, getModel(), *document);
+			m_machinePicker->update();
 		}
 
 		if(getModel() == md::MachineModel::Machinedrum)
@@ -2089,6 +2099,10 @@ namespace mdJucePlugin
 
 		if(m_lcdCanvas && m_lcdChanged)
 			m_lcdCanvas->repaint();
+
+		if(m_machinePicker && m_machinePicker->update())
+			if(auto* rml = getRmlComponent())
+				rml->enqueueUpdateOnce();
 
 		// SetClass mutates the Rml DOM but does not wake its renderer. Without this,
 		// LED state is correct in the DOM while the pixels on screen can remain stale

@@ -3,9 +3,11 @@
 #include "jucePluginLib/controller.h"
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
+#include "mdLib/mdmachines.h"
 #include "mdLib/mdtypes.h"
 #include "mdRealtimeQueue.h"
 
+#include <array>
 #include <atomic>
 #include <deque>
 #include <map>
@@ -72,6 +74,19 @@ namespace mdJucePlugin
 			return m_synchronizationRequests.load(std::memory_order_acquire);
 		}
 		int getLastFirmwareKitValue(const pluginLib::Parameter& _parameter) const;
+
+		// Machine of a track as last read from a Kit dump or assigned through
+		// assignMachine, md::machines::g_unknown when neither happened yet. A machine
+		// changed on the front panel is not seen: a Kit dump request returns the
+		// stored Kit, not the live one.
+		uint16_t getTrackMachine(uint8_t _part) const;
+		// Increments whenever a track's machine changes.
+		uint64_t getMachineRevision() const { return m_machineRevision.load(std::memory_order_acquire); }
+		// Sends ASSIGN MACHINE for a track of the live Kit. Once synchronized, it then
+		// re-sends the track's machine pages from the parameter cache, so the firmware
+		// and the editor keep the same values whatever the assignment did to them.
+		// False for a track or machine the model does not have.
+		bool assignMachine(uint8_t _part, uint16_t _machine);
 		void requestAutomationState();
 		std::vector<uint8_t> createAutomationSnapshot() const;
 		bool restoreAutomationSnapshot(const std::vector<uint8_t>& _snapshot);
@@ -151,6 +166,9 @@ namespace mdJucePlugin
 		void completeSynchronizationIfReady();
 		bool firmwareReadyForAutomation() const;
 		void applyKitParameters(const std::vector<md::automation::ParameterChange>& _changes);
+		// An applied dump replaces every track's machine; an inspection dump only
+		// fills tracks whose machine is still unknown.
+		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
 		void onControllerTimer() override;
 		void sendMissingSynchronizationRequests();
 		void sendSynchronizationRequest(const pluginLib::SysEx& _message) const;
@@ -183,6 +201,8 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_transmittedAutomationDigest{14695981039346656037ull};
 		std::atomic<uint8_t> m_currentGlobal{0xff};
 		std::atomic<uint8_t> m_currentKit{0xff};
+		std::array<std::atomic<uint16_t>, md::automation::machinedrum::TrackCount> m_trackMachines{};
+		std::atomic<uint64_t> m_machineRevision{0};
 		std::deque<AutomationSlot> m_automationSlots;
 		std::map<Address, size_t> m_automationSlotIndices;
 		RealtimeQueue<QueuedAutomationChange,

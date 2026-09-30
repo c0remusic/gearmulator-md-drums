@@ -1236,6 +1236,57 @@ namespace
 		return true;
 	}
 
+	// The controller keeps a machine per track from applied Kit dumps and its own
+	// assignments; an assignment re-sends the track's machine pages from the cache.
+	void verifyMachineAssignment(Harness& _harness)
+	{
+		auto& controller = _harness.controller;
+		const bool mm = _harness.model == md::MachineModel::Monomachine;
+		const uint8_t tracks = mm ? 6 : 16;
+		const uint16_t first = mm ? 3 : 16;      // SID-6581, TRX-BD
+		const uint16_t second = mm ? 32 : 176;   // DPRO-DDRW, ROM-33
+
+		std::vector<uint16_t> machines(tracks, first);
+		controller.onStateLoaded();
+		controller.parseSysexMessage(statusResponse(_harness.model,
+			md::automation::sysex::StatusParameter::Global, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(statusResponse(_harness.model,
+			md::automation::sysex::StatusParameter::Kit, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeGlobalDump(_harness.model, 0, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeKitDump(_harness.model, 0, 23, machines), synthLib::MidiEventSource::Device);
+		require(controller.isAutomationSynchronized(), "machine test did not synchronize");
+		for(uint8_t track = 0; track < tracks; ++track)
+			require(controller.getTrackMachine(track) == first, "applied Kit dump did not set the track machines");
+
+		const auto revision = controller.getMachineRevision();
+		const auto sent = controller.getTransmittedAutomationChangeCount();
+		require(controller.assignMachine(2, second), "valid machine assignment refused");
+		require(controller.getTrackMachine(2) == second && controller.getTrackMachine(1) == first,
+			"assignment changed the wrong track");
+		require(controller.getMachineRevision() > revision, "assignment did not bump the machine revision");
+		// MD: synthesis, effects and routing pages (24); MM: the seven machine pages (56).
+		require(controller.getTransmittedAutomationChangeCount() - sent == (mm ? 56u : 24u),
+			"assignment did not re-send exactly the track's machine pages");
+
+		const auto refused = controller.getTransmittedAutomationChangeCount();
+		require(!controller.assignMachine(tracks, first), "assignment accepted a track the model does not have");
+		require(!controller.assignMachine(0, 6000), "assignment accepted an unknown machine");
+		require(controller.getTransmittedAutomationChangeCount() == refused, "refused assignment transmitted values");
+
+		// A same-slot inspection dump holds the stored Kit, not the live one: it
+		// must not undo the assignment. A state load applies its Kit and does.
+		primeSyntheticSnapshot(_harness);
+		require(controller.getTrackMachine(2) == second, "inspection dump undid a live machine assignment");
+		controller.onStateLoaded();
+		controller.parseSysexMessage(statusResponse(_harness.model,
+			md::automation::sysex::StatusParameter::Global, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(statusResponse(_harness.model,
+			md::automation::sysex::StatusParameter::Kit, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeGlobalDump(_harness.model, 0, 0), synthLib::MidiEventSource::Device);
+		controller.parseSysexMessage(makeKitDump(_harness.model, 0, 23, machines), synthLib::MidiEventSource::Device);
+		require(controller.getTrackMachine(2) == first, "state load kept a machine its Kit does not hold");
+	}
+
 	void verifyArchitecture(const md::MachineModel _model)
 	{
 		verifyRetriedKitSynchronization(_model, false);
@@ -1250,6 +1301,7 @@ namespace
 		primeSyntheticSnapshot(harness);
 		verifyStateLoadReplacesSameSlotBaseline(harness);
 		verifyMuteOwnership(harness);
+		verifyMachineAssignment(harness);
 		verifyOrderedIntentArchitecture(harness);
 		verifyAdversarialRestoreSynchronization(harness);
 		verifyConcurrentPublicationArchitecture(harness);

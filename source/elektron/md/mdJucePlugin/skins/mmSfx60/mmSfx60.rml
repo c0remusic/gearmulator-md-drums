@@ -466,10 +466,10 @@
 							<div id="mdEdMachine" class="jucePos mdEdBlock" style="left: 16dp; top: 16dp; width: 1068dp; height: 88dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 1036dp;">MACHINE</div>
 								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 8dp; width: 1036dp;">piste {{page + 1}} · 6 pistes, une machine chacune</div>
-								<div class="jucePos mdEdPicto mdEdOff" style="left: 16dp; top: 44dp;"/>
-								<div class="jucePos juceLabel mdEdMachineName mdEdOff" style="left: 60dp; top: 44dp; width: 300dp;">—</div>
-								<div class="jucePos juceLabel mdEdNote" style="left: 196dp; top: 52dp; width: 560dp;">Nom, famille et type de synthèse de la machine : lecture à venir.</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 900dp; top: 48dp; width: 168dp;">CHANGER DE MACHINE</div>
+								<div id="mdEdMachineFamily" class="jucePos mdEdPicto" style="left: 16dp; top: 44dp;">—</div>
+								<div id="mdEdMachineName" class="jucePos juceLabel mdEdMachineName" style="left: 64dp; top: 44dp; width: 150dp;">—</div>
+								<div id="mdEdMachineInfo" class="jucePos juceLabel mdEdNote" style="left: 214dp; top: 52dp; width: 680dp;">machine inconnue : en attente du kit</div>
+								<button id="mdEdMachineChange" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 900dp; top: 48dp; width: 168dp;">CHANGER DE MACHINE</button>
 							</div>
 							<div id="mdEdOsc" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 116dp; width: 348dp; height: 356dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 8dp; width: 316dp;">OSCILLATEUR</div>
@@ -683,6 +683,11 @@
 									<div class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 170dp; width: 78dp;">{{Lfo3Depth_text}}</div>
 									<div class="jucePos juceLabel mdEdName" style="left: 270dp; top: 184dp; width: 78dp;">DEP</div>
 								</div>
+							</div>
+							<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: 16dp; top: 108dp; width: 1068dp; display: none;">
+								<div id="mdEdPickerFamilies" class="mdEdPickerRow"/>
+								<div id="mdEdPickerMachines" class="mdEdPickerRow"/>
+								<div id="mdEdPickerInfo" class="mdEdPickerInfo"/>
 							</div>
 						</div>
 					</div>

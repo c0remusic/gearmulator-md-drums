@@ -322,8 +322,10 @@ namespace mdAutomationTest
 		return makeDump(_model, 0x50, _slot, decoded);
 	}
 
+	// _machines, when given, holds one machine id per track.
 	inline pluginLib::SysEx makeKitDump(
-		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value)
+		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value,
+		const std::vector<uint16_t>& _machines = {})
 	{
 		if(_model == md::MachineModel::Monomachine)
 		{
@@ -334,6 +336,8 @@ namespace mdAutomationTest
 				decoded[0x0b + track] = _value;
 				for(uint8_t parameter = 0; parameter < 56; ++parameter)
 					decoded[0x11 + track * 72 + parameter] = _value;
+				if(track < _machines.size())
+					decoded[0x11 + 6 * 72 + track] = static_cast<uint8_t>(_machines[track]);
 			}
 			return makeDump(_model, 0x52, _slot, decoded);
 		}
@@ -344,6 +348,28 @@ namespace mdAutomationTest
 			for(uint8_t parameter = 0; parameter < 24; ++parameter)
 				decoded[0x10 + track * 24 + parameter] = _value;
 			decoded[0x190 + track] = _value;
+		}
+		if(!_machines.empty())
+		{
+			// 16 big-endian 32-bit values in 7-bit groups, at 0x1aa of the message.
+			std::vector<uint8_t> raw;
+			for(uint8_t track = 0; track < md::automation::machinedrum::TrackCount; ++track)
+			{
+				raw.insert(raw.end(), {0, 0, 0});
+				raw.push_back(track < _machines.size() ? static_cast<uint8_t>(_machines[track]) : 0);
+			}
+			size_t position = 0x1a0;
+			for(size_t group = 0; group < raw.size(); group += 7)
+			{
+				const auto count = std::min<size_t>(7, raw.size() - group);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+					if(raw[group + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				decoded[position++] = highBits;
+				for(size_t bit = 0; bit < count; ++bit)
+					decoded[position++] = raw[group + bit] & 0x7f;
+			}
 		}
 		return makeDump(_model, 0x52, _slot, decoded);
 	}
