@@ -204,9 +204,12 @@ namespace md
 					.getLastTxWrittenMask() != 0;
 				// Content offset applies to the producer->mixer direction only;
 				// the back-channel is causal. Boot traffic (origin not latched
-				// yet) stays undated.
-				entry.dueFrames = (_selfDsp == 1 && m_schedDspOriginLatched[1])
-					? schedDspFramePos(1) + m_linkPipelineDepthFrames : 0.0;
+				// yet) stays undated. The catch-up below reuses the producer's
+				// position: nothing runs in between.
+				std::optional<double> producerPos;
+				if(_selfDsp == 1 && m_schedDspOriginLatched[1])
+					producerPos = schedDspFramePos(1);
+				entry.dueFrames = producerPos ? *producerPos + m_linkPipelineDepthFrames : 0.0;
 				auto& ring = m_linkRing[1u - _selfDsp];
 				const bool mdProducerToMixer = _selfDsp == 1 && !isMonomachine();
 				const bool rendezvousActiveBefore = mdProducerToMixer
@@ -261,7 +264,7 @@ namespace md
 								score.maximumRingDepth = std::max(score.maximumRingDepth, ring.size()););
 						}
 						if(dspsShareThread())
-							schedCatchUpDspToDsp(1u - _selfDsp, _selfDsp);
+							schedCatchUpDspToDsp(1u - _selfDsp, _selfDsp, producerPos);
 						++_frameIndex;
 						return;
 					}
@@ -281,7 +284,7 @@ namespace md
 					// other inline: the dated ring and the pop-side wait replace
 					// the rendezvous. Two DSPs sharing a thread keep it.
 					if(dspsShareThread())
-						schedCatchUpDspToDsp(1u - _selfDsp, _selfDsp);
+						schedCatchUpDspToDsp(1u - _selfDsp, _selfDsp, producerPos);
 
 					// Every gate that used to read CONSUMER state here (receive
 					// window epochs, receiver-overrun on RDF, post-flush
@@ -313,9 +316,21 @@ namespace md
 				// The mixer path normally disposes in the availability
 				// callback; this covers consumers polled without one. Never
 				// an RX-tick ROE site: the availability probe owns that.
-				linkDisposeAtConsumer(_selfDsp, false);
+				// When that probe ran in this very slot (linkRxAvailable),
+				// disposing again would change nothing: take its position.
+				auto& tick = m_linkRxTick[_selfDsp].value;
+				double now;
+				if(tick.cycles == ((_selfDsp == 0) ? m_dspMixer : m_dspProducer).dsp().getCycles())
+				{
+					now = tick.now;
+				}
+				else
+				{
+					linkDisposeAtConsumer(_selfDsp, false);
+					now = linkConsumerNow(_selfDsp);
+				}
+				tick.cycles = ~0ull;
 				auto& ring = m_linkRing[_selfDsp];
-				const double now = linkConsumerNow(_selfDsp);
 					// Stall recovery: under scheduler link catch-up the consumer is
 					// advanced to the producer's time before every enqueue, so this ring can only be
 					// DEEP if the consumer's RX stopped clocking for a while as the wire kept running
@@ -1231,6 +1246,12 @@ namespace md
 		const auto& ring = m_linkRing[_consumer];
 		return !ring.empty()
 			&& ring.front().dueFrames <= linkConsumerNow(_consumer);
+	}
+
+	bool Hardware::linkHeadDue(const uint32_t _consumer, const double _now)
+	{
+		const auto& ring = m_linkRing[_consumer];
+		return !ring.empty() && ring.front().dueFrames <= _now;
 	}
 
 	void Hardware::mdLinkWindowFlushed()
@@ -3152,16 +3173,24 @@ namespace md
 
 	bool Hardware::linkRxAvailable(const uint32_t _consumer)
 	{
+		auto& tick = m_linkRxTick[_consumer].value;
+		tick.cycles = ~0ull;
 		if(linkDisposeAtConsumer(_consumer, true))
 			return false;
-		if(linkHeadDue(_consumer))
+		const double now = linkConsumerNow(_consumer);
+		// With one thread running both DSPs, nothing reaches this ring or the
+		// consumer's receiver before the pop of this slot: leave it the
+		// disposal just done and this position (blockingPop).
+		if(dspsShareThread())
+			tick = {((_consumer == 0) ? m_dspMixer : m_dspProducer).dsp().getCycles(), now};
+		if(linkHeadDue(_consumer, now))
 			return true;
 		// Mixer input with a threaded producer: an empty (or immature) ring
 		// is genuinely empty only if the producer has already passed the
 		// time this slot needs (pop rule (c)); otherwise wait for it (d).
 		if(_consumer != 0 || dspsShareThread() || !m_schedDspOriginLatched[1])
 			return false;
-		const double needed = linkConsumerNow(0) - m_linkPipelineDepthFrames;
+		const double needed = now - m_linkPipelineDepthFrames;
 		// Never wait for more than the producer's own UC gate can grant (the
 		// exact rational conversion it uses): the UC runs on this thread and
 		// cannot advance while the mixer waits here, so a need past it could
@@ -3293,7 +3322,8 @@ namespace md
 				++score.unexpectedShort;);
 	}
 
-	void Hardware::schedCatchUpDspToDsp(const uint32_t _consumer, const uint32_t _producer)
+	void Hardware::schedCatchUpDspToDsp(const uint32_t _consumer, const uint32_t _producer,
+		const std::optional<double> _producerPos)
 	{
 		// Before a producer DSP enqueues a link frame into the ESSI route,
 		// consumer DSP's input ring, advance the CONSUMER to the producer's current machine time - so a
@@ -3319,7 +3349,7 @@ namespace md
 			return;
 		}
 		auto& d = (c == 0) ? m_dspMixer : m_dspProducer;
-		const double producerPos = schedDspFramePos(p);
+		const double producerPos = _producerPos ? *_producerPos : schedDspFramePos(p);
 		const double deltaFrames = producerPos - m_schedDspOriginFrame[c];
 		if(deltaFrames <= 0.0)
 		{
