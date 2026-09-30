@@ -926,11 +926,14 @@ chacun ; sur le binaire d'avant correctif, tous deux expirent à 120 s.
 sans que le worker paire démarre : un test resté en série passerait sans
 exercer les portes.
 
+Tranché le même jour (Antoine) : un `MDMM_TRANSPORT` inconnu (faute de
+frappe, « pairs », « Pair ») compte comme non défini, avec l'avertissement
+`[MD] MDMM_TRANSPORT="…" ignored: not serial, parallel or pair` ; il valait
+Serial en silence. Seuls `serial`, `parallel` et `pair` choisissent un mode.
+Test unitaire `mdTransportModeTest` (fixture de `mdAudioQueueTest`, donc dans
+la gate).
+
 Reste :
-- `MDMM_TRANSPORT` inconnu (faute de frappe, « pairs ») vaut toujours Serial
-  en silence, et la vérification de `mmAudioFirmwareTest` ne le voit pas
-  (elle ne vise que « pair » exact). Arbitrage laissé : inconnu = non
-  défini, erreur, ou Serial comme aujourd'hui.
 - Coût du plancher pour les expériences à avances nulles : 39,6 s contre
   26,9 s pour la même écoute (×1,5).
 

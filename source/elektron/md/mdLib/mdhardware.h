@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <mutex>
@@ -58,19 +59,24 @@ namespace md
 		Pair,
 	};
 
-	// MDMM_TRANSPORT's value (std::getenv's result). None when unset or empty,
-	// so the caller keeps its default: PowerShell's
-	// [Environment]::SetEnvironmentVariable($name, $null) leaves an empty
-	// variable that child processes see. Any other value selects Serial.
+	// MDMM_TRANSPORT's value (std::getenv's result): serial, parallel or pair.
+	// Anything else counts as unset, so the caller keeps its default: unset,
+	// empty (PowerShell's [Environment]::SetEnvironmentVariable($name, $null)
+	// leaves an empty variable that child processes see) and any other value,
+	// which also prints a warning. A typo such as "pairs" used to select
+	// Serial without a word.
 	inline std::optional<TransportMode> parseTransportMode(const char* _mode)
 	{
 		if(!_mode || !*_mode)
 			return std::nullopt;
+		if(std::strcmp(_mode, "serial") == 0)
+			return TransportMode::Serial;
 		if(std::strcmp(_mode, "parallel") == 0)
 			return TransportMode::Parallel;
 		if(std::strcmp(_mode, "pair") == 0)
 			return TransportMode::Pair;
-		return TransportMode::Serial;
+		std::fprintf(stderr, "[MD] MDMM_TRANSPORT=\"%s\" ignored: not serial, parallel or pair\n", _mode);
+		return std::nullopt;
 	}
 
 	struct FactoryFlashSnapshot
