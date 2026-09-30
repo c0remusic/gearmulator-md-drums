@@ -2490,6 +2490,11 @@ namespace md
 						dspNames[d], diff(e.checks[0], s.checks[0]), diff(e.checks[1], s.checks[1]), diff(e.checks[2], s.checks[2]),
 						diff(e.checks[3], s.checks[3]), diff(e.periphDue, s.periphDue), diff(e.intrEmpty, s.intrEmpty),
 						diff(e.intrMasked, s.intrMasked), diff(e.modeChecks, s.modeChecks));
+					std::fprintf(stderr, "[probe] %s essi slots: tx0=%llu frames=%llu rx0=%llu idle=%llu | tx1=%llu frames=%llu rx1=%llu idle=%llu\n",
+						dspNames[d], diff(e.essiTxSlots[0], s.essiTxSlots[0]), diff(e.essiTxFrames[0], s.essiTxFrames[0]),
+						diff(e.essiRxSlots[0], s.essiRxSlots[0]), diff(e.essiRxIdle[0], s.essiRxIdle[0]),
+						diff(e.essiTxSlots[1], s.essiTxSlots[1]), diff(e.essiTxFrames[1], s.essiTxFrames[1]),
+						diff(e.essiRxSlots[1], s.essiRxSlots[1]), diff(e.essiRxIdle[1], s.essiRxIdle[1]));
 					std::fprintf(stderr, "[probe] %s untimed scope entries (level too low):", dspNames[d]);
 					for(uint32_t c = Exec; c < Calib; ++c)
 						if(ctx.untimedCalls[d][c])
