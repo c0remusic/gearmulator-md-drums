@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -177,6 +178,8 @@ namespace md
 		// Zero keeps rendering synchronous; any latency renders on AsyncRender.
 		// MDMM_LATENCY_BLOCKS overrides the default (tests, A/B runs).
 		uint32_t getDefaultLatencyBlocks() const override;
+		// MDMM_LATENCY_BLOCKS, or none when unset, empty or not a count.
+		static std::optional<uint32_t> latencyBlocksFromEnvironment();
 		uint32_t getInternalLatencyInputToOutput() const override
 		{
 			return g_hostAudioInputSafetyFrames;

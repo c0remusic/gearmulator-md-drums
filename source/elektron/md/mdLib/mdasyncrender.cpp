@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdlib>
+
+#include "mdenv.h"
 
 #include "dsp56kBase/threadtools.h"
 
@@ -16,8 +17,8 @@ namespace md
 
 	AsyncRender::AsyncRender(RenderFunc _render) : m_render(std::move(_render))
 	{
-		if(const char* const spin = std::getenv("MDMM_RENDER_SPIN_US"))
-			m_idleSpin = std::chrono::microseconds(std::strtoul(spin, nullptr, 10));
+		if(const auto spin = envCount<uint32_t>("MDMM_RENDER_SPIN_US"))
+			m_idleSpin = std::chrono::microseconds(*spin);
 		for(auto& job : m_jobs)
 		{
 			for(auto& in : job.in)

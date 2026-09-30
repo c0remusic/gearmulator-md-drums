@@ -1,5 +1,6 @@
 #include "mddsp.h"
 
+#include "mdenv.h"
 #include "mdhardware.h"
 #include "mdtransportpolicy.h"
 
@@ -8,7 +9,6 @@
 
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <limits>
 
 namespace md
@@ -133,11 +133,13 @@ namespace md
 		// MD_MAX_DO_ITERATIONS overrides for experiments (power of two required by
 		// the JIT).
 		config.maxDoIterations = m_hardware.isMonomachine() ? 4 : 64;
-		if(const char* const doIterations = std::getenv("MD_MAX_DO_ITERATIONS"))
+		if(const auto doIterations = envCount<uint32_t>("MD_MAX_DO_ITERATIONS"))
 		{
-			const auto v = static_cast<uint32_t>(std::atoi(doIterations));
+			const auto v = *doIterations;
 			if(v && (v & (v - 1)) == 0)
 				config.maxDoIterations = v;
+			else
+				std::fprintf(stderr, "[MD] MD_MAX_DO_ITERATIONS=%u ignored: not a power of two\n", v);
 		}
 		// JIT blocks are first compiled synchronously by the audio thread; a
 		// pattern/kit switch can queue hundreds of cold compilations into one
@@ -147,7 +149,7 @@ namespace md
 		// so keep it off everywhere to shorten those storms.
 		// MD_JIT_OPTIMIZER=1 forces it back on, =0 forces it off.
 		config.enableOptimizer = false;
-		if(const char* const optimizer = std::getenv("MD_JIT_OPTIMIZER"))
+		if(const char* const optimizer = envOverride("MD_JIT_OPTIMIZER"))
 			config.enableOptimizer = optimizer[0] != '0';
 		config.getBlockConfig = [](const TWord)
 			-> std::optional<dsp56k::JitConfig>

@@ -2457,8 +2457,9 @@ namespace md
 
 			PairProbeSession(dsp56k::DSP& _mixer, dsp56k::DSP& _producer) : dsps{&_mixer, &_producer}
 			{
+				// Empty counts as unset (mdenv.h): level 1.
 				const char* const level = std::getenv("DSP56K_PROBE_LEVEL");
-				ctx.level = static_cast<uint8_t>(level ? std::atoi(level) : 1);
+				ctx.level = static_cast<uint8_t>(level && *level ? std::atoi(level) : 1);
 				dsp56k::probe::t_ctx = &ctx;
 				dsp56k::probe::calibrate(ctx);
 				start[0] = _mixer.probeCounters();
