@@ -55,6 +55,8 @@ namespace jucePluginEditorLib
 
 		int getWidth() const;
 		int getHeight() const;
+		// True when the skin's height follows the window (juceRmlUi::RmlComponent::isHeightResizable).
+		bool isHeightResizable() const;
 
 		bool resizeEditor(int _width, int _height) const;
 

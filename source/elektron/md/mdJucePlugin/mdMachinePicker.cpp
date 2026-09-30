@@ -119,7 +119,7 @@ namespace mdJucePlugin
 		if(!m_info)
 			return;
 		if(machine)
-			m_info->SetInnerRML(std::string(family->synthesis) + " · " + trackLabel(m_shownPart));
+			m_info->SetInnerRML(std::string(family->synthesis));
 		else if(m_shownMachine == md::machines::g_unknown)
 			m_info->SetInnerRML("machine inconnue : en attente du kit");
 		else

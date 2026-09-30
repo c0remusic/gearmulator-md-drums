@@ -1273,6 +1273,7 @@ namespace juceRmlUi
 				{
 					m_documentSize.x = static_cast<int>(s.x);
 					m_documentSize.y = static_cast<int>(s.y);
+					m_heightResizable = m_document->HasAttribute("resizableheight");
 				}
 				else
 					throw std::runtime_error("RMLUI document '" + m_rootRmlFilename + "' has no valid size, explicit default size needs to be specified on the <body> element.");
@@ -1333,6 +1334,20 @@ namespace juceRmlUi
 			m_currentRenderScale = renderScale;
 			m_rmlContext->SetDensityIndependentPixelRatio(renderScale * m_contentScale);
 			m_rmlContext->SetDimensions({ size.x, size.y });
+		}
+
+		// The body's default height is its minimum; below it, the document keeps
+		// that height and the bottom is cut off.
+		if (m_heightResizable && m_document && renderScale > 0.0f)
+		{
+			const auto ratio = renderScale * m_contentScale;
+			const auto height = std::max(static_cast<float>(size.y) / ratio, static_cast<float>(m_documentSize.y));
+			// This runs every frame; a property set again would lay the document out again.
+			if (height != m_documentHeight)
+			{
+				m_documentHeight = height;
+				m_document->SetProperty(Rml::PropertyId::Height, Rml::Property(height, Rml::Unit::DP));
+			}
 		}
 	}
 

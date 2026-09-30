@@ -126,6 +126,9 @@ namespace juceRmlUi
 		void setUseNativePixelDensity(bool _enabled);
 
 		Rml::Vector2i getDocumentSize() const { return m_documentSize; }
+		// A <body> with the resizableheight attribute keeps its width and scale
+		// from the window width and takes the window height, whatever it is.
+		bool isHeightResizable() const { return m_heightResizable; }
 
 		void resize(int _width, int _height);
 
@@ -212,6 +215,8 @@ namespace juceRmlUi
 		bool m_updating = true;
 
 		Rml::Vector2i m_documentSize{0,0};
+		bool m_heightResizable = false;
+		float m_documentHeight = 0.0f;   // dp, last height given to a resizable-height body
 
 		JUCE_DECLARE_NON_COPYABLE(RmlComponent)
 		JUCE_DECLARE_NON_MOVEABLE(RmlComponent)

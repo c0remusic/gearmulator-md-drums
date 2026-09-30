@@ -1,4 +1,5 @@
-/* Editor below the front panel (mdDefault.rml, mmSfx60.rml). Window 1100 × 1000 dp.
+/* Editor of mdDefault.rml and mmSfx60.rml. Window 1100 × 606 dp: a 36 dp top bar over either the
+   front panel (570 dp) or the editor; a taller window stacks both (mdViewLayout.cpp).
    Grid: 16 dp margins, 12 columns of 78 dp, 12 dp gutters. Blocks are placed in dp by the RML.
    Colours: anthracite chassis, cream text, orange only for active state. */
 
@@ -10,14 +11,17 @@
 	height: 570dp;
 }
 
-.mdEdFoldedBar
+.mdEdTopBar
 {
 	position: relative;
 	box-sizing: border-box;
-	flex: 0 0 32dp;
-	height: 32dp;
+	flex: 0 0 36dp;
+	width: 1100dp;
+	height: 36dp;
 	background-color: #141516;
 	border-bottom: 1dp #2e3034;
+	font-family: Roboto;
+	color: #f4f1ea;
 }
 
 .mdEdRoot
@@ -32,7 +36,7 @@
 	color: #f4f1ea;
 }
 
-.mdEdHeader, .mdEdStrip
+.mdEdStrip
 {
 	position: relative;
 	box-sizing: border-box;
@@ -40,8 +44,7 @@
 	border-bottom: 1dp #2e3034;
 }
 
-.mdEdHeader { flex: 0 0 56dp; height: 56dp; }
-.mdEdStrip { flex: 0 0 48dp; height: 48dp; }
+.mdEdStrip { flex: 0 0 32dp; height: 32dp; }
 
 .mdEdPage
 {
@@ -88,7 +91,7 @@
 .mdEdNote { font-size: 12dp; line-height: 16dp; color: #8a8d93; }
 .mdEdRight { text-align: right; }
 .mdEdLeft { text-align: left; }
-.mdEdMachineName { height: 32dp; line-height: 32dp; font-size: 20dp; font-weight: bold; }
+.mdEdMachineName { height: 24dp; line-height: 24dp; font-size: 17dp; font-weight: bold; }
 
 /* inactive: laid out, but the data behind it is not available yet (wireframe board 0b, third state) */
 .mdEdOff { opacity: 0.35; pointer-events: none; }
@@ -96,8 +99,8 @@
 /* header screen: kit and pattern */
 .mdEdScreen
 {
-	height: 32dp;
-	line-height: 30dp;
+	height: 28dp;
+	line-height: 26dp;
 	padding: 0dp 12dp;
 	box-sizing: border-box;
 	font-size: 13dp;
@@ -108,21 +111,6 @@
 	border-radius: 3dp;
 }
 
-/* curve area inside a block (128 dp); drawn later by the plug-in */
-.mdEdGraph
-{
-	background-color: #151618;
-	border: 1dp #2e3034;
-	border-radius: 2dp;
-}
-.mdEdGraphCaption
-{
-	display: block;
-	margin: 8dp 10dp;
-	font-size: 10dp;
-	font-weight: bold;
-	color: #4a4d52;
-}
 
 /* segmented selector and inactive buttons */
 .mdEdSeg
@@ -137,13 +125,12 @@
 	border: 1dp #3a3d42;
 }
 
-/* steps: 28 × 32 dp on a 30 dp pitch */
+/* steps: 24 dp high, their width set by the RML */
 .mdEdStep
 {
 	box-sizing: border-box;
-	width: 28dp;
-	height: 32dp;
-	line-height: 32dp;
+	height: 24dp;
+	line-height: 24dp;
 	font-size: 10dp;
 	text-align: center;
 	color: #8a8d93;
@@ -161,7 +148,7 @@
 .mdEdHidden { visibility: hidden; }
 .mdEdDim { opacity: 0.35; }
 
-.mdEdPicto { box-sizing: border-box; width: 40dp; height: 32dp; line-height: 30dp; border: 1dp #8a8d93; border-radius: 3dp;
+.mdEdPicto { box-sizing: border-box; width: 40dp; height: 24dp; line-height: 22dp; border: 1dp #8a8d93; border-radius: 3dp;
 	font-size: 10dp; font-weight: bold; text-align: center; color: #f4f1ea; }
 
 /* vertical fader: 12 × 46 dp, maximum at the top */
@@ -178,7 +165,7 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 
 /* list rows (MIX) */
 .mdEdRow { border-bottom: 1dp #2e3034; }
-.mdEdRowName { height: 32dp; line-height: 32dp; font-size: 12dp; font-weight: bold; }
+.mdEdRowName { height: 26dp; line-height: 26dp; font-size: 12dp; font-weight: bold; }
 .mdEdMuted { color: #5a5d62; text-decoration: line-through; }
 /* a value you drag like a knob; the knob tag is reset to plain text */
 .mdEdNum { width: 78dp; height: 24dp; line-height: 24dp; font-size: 13dp; font-weight: bold; text-align: center; color: #f4f1ea; cursor: pointer;
@@ -200,7 +187,7 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 
 /* buttons */
 
-.mdEdCat, .mdEdTrackTab, .mdEdButton, .mdEdLed, .mdEdLfoTab
+.mdEdCat, .mdEdTrackTab, .mdEdButton, .mdEdSwitch, .mdEdLed, .mdEdLfoTab
 {
 	border-width: 0dp;
 	box-shadow: none;
@@ -211,15 +198,19 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 	cursor: pointer;
 }
 
-.mdEdCat { top: 12dp; width: 78dp; height: 32dp; line-height: 32dp; font-size: 12dp; border-radius: 3dp; }
-.mdEdCat:hover, .mdEdTrackTab:hover, .mdEdButton:hover, .mdEdLfoTab:hover { color: #f4f1ea; }
+.mdEdCat { top: 4dp; width: 78dp; height: 28dp; line-height: 28dp; font-size: 12dp; border-radius: 3dp; }
+.mdEdCat:hover, .mdEdTrackTab:hover, .mdEdButton:hover, .mdEdSwitch:hover, .mdEdLfoTab:hover { color: #f4f1ea; }
 .mdEdCat:checked { color: #f4f1ea; background-color: #26282b; }
 
-.mdEdTrackTab { top: 8dp; width: 60dp; height: 40dp; line-height: 40dp; font-size: 12dp; border-radius: 3dp 3dp 0dp 0dp; }
+.mdEdTrackTab { top: 4dp; width: 60dp; height: 28dp; line-height: 28dp; font-size: 12dp; border-radius: 3dp 3dp 0dp 0dp; }
 .mdEdTrackTab:checked { color: #f4f1ea; background-color: #1c1d1f; }
 
 .mdEdButton { height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
 .mdEdButton:checked { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+
+/* FACE AVANT / ÉDITEUR in the top bar; hidden while both are shown */
+.mdEdSwitch { top: 6dp; width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; }
+.mdEdSwitch:checked { color: #f4f1ea; background-color: #2e3034; }
 
 /* mute LED in a MIX row: lit while the track plays */
 .mdEdLed { width: 12dp; height: 12dp; border-radius: 6dp; background-color: #3a3d42; }

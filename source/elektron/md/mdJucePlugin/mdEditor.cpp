@@ -3,6 +3,7 @@
 #include "mdController.h"
 #include "mdMachinePicker.h"
 #include "mdStepGrid.h"
+#include "mdViewLayout.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -718,6 +719,10 @@ namespace mdJucePlugin
 					m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
 			});
 		}
+
+		// The top bar shows the front panel or the editor, or both in a tall window.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
+			m_viewLayout = std::make_unique<ViewLayout>(*document);
 
 		// The MACHINE block shows and assigns the edited track's machine.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMachineName"))

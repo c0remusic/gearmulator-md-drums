@@ -50,7 +50,9 @@ void EditorWindow::resized()
 	const auto scaleX = static_cast<float>(w) / static_cast<float>(m_state.getWidth());
 	const auto scaleY = static_cast<float>(h) / static_cast<float>(m_state.getHeight());
 
-	const auto scale = std::min(scaleX, scaleY);
+	// A skin whose height follows the window is scaled by the width alone.
+	const bool freeHeight = m_state.isHeightResizable();
+	const auto scale = freeHeight ? scaleX : std::min(scaleX, scaleY);
 
 	if (!m_state.resizeEditor(w,h))
 		return;
@@ -59,6 +61,8 @@ void EditorWindow::resized()
 	{
 		const auto percent = 100.f * scale / m_state.getRootScale();
 		m_config.setValue("scale", percent);
+		if(freeHeight && scale > 0.0f)
+			m_config.setValue("height", static_cast<double>(h) / static_cast<double>(scale));
 		m_config.saveIfNeeded();
 	}
 
@@ -122,8 +126,13 @@ void EditorWindow::setGuiScale(const float _percent)
 
 	const auto s = _percent / 100.0f * m_state.getRootScale();
 
+	// The height of a free-height skin is kept in its own units, so that a new
+	// scale keeps the layout the user chose.
+	const auto height = m_state.isHeightResizable()
+		? std::max(static_cast<float>(m_config.getDoubleValue("height", m_state.getHeight())), static_cast<float>(m_state.getHeight()))
+		: static_cast<float>(m_state.getHeight());
 	const auto w = static_cast<int>(static_cast<float>(m_state.getWidth()) * s);
-	const auto h = static_cast<int>(static_cast<float>(m_state.getHeight()) * s);
+	const auto h = static_cast<int>(height * s);
 
 	setSize(w, h);
 
@@ -145,7 +154,9 @@ void EditorWindow::setUiRoot(juce::Component* _component)
 	m_sizeConstrainer.setMinimumSize(m_state.getWidth() / 10, m_state.getHeight() / 10);
 	m_sizeConstrainer.setMaximumSize(m_state.getWidth() * 4, m_state.getHeight() * 4);
 
-	m_sizeConstrainer.setFixedAspectRatio(static_cast<double>(m_state.getWidth()) / static_cast<double>(m_state.getHeight()));
+	// A free-height skin can be made taller or shorter; the width sets its scale.
+	m_sizeConstrainer.setFixedAspectRatio(m_state.isHeightResizable()
+		? 0.0 : static_cast<double>(m_state.getWidth()) / static_cast<double>(m_state.getHeight()));
 	
 	const auto configuredScale = static_cast<float>(m_config.getDoubleValue("scale", 100));
 	const auto attachAction = m_scaleRestore.attachRoot(

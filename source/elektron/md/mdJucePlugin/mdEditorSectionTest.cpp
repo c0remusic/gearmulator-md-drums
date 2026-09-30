@@ -1,6 +1,6 @@
 // Loads the real Machinedrum skin (or the Monomachine skin with MD_EDITOR_SECTION_TEST_MM) headless
-// and checks the editor below the front panel: window size, dp geometry of the grid, parameter
-// binding, tabs and the front-panel fold.
+// and checks the editor: window size, the FACE AVANT / ÉDITEUR switch and the stacked layout of a
+// tall window, dp geometry of the grid, parameter binding and tabs.
 
 #include "mdEditor.h"
 #include "mdPluginEditorState.h"
@@ -135,7 +135,10 @@ namespace
 		float x, y, w, h;
 	};
 
-	// Tops of the SON blocks are relative to the scrolling page.
+	// Tops of the SON blocks are relative to the page, which starts under the top bar (36 dp)
+	// and the track strip (32 dp) when the editor is shown. Every view fits the 538 dp page.
+	constexpr float g_pageTop = 36 + 32;
+	constexpr float g_pageHeight = 538;
 #if defined(MD_EDITOR_SECTION_TEST_MM)
 	constexpr auto g_model = md::MachineModel::Monomachine;
 	// Picker: family 1 is SID, whose only machine is SID-6581 (3); family 0 (GND) holds GND-SIN (1).
@@ -143,19 +146,19 @@ namespace
 	constexpr const char* g_pickName = "SID-6581";
 	constexpr const char* g_pickFamily = "SID";
 	constexpr uint16_t g_otherFamilyMachine = 1;
-	constexpr float g_pickerTop = 16 + 88 + 4;
+	constexpr float g_pickerTop = 12 + 64 + 4;
 	constexpr const char* g_name = "mmEditorSectionTest";
 	constexpr int g_trackCount = 6;
 	constexpr float g_trackTabPitch = 180, g_trackTabWidth = 168;
 	// SON: 54 knobs + 2 faders; MIX: 3 values, a level fader and a mute LED per track
 	constexpr size_t g_boundElements = 54 + 2 + 6 * 5;
 	constexpr Block g_blocks[] = {
-		{"mdEdMachine", 16, 16, 1068, 88},
-		{"mdEdOsc", 16, 116, 348, 356},
-		{"mdEdAmp", 376, 116, 348, 356},
-		{"mdEdFilter", 736, 116, 348, 356},
-		{"mdEdEffects", 16, 484, 348, 356},
-		{"mdEdLfo", 376, 484, 708, 356},
+		{"mdEdMachine", 16, 12, 1068, 64},
+		{"mdEdOsc", 16, 88, 348, 208},
+		{"mdEdAmp", 376, 88, 348, 208},
+		{"mdEdFilter", 736, 88, 348, 208},
+		{"mdEdEffects", 16, 308, 348, 208},
+		{"mdEdLfo", 376, 308, 708, 208},
 	};
 #else
 	constexpr auto g_model = md::MachineModel::Machinedrum;
@@ -164,21 +167,21 @@ namespace
 	constexpr const char* g_pickName = "TRX-BD";
 	constexpr const char* g_pickFamily = "TRX";
 	constexpr uint16_t g_otherFamilyMachine = 1;
-	constexpr float g_pickerTop = 116 + 88 + 4;
+	constexpr float g_pickerTop = 12 + 64 + 4;
 	constexpr const char* g_name = "mdEditorSectionTest";
 	constexpr int g_trackCount = 16;
 	constexpr float g_trackTabPitch = 63, g_trackTabWidth = 60;
 	// SON: 21 knobs + 3 faders; MIX: 4 values, a level fader and a mute LED per track
 	constexpr size_t g_boundElements = 21 + 3 + 16 * 6;
 	constexpr Block g_blocks[] = {
-		{"mdEdSteps", 16, 16, 1068, 88},
-		{"mdEdMachine", 16, 116, 1068, 88},
-		// two rows whose blocks share one height
-		{"mdEdSource", 16, 216, 438, 384},
-		{"mdEdFilter", 466, 216, 348, 384},
-		{"mdEdMix", 826, 216, 258, 384},
-		{"mdEdColour", 16, 612, 348, 272},
-		{"mdEdLfo", 376, 612, 708, 272},
+		// rows whose blocks share one height
+		{"mdEdSteps", 16, 12, 708, 64},
+		{"mdEdMachine", 736, 12, 348, 64},
+		{"mdEdSource", 16, 88, 348, 208},
+		{"mdEdFilter", 376, 88, 258, 208},
+		{"mdEdColour", 646, 88, 168, 208},
+		{"mdEdMix", 826, 88, 258, 208},
+		{"mdEdLfo", 16, 308, 1068, 124},
 	};
 #endif
 }
@@ -204,24 +207,35 @@ int main()
 		auto& doc = *component->getDocument();
 		context.Update();
 
-		// window: 1100 x 1000 dp at scale 1
+		// window: 1100 x 606 dp at scale 1, a top bar over the front panel; the height follows the window
 		const auto docSize = component->getDocumentSize();
-		require(docSize.x == 1100 && docSize.y == 1000,
-			"document is " + std::to_string(docSize.x) + "x" + std::to_string(docSize.y) + ", expected 1100x1000");
+		require(docSize.x == 1100 && docSize.y == 606,
+			"document is " + std::to_string(docSize.x) + "x" + std::to_string(docSize.y) + ", expected 1100x606");
+		require(component->isHeightResizable(), "skin height does not follow the window");
+		requireRect(element(doc, "mdTopBar"), 0, 0, 1100, 36, "top bar");
+		requireRect(element(doc, "mdFrontPanel"), 0, 36, 1100, 570, "front panel");
+		require(!visible(element(doc, "mdEditor")), "editor shown with the front panel in a 606 dp window");
 
-		// front panel open: panel 570, header 56, track strip 48, then the scrolling page
-		requireRect(element(doc, "mdFrontPanel"), 0, 0, 1100, 570, "front panel");
-		require(!visible(element(doc, "mdFrontPanelFolded")), "folded bar visible while the panel is open");
+		// ÉDITEUR replaces the front panel: track strip, then the page
+		element(doc, "mdViewEditor").Click();
+		context.Update();
+		require(visible(element(doc, "mdEditor")) && !visible(element(doc, "mdFrontPanel")), "ÉDITEUR did not replace the front panel");
+		requireRect(element(doc, "mdEditor"), 0, 36, 1100, 570, "editor");
 		constexpr int lastTrack = g_trackCount - 1;
-		requireRect(element(doc, "editTrack0"), 16, 570 + 56 + 8, g_trackTabWidth, 40, "first track tab");
-		requireRect(element(doc, "editTrack" + std::to_string(lastTrack)), 16 + lastTrack * g_trackTabPitch, 570 + 56 + 8,
-			g_trackTabWidth, 40, "last track tab");
+		requireRect(element(doc, "editTrack0"), 16, 36 + 4, g_trackTabWidth, 28, "first track tab");
+		requireRect(element(doc, "editTrack" + std::to_string(lastTrack)), 16 + lastTrack * g_trackTabPitch, 36 + 4,
+			g_trackTabWidth, 28, "last track tab");
 		require(doc.GetElementById("editTrack" + std::to_string(g_trackCount)) == nullptr, "more track tabs than tracks");
-		constexpr float pageTop = 570 + 56 + 48;
+		constexpr float pageTop = g_pageTop;
 		for(const auto& b : g_blocks)
 			requireRect(element(doc, b.id), b.x, pageTop + b.y, b.w, b.h, b.id);
 		requireTiled(element(doc, "mdEdTrackView"), "SON");
-		const auto& first = g_blocks[0];
+		const auto fits = [&](const char* _view)
+		{
+			const auto h = element(doc, _view).GetBox().GetSize(Rml::BoxArea::Border).y;
+			require(h <= g_pageHeight, std::string(_view) + " is " + std::to_string(h) + " dp, taller than the page");
+		};
+		fits("mdEdTrackView");
 
 		// every editor control with a param found its parameter (the binding writes min/max on the element);
 		// inactive controls (data not exposed yet) carry no param
@@ -258,8 +272,9 @@ int main()
 		context.Update();
 		require(visible(element(doc, "mdEdMasterView")) && !visible(element(doc, "mdEdTrackView")), "MASTER tab did not show the master effects");
 		requireTiled(element(doc, "mdEdMasterView"), "MASTER");
-		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 16, 528, 272, "RHYTHM ECHO (6 columns)");
-		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 300, 528, 272, "DYNAMIX (6 columns)");
+		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 12, 528, 124, "RHYTHM ECHO (6 columns)");
+		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 148, 528, 124, "DYNAMIX (6 columns)");
+		fits("mdEdMasterView");
 		require(controller.getCurrentPart() == 0, "MASTER tab changed the edited part");
 		element(doc, "editTrack0").Click();
 		context.Update();
@@ -377,19 +392,41 @@ int main()
 		context.Update();
 		require(visible(element(doc, "mdEdPageMix")) && !visible(element(doc, "mdEdPageSound")), "MIX tab did not switch pages");
 		requireTiled(element(doc, "mdEdPageMix"), "MIX");
+		{
+			Rml::ElementList contents;
+			element(doc, "mdEdPageMix").GetElementsByClassName(contents, "mdEdContent");
+			require(!contents.empty() && contents.front()->GetBox().GetSize(Rml::BoxArea::Border).y <= g_pageHeight, "MIX is taller than the page");
+		}
 		tabButton(doc, "mdEdit", "0").Click();
 		context.Update();
 		require(visible(element(doc, "mdEdPageSound")) && !visible(element(doc, "mdEdPageMix")), "SON tab did not switch back");
 
-		// fold the front panel: the editor moves up to y = 32 and grows
-		element(doc, "mdPanelFold").Click();
+		// FACE AVANT brings the front panel back; a category opens the editor again
+		element(doc, "mdViewPanel").Click();
 		context.Update();
-		require(!visible(element(doc, "mdFrontPanel")) && visible(element(doc, "mdFrontPanelFolded")), "fold did not hide the front panel");
-		requireRect(element(doc, first.id), first.x, 32 + 56 + 48 + first.y, first.w, first.h, "first block with the panel folded");
-		element(doc, "mdPanelFold").Click();
+		require(visible(element(doc, "mdFrontPanel")) && !visible(element(doc, "mdEditor")), "FACE AVANT did not bring the front panel back");
+		require(element(doc, "mdViewPanel").IsPseudoClassSet("checked") && !element(doc, "mdViewEditor").IsPseudoClassSet("checked"),
+			"switch does not show the front panel as chosen");
+		tabButton(doc, "mdEdit", "1").Click();
 		context.Update();
-		require(visible(element(doc, "mdFrontPanel")) && !visible(element(doc, "mdFrontPanelFolded")), "unfold did not restore the front panel");
-		requireRect(element(doc, first.id), first.x, pageTop + first.y, first.w, first.h, "first block after unfolding");
+		require(visible(element(doc, "mdEditor")) && visible(element(doc, "mdEdPageMix")), "MIX category did not open the editor on MIX");
+		tabButton(doc, "mdEdit", "0").Click();
+		element(doc, "mdViewPanel").Click();
+		context.Update();
+
+		// A window tall enough for both stacks them and hides the switch; a shorter one goes back to the switch.
+		const auto& first = g_blocks[0];
+		component->setSize(1100, 1200);
+		context.Update();
+		require(visible(element(doc, "mdFrontPanel")) && visible(element(doc, "mdEditor")), "1200 dp window does not stack panel and editor");
+		require(element(doc, "mdViewPanel").IsClassSet("mdEdHidden"), "switch shown while both views are");
+		requireRect(element(doc, "mdEditor"), 0, 606, 1100, 594, "stacked editor");
+		requireRect(element(doc, first.id), first.x, 606 + 32 + first.y, first.w, first.h, "first block, stacked");
+		component->setSize(1100, 606);
+		context.Update();
+		require(visible(element(doc, "mdFrontPanel")) && !visible(element(doc, "mdEditor")), "606 dp window still stacked");
+		element(doc, "mdViewEditor").Click();
+		context.Update();
 
 		// Optional: MD_EDITOR_TEST_PNG=<prefix> writes snapshots of the SON and MIX pages for review.
 		if(const char* png = std::getenv("MD_EDITOR_TEST_PNG"))
@@ -412,29 +449,30 @@ int main()
 				out.truncate();
 				juce::PNGImageFormat().writeImageToStream(image, out);
 			};
+			// the editor is shown (see above); the front panel, then the stacked tall window
 			snap("-son");
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			element(doc, "mdEdStep0").Click();
+			snap("-steps");
+			element(doc, "mdEdStep0").Click();
+#endif
+			element(doc, "mdEdMachineChange").Click();
+			snap("-picker");
+			element(doc, "mdEdMachineChange").Click();
 			tabButton(doc, "mdEdit", "1").Click();
 			snap("-mix");
 			tabButton(doc, "mdEdit", "0").Click();
-			element(doc, "mdPanelFold").Click();
-			snap("-son-folded");
-#if !defined(MD_EDITOR_SECTION_TEST_MM)
-			element(doc, "mdEdStep0").Click();
-			snap("-steps-folded");
-			element(doc, "mdEdStep0").Click();
-#endif
-			element(doc, "mdEdMachineChange").Click();
-			snap("-picker-folded");
-			element(doc, "mdEdMachineChange").Click();
-			tabButton(doc, "mdEdit", "1").Click();
-			snap("-mix-folded");
-			tabButton(doc, "mdEdit", "0").Click();
 #if !defined(MD_EDITOR_SECTION_TEST_MM)
 			element(doc, "editMaster").Click();
-			snap("-master-folded");
+			snap("-master");
 			element(doc, "editTrack0").Click();
 #endif
-			element(doc, "mdPanelFold").Click();
+			element(doc, "mdViewPanel").Click();
+			snap("-panel");
+			component->setSize(1100, 1200);
+			snap("-stacked");
+			component->setSize(1100, 606);
+			element(doc, "mdViewEditor").Click();
 			component->setLookAndFeel(nullptr);
 		}
 

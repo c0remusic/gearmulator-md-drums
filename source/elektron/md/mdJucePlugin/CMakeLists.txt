@@ -23,6 +23,7 @@ set(SOURCES
 	mdLcdViewport.h
 	mdMachinePicker.cpp mdMachinePicker.h
 	mdStepGrid.cpp mdStepGrid.h
+	mdViewLayout.cpp mdViewLayout.h
 	mdPixelPerfectPanel.cpp mdPixelPerfectPanel.h
 	mdPanelAffordances.h
 	mdPluginEditorState.cpp mdPluginEditorState.h
