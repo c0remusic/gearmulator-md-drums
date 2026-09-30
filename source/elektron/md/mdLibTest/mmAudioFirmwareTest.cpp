@@ -468,6 +468,10 @@ int main(int argc, char** argv)
 		auto& hardware = *machine;
 		advance(hardware, md::g_samplerate * 20);
 		require(hardware.isAudioReady() && hardware.isFirmwareMidiReady(), "MM boot incomplete");
+		// A pair run left on the serial scheduler would pass without ever
+		// exercising the pair gates (mmPairZeroLeadFirmwareTest).
+		if(md::parseTransportMode(std::getenv("MDMM_TRANSPORT")) == md::TransportMode::Pair)
+			require(hardware.isDspPairThreaded(), "MDMM_TRANSPORT=pair, but the pair worker never started");
 		if(sine || digipro || input || listening)
 			loadEmptyKit(hardware);
 		if(input) { testAudioInput(hardware); return 0; }
