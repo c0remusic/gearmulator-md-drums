@@ -20,7 +20,6 @@
 #include "juce_audio_utils/juce_audio_utils.h"
 #include "juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h"
 
-#include <cstdlib>
 #include <memory>
 #include <utility>
 
@@ -401,7 +400,7 @@ namespace mdJucePlugin
 		// the machine then renders ahead on its own threads and the host's
 		// audio callback only exchanges buffers. A saved choice is kept, and
 		// MDMM_LATENCY_BLOCKS (the device default) wins for tests and A/B runs.
-		const bool latencyFromEnvironment = std::getenv("MDMM_LATENCY_BLOCKS") != nullptr;
+		const bool latencyFromEnvironment = md::Device::latencyBlocksFromEnvironment().has_value();
 		const auto latencyBlocks = getConfig().getIntValue("latencyBlocks",
 			m_model == md::MachineModel::Machinedrum && !latencyFromEnvironment ? DefaultLatencyBlocks
 				: static_cast<int>(getPlugin().getLatencyBlocks()));
