@@ -301,6 +301,12 @@ add_test(NAME mmPairZeroLeadFirmwareTest COMMAND mmAudioFirmwareTest --listen)
 set_tests_properties(mmPairZeroLeadFirmwareTest PROPERTIES
 	LABELS "Integration;FirmwareTest;AudioIo;Transport" SKIP_RETURN_CODE 77 TIMEOUT 120
 	ENVIRONMENT "MDMM_TRANSPORT=pair;MD_PAIR_LEAD_US=0;MD_PAIR_UC_LEAD_US=0;MM_LISTEN_LONE_MIXER=1;MM_LISTEN_SECONDS=2")
+# The DSP2 hold takes the DSP lead to zero during a round trip: with the UC
+# lead at zero too it stopped the machine the same way, early in the boot.
+add_test(NAME mmPairHoldZeroUcLeadFirmwareTest COMMAND mmAudioFirmwareTest --listen)
+set_tests_properties(mmPairHoldZeroUcLeadFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;AudioIo;Transport" SKIP_RETURN_CODE 77 TIMEOUT 120
+	ENVIRONMENT "MDMM_TRANSPORT=pair;MD_PAIR_HOLD_DSP2_US=30;MD_PAIR_UC_LEAD_US=0;MM_LISTEN_LONE_MIXER=1;MM_LISTEN_SECONDS=2")
 set_property(TARGET mmAudioFirmwareTest PROPERTY FOLDER "Elektron/test")
 
 if(BUILD_TESTING)
