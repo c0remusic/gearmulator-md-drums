@@ -1033,6 +1033,61 @@ propre. Pistes : fusionner sonde et pop RX en un appel hôte (~2 points),
 chemin court DMA pour les transferts d'un mot déclenchés par ESSI (~1 à 2),
 entrée construite dans l'anneau et test rapide du rattrapage (~1).
 
+### Rattrapage MM sous `execUntilCycles`, fin de la série (2026-09-30)
+
+Levier 3 ci-dessus. La boucle de rattrapage MM (`schedCatchUpDspToDsp`,
+branche `bpGate`) avançait le consommateur bloc par bloc avec `exec()` pour
+tester le backlog hôte entre deux blocs. Elle passe sous
+`execUntilCycles(min(cible, clamp, prochain item hôte))`, comme la branche MD.
+Côté DSP, le backlog ne croît que par une écriture HOTX : pendant le
+rattrapage (`Dsp::setExecExitOnHostTx`), le callback d'écriture TX du MM
+appelle `DSP::requestExecExit()`, et le trampoline rend la main après le bloc
+en cours, là où la boucle bloc par bloc testait le backlog.
+
+Sous-module : la cible d'`execUntilCycles` quitte la pile du trampoline x86
+(le registre `g_counter` sur ARM) pour un membre du DSP, `m_execTargetCycles`,
+relu après chaque bloc (autant d'instructions sur x86, un `ldr` de plus sur
+ARM). `requestExecExit()` la met à 0 et coupe `m_skipLimitCycles` : aucun saut
+NOP ou de scrutation ne franchit la sortie demandée. `setSkipLimitCycles`
+(correctif A) disparaît, sans appelant. Test unitaire `execExitRequest`
+(`jitunittests.cpp`, dans `dsp56300_unitTests`) : une écriture HOTX dont le
+callback demande la sortie arrête `execUntilCycles` dans l'état du pas à pas
+par `execJit()`, loin de sa cible.
+
+Au passage : avec le correctif A, un saut de scrutation pouvait franchir une
+écriture HOTX faite dans la même passe par le dispatch d'interruption (vecteur
+rapide avant le bloc de scrutation), puisque la boucle ne testait le backlog
+qu'après la passe. `requestExecExit` coupe ce saut. Cas non rencontré par le
+test d'exactitude ci-dessous.
+
+Exactitude : `mmAudioFirmwareTest` en série (`MDMM_TRANSPORT=serial`) est
+déterministe (deux runs HEAD identiques) ; ses 18 valeurs imprimées (RMS au
+repos, RMS, RMS à niveau nul et rugosité des six pistes) sont identiques à
+HEAD sur deux runs. Chemin ARM relu, non compilé ici.
+
+Mesures (sondes niveau 0, banc non cadencé, MM paire, 3 paires alternées de
+30 s contre `f60b882a` ; machine chargée par le vite d'un autre projet,
+réel ~97 %) :
+- Rattrapé : 5,27 → 5,03 ns/cycle (−4,6 % ; chaque run nouveau sous chaque
+  run de référence, 4,92 à 5,11 contre 5,19 à 5,38), 478 → 456 ns par
+  rattrapage, part du mur worker 13,8 → 13,3 %.
+- Propre (mixer, producer) : inchangé, 3,80 à 3,85 ns/cycle pour le mixer.
+- Temps réel du banc : 96,7 → 96,8 %, dans le bruit.
+
+Moins que les 2 à 3 points estimés. Un rattrapage exécute ~90 cycles
+(12,6 M rattrapages pour 1,14 G cycles), un slot de lien : quelques blocs à
+peine, la boucle par bloc pesait peu. L'écart restant entre rattrapé et
+propre (5,0 contre 3,8 ns/cycle sous cette charge, ~3 % du mur) est un coût
+fixe par rattrapage (~110 ns : entrée, dates en double, garde, backlog,
+service hôte), à attaquer seulement en rattrapant moins souvent, ce qui
+change la synchronisation.
+
+Série arrêtée ici (Antoine, 2026-09-30) : MM paire ~70-73 % du temps réel sur
+cette machine hors charge, rendements décroissants. Pistes identifiées non
+menées : HDI08 servi seulement à l'arrivée d'un mot hôte (1 à 2 points,
+invasif), chemin court DMA pour les transferts d'un mot déclenchés par ESSI
+(~1 point), coût fixe par rattrapage (ci-dessus).
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée
