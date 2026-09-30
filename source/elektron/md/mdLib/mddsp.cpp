@@ -182,6 +182,8 @@ namespace md
 			hdi08().setWriteTxCallback([this]
 			{
 				m_mmHostTxCycle = m_dsp.getCycles();
+				if(m_execExitOnHostTx)
+					m_dsp.requestExecExit();
 				// A DSP on a worker never touches the UC's register file: it
 				// stages the word, the UC context takes it (stageHostTx).
 				if(m_hardware.dspInlineRunAllowed(m_index))

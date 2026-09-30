@@ -3402,18 +3402,17 @@ namespace md
 		else
 		{
 			// Between two blocks this loop acts only at targetCyc, clampStop and
-			// nextHostItem. The consumer grows the host backlog only by writing
-			// HOTX, which NOP and polling loops never do; in pair mode the UC
-			// thread moves it too, but at no particular DSP cycle, so checking it
-			// at every block never pinned that down either. Let those loops skip
-			// up to the nearest of the three, as the consumer's own chunks let
-			// them skip up to the chunk target. Without it every polling
-			// iteration of a catch-up ran as a block of its own.
-			const auto skipLimit = [&]
-			{
-				return std::min(std::min(targetCyc, clampStop), nextHostItem);
-			};
-			d.dsp().setSkipLimitCycles(skipLimit());
+			// nextHostItem, and on the host backlog. The consumer grows the
+			// backlog only by writing HOTX; in pair mode the UC thread moves it
+			// too, but at no particular DSP cycle, so checking it at every block
+			// never pinned that down either. So run up to the nearest of the
+			// three under one trampoline entry, which a HOTX write leaves once
+			// its block completes (Dsp::setExecExitOnHostTx): the backlog is
+			// checked where a block-by-block loop checked it. NOP and polling
+			// loops skip up to that target, as in the consumer's own chunks;
+			// stepped with exec(), every polling iteration of a catch-up ran as
+			// a block of its own.
+			d.setExecExitOnHostTx(true);
 			while(d.dsp().getCycles() < targetCyc && d.dsp().getCycles() < clampStop
 				&& d.hostTxBacklog() <= policy.hostTransmitBackpressureThresholdWords)
 			{
@@ -3425,11 +3424,10 @@ namespace md
 					// chunk or HRX read edge, not at every instruction.
 					if(nextHostItem <= d.dsp().getCycles())
 						nextHostItem = std::numeric_limits<uint64_t>::max();
-					d.dsp().setSkipLimitCycles(skipLimit());
 				}
-				d.dsp().exec();
+				d.dsp().execUntilCycles(std::min(std::min(targetCyc, clampStop), nextHostItem));
 			}
-			d.dsp().setSkipLimitCycles(0);
+			d.setExecExitOnHostTx(false);
 		}
 #ifdef DSP56K_TSC_PROBES
 		dsp56k::probe::leave(probeToken);
