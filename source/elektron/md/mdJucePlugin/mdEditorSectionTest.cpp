@@ -8,6 +8,7 @@
 
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/juceRmlLookAndFeel.h"
+#include "juceRmlUi/rmlElemValue.h"
 #include "juceRmlUi/rmlInterfaces.h"
 
 #include "jucePluginLib/controller.h"
@@ -384,6 +385,37 @@ int main()
 			context.Update();
 			require(!step(0).IsClassSet("mdEdStepFocus") && !element(doc, "mdEdCtl_FilterBase").IsClassSet("mdEdDim")
 				&& !visible(element(doc, "mdEdLock_MachineParameter1")), "second click did not clear the focus");
+
+			// Writing: a double click sets a trig and focuses its step; a control then
+			// writes a lock on that step, and a double click on it clears the lock.
+			const auto doubleClick = [&](Rml::Element& _e)
+			{
+				_e.Click();
+				_e.Click();
+				_e.DispatchEvent(Rml::EventId::Dblclick, Rml::Dictionary());
+				context.Update();
+			};
+			auto& lockKnob = element(doc, "mdEdLockKnob_FilterBase");
+			require(!visible(lockKnob), "lock knob shown without a focused step");
+			doubleClick(step(1));
+			require(step(1).IsClassSet("mdEdStepTrig") && step(1).IsClassSet("mdEdStepFocus"), "double click did not set a trig and focus it");
+			require(md.getPattern()->hasTrig(0, 1), "trig not in the controller's pattern");
+			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "trig not written to the firmware");
+			require(visible(lockKnob) && visible(element(doc, "mdEdLockKnob_Volume")), "lock knobs not over the controls of a step with a trig");
+			const auto filterBase = md.getParameter("FilterBase", 0);
+			const auto kitBefore = filterBase->getUnnormalizedValue();
+			juceRmlUi::ElemValue::setValue(&lockKnob, 77.0f);
+			context.Update();
+			require(visible(element(doc, "mdEdLock_FilterBase")) && text("mdEdLock_FilterBase") == "77", "lock knob did not write a lock");
+			require(filterBase->getUnnormalizedValue() == kitBefore, "lock knob changed the Kit value");
+			lockKnob.DispatchEvent(Rml::EventId::Dblclick, Rml::Dictionary());
+			context.Update();
+			require(!visible(element(doc, "mdEdLock_FilterBase")), "double click on the lock knob did not clear the lock");
+			doubleClick(step(1));
+			require(!step(1).IsClassSet("mdEdStepTrig") && !md.getPattern()->hasTrig(0, 1) && !visible(lockKnob),
+				"second double click did not clear the trig");
+			step(1).Click();
+			context.Update();
 		}
 #endif
 

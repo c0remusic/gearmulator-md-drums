@@ -6,6 +6,7 @@
 #include "synthLib/midiBufferParser.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -525,6 +526,133 @@ namespace
 		require(!parseMdPatternDump(pattern), "accepted truncated MD pattern");
 	}
 
+	// Unpacks _count bytes of a 7-bit run starting at _position, which it advances.
+	std::vector<uint8_t> read7Bit(const md::automation::sysex::Message& _message, size_t& _position, const size_t _count)
+	{
+		std::vector<uint8_t> result;
+		while(result.size() < _count)
+		{
+			const auto highBits = _message.at(_position++);
+			for(uint8_t bit = 0; bit < 7 && result.size() < _count; ++bit)
+				result.push_back(static_cast<uint8_t>(_message.at(_position++) | ((highBits >> (6 - bit)) & 1u) << 7));
+		}
+		return result;
+	}
+
+	// A Machinedrum pattern dump: _trigs and _masks per track, lock rows as given
+	// (the rest empty), and with _extension the 64-step form.
+	md::automation::sysex::Message makePattern(const uint8_t _length, const std::array<uint32_t, 16>& _trigs,
+		const std::array<uint32_t, 16>& _masks, const std::vector<uint8_t>& _locks, const std::vector<uint8_t>& _extension = {})
+	{
+		using namespace md::automation::sysex;
+		std::vector<uint8_t> trigs, masks;
+		for(uint8_t track = 0; track < 16; ++track)
+		{
+			for(const auto shift : {24, 16, 8, 0})
+			{
+				trigs.push_back(static_cast<uint8_t>(_trigs[track] >> shift));
+				masks.push_back(static_cast<uint8_t>(_masks[track] >> shift));
+			}
+		}
+		auto locks = _locks;
+		locks.resize(64 * 32, 0xff);
+		uint8_t rows = 0;
+		for(const auto mask : _masks)
+			for(uint8_t parameter = 0; parameter < 24; ++parameter)
+				rows += (mask >> parameter) & 1u;
+		Message pattern{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x67, 0x03, 0x01, 18};
+		append7Bit(pattern, trigs);
+		append7Bit(pattern, masks);
+		append7Bit(pattern, std::vector<uint8_t>(16, 0));
+		pattern.insert(pattern.end(), {0, _length, 0, 0, 5, rows});
+		append7Bit(pattern, locks);
+		append7Bit(pattern, std::vector<uint8_t>(204, 0));
+		if(!_extension.empty())
+			append7Bit(pattern, _extension);
+		finishDump(pattern);
+		return pattern;
+	}
+
+	void testMachinedrumPatternEditing()
+	{
+		using namespace md::automation::sysex;
+		// Track 1: trigs on steps 1, 5 and 32, locks on parameters 0 (step 5) and 9
+		// (step 32). Track 3: a trig on step 2, a lock on parameter 23.
+		std::array<uint32_t, 16> trigs{}, masks{};
+		trigs[0] = 0x80000011u;
+		trigs[2] = 0x2u;
+		masks[0] = 1u << 0 | 1u << 9;
+		masks[2] = 1u << 23;
+		std::vector<uint8_t> locks(64 * 32, 0xff);
+		locks[0 * 32 + 4] = 100;
+		locks[1 * 32 + 31] = 7;
+		locks[2 * 32 + 1] = 64;
+		const auto pattern = makePattern(32, trigs, masks, locks);
+		constexpr size_t rowCountPosition = 0xb6;
+		require(pattern.size() == 0xacb && pattern[rowCountPosition] == 3, "test pattern has the wrong layout");
+
+		auto editor = MdPatternEditor::fromDump(pattern);
+		require(editor && editor->toDump() == pattern, "MD pattern does not survive a read and write unchanged");
+
+		// A trig, then a lock on a new parameter: its row goes between the two of track 1.
+		require(editor->setTrig(0, 1, true), "could not set a trig");
+		require(editor->setLock(0, 5, 4, 42), "could not lock parameter 5 on step 5");
+		auto dump = editor->toDump();
+		auto parsed = parseMdPatternDump(dump);
+		require(parsed && parsed->hasTrig(0, 1) && parsed->hasTrig(0, 4), "trig not written");
+		require(parsed->lock(0, 5, 4) == uint8_t{42} && parsed->lock(0, 0, 4) == uint8_t{100}
+			&& parsed->lock(0, 9, 31) == uint8_t{7} && parsed->lock(2, 23, 1) == uint8_t{64}, "rows not kept in order around a new one");
+		require(dump[rowCountPosition] == 4, "row count not updated");
+		require(!editor->setLock(0, 0, 2, 5), "lock accepted on a step without a trig");
+		require(!editor->setLock(0, 0, 4, 128), "lock value above 127 accepted");
+		require(!editor->setTrig(0, 32, true) && !editor->setLock(0, 24, 4, 1), "step or parameter out of range accepted");
+
+		// Clearing the new lock and trig gives the original dump back, byte for byte.
+		require(editor->setLock(0, 5, 4, std::nullopt) && editor->setTrig(0, 1, false), "could not clear");
+		require(editor->toDump() == pattern, "clearing the edits did not restore the pattern");
+
+		// Clearing a trig clears its locks; an emptied row goes away.
+		require(editor->setTrig(0, 4, false), "could not clear a trig");
+		dump = editor->toDump();
+		parsed = parseMdPatternDump(dump);
+		require(parsed && !parsed->hasTrig(0, 4) && !parsed->lock(0, 0, 4) && parsed->lock(0, 9, 31) == uint8_t{7}
+			&& parsed->lock(2, 23, 1) == uint8_t{64} && dump[rowCountPosition] == 2, "clearing a trig kept its lock row");
+
+		// 64 rows at most.
+		std::array<uint32_t, 16> allTracks{};
+		allTracks.fill(1u);
+		auto full = MdPatternEditor::fromDump(makePattern(16, allTracks, {}, {}));
+		require(full.has_value(), "could not read the empty pattern");
+		for(uint8_t track = 0; track < 16; ++track)
+			for(uint8_t parameter = 0; parameter < 4; ++parameter)
+				require(full->setLock(track, parameter, 0, static_cast<uint8_t>(track * 4 + parameter)), "could not fill the rows");
+		require(!full->setLock(0, 4, 0, 1), "a 65th row was accepted");
+		parsed = parseMdPatternDump(full->toDump());
+		require(parsed && parsed->lock(15, 3, 0) == uint8_t{63} && parsed->lock(0, 0, 0) == uint8_t{0}, "full rows read back wrong");
+
+		// 64-step form: the second half's rows move with the first half's.
+		std::vector<uint8_t> extension(64 + 12 + 64 * 32 + 192, 0);
+		std::fill(extension.begin() + 76, extension.begin() + 76 + 64 * 32, 0xff);
+		extension[2 * 4 + 3] = 0x02;                  // track 3: trig on step 34
+		extension[76 + 2 * 32 + 1] = 77;              // row 2 (track 3, parameter 23): step 34
+		const auto longPattern = makePattern(48, trigs, masks, locks, extension);
+		require(longPattern.size() == 0x1522, "64-step test pattern has the wrong size");
+		auto longEditor = MdPatternEditor::fromDump(longPattern);
+		require(longEditor && longEditor->toDump() == longPattern, "64-step pattern does not survive a read and write");
+		require(longEditor->setLock(0, 5, 4, 42), "could not add a row to the 64-step pattern");
+		dump = longEditor->toDump();
+		size_t position = 0xacb - 5;
+		const auto second = read7Bit(dump, position, extension.size());
+		require(second[76 + 3 * 32 + 1] == 77 && second[76 + 2 * 32 + 1] == 0xff, "second half of the rows did not move with the first");
+		require(longEditor->setLock(2, 23, 33, std::nullopt) && longEditor->setLock(2, 23, 1, 50), "could not edit the second half");
+		require(longEditor->setLock(0, 5, 4, std::nullopt), "could not clear the added row");
+		require(longEditor->setTrig(2, 33, true) && longEditor->setLock(2, 23, 33, 77) && longEditor->setLock(2, 23, 1, 64),
+			"could not restore the second half");
+		require(longEditor->toDump() == longPattern, "64-step edits did not restore the pattern");
+
+		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");
+	}
+
 	void testMachineAssignment()
 	{
 		using md::automation::sysex::Message;
@@ -864,6 +992,7 @@ int main(const int _argc, const char* const* _argv)
 	testMonomachineDumps();
 	testMachineAssignment();
 	testMachinedrumPattern();
+	testMachinedrumPatternEditing();
 	testDumpRequestOrdering();
 	testGlobalSync();
 	testHostSync();

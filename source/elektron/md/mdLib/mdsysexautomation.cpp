@@ -137,6 +137,25 @@ namespace md::automation::sysex
 			return decoded;
 		}
 
+		// Appends _count bytes in 7-bit groups: each group of up to seven bytes is
+		// preceded by their top bits, MSB first. The inverse of read7Bit.
+		void append7Bit(std::vector<uint8_t>& _out, const uint8_t* _data, const size_t _count)
+		{
+			for(size_t position = 0; position < _count; position += 7)
+			{
+				const auto count = std::min<size_t>(7, _count - position);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+				{
+					if(_data[position + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				}
+				_out.push_back(highBits);
+				for(size_t bit = 0; bit < count; ++bit)
+					_out.push_back(static_cast<uint8_t>(_data[position + bit] & 0x7f));
+			}
+		}
+
 		// Inverse of decodeMonomachinePayload: run-length pass, then 7-bit groups.
 		std::vector<uint8_t> encodeMonomachinePayload(const std::vector<uint8_t>& _decoded)
 		{
@@ -161,22 +180,9 @@ namespace md::automation::sysex
 				position += count;
 			}
 
-			// Each group of up to seven bytes is preceded by their top bits, MSB first.
 			std::vector<uint8_t> packed;
 			packed.reserve(rle.size() + rle.size() / 7 + 1);
-			for(size_t position = 0; position < rle.size(); position += 7)
-			{
-				const auto count = std::min<size_t>(7, rle.size() - position);
-				uint8_t highBits = 0;
-				for(size_t bit = 0; bit < count; ++bit)
-				{
-					if(rle[position + bit] & 0x80)
-						highBits |= static_cast<uint8_t>(1u << (6u - bit));
-				}
-				packed.push_back(highBits);
-				for(size_t bit = 0; bit < count; ++bit)
-					packed.push_back(static_cast<uint8_t>(rle[position + bit] & 0x7f));
-			}
+			append7Bit(packed, rle.data(), rle.size());
 			return packed;
 		}
 
@@ -319,6 +325,191 @@ namespace md::automation::sysex
 		// Parameters 24 and up belong to lock rows the classic format does not have.
 		for(auto& mask : result.lockMasks)
 			mask &= 0x00ffffffu;
+		return result;
+	}
+
+	namespace
+	{
+		// Pattern dump sections after the 6 plain bytes: the lock rows, then accent,
+		// slide and swing edit flags and per-track patterns. The 64-step form adds
+		// one 7-bit run: trigs, accent/slide/swing, lock rows and per-track patterns
+		// of steps 33 to 64.
+		constexpr size_t g_patternTailSize = 204;
+		constexpr size_t g_patternExtensionSize = 64 + 12 + 64 * 32 + 192;
+		constexpr size_t g_patternExtensionLocks = 64 + 12;
+		constexpr size_t g_patternRows = 64;
+		constexpr uint8_t g_patternParameters = 24;
+		constexpr uint8_t g_noLock = 0xff;
+	}
+
+	std::optional<MdPatternEditor> MdPatternEditor::fromDump(const MessageView _message)
+	{
+		if(!parseMdPatternDump(_message))
+			return std::nullopt;
+		MdPatternEditor editor;
+		editor.m_header.assign(_message.begin(), _message.begin() + 0x0a);
+		editor.m_locks.resize(g_patternRows * 32);
+		editor.m_tail.resize(g_patternTailSize);
+		size_t position = 0x0a;
+		if(!read7Bit(_message, position, editor.m_trigs.size(), editor.m_trigs.data())
+			|| !read7Bit(_message, position, editor.m_masks.size(), editor.m_masks.data())
+			|| !read7Bit(_message, position, editor.m_swing.size(), editor.m_swing.data()))
+			return std::nullopt;
+		std::copy_n(_message.begin() + position, editor.m_plain.size(), editor.m_plain.begin());
+		position += editor.m_plain.size();
+		if(!read7Bit(_message, position, editor.m_locks.size(), editor.m_locks.data())
+			|| !read7Bit(_message, position, editor.m_tail.size(), editor.m_tail.data()))
+			return std::nullopt;
+		if(_message.size() == 0x1522)
+		{
+			editor.m_extension.resize(g_patternExtensionSize);
+			if(!read7Bit(_message, position, editor.m_extension.size(), editor.m_extension.data()))
+				return std::nullopt;
+		}
+		if(position != _message.size() - 5)
+			return std::nullopt;
+		return editor;
+	}
+
+	uint8_t& MdPatternEditor::trigByte(const uint8_t _track, const uint8_t _step)
+	{
+		// Big-endian 32-bit masks: step n is bit n % 32 of the low or high half.
+		auto* bytes = _step < 32 ? m_trigs.data() : m_extension.data();
+		return bytes[_track * 4 + 3 - (_step % 32) / 8];
+	}
+
+	bool MdPatternEditor::hasTrig(const uint8_t _track, const uint8_t _step)
+	{
+		return (trigByte(_track, _step) >> (_step % 8)) & 1u;
+	}
+
+	size_t MdPatternEditor::rowIndex(const uint8_t _track, const uint8_t _parameter)
+	{
+		size_t row = 0;
+		for(uint8_t track = 0; track < 16; ++track)
+		{
+			for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+			{
+				if(track == _track && parameter == _parameter)
+					return row;
+				row += hasRow(track, parameter) ? 1 : 0;
+			}
+		}
+		return row;
+	}
+
+	size_t MdPatternEditor::rowCount()
+	{
+		size_t rows = 0;
+		for(uint8_t track = 0; track < 16; ++track)
+			for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+				rows += hasRow(track, parameter) ? 1 : 0;
+		return rows;
+	}
+
+	uint8_t& MdPatternEditor::lockValue(const size_t _row, const uint8_t _step)
+	{
+		return _step < 32 ? m_locks[_row * 32 + _step] : m_extension[g_patternExtensionLocks + _row * 32 + _step - 32];
+	}
+
+	bool MdPatternEditor::rowEmpty(const size_t _row)
+	{
+		for(uint8_t step = 0; step < stepCount(); ++step)
+		{
+			if(lockValue(_row, step) < 0x80)
+				return false;
+		}
+		return true;
+	}
+
+	void MdPatternEditor::insertRow(const size_t _row)
+	{
+		for(size_t row = g_patternRows - 1; row > _row; --row)
+		{
+			for(uint8_t step = 0; step < stepCount(); ++step)
+				lockValue(row, step) = lockValue(row - 1, step);
+		}
+		for(uint8_t step = 0; step < stepCount(); ++step)
+			lockValue(_row, step) = g_noLock;
+	}
+
+	void MdPatternEditor::removeRow(const size_t _row)
+	{
+		for(size_t row = _row; row + 1 < g_patternRows; ++row)
+		{
+			for(uint8_t step = 0; step < stepCount(); ++step)
+				lockValue(row, step) = lockValue(row + 1, step);
+		}
+		for(uint8_t step = 0; step < stepCount(); ++step)
+			lockValue(g_patternRows - 1, step) = g_noLock;
+	}
+
+	bool MdPatternEditor::setTrig(const uint8_t _track, const uint8_t _step, const bool _on)
+	{
+		if(_track >= 16 || _step >= std::min(length(), stepCount()))
+			return false;
+		auto& byte = trigByte(_track, _step);
+		const auto bit = static_cast<uint8_t>(1u << (_step % 8));
+		if(_on)
+		{
+			byte |= bit;
+			return true;
+		}
+		byte &= static_cast<uint8_t>(~bit);
+		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+			setLock(_track, parameter, _step, std::nullopt);
+		return true;
+	}
+
+	bool MdPatternEditor::setLock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		if(_track >= 16 || _parameter >= g_patternParameters || _step >= std::min(length(), stepCount())
+			|| (_value && *_value >= 0x80))
+			return false;
+		const auto row = rowIndex(_track, _parameter);
+		if(!_value)
+		{
+			if(!hasRow(_track, _parameter) || row >= g_patternRows)
+				return true;
+			lockValue(row, _step) = g_noLock;
+			if(rowEmpty(row))
+			{
+				removeRow(row);
+				maskByte(_track, _parameter) &= static_cast<uint8_t>(~(1u << (_parameter % 8)));
+			}
+		}
+		else
+		{
+			if(!hasTrig(_track, _step))
+				return false;
+			if(!hasRow(_track, _parameter))
+			{
+				if(rowCount() >= g_patternRows)
+					return false;
+				insertRow(row);
+				maskByte(_track, _parameter) |= static_cast<uint8_t>(1u << (_parameter % 8));
+			}
+			if(row >= g_patternRows)
+				return false;
+			lockValue(row, _step) = *_value;
+		}
+		m_plain[5] = static_cast<uint8_t>(std::min(rowCount(), g_patternRows));
+		return true;
+	}
+
+	Message MdPatternEditor::toDump() const
+	{
+		Message result(m_header);
+		append7Bit(result, m_trigs.data(), m_trigs.size());
+		append7Bit(result, m_masks.data(), m_masks.size());
+		append7Bit(result, m_swing.data(), m_swing.size());
+		result.insert(result.end(), m_plain.begin(), m_plain.end());
+		append7Bit(result, m_locks.data(), m_locks.size());
+		append7Bit(result, m_tail.data(), m_tail.size());
+		if(!m_extension.empty())
+			append7Bit(result, m_extension.data(), m_extension.size());
+		finishDump(result);
 		return result;
 	}
 

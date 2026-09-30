@@ -145,6 +145,11 @@
 
 /* focused step: locked values in orange over the bound value, the other controls dimmed */
 .mdEdLockValue { color: #ff6b1f; font-weight: bold; }
+/* over a control while a step with a trig has the focus: dragging it writes a lock (mdStepGrid.cpp) */
+.mdEdLockKnob, .mdEdLockFader { box-sizing: border-box; decorator: none; background-color: transparent; box-shadow: none; border-width: 0dp; cursor: pointer; }
+.mdEdLockKnob { width: 46dp; height: 46dp; border-radius: 23dp; }
+.mdEdLockFader { width: 12dp; height: 46dp; border-radius: 2dp; }
+.mdEdLockKnob:hover, .mdEdLockFader:hover, .mdEdLockKnob:active, .mdEdLockFader:active { border: 2dp #ff6b1f; }
 .mdEdHidden { visibility: hidden; }
 .mdEdDim { opacity: 0.35; }
 

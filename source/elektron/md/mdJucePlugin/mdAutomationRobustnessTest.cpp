@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <new>
@@ -1324,6 +1325,73 @@ namespace
 			"another current pattern was not read");
 	}
 
+	// Runs after verifyPatternReading, with pattern 20 (16 steps, trigs on steps 1 and 5 of track 1) shown.
+	void verifyPatternWriting(Harness& _harness)
+	{
+		auto& controller = _harness.controller;
+		using Write = mdJucePlugin::Controller::PatternWrite;
+		using Status = md::automation::sysex::StatusParameter;
+		if(_harness.model == md::MachineModel::Monomachine)
+		{
+			require(!controller.setPatternTrig(0, 0, true) && !controller.sendPattern(), "Monomachine accepted a pattern edit");
+			return;
+		}
+		std::array<uint32_t, 16> trigs{};
+		trigs[0] = 0x11;
+		const auto shown = makeMdPatternDump(20, 16, trigs);
+		const auto firmwareDump = [&](const std::function<void(md::automation::sysex::MdPatternEditor&)>& _edits)
+		{
+			auto editor = md::automation::sysex::MdPatternEditor::fromDump(shown);
+			require(editor.has_value(), "test pattern not editable");
+			_edits(*editor);
+			const auto dump = editor->toDump();
+			return pluginLib::SysEx(dump.begin(), dump.end());
+		};
+		const auto reply = [&](const pluginLib::SysEx& _dump)
+		{
+			controller.parseSysexMessage(_dump, synthLib::MidiEventSource::Device);
+		};
+
+		// Edits show at once and are sent together.
+		require(!controller.sendPattern(), "an unedited pattern was sent");
+		const auto revision = controller.getPatternRevision();
+		require(controller.setPatternTrig(0, 1, true) && controller.setPatternLock(0, 3, 1, 55), "pattern edit refused");
+		require(!controller.setPatternLock(0, 3, 2, 1), "lock accepted on a step without a trig");
+		require(controller.getPatternRevision() == revision + 2 && controller.getPattern()->hasTrig(0, 1)
+			&& controller.getPattern()->lock(0, 3, 1) == uint8_t{55}, "edit not shown");
+		require(controller.getPatternWrite() == Write::None, "write state before any write");
+		require(controller.sendPattern() && controller.getPatternWrite() == Write::Pending, "edited pattern not sent");
+		require(!controller.sendPattern(), "the same edits were sent twice");
+		const auto kept = firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 55); });
+		reply(kept);
+		require(controller.getPatternWrite() == Write::Written && controller.getPattern()->lock(0, 3, 1) == uint8_t{55},
+			"read-back as sent not reported as written");
+
+		// A read-back that differs is reported, and the firmware's pattern is shown.
+		require(controller.setPatternLock(0, 3, 1, 60) && controller.sendPattern(), "second edit not sent");
+		reply(kept);
+		require(controller.getPatternWrite() == Write::Refused && controller.getPattern()->lock(0, 3, 1) == uint8_t{55},
+			"read-back without the edit not reported as refused");
+
+		// Two writes in flight: only the second read-back decides.
+		require(controller.setPatternLock(0, 3, 1, 61) && controller.sendPattern(), "first of two writes not sent");
+		require(controller.setPatternLock(0, 3, 1, 62) && controller.sendPattern(), "second of two writes not sent");
+		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 61); }));
+		require(controller.getPatternWrite() == Write::Pending && controller.getPattern()->lock(0, 3, 1) == uint8_t{62},
+			"the first read-back replaced a newer edit");
+		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 62); }));
+		require(controller.getPatternWrite() == Write::Written, "the last read-back did not decide");
+
+		// An edit not sent yet stays over a read of the same pattern.
+		require(controller.setPatternLock(0, 3, 1, 70), "unsent edit refused");
+		require(controller.requestPattern(), "pattern read refused");
+		controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 20), synthLib::MidiEventSource::Device);
+		reply(kept);
+		require(controller.getPattern()->lock(0, 3, 1) == uint8_t{70}, "a read of the same pattern dropped an unsent edit");
+		require(controller.sendPattern(), "unsent edit could not be sent after a read");
+		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 70); }));
+	}
+
 	void verifyArchitecture(const md::MachineModel _model)
 	{
 		verifyRetriedKitSynchronization(_model, false);
@@ -1340,6 +1408,7 @@ namespace
 		verifyMuteOwnership(harness);
 		verifyMachineAssignment(harness);
 		verifyPatternReading(harness);
+		verifyPatternWriting(harness);
 		verifyOrderedIntentArchitecture(harness);
 		verifyAdversarialRestoreSynchronization(harness);
 		verifyConcurrentPublicationArchitecture(harness);

@@ -72,6 +72,47 @@ namespace md::automation::sysex
 		std::optional<uint8_t> lock(uint8_t _track, uint8_t _parameter, uint8_t _step) const;
 	};
 
+	// A Machinedrum pattern dump ($67) that can be edited and sent back. Every
+	// byte of the dump is kept; toDump() changes only what the edits touched.
+	class MdPatternEditor
+	{
+	public:
+		static std::optional<MdPatternEditor> fromDump(MessageView _message);
+
+		// Sets or clears the trig of a step below the pattern length. Clearing it
+		// also clears that step's locks on the track, as the Machinedrum does.
+		bool setTrig(uint8_t _track, uint8_t _step, bool _on);
+		// Sets a locked value (0..127) on a step that has a trig, or clears it.
+		// A parameter (0..23) gets its lock row with its first lock and loses it
+		// with its last. False when the step has no trig or all 64 rows are taken.
+		bool setLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
+
+		Message toDump() const;
+
+	private:
+		uint8_t stepCount() const { return m_extension.empty() ? 32 : 64; }
+		uint8_t length() const { return m_plain[1]; }
+		uint8_t& trigByte(uint8_t _track, uint8_t _step);
+		bool hasTrig(uint8_t _track, uint8_t _step);
+		uint8_t& maskByte(uint8_t _track, uint8_t _parameter) { return m_masks[_track * 4 + 3 - _parameter / 8]; }
+		bool hasRow(uint8_t _track, uint8_t _parameter) { return (maskByte(_track, _parameter) >> (_parameter % 8)) & 1u; }
+		size_t rowIndex(uint8_t _track, uint8_t _parameter);
+		size_t rowCount();
+		uint8_t& lockValue(size_t _row, uint8_t _step);
+		bool rowEmpty(size_t _row);
+		void insertRow(size_t _row);
+		void removeRow(size_t _row);
+
+		Message m_header;                  // F0 up to the pattern position
+		std::array<uint8_t, 64> m_trigs{};
+		std::array<uint8_t, 64> m_masks{};
+		std::array<uint8_t, 16> m_swing{};
+		std::array<uint8_t, 6> m_plain{};  // accent amount, length, double tempo, scale, kit, row count
+		std::vector<uint8_t> m_locks;      // 64 rows of 32 steps
+		std::vector<uint8_t> m_tail;
+		std::vector<uint8_t> m_extension;  // 64-step form: steps 33 to 64 of the above
+	};
+
 	// The receiving half of a Global's MIDI SYNC page.
 	struct GlobalSync
 	{

@@ -13,6 +13,12 @@ namespace mdJucePlugin
 {
 	namespace
 	{
+		// What the step grid shows of a pattern: trigs, lock rows and length.
+		bool samePattern(const md::automation::sysex::PatternDump& _a, const md::automation::sysex::PatternDump& _b)
+		{
+			return _a.length == _b.length && _a.trigs == _b.trigs && _a.lockMasks == _b.lockMasks && _a.lockRows == _b.lockRows;
+		}
+
 		constexpr uint64_t g_dumpRequestRetryMs = 2000;
 		constexpr uint8_t g_snapshotVersion = 2;
 		constexpr uint8_t g_snapshotComplete = 1u << 0;
@@ -349,6 +355,71 @@ namespace mdJucePlugin
 	{
 		const std::lock_guard lock(m_patternMutex);
 		return m_pattern;
+	}
+
+	bool Controller::editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit)
+	{
+		if(m_model != md::MachineModel::Machinedrum)
+			return false;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternDump.empty())
+				return false;
+			auto editor = md::automation::sysex::MdPatternEditor::fromDump(m_patternDump);
+			if(!editor || !_edit(*editor))
+				return false;
+			auto dump = editor->toDump();
+			auto pattern = md::automation::sysex::parseMdPatternDump(dump);
+			if(!pattern)
+				return false;
+			m_patternDump = std::move(dump);
+			m_pattern = std::move(*pattern);
+			m_patternEdited = true;
+		}
+		m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	bool Controller::setPatternTrig(const uint8_t _track, const uint8_t _step, const bool _on)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setTrig(_track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternLock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setLock(_track, _parameter, _step, _value);
+		});
+	}
+
+	bool Controller::sendPattern()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		md::automation::sysex::Message dump;
+		uint8_t slot = 0;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(!m_patternEdited || !m_pattern)
+				return false;
+			dump = m_patternDump;
+			slot = m_pattern->slot;
+			m_patternEdited = false;
+			m_patternSent = m_pattern;
+			++m_patternWritesInFlight;
+		}
+		m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
+		m_patternRequestedSlot.store(slot, std::memory_order_release);
+		m_patternWanted.store(true, std::memory_order_release);
+		sendEditorSysex(dump);
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
+		return true;
 	}
 
 	void Controller::requestKitState()
@@ -1012,7 +1083,22 @@ namespace mdJucePlugin
 				{
 					{
 						const std::lock_guard lock(m_patternMutex);
-						m_pattern = std::move(*pattern);
+						// Each write is read back; only the reply to the last one tells
+						// what the firmware kept.
+						if(m_patternWritesInFlight > 0)
+						{
+							if(--m_patternWritesInFlight > 0)
+								return true;
+							m_patternWrite.store(m_patternSent && samePattern(*pattern, *m_patternSent)
+								? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
+						}
+						// Edits not sent yet stay on top of the same pattern.
+						if(!m_patternEdited || !m_pattern || m_pattern->slot != pattern->slot)
+						{
+							m_pattern = std::move(*pattern);
+							m_patternDump.assign(_message.begin(), _message.end());
+							m_patternEdited = false;
+						}
 					}
 					m_patternWanted.store(false, std::memory_order_release);
 					m_patternRevision.fetch_add(1, std::memory_order_acq_rel);

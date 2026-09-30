@@ -11,6 +11,7 @@
 #include <array>
 #include <atomic>
 #include <deque>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -96,14 +97,32 @@ namespace mdJucePlugin
 		bool requestPattern();
 		// The pattern as last read, nullopt before the first dump.
 		std::optional<md::automation::sysex::PatternDump> getPattern() const;
-		// Increments whenever a new pattern dump is stored.
+		// Increments whenever a new pattern dump is stored or the pattern is edited.
 		uint64_t getPatternRevision() const { return m_patternRevision.load(std::memory_order_acquire); }
+
+		// Machinedrum only: edit the pattern as last read. The edit shows at once in
+		// getPattern(); sendPattern() writes it to the firmware. False without a
+		// pattern, or when md::automation::sysex::MdPatternEditor refuses the edit.
+		bool setPatternTrig(uint8_t _track, uint8_t _step, bool _on);
+		bool setPatternLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
+		// Writes the edited pattern back to its slot ($67), then reads it again: the
+		// reply tells whether the firmware kept it. False when there is nothing to send.
+		bool sendPattern();
+		enum class PatternWrite : uint8_t
+		{
+			None,       // nothing written yet
+			Pending,    // written, waiting for the pattern to be read back
+			Written,    // read back as sent
+			Refused     // read back different from what was sent
+		};
+		PatternWrite getPatternWrite() const { return m_patternWrite.load(std::memory_order_acquire); }
 		void requestAutomationState();
 		std::vector<uint8_t> createAutomationSnapshot() const;
 		bool restoreAutomationSnapshot(const std::vector<uint8_t>& _snapshot);
 
 	private:
 		friend struct ControllerAutomationTestAccess;
+		bool editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit);
 		struct Address
 		{
 			uint8_t page = 0;
@@ -217,6 +236,12 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_machineRevision{0};
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
+		// The dump behind m_pattern, edits included; both under m_patternMutex.
+		md::automation::sysex::Message m_patternDump;
+		bool m_patternEdited = false;               // edits not sent yet
+		uint32_t m_patternWritesInFlight = 0;       // sent, not read back yet
+		std::optional<md::automation::sysex::PatternDump> m_patternSent;
+		std::atomic<PatternWrite> m_patternWrite{PatternWrite::None};
 		std::atomic<uint64_t> m_patternRevision{0};
 		std::atomic<bool> m_patternWanted{false};
 		std::atomic<uint8_t> m_patternRequestedSlot{0xff};

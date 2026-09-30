@@ -2,11 +2,14 @@
 
 #include "mdController.h"
 
+#include "juceRmlUi/rmlElemValue.h"
 #include "juceRmlUi/rmlEventListener.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace mdJucePlugin
@@ -14,6 +17,8 @@ namespace mdJucePlugin
 	namespace
 	{
 		constexpr double g_retryMilliseconds = 3000.0;
+		// A wheel turn has no end: its lock is sent once it pauses this long.
+		constexpr double g_sendDelayMilliseconds = 300.0;
 
 		// Pattern slot 0..127 as the Machinedrum shows it: banks A to H of 16.
 		std::string patternName(const uint8_t _slot)
@@ -27,6 +32,16 @@ namespace mdJucePlugin
 			const auto* value = _element.GetAttribute(_name);
 			return value ? value->Get<Rml::String>(_element.GetCoreInstance()) : std::string();
 		}
+
+		void setDisplayed(Rml::Element* _element, const bool _displayed)
+		{
+			if(!_element)
+				return;
+			if(_displayed)
+				_element->RemoveProperty(Rml::PropertyId::Display);
+			else
+				_element->SetProperty(Rml::PropertyId::Display, Rml::Style::Display::None);
+		}
 	}
 
 	StepGrid::StepGrid(Controller& _controller, Rml::Element& _document)
@@ -35,13 +50,17 @@ namespace mdJucePlugin
 		for(uint8_t step = 0; step < m_steps.size(); ++step)
 		{
 			m_steps[step] = _document.GetElementById("mdEdStep" + std::to_string(step));
-			if(m_steps[step])
+			if(!m_steps[step])
+				continue;
+			juceRmlUi::EventListener::Add(m_steps[step], Rml::EventId::Click, [this, step](Rml::Event&)
 			{
-				juceRmlUi::EventListener::Add(m_steps[step], Rml::EventId::Click, [this, step](Rml::Event&)
-				{
-					toggleFocus(step);
-				});
-			}
+				toggleFocus(step);
+			});
+			// The two clicks before it have toggled the focus off and on again.
+			juceRmlUi::EventListener::Add(m_steps[step], Rml::EventId::Dblclick, [this, step](Rml::Event&)
+			{
+				toggleTrig(step);
+			});
 		}
 		m_info = _document.GetElementById("mdEdStepsInfo");
 		if(auto* button = _document.GetElementById("mdEdStepsRefresh"))
@@ -59,7 +78,9 @@ namespace mdJucePlugin
 		{
 			if(description.page > md::automation::machinedrum::Routing || description.index >= 8)
 				continue;
-			auto& control = m_controls[description.page * 8 + description.index];
+			const auto parameter = static_cast<uint8_t>(description.page * 8 + description.index);
+			auto& control = m_controls[parameter];
+			control.name = description.name;
 			control.control = _document.GetElementById("mdEdCtl_" + description.name);
 			control.value = _document.GetElementById("mdEdVal_" + description.name);
 			if(!control.value || !document)
@@ -75,11 +96,57 @@ namespace mdJucePlugin
 			lock->SetAttribute("style", attribute(*control.value, "style"));
 			lock->SetId("mdEdLock_" + description.name);
 			control.lock = control.value->GetParentNode()->AppendChild(std::move(lock));
+			juceRmlUi::EventListener::Add(control.lock, Rml::EventId::Dblclick, [this, parameter](Rml::Event&)
+			{
+				if(isLocking())
+				{
+					editLock(parameter, std::nullopt);
+					send();
+				}
+			});
+
+			if(!control.control)
+				continue;
+			// A knob without sprite over the control: while a step with a trig has the
+			// focus it takes the pointer, so the bound control and the Kit stay as they are.
+			const bool fader = control.control->GetTagName() == "input";
+			auto knob = document->CreateElement("knob");
+			knob->SetClass("jucePos", true);
+			knob->SetClass(fader ? "mdEdLockFader" : "mdEdLockKnob", true);
+			knob->SetAttribute("style", attribute(*control.control, "style"));
+			knob->SetAttribute("min", 0);
+			knob->SetAttribute("max", 127);
+			knob->SetAttribute("value", 0);
+			// Out of range: the knob's own double click (back to default) does nothing.
+			knob->SetAttribute("default", -1);
+			knob->SetId("mdEdLockKnob_" + description.name);
+			knob->SetProperty(Rml::PropertyId::Display, Rml::Style::Display::None);
+			control.lockKnob = control.control->GetParentNode()->AppendChild(std::move(knob));
+			juceRmlUi::EventListener::Add(control.lockKnob, Rml::EventId::Change, [this, parameter](Rml::Event& _event)
+			{
+				const auto value = std::lround(_event.GetParameter<float>("value", 0.0f));
+				editLock(parameter, static_cast<uint8_t>(std::clamp<long>(value, 0, 127)));
+			});
+			juceRmlUi::EventListener::Add(control.lockKnob, Rml::EventId::Dragstart, [this](Rml::Event&)
+			{
+				m_dragging = true;
+			});
+			juceRmlUi::EventListener::Add(control.lockKnob, Rml::EventId::Dragend, [this](Rml::Event&)
+			{
+				m_dragging = false;
+				send();
+			});
+			juceRmlUi::EventListener::Add(control.lockKnob, Rml::EventId::Dblclick, [this, parameter](Rml::Event&)
+			{
+				editLock(parameter, std::nullopt);
+				send();
+			});
 		}
 	}
 
 	bool StepGrid::update(const double _nowMilliseconds)
 	{
+		m_now = _nowMilliseconds;
 		if(m_controller.getPatternRevision() == 0 && _nowMilliseconds - m_lastRequest >= g_retryMilliseconds)
 		{
 			m_lastRequest = _nowMilliseconds;
@@ -87,14 +154,22 @@ namespace mdJucePlugin
 			m_dirty |= reading != m_reading;
 			m_reading = reading;
 		}
+		if(m_sendPending && !m_dragging && _nowMilliseconds - m_lastEdit >= g_sendDelayMilliseconds)
+			send();
+
 		const auto part = m_controller.getCurrentPart();
 		const auto revision = m_controller.getPatternRevision();
-		if(part != m_shownPart || revision != m_shownRevision)
+		const auto write = static_cast<uint8_t>(m_controller.getPatternWrite());
+		if(part != m_shownPart || revision != m_shownRevision || write != m_shownWrite)
 		{
 			if(revision != m_shownRevision)
 				m_reading = false;
+			// Pending edits belong to the track they were made on.
+			if(part != m_shownPart && m_shownPart != 0xff)
+				send();
 			m_shownPart = part;
 			m_shownRevision = revision;
+			m_shownWrite = write;
 			m_dirty = true;
 		}
 		if(!m_dirty)
@@ -112,9 +187,60 @@ namespace mdJucePlugin
 
 	void StepGrid::toggleFocus(const uint8_t _step)
 	{
+		send();
 		m_focus = m_focus == _step ? -1 : _step;
 		m_dirty = true;
 		render();
+	}
+
+	void StepGrid::toggleTrig(const uint8_t _step)
+	{
+		send();
+		const auto pattern = m_controller.getPattern();
+		const auto part = static_cast<uint8_t>(m_controller.getCurrentPart());
+		if(pattern && m_controller.setPatternTrig(part, _step, !pattern->hasTrig(part, _step)))
+			m_controller.sendPattern();
+		m_focus = _step;
+		m_dirty = true;
+		render();
+	}
+
+	bool StepGrid::isLocking() const
+	{
+		if(m_focus < 0)
+			return false;
+		const auto pattern = m_controller.getPattern();
+		return pattern && pattern->hasTrig(static_cast<uint8_t>(m_controller.getCurrentPart()), static_cast<uint8_t>(m_focus));
+	}
+
+	void StepGrid::editLock(const uint8_t _parameter, const std::optional<uint8_t> _value)
+	{
+		if(!isLocking())
+			return;
+		const auto part = static_cast<uint8_t>(m_controller.getCurrentPart());
+		const auto step = static_cast<uint8_t>(m_focus);
+		const auto pattern = m_controller.getPattern();
+		if(pattern && pattern->lock(part, _parameter, step) == _value)
+			return;
+		if(!m_controller.setPatternLock(part, _parameter, step, _value))
+			return;
+		m_sendPending = true;
+		m_lastEdit = m_now;
+		render();
+	}
+
+	void StepGrid::send()
+	{
+		if(!m_sendPending)
+			return;
+		m_sendPending = false;
+		m_controller.sendPattern();
+	}
+
+	uint8_t StepGrid::kitValue(const uint8_t _parameter) const
+	{
+		const auto* parameter = m_controller.getParameter(m_controls[_parameter].name, m_controller.getCurrentPart());
+		return parameter ? static_cast<uint8_t>(std::clamp(static_cast<int>(parameter->getUnnormalizedValue()), 0, 127)) : 0;
 	}
 
 	void StepGrid::render()
@@ -123,6 +249,7 @@ namespace mdJucePlugin
 		const auto pattern = m_controller.getPattern();
 		const auto part = static_cast<uint8_t>(m_controller.getCurrentPart());
 		const auto length = pattern ? pattern->length : uint8_t{0};
+		const bool locking = isLocking();
 
 		size_t trigs = 0;
 		for(uint8_t step = 0; step < m_steps.size(); ++step)
@@ -158,6 +285,13 @@ namespace mdJucePlugin
 				control.control->SetClass("mdEdDim", dim);
 				control.control->SetClass("mdEdLocked", lock.has_value());
 			}
+			if(control.lockKnob)
+			{
+				setDisplayed(control.lockKnob, locking);
+				// Starts from the lock, or from the Kit value for a parameter without one.
+				if(locking && !m_dragging)
+					juceRmlUi::ElemValue::setValue(control.lockKnob, static_cast<float>(lock ? *lock : kitValue(parameter)), false);
+			}
 		}
 
 		if(!m_info)
@@ -167,13 +301,23 @@ namespace mdJucePlugin
 			m_info->SetInnerRML(m_reading ? "lecture du pattern…" : "pattern : en attente du firmware");
 			return;
 		}
-		auto text = "pattern " + patternName(pattern->slot) + " · " + std::to_string(length) + " pas · piste "
-			+ std::to_string(part + 1) + " : " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs");
-		if(length > 32)
-			text += " · 32 premiers pas affichés";
+		// The track is the tab above; the line keeps to what the grid cannot show.
+		auto text = "pattern " + patternName(pattern->slot) + " · " + std::to_string(length) + " pas"
+			+ (length > 32 ? " (32 affichés)" : "") + " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs");
 		if(m_focus >= 0)
-			text += " · pas " + std::to_string(m_focus + 1) + " : " + std::to_string(locks)
-				+ (locks == 1 ? " valeur verrouillée" : " valeurs verrouillées");
+		{
+			text += " · pas " + std::to_string(m_focus + 1);
+			if(locking)
+				text += " : " + std::to_string(locks) + (locks == 1 ? " lock" : " locks");
+			else
+				text += " sans trig : double-clic";
+		}
+		switch(m_controller.getPatternWrite())
+		{
+		case Controller::PatternWrite::Pending: text += " · envoi…"; break;
+		case Controller::PatternWrite::Refused: text += " · refusé par le firmware"; break;
+		default: break;
+		}
 		if(m_reading)
 			text += " · relecture…";
 		m_info->SetInnerRML(text);
