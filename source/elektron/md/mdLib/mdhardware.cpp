@@ -1,4 +1,5 @@
 #include "mdhardware.h"
+#include "mdenv.h"
 #include "mdhostclock.h"
 #include "mdrampacking.h"
 #include "mdtransportpolicy.h"
@@ -7,7 +8,6 @@
 #include "synthLib/realtimeInstrumentation.h"
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -48,54 +48,6 @@ namespace md
 	// could still be missing and the block came out one frame short (GND SIN
 	// clicks). A frame reaches the ring up to 0.7 frame after its date.
 	constexpr uint64_t g_pairCodecCutFrames = 2;
-
-	namespace
-	{
-		// Environment overrides are for experiments. Unset, empty and
-		// unparsable all count as unset: std::atof and std::strtoul read the
-		// last two as 0, which most overrides take as a real setting, and
-		// PowerShell's [Environment]::SetEnvironmentVariable($name, $null)
-		// leaves an empty variable that child processes see. Both pair leads
-		// read that way stopped the Monomachine at the pair handoff.
-		const char* envOverride(const char* _name)
-		{
-			const char* const value = std::getenv(_name);
-			return value && *value ? value : nullptr;
-		}
-
-		std::optional<double> envNumber(const char* _name)
-		{
-			const char* const value = envOverride(_name);
-			if(!value)
-				return std::nullopt;
-			char* end = nullptr;
-			const double number = std::strtod(value, &end);
-			const bool parsed = end != value;
-			while(std::isspace(static_cast<unsigned char>(*end)))
-				++end;
-			if(!parsed || *end || !std::isfinite(number))
-			{
-				std::fprintf(stderr, "[MD] %s=\"%s\" ignored: not a number\n", _name, value);
-				return std::nullopt;
-			}
-			return number;
-		}
-
-		// A count also fits T and is not negative (std::strtoul wraps "-1").
-		template<typename T>
-		std::optional<T> envCount(const char* _name)
-		{
-			const auto number = envNumber(_name);
-			if(!number)
-				return std::nullopt;
-			if(*number < 0.0 || *number >= std::ldexp(1.0, std::numeric_limits<T>::digits))
-			{
-				std::fprintf(stderr, "[MD] %s=%g ignored: not a count\n", _name, *number);
-				return std::nullopt;
-			}
-			return static_cast<T>(*number);
-		}
-	}
 
 	Rom initRom(const std::vector<uint8_t>& _romData, const std::string& _romName,
 		const MachineModel _model)
@@ -2457,9 +2409,7 @@ namespace md
 
 			PairProbeSession(dsp56k::DSP& _mixer, dsp56k::DSP& _producer) : dsps{&_mixer, &_producer}
 			{
-				// Empty counts as unset (mdenv.h): level 1.
-				const char* const level = std::getenv("DSP56K_PROBE_LEVEL");
-				ctx.level = static_cast<uint8_t>(level && *level ? std::atoi(level) : 1);
+				ctx.level = envCount<uint8_t>("DSP56K_PROBE_LEVEL").value_or(1);
 				dsp56k::probe::t_ctx = &ctx;
 				dsp56k::probe::calibrate(ctx);
 				start[0] = _mixer.probeCounters();
