@@ -9,6 +9,8 @@
 #include "mdUnreadValues.h"
 #include "mdMasterEffectsView.h"
 #include "mdTrackRoutingView.h"
+#include "mdOutputMetersView.h"
+#include "mdSystemPage.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -757,6 +759,21 @@ namespace mdJucePlugin
 		{
 			m_trackRoutingView = std::make_unique<TrackRoutingView>(m_controller, *document);
 			m_trackRoutingView->update();
+		}
+
+		// MIX: the meters of the plug-in's three output buses.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMeterFill0_0"))
+			m_outputMetersView = std::make_unique<OutputMetersView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()),
+				m_controller, *document);
+
+		// SYSTÈME, and OPTIONS in the top bar: the plug-in's menu, as a right click opens it.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdSysGlobalState"))
+			m_systemPage = std::make_unique<SystemPage>(*this, static_cast<AudioPluginAudioProcessor&>(getProcessor()),
+				m_controller, *document);
+		if(auto* const document = getDocument())
+		{
+			if(auto* options = document->GetElementById("mdEdOptions"))
+				juceRmlUi::EventListener::Add(options, Rml::EventId::Click, [this](Rml::Event& _event) { openMenu(_event); });
 		}
 
 		// The COURBES row under SON, when the window leaves room for it.
@@ -2162,7 +2179,10 @@ namespace mdJucePlugin
 		const bool unreadChanged = m_unreadValues && m_unreadValues->update();
 		const bool effectsChanged = m_masterEffectsView && m_masterEffectsView->update();
 		const bool routingChanged = m_trackRoutingView && m_trackRoutingView->update();
-		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged)
+		const bool metersChanged = m_outputMetersView && m_outputMetersView->update(nowMilliseconds);
+		const bool systemChanged = m_systemPage && m_systemPage->update(nowMilliseconds);
+		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
+			|| metersChanged || systemChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

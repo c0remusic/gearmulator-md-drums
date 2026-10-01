@@ -203,6 +203,8 @@ namespace pluginLib
 	protected:
 		void destroyController();
 		void handleAsyncUpdate() override;
+		// Protected so a product can wrap it (the MD/MM editor meters its outputs after it)
+		void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
 
 	private:
 		void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
@@ -218,7 +220,6 @@ namespace pluginLib
 		bool acceptsMidi() const override;
 		bool producesMidi() const override;
 		bool isMidiEffect() const override;
-		void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
 		void processBlockBypassed(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
 		void numChannelsChanged() override;
 

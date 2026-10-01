@@ -145,10 +145,11 @@
 	border: 1dp #3a3d42;
 }
 
-/* a segment that is a choice (track output in MIX, mdTrackRoutingView.cpp); the chosen one in orange */
+/* a segment that is a choice (track output in MIX, mdTrackRoutingView.cpp), or a state (a bus on in the DAW);
+   the chosen or active one in orange */
 .mdEdSegChoice { cursor: pointer; }
 .mdEdSegChoice:hover { color: #f4f1ea; }
-.mdEdSegChoice.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdEdSeg.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
 
 /* steps: 24 dp high, their width set by the RML */
 .mdEdStep
@@ -206,9 +207,16 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 .mdEdUnread { opacity: 0.4; }
 .mdEdValue.mdEdUnread, .mdEdNum.mdEdUnread { opacity: 1; color: transparent; decorator: text("—" #8a8d93 center center); }
 
-/* output panels and meters */
+/* output panels and meters (mdOutputMetersView.cpp): the fill and the peak line move by transform only,
+   so a meter moving 60 times a second does not lay the page out again */
 .mdEdPanel { background-color: #1c1d1f; border: 1dp #2e3034; border-radius: 3dp; }
-.mdEdMeter { width: 8dp; height: 64dp; background-color: #3a3d42; }
+.mdEdMeter { width: 8dp; height: 64dp; background-color: #2a2c30; }
+.mdEdMeterFill, .mdEdMeterPeak { position: absolute; left: 0dp; top: 0dp; width: 8dp; height: 100%; }
+.mdEdMeterFill { background-color: #c9c5bc; transform-origin: center bottom; }
+.mdEdMeterFill.mdEdMeterHot { background-color: #ff6b1f; }
+.mdEdMeterPeak { box-sizing: border-box; border-top: 2dp #f4f1ea; transform: translateY(100%); }
+.mdEdBusLevel { height: 16dp; line-height: 16dp; font-size: 12dp; font-weight: bold; color: #f4f1ea; }
+.mdEdWarning { color: #ff6b1f; }
 
 /* blocks */
 

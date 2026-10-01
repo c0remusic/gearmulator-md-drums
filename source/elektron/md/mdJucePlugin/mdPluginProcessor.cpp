@@ -446,6 +446,21 @@ namespace mdJucePlugin
 			.withOutput("Out E/F", juce::AudioChannelSet::stereo(), false);
 	}
 
+	void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages)
+	{
+		jucePluginEditorLib::Processor::processBlock(_buffer, _midiMessages);
+		// The editor's meters: each enabled output bus as the host receives it
+		for(int bus = 0; bus < getBusCount(false) && bus < 3; ++bus)
+		{
+			const auto busBuffer = getBusBuffer(_buffer, false, bus);
+			for(int channel = 0; channel < busBuffer.getNumChannels() && channel < 2; ++channel)
+			{
+				m_outputMeters.measure(static_cast<size_t>(bus * 2 + channel), busBuffer.getReadPointer(channel),
+					busBuffer.getNumSamples());
+			}
+		}
+	}
+
 	AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 	{
 		stopTimer();

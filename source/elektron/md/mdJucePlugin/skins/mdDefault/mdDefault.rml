@@ -22,7 +22,7 @@
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 736dp;">MIX</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: 826dp;">BIBLIO</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: 916dp;">SYSTÈME</button>
-			<div class="jucePos mdEdSeg mdEdOff" style="left: 1006dp; top: 6dp; width: 78dp;">OPTIONS</div>
+			<button id="mdEdOptions" class="jucePos juceButton mdEdSwitch" isToggle="0" style="left: 1006dp;">OPTIONS</button>
 		</div>
 		<!-- The front panel, unchanged, 1100 × 570 dp. ViewLayout (mdViewLayout.cpp) shows it or the editor, or both when the window is tall enough. -->
 		<div id="mdFrontPanel" class="mdFrontPanel">
@@ -1042,25 +1042,49 @@
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">SORTIES</div>
 							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">bus du plug-in</div>
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 32dp; width: 316dp; height: 146dp;">
-								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 200dp;">MAIN A/B</div>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 12dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 32dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos juceLabel mdEdNote" style="left: 64dp; top: 34dp; width: 220dp;">Vu-mètres et pistes routées : à venir</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 64dp; top: 110dp; width: 140dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">MAIN A/B</div>
+								<div id="mdEdBusActive0" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill0_0" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak0_0" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill0_1" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak0_1" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div id="mdEdBusLevel0" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks0" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning0" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
 							</div>
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 186dp; width: 316dp; height: 146dp;">
-								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 200dp;">OUT C/D</div>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 12dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 32dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos juceLabel mdEdNote" style="left: 64dp; top: 34dp; width: 220dp;">Vu-mètres et pistes routées : à venir</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 64dp; top: 110dp; width: 140dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT C/D</div>
+								<div id="mdEdBusActive1" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill1_0" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak1_0" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill1_1" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak1_1" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div id="mdEdBusLevel1" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks1" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning1" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
 							</div>
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 340dp; width: 316dp; height: 146dp;">
-								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 200dp;">OUT E/F</div>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 12dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos mdEdMeter mdEdOff" style="left: 32dp; top: 32dp; height: 102dp;"/>
-								<div class="jucePos juceLabel mdEdNote" style="left: 64dp; top: 34dp; width: 220dp;">Vu-mètres et pistes routées : à venir</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 64dp; top: 110dp; width: 140dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT E/F</div>
+								<div id="mdEdBusActive2" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill2_0" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak2_0" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 104dp;">
+									<div id="mdEdMeterFill2_1" class="mdEdMeterFill mdEdHidden"/>
+									<div id="mdEdMeterPeak2_1" class="mdEdMeterPeak mdEdHidden"/>
+								</div>
+								<div id="mdEdBusLevel2" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks2" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning2" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
 							</div>
 						</div>
 					</div>
@@ -1078,11 +1102,52 @@
 					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Kits et banque de samples UW : à venir.</div>
 				</div></div>
 			</div>
+			<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->
 			<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">
-				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
-					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">SYSTÈME</div>
-					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Réglages de la machine et du plug-in : à venir.</div>
-				</div></div>
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 372dp;">
+						<div id="mdSysList" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 320dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">SYSTÈME</div>
+							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 1036dp;">machine entière et plug-in</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 32dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">RÉGLAGES GLOBAUX</div>
+								<div id="mdSysGlobalState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<div class="jucePos juceLabel mdEdNote mdEdRight" style="left: 884dp; top: 12dp; width: 152dp;">face avant</div>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 72dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">SYNCHRO DAW</div>
+								<div id="mdSysFollowState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysFollowTempo" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">SUIVRE L'HÔTE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 112dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">TRANSPORT PARALLÈLE</div>
+								<div id="mdSysParallelState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysParallel" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">PARALLÈLE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 152dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">ENREGISTREMENT RAM</div>
+								<div id="mdSysRamState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysRamComplete" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">QUEUES COMPLÈTES</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 192dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">TRANSFERT SYSEX</div>
+								<div id="mdSysSysexState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysSysex" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">FICHIER…</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 232dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">STOCKAGE MACHINE</div>
+								<div id="mdSysStorageState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">remplace toute la mémoire de la machine (kits, patterns, samples) ; confirmation demandée</div>
+								<button id="mdSysStorage" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">CHARGER…</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 272dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">PLUG-IN</div>
+								<div id="mdSysPluginState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">échelle, skin, rendu, ports MIDI, MIDI Learn, entrée audio ; menu aussi dans OPTIONS</div>
+								<button id="mdSysSettings" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">RÉGLAGES…</button>
+							</div>
+						</div>
+						<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 344dp; width: 1036dp;">Les réglages de la machine (canal MIDI, table de notes, sync, routage) se font sur sa face avant, menu GLOBAL ; le routage des pistes aussi dans MIX.</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</body>

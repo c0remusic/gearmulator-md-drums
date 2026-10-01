@@ -100,9 +100,10 @@ namespace mdJucePlugin
 		// Increments whenever a value becomes unknown or known again.
 		uint64_t getValueStateRevision() const { return m_valueStateRevision.load(std::memory_order_acquire); }
 
-		// The Kit and pattern the firmware has selected, 0xff until a status reply
-		// told them. Status is polled every 5 s, so a selection made on the front
-		// panel shows within that time.
+		// The Global, Kit and pattern the firmware has selected, 0xff until a status
+		// reply told them. Status is polled every 5 s, so a selection made on the
+		// front panel shows within that time.
+		uint8_t getCurrentGlobal() const { return m_currentGlobal.load(std::memory_order_acquire); }
 		uint8_t getCurrentKit() const { return m_currentKit.load(std::memory_order_acquire); }
 		uint8_t getCurrentPattern() const { return m_currentPattern.load(std::memory_order_acquire); }
 		// Name of the current Kit, empty until its dump arrived. A Kit dump request

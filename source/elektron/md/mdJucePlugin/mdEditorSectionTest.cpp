@@ -18,7 +18,9 @@
 #include "mdKitPatternScreen.h"
 #include "mdMachinePicker.h"
 #include "mdMasterEffectsView.h"
+#include "mdOutputMetersView.h"
 #include "mdStepGrid.h"
+#include "mdSystemPage.h"
 #include "mdTrackRoutingView.h"
 #include "mdUnreadValues.h"
 #include "mdLib/mdmachines.h"
@@ -62,9 +64,21 @@ namespace mdJucePlugin
 			return _editor.m_unreadValues && _editor.m_unreadValues->update();
 		}
 
+		static bool updateMeters(Editor& _editor, const double _now)
+		{
+			return _editor.m_outputMetersView && _editor.m_outputMetersView->update(_now);
+		}
+
+		static bool updateSystem(Editor& _editor, const double _now)
+		{
+			return _editor.m_systemPage && _editor.m_systemPage->update(_now);
+		}
+
 		// Every editor component the presentation timer refreshes, for the snapshots
 		static void present(Editor& _editor)
 		{
+			updateMeters(_editor, juce::Time::getMillisecondCounterHiRes());
+			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_machinePicker)
 				_editor.m_machinePicker->update();
 			if(_editor.m_stepGrid)
@@ -748,6 +762,118 @@ int main()
 #endif
 		}
 
+		const auto text = [&](const std::string& _id) { return std::string(element(doc, _id).GetInnerRML()); };
+
+		// MIX, SORTIES: the meters follow the levels the processor measured after each block,
+		// the louder channel's peak shows in dB, a bus near 0 dBFS turns orange, levels fall
+		// once the sound stops; each bus names its tracks (MD) and says whether the DAW has it on.
+		{
+			using View = mdJucePlugin::OutputMetersView;
+			require(View::meterPosition(1.0f) == 1.0f && View::meterPosition(2.0f) == 1.0f && View::meterPosition(0.001f) == 0.0f
+				&& std::fabs(View::meterPosition(0.5f) - (60.0f - 6.0206f) / 60.0f) < 0.001f, "meter scale is not -60 to 0 dBFS");
+			auto& meters = processor.getOutputMeters();
+			tabButton(doc, "mdEdit", "1").Click();
+			context.Update();
+			double now = juce::Time::getMillisecondCounterHiRes();
+			mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
+			std::vector<float> half(128, 0.5f);
+			meters.measure(0, half.data(), static_cast<int>(half.size()));
+			meters.measure(1, half.data(), static_cast<int>(half.size()));
+			now += 250;
+			require(mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now), "meters not redrawn after a level");
+			context.Update();
+			require(text("mdEdBusLevel0") == "−6 dB" && text("mdEdBusLevel1") == "—", "bus peaks not shown in dB");
+			require(!element(doc, "mdEdMeterPeak0_0").IsClassSet("mdEdHidden") && element(doc, "mdEdMeterPeak1_0").IsClassSet("mdEdHidden")
+				&& !element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot"), "peak lines do not follow the levels");
+			std::vector<float> full(128, 1.0f);
+			meters.measure(0, full.data(), static_cast<int>(full.size()));
+			now += 250;
+			mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
+			require(element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot") && !element(doc, "mdEdMeterFill0_1").IsClassSet("mdEdMeterHot"),
+				"a channel at 0 dBFS did not turn orange");
+			require(text("mdEdBusActive0") == "ACTIF DANS LE DAW" && element(doc, "mdEdBusActive0").IsClassSet("mdEdSelected")
+				&& text("mdEdBusActive1") == "INACTIF DANS LE DAW" && !element(doc, "mdEdBusActive1").IsClassSet("mdEdSelected"),
+				"buses not shown on or off as the DAW has them");
+#if defined(MD_EDITOR_SECTION_TEST_MM)
+			require(text("mdEdBusTracks0") == "routage des pistes : inconnu sur le MM" && text("mdEdBusWarning1").empty(),
+				"MM buses claim a routing");
+#else
+			// The routing the SORTIE test left: track 5 on C, 9 on A, 13 on F, the others on MAIN
+			require(text("mdEdBusTracks0") == "MAIN : 13 pistes · A : 9" && text("mdEdBusTracks1") == "C : 5"
+				&& text("mdEdBusTracks2") == "F : 13", "buses do not name their tracks: \"" + text("mdEdBusTracks0") + "\"");
+			require(text("mdEdBusWarning1") == "pistes muettes : activer Out C/D dans le DAW" && text("mdEdBusWarning0").empty(),
+				"no warning for tracks routed to a bus the DAW has off");
+			using Output = md::automation::sysex::TrackOutput;
+			View::TrackOutputs outputs{};
+			outputs.fill(Output::Main);
+			require(View::routedTracks(outputs, 0) == "MAIN : les 16 pistes" && View::routedTracks(outputs, 1) == "aucune piste",
+				"all tracks on MAIN not named so");
+			outputs[1] = outputs[2] = outputs[3] = outputs[6] = Output::C;
+			outputs[7] = Output::D;
+			outputs[10] = std::nullopt;
+			require(View::routedTracks(outputs, 1) == "routage : en attente du Global", "unknown routing not said");
+			outputs[10] = Output::C;
+			require(View::routedTracks(outputs, 1) == "C : 2–4, 7, 11 · D : 8", "track runs not written as ranges");
+#endif
+			snap("-mix");
+			// The sound stops: after a second of hold the levels fall 20 dB a second
+			for(int second = 1; second <= 4; ++second)
+			{
+				now += 1000;
+				mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
+			}
+			context.Update();
+			require(text("mdEdBusLevel0") == "—" && element(doc, "mdEdMeterPeak0_0").IsClassSet("mdEdHidden")
+				&& !element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot"), "meters did not fall after the sound stopped");
+		}
+
+		// SYSTÈME: one row per subject, with its state and action.
+		{
+			using Page = mdJucePlugin::SystemPage;
+			using Model = md::MachineModel;
+			require(Page::globalLine(Model::Machinedrum, 0xff, false, 0x7f) == "MIDI : en attente du Global"
+				&& Page::globalLine(Model::Monomachine, 2, true, 0x7f) == "Global 3 · MIDI : aucun canal (NONE), l'automation attend"
+				&& Page::globalLine(Model::Machinedrum, 0, true, 14) == "Global 1 · MIDI : canal de base 15",
+				"Global line wrong for an unknown Global, NONE or a base channel near 16");
+			tabButton(doc, "mdEdit", "4").Click();
+			context.Update();
+			double now = juce::Time::getMillisecondCounterHiRes() + 10000;
+			require(mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now), "SYSTÈME not filled when shown");
+			context.Update();
+			const std::string channels = g_model == Model::Monomachine ? "1 à 6" : "1 à 4";
+			require(text("mdSysGlobalState") == "Global 1 · MIDI : canal de base 1, pistes sur les canaux " + channels,
+				"SYSTÈME does not show the Global: \"" + text("mdSysGlobalState") + "\"");
+			require(text("mdSysSysexState") == "aucun transfert ; envoie un fichier .syx à la machine" && text("mdSysSysex") == "FICHIER…",
+				"SYSTÈME does not show the idle SysEx transfer");
+			const bool follow = processor.getFollowHostTempoSetting();
+			element(doc, "mdSysFollowTempo").Click();
+			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
+			context.Update();
+			require(processor.getFollowHostTempoSetting() != follow && element(doc, "mdSysFollowTempo").IsPseudoClassSet("checked") != follow,
+				"SUIVRE L'HÔTE did not toggle the setting");
+			element(doc, "mdSysFollowTempo").Click();
+			const bool parallel = processor.getParallelTransportSetting();
+			element(doc, "mdSysParallel").Click();
+			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
+			context.Update();
+			require(processor.getParallelTransportSetting() != parallel && element(doc, "mdSysParallel").IsPseudoClassSet("checked") != parallel,
+				"PARALLÈLE did not toggle the setting");
+			element(doc, "mdSysParallel").Click();
+			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
+			context.Update();
+			require(processor.getFollowHostTempoSetting() == follow && processor.getParallelTransportSetting() == parallel, "settings not toggled back");
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			require(doc.GetElementById("mdSysRamComplete") != nullptr && !text("mdSysRamState").empty(), "MD has no RAM recording row");
+#else
+			require(doc.GetElementById("mdSysRamComplete") == nullptr, "MM shows a RAM recording row");
+#endif
+			require(element(doc, "mdEdOptions").GetTagName() == "button" && !element(doc, "mdEdOptions").IsClassSet("mdEdOff"),
+				"OPTIONS still inactive");
+			snap("-system");
+			tabButton(doc, "mdEdit", "0").Click();
+			context.Update();
+		}
+
 		if(png)
 		{
 			// the editor is shown (see above); the front panel, then the stacked tall window
@@ -760,9 +886,6 @@ int main()
 			element(doc, "mdEdMachineChange").Click();
 			snap("-picker");
 			element(doc, "mdEdMachineChange").Click();
-			tabButton(doc, "mdEdit", "1").Click();
-			snap("-mix");
-			tabButton(doc, "mdEdit", "0").Click();
 #if !defined(MD_EDITOR_SECTION_TEST_MM)
 			element(doc, "editMaster").Click();
 			snap("-master");

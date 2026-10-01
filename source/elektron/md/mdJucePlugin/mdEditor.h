@@ -53,6 +53,8 @@ namespace mdJucePlugin
 	class UnreadValues;
 	class MasterEffectsView;
 	class TrackRoutingView;
+	class OutputMetersView;
+	class SystemPage;
 	class PixelPerfectPanel;
 	struct EditorIdentityTestAccess;
 
@@ -185,6 +187,8 @@ namespace mdJucePlugin
 		std::unique_ptr<UnreadValues> m_unreadValues;
 		std::unique_ptr<MasterEffectsView> m_masterEffectsView;
 		std::unique_ptr<TrackRoutingView> m_trackRoutingView;
+		std::unique_ptr<OutputMetersView> m_outputMetersView;
+		std::unique_ptr<SystemPage> m_systemPage;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;
 		md::FrontPanel m_frontPanelSnapshot;
 		bool m_frontPanelSnapshotValid = false;

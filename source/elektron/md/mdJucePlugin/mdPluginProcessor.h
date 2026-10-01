@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jucePluginEditorLib/pluginProcessor.h"
+#include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdtypes.h"
 #include "synthLib/performanceReport.h"
@@ -79,6 +80,11 @@ namespace mdJucePlugin
 		void applyFollowHostTempoSetting(bool _changedByUser);
 		md::HostSync::State getHostSyncState() const { return m_hostSyncControl->getState(); }
 
+		// Levels of the three output buses after each block, for the editor's meters
+		OutputMeters& getOutputMeters() { return m_outputMeters; }
+		using jucePluginEditorLib::Processor::processBlock;
+		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
+
 	    jucePluginEditorLib::PluginEditorState* createEditorState() override;
 	    synthLib::Device* createDevice() override;
 		void getRemoteDeviceParams(synthLib::DeviceCreateParams& _params) const override;
@@ -116,6 +122,7 @@ namespace mdJucePlugin
 			static_cast<uint8_t>(md::RamRecordingMode::Original)};
 		bool m_ramRecordingModeChunkSeen = false;
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
+		OutputMeters m_outputMeters;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 	};
 }

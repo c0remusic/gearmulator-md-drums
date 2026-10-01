@@ -50,7 +50,7 @@ build/source/elektron/md/mdLibTest/mdAutomationMidiTest
 build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-only
 ```
 
-- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-unread`, `-son`, `-steps`, `-picker`, `-mix`, `-master`, `-panel`, `-stacked`, `-curves`. Avant chaque capture, le test fait ce que les minuteurs font dans le plug-in (valeurs poussées vers l'interface, composants de l'éditeur rafraîchis) : sans cela, textes et knobs gardent leur valeur de départ.
+- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-unread`, `-mix`, `-system`, `-son`, `-steps`, `-picker`, `-master`, `-panel`, `-stacked`, `-curves`. Avant chaque capture, le test fait ce que les minuteurs font dans le plug-in (valeurs poussées vers l'interface, composants de l'éditeur rafraîchis) : sans cela, textes et knobs gardent leur valeur de départ.
 - Windows (VS 2022, `temp/cmake_vs22`) : régénérer les skins avec `PYTHONUTF8=1`, sinon Python lit les skins en cp1252. Les tests firmware du plug-in (`Harness`) cherchent la ROM dans le dossier de données du plug-in ou à côté de leur exécutable, pas dans `GEARMULATOR_*_FIRMWARE_BIN` : copier les `.bin` dans `…/mdJucePlugin/Release/`.
 - ASan comme la CI : configurer avec `-fsanitize=address,undefined` et lancer `ctest -R "mdAutomationMidiTest|mdAutomationArchitectureTest|mdAutomationParameterTest"`.
 - Avec une ROM, les tests firmware (`*FirmwareTest`, `mdAutomationRobustnessTest` sans option) tournent ; sans ROM ils sont ignorés.
@@ -108,16 +108,27 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
   - UI : colonne SORTIE de MIX (`mdTrackRoutingView.*`), segments cliquables `mdEdOut<piste>_<sortie>`, la sortie choisie en orange, la rangée grisée tant que le routage est inconnu.
 - **MM** : format inconnu. MCL ne connaît qu'un octet `globalRouting` dans le Global et déclare `MNM_SET_TRACK_ROUTING_ID = 0x5C` avec des drapeaux `AB=1, CD=2, EF=4`, sans jamais s'en servir. Il faut le manuel MM (annexe SysEx) ou un dump Global réel à comparer avant/après un changement de routage. En attendant, la colonne BUS reste inactive.
 
-### 4. Vu-mètres, pistes routées, « ACTIF DANS LE DAW »
+### 4. Vu-mètres, pistes routées, « ACTIF DANS LE DAW » (fait)
 
-- Niveaux crête/RMS des trois paires de sorties du plug-in, mesurés dans le processeur audio. Il faut les publier par des atomiques, sans verrou sur le fil audio (règle du dépôt), puis les lire dans le minuteur de présentation de l'éditeur (`Editor::timerCallback`, 16 ms).
-- Pistes routées vers chaque paire : dérivées du routage du point 3.
-- « ACTIF DANS LE DAW » : état des bus de sortie côté hôte (`AudioProcessor::getBus(false, i)->isEnabled()`). Voir `mdAudioIoLayoutTest.cpp` pour la disposition des bus.
+- Mesure : `OutputMeters` (`mdOutputMeters.h`), dans `AudioPluginAudioProcessor::processBlock` après le traitement, pour chaque bus de sortie activé par l'hôte : crête et RMS du bloc, publiés par atomiques (maximum depuis la dernière lecture, quelques essais au plus, sans verrou ni allocation sur le fil audio). `pluginLib::Processor::processBlock` est passé de privé à protégé pour pouvoir l'envelopper.
+- Affichage : `mdOutputMetersView.*`, lu dans le minuteur de présentation (16 ms). Barre = RMS, trait = crête tenue 1 s ; les deux tombent de 20 dB/s ; échelle −60 à 0 dBFS ; orange à partir de −1 dBFS ; crête du bus en dB (texte rafraîchi 5 fois par seconde au plus). Les barres bougent par `transform` seulement, sans relayout de la page ; une barre à zéro est cachée (RmlUi dessine une échelle nulle sans transformation). Rien n'est redessiné tant que MIX est caché.
+- Pistes routées (MD) : « MAIN : 13 pistes · A : 9 », « C : 5 », plages « 2–4 » ; « routage : en attente du Global » tant qu'il est inconnu. MM : « routage des pistes : inconnu sur le MM ».
+- « ACTIF DANS LE DAW » : `getBus(false, i)->isEnabled()`, en orange si actif. Des pistes routées vers un bus coupé dans le DAW donnent « pistes muettes : activer Out C/D dans le DAW » (planche 7).
+- Non fait : niveau de l'entrée audio A/B (planche 10).
 
-### 5. OPTIONS et SYSTÈME
+### 5. OPTIONS et SYSTÈME (fait)
 
-- OPTIONS (barre du haut, `div.mdEdSeg.mdEdOff`) : ouvrir le menu existant du plug-in (échelle 50–125 %, skin, réglages ; voir `jucePluginEditorLib/pluginEditorState.cpp`, menu d'échelle vers la ligne 340, et les réglages MD `mdSettingsPanelFeel`, `mdSettingsAudioInput`).
-- SYSTÈME : page qui montre et édite ce que le plug-in expose déjà : canal MIDI de base, horloge et transport entrants (`GlobalSync`, `withGlobalSync`), réglages du panneau et de l'entrée audio.
+- OPTIONS (barre du haut) : bouton qui ouvre le menu du plug-in (`Editor::openMenu`, comme un clic droit) : échelle, verrous de régions, enregistrement RAM, diagnostics, fichier SysEx, réglages.
+- SYSTÈME (`mdSystemPage.*`, planche 10) : une ligne par sujet, libellé 3 colonnes, état 7, action 2 :
+  - RÉGLAGES GLOBAUX : Global et canaux MIDI (`getCurrentGlobal`, canal de base ; MD 4 canaux, MM 6) ; réglage sur la face avant ;
+  - SYNCHRO DAW : « suivre le tempo de l'hôte » (`FollowHostTempoConfigKey`) et l'état de `HostSync` ;
+  - TRANSPORT PARALLÈLE (`ParallelTransportConfigKey`) et son état ;
+  - ENREGISTREMENT RAM (MD) : queues complètes ou finalisation d'origine, grisé si la machine ne le permet pas ;
+  - TRANSFERT SYSEX : fichier, reprise ou annulation selon l'état du transfert ;
+  - STOCKAGE MACHINE : chargement d'une image (avec la confirmation existante) ;
+  - PLUG-IN : fenêtre de réglages.
+- L'état est relu deux fois par seconde au plus, seulement pendant que la page est affichée (certains états prennent le verrou du device).
+- Les états sont en français ; la fenêtre de réglages existante reste en anglais.
 
 ### 6. JOUER et BIBLIO (long, à découper)
 

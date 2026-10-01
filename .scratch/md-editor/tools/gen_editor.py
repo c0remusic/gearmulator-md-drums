@@ -287,21 +287,66 @@ def mix_page(d, tracks):
            "MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir."
     w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lh - note_h}dp; width: {span(8) - 32}dp;">{note}</div>')
     block_close(d)
-    # SORTIES: the three stereo pairs the plug-in exposes to the DAW
+    # SORTIES: the three stereo pairs the plug-in exposes to the DAW. OutputMetersView (mdOutputMetersView.cpp)
+    # moves the meters, writes the peak in dB, the tracks each pair carries and whether the DAW has it on.
     sh = lh
     ph = (sh - TOP - 8 - 2 * 8) // 3
+    pw = span(4) - 32
     block_open(d, "mdEdOutputs", "SORTIES", "bus du plug-in", 8, 4, 12, sh)
     for i, bus in enumerate(["MAIN A/B", "OUT C/D", "OUT E/F"]):
         y = TOP + i * (ph + 8)
-        w(f'{ind(d + 1)}<div class="jucePos mdEdPanel" style="left: 16dp; top: {y}dp; width: {span(4) - 32}dp; height: {ph}dp;">')
-        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 200dp;">{bus}</div>')
+        w(f'{ind(d + 1)}<div class="jucePos mdEdPanel" style="left: 16dp; top: {y}dp; width: {pw}dp; height: {ph}dp;">')
+        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">{bus}</div>')
+        w(f'{ind(d + 2)}<div id="mdEdBusActive{i}" class="jucePos mdEdSeg" style="left: {pw - 12 - 150}dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>')
         for m in range(2):
-            w(f'{ind(d + 2)}<div class="jucePos mdEdMeter mdEdOff" style="left: {12 + m * 20}dp; top: 32dp; height: {ph - 44}dp;"/>')
-        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 64dp; top: 34dp; width: 220dp;">Vu-mètres et pistes routées : à venir</div>')
-        w(f'{ind(d + 2)}<div class="jucePos mdEdSeg mdEdOff" style="left: 64dp; top: {ph - 36}dp; width: 140dp;">ACTIF DANS LE DAW</div>')
+            w(f'{ind(d + 2)}<div class="jucePos mdEdMeter" style="left: {12 + m * 12}dp; top: 34dp; height: {ph - 42}dp;">')
+            w(f'{ind(d + 3)}<div id="mdEdMeterFill{i}_{m}" class="mdEdMeterFill mdEdHidden"/>')
+            w(f'{ind(d + 3)}<div id="mdEdMeterPeak{i}_{m}" class="mdEdMeterPeak mdEdHidden"/>')
+            w(f'{ind(d + 2)}</div>')
+        w(f'{ind(d + 2)}<div id="mdEdBusLevel{i}" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>')
+        w(f'{ind(d + 2)}<div id="mdEdBusTracks{i}" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: {pw - 56}dp;">—</div>')
+        w(f'{ind(d + 2)}<div id="mdEdBusWarning{i}" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: {pw - 56}dp;"></div>')
         w(f'{ind(d + 1)}</div>')
     block_close(d)
     return 12 + max(lh, sh) + 12
+
+# ---------- SYSTÈME (board 10) ----------
+
+def system_page(d):
+    # One row per subject: label 3 columns, state 7, action 2. SystemPage (mdSystemPage.cpp) fills the
+    # states and acts on the buttons.
+    rows = [("mdSysGlobal", "RÉGLAGES GLOBAUX", None, "face avant"),
+            ("mdSysFollow", "SYNCHRO DAW", "mdSysFollowTempo", "SUIVRE L'HÔTE"),
+            ("mdSysParallel", "TRANSPORT PARALLÈLE", "mdSysParallel", "PARALLÈLE")]
+    if MD:
+        rows.append(("mdSysRam", "ENREGISTREMENT RAM", "mdSysRamComplete", "QUEUES COMPLÈTES"))
+    rows += [("mdSysSysex", "TRANSFERT SYSEX", "mdSysSysex", "FICHIER…"),
+             ("mdSysStorage", "STOCKAGE MACHINE", "mdSysStorage", "CHARGER…"),
+             ("mdSysPlugin", "PLUG-IN", "mdSysSettings", "RÉGLAGES…")]
+    states = {"mdSysStorage": "remplace toute la mémoire de la machine (kits, patterns, samples) ; confirmation demandée",
+              "mdSysPlugin": "échelle, skin, rendu, ports MIDI, MIDI Learn, entrée audio ; menu aussi dans OPTIONS"}
+    rh = 40
+    h = TOP + len(rows) * rh + 8
+    w(f'{ind(d)}<div class="mdEdContent" style="height: {12 + h + 12 + 28}dp;">')
+    block_open(d + 1, "mdSysList", "SYSTÈME", "machine entière et plug-in", 0, 12, 12, h)
+    for r, (sid, label, button, action) in enumerate(rows):
+        y = TOP + r * rh
+        w(f'{ind(d + 2)}<div class="jucePos mdEdRow" style="left: 16dp; top: {y}dp; width: {span(12) - 32}dp; height: {rh}dp;">')
+        w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: {span(3)}dp;">{label}</div>')
+        state = states.get(sid, "—")
+        w(f'{ind(d + 3)}<div id="{sid}State" class="jucePos juceLabel mdEdNote" style="left: {bx(3) - 16}dp; top: 12dp; width: {span(7)}dp;">{state}</div>')
+        if button:
+            w(f'{ind(d + 3)}<button id="{button}" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {bx(10) - 16}dp; top: 8dp; width: {span(2) - 16}dp;">{action}</button>')
+        else:
+            w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdNote mdEdRight" style="left: {bx(10) - 16}dp; top: 12dp; width: {span(2) - 16}dp;">{action}</div>')
+        w(f'{ind(d + 2)}</div>')
+    block_close(d + 1)
+    note = ("Les réglages de la machine (canal MIDI, table de notes, sync, routage) se font sur sa face avant, menu GLOBAL ; "
+            "le routage des pistes aussi dans MIX." if MD else
+            "Les réglages de la machine (canaux MIDI, sync) se font sur sa face avant, menu GLOBAL.")
+    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: {12 + h + 12}dp; width: 1036dp;">{note}</div>')
+    w(f'{ind(d)}</div>')
+    return 12 + h + 12 + 28
 
 # ---------- page assembly ----------
 
@@ -344,7 +389,6 @@ lib_text = "Kits et banque de samples UW : à venir." if MD else "Kits et formes
 for idx, pid, title, text in [
     (2, "mdEdPagePlay", "JOUER", play_text),
     (3, "mdEdPageLibrary", "BIBLIO", lib_text),
-    (4, "mdEdPageSystem", "SYSTÈME", "Réglages de la machine et du plug-in : à venir."),
 ]:
     w(f'\t\t\t<div id="{pid}" class="mdEdPage" tabgroup="mdEdit" tabpage="{idx}">')
     w(f'\t\t\t\t<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">')
@@ -353,7 +397,14 @@ for idx, pid, title, text in [
     w('\t\t\t\t</div></div>')
     w('\t\t\t</div>')
 
-for name, h in [("SON", track_h), ("MASTER", master_h), ("MIX", mix_h)]:
+w('\t\t\t<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->')
+w('\t\t\t<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">')
+w('\t\t\t\t<div class="mdEdScroll">')
+system_h = system_page(5)
+w('\t\t\t\t</div>')
+w('\t\t\t</div>')
+
+for name, h in [("SON", track_h), ("MASTER", master_h), ("MIX", mix_h), ("SYSTÈME", system_h)]:
     if h and h > PAGE_H:
         sys.exit(f"{MODEL} {name} is {h} dp, more than the {PAGE_H} dp page")
 
@@ -369,7 +420,7 @@ topbar = f'''		<!-- ===== Top bar: name, the FACE AVANT / ÉDITEUR switch, kit/p
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: {colx(8)}dp;">MIX</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: {colx(9)}dp;">BIBLIO</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: {colx(10)}dp;">SYSTÈME</button>
-			<div class="jucePos mdEdSeg mdEdOff" style="left: {colx(11)}dp; top: 6dp; width: {COL}dp;">OPTIONS</div>
+			<button id="mdEdOptions" class="jucePos juceButton mdEdSwitch" isToggle="0" style="left: {colx(11)}dp;">OPTIONS</button>
 		</div>
 '''
 editor = '''		<!-- ===== Editor: shown instead of the front panel, or below it when the window is tall enough. ===== -->

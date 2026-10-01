@@ -21,6 +21,9 @@ set(SOURCES
 	mdUnreadValues.cpp mdUnreadValues.h
 	mdMasterEffectsView.cpp mdMasterEffectsView.h
 	mdTrackRoutingView.cpp mdTrackRoutingView.h
+	mdOutputMeters.h
+	mdOutputMetersView.cpp mdOutputMetersView.h
+	mdSystemPage.cpp mdSystemPage.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h
