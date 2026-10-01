@@ -24,6 +24,8 @@ set(SOURCES
 	mdOutputMeters.h
 	mdOutputMetersView.cpp mdOutputMetersView.h
 	mdSystemPage.cpp mdSystemPage.h
+	mdPatternView.cpp mdPatternView.h
+	mdLibraryView.cpp mdLibraryView.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h

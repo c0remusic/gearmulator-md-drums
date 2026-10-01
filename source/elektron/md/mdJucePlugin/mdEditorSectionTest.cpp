@@ -16,9 +16,11 @@
 #include "mdController.h"
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
+#include "mdLibraryView.h"
 #include "mdMachinePicker.h"
 #include "mdMasterEffectsView.h"
 #include "mdOutputMetersView.h"
+#include "mdPatternView.h"
 #include "mdStepGrid.h"
 #include "mdSystemPage.h"
 #include "mdTrackRoutingView.h"
@@ -49,6 +51,13 @@ namespace mdJucePlugin
 		{
 			_controller.m_syntheticFirmwareReadyForTests = true;
 		}
+
+		// The library Kit asked for is not answered within 2 s: the controller timer skips it
+		static void expireLibraryRequest(Controller& _controller)
+		{
+			_controller.m_libraryRequestMs = Controller::milliseconds() - 2001;
+			_controller.onControllerTimer();
+		}
 	};
 
 	// What the presentation timer does for the top bar's screen; no timer runs here.
@@ -74,11 +83,18 @@ namespace mdJucePlugin
 			return _editor.m_systemPage && _editor.m_systemPage->update(_now);
 		}
 
+		static const OutputMetersView& meters(const Editor& _editor) { return *_editor.m_outputMetersView; }
+		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
+
 		// Every editor component the presentation timer refreshes, for the snapshots
 		static void present(Editor& _editor)
 		{
 			updateMeters(_editor, juce::Time::getMillisecondCounterHiRes());
 			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
+			if(_editor.m_patternView)
+				_editor.m_patternView->update();
+			if(_editor.m_libraryView)
+				_editor.m_libraryView->update();
 			if(_editor.m_machinePicker)
 				_editor.m_machinePicker->update();
 			if(_editor.m_stepGrid)
@@ -774,6 +790,7 @@ int main()
 			auto& meters = processor.getOutputMeters();
 			tabButton(doc, "mdEdit", "1").Click();
 			context.Update();
+			require(visible(element(doc, "mdEdMeters0")), "meters area hidden on MIX");
 			double now = juce::Time::getMillisecondCounterHiRes();
 			mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
 			std::vector<float> half(128, 0.5f);
@@ -783,14 +800,14 @@ int main()
 			require(mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now), "meters not redrawn after a level");
 			context.Update();
 			require(text("mdEdBusLevel0") == "−6 dB" && text("mdEdBusLevel1") == "—", "bus peaks not shown in dB");
-			require(!element(doc, "mdEdMeterPeak0_0").IsClassSet("mdEdHidden") && element(doc, "mdEdMeterPeak1_0").IsClassSet("mdEdHidden")
-				&& !element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot"), "peak lines do not follow the levels");
+			const auto& view = mdJucePlugin::EditorIdentityTestAccess::meters(*editor);
+			require(std::fabs(view.holdPosition(0, 0) - View::meterPosition(0.5f)) < 0.01f && view.levelPosition(0, 1) > 0.85f
+				&& view.holdPosition(1, 0) == 0.0f && !view.isHot(0, 0), "meters do not follow the levels");
 			std::vector<float> full(128, 1.0f);
 			meters.measure(0, full.data(), static_cast<int>(full.size()));
 			now += 250;
 			mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
-			require(element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot") && !element(doc, "mdEdMeterFill0_1").IsClassSet("mdEdMeterHot"),
-				"a channel at 0 dBFS did not turn orange");
+			require(view.isHot(0, 0) && !view.isHot(0, 1) && view.levelPosition(0, 0) == 1.0f, "a channel at 0 dBFS did not turn orange");
 			require(text("mdEdBusActive0") == "ACTIF DANS LE DAW" && element(doc, "mdEdBusActive0").IsClassSet("mdEdSelected")
 				&& text("mdEdBusActive1") == "INACTIF DANS LE DAW" && !element(doc, "mdEdBusActive1").IsClassSet("mdEdSelected"),
 				"buses not shown on or off as the DAW has them");
@@ -823,8 +840,8 @@ int main()
 				mdJucePlugin::EditorIdentityTestAccess::updateMeters(*editor, now);
 			}
 			context.Update();
-			require(text("mdEdBusLevel0") == "—" && element(doc, "mdEdMeterPeak0_0").IsClassSet("mdEdHidden")
-				&& !element(doc, "mdEdMeterFill0_0").IsClassSet("mdEdMeterHot"), "meters did not fall after the sound stopped");
+			require(text("mdEdBusLevel0") == "—" && view.holdPosition(0, 0) == 0.0f && view.levelPosition(0, 0) == 0.0f
+				&& !view.isHot(0, 0), "meters did not fall after the sound stopped");
 		}
 
 		// SYSTÈME: one row per subject, with its state and action.
@@ -870,6 +887,106 @@ int main()
 			require(element(doc, "mdEdOptions").GetTagName() == "button" && !element(doc, "mdEdOptions").IsClassSet("mdEdOff"),
 				"OPTIONS still inactive");
 			snap("-system");
+			tabButton(doc, "mdEdit", "0").Click();
+			context.Update();
+		}
+
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+		// JOUER: the current pattern on every track, a step with locks framed, and the lane
+		// of the edited track: the Kit value in grey, a lock in orange, on the steps that play.
+		{
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			std::array<uint32_t, 16> trigs{};
+			trigs[0] = 0x11;            // track 1: steps 1 and 5, a lock of 77 on parameter 1 at step 1
+			trigs[2] = 0xf0f0f0f0u;
+			trigs[8] = 0xffffffffu;
+			require(md.requestPattern(), "pattern read refused");
+			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 20, 0xf7}, synthLib::MidiEventSource::Device);
+			// The PAS test left writes waiting for their read-back: each dump answers one
+			for(int reply = 0; reply < 8 && (!md.getPattern() || md.getPattern()->slot != 20); ++reply)
+				md.parseSysexMessage(mdAutomationTest::makeMdPatternDump(20, 32, trigs, 77), synthLib::MidiEventSource::Device);
+			require(md.getPattern() && md.getPattern()->slot == 20, "pattern B05 not read");
+			element(doc, "editTrack0").Click();
+			tabButton(doc, "mdEdit", "2").Click();
+			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			const auto cell = [&](const int _track, const int _step) -> Rml::Element&
+			{
+				return element(doc, "mdPlayStep" + std::to_string(_track) + "_" + std::to_string(_step));
+			};
+			require(text("mdPlayInfo").rfind("pattern B05 · 32 pas · 50 trigs", 0) == 0, "JOUER does not name the pattern: \"" + text("mdPlayInfo") + "\"");
+			require(cell(0, 0).IsClassSet("mdEdStepTrig") && cell(0, 0).IsClassSet("mdPlayLocked") && cell(0, 4).IsClassSet("mdEdStepTrig")
+				&& !cell(0, 4).IsClassSet("mdPlayLocked") && !cell(0, 1).IsClassSet("mdEdStepTrig") && cell(2, 4).IsClassSet("mdEdStepTrig")
+				&& !cell(2, 0).IsClassSet("mdEdStepTrig") && cell(8, 31).IsClassSet("mdEdStepTrig"), "JOUER grid does not show the pattern");
+			const auto& lane = mdJucePlugin::EditorIdentityTestAccess::pattern(*editor);
+			require(lane.barValue(0) == 77 && lane.barLocked(0) && lane.barValue(4) == 64 && !lane.barLocked(4) && lane.barValue(1) == -1,
+				"lane does not show the lock and the Kit value");
+			require(text("mdPlayLaneInfo") == "piste 01 · P1 : 1 lock · kit 64" && text("mdPlayParam0") == "P1 · 1",
+				"lane does not count the locks: \"" + text("mdPlayLaneInfo") + "\"");
+			element(doc, "mdPlayParam17").Click();
+			context.Update();
+			require(text("mdPlayLaneInfo") == "piste 01 · VOL : 0 locks · kit 64" && !lane.barLocked(0) && lane.barValue(0) == 64,
+				"choosing VOL did not change the lane");
+			// A track name makes it the edited track; its lane follows
+			element(doc, "mdPlayTrack2").Click();
+			context.Update();
+			require(controller.getCurrentPart() == 2 && element(doc, "mdPlayTrack2").IsClassSet("mdEdSelected")
+				&& lane.barValue(0) == -1 && lane.barValue(4) == 64, "a track name did not take the lane");
+			// A double click writes a trig, as in PAS
+			cell(1, 3).DispatchEvent(Rml::EventId::Dblclick, Rml::Dictionary());
+			context.Update();
+			require(md.getPattern()->hasTrig(1, 3) && md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
+				&& cell(1, 3).IsClassSet("mdEdStepTrig"), "a double click did not write the trig");
+			element(doc, "mdPlayParam0").Click();
+			element(doc, "mdPlayTrack0").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			snap("-play");
+			// OUVRIR DANS SON shows the edited track's sound
+			element(doc, "mdPlayOpen").Click();
+			context.Update();
+			require(visible(element(doc, "mdEdPageSound")) && controller.getCurrentPart() == 0, "OUVRIR DANS SON did not open SON");
+		}
+#endif
+
+		// BIBLIO: LIRE LES KITS reads every stored Kit, one request at a time; a Kit
+		// shows its machines without being loaded.
+		{
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			tabButton(doc, "mdEdit", "3").Click();
+			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			const auto kits = md.getKitLibrarySize();
+			require(kits == (g_model == md::MachineModel::Monomachine ? 128u : 64u), "library size is not the machine's Kit count");
+			require(text("mdLibKit0") == "01  —" && element(doc, "mdLibKit0").IsClassSet("mdEdUnread"), "library shows a Kit before reading");
+			element(doc, "mdLibRead").Click();
+			require(md.isReadingKitLibrary() && md.getKitLibraryProgress() == 0, "LIRE LES KITS did not start reading");
+			// Slot 3 is not answered: the timer skips it after 2 s
+			for(uint8_t slot = 0; slot < kits; ++slot)
+			{
+				if(slot == 3)
+				{
+					mdJucePlugin::ControllerAutomationTestAccess::expireLibraryRequest(md);
+					continue;
+				}
+				std::vector<uint16_t> machines(g_trackCount, slot % 2 ? g_pickMachine : g_otherFamilyMachine);
+				md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, slot, 64, machines, "KIT " + std::to_string(slot + 1)),
+					synthLib::MidiEventSource::Device);
+			}
+			require(!md.isReadingKitLibrary() && md.getKitLibraryProgress() == kits, "reading did not end after the last Kit");
+			require(md.getLibraryKit(11) && md.getLibraryKit(11)->read && md.getLibraryKit(11)->name == "KIT 12"
+				&& !md.getLibraryKit(3)->read, "library did not keep the Kits read and skip the one not answered");
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(text("mdLibKit11") == "12  KIT 12" && text("mdLibKit3") == "04  —" && !element(doc, "mdLibKit11").IsClassSet("mdEdUnread"),
+				"library cells do not show the Kits read");
+			require(element(doc, "mdLibKit" + std::to_string(md.getCurrentKit())).IsClassSet("mdLibCurrent"), "the loaded Kit is not marked");
+			element(doc, "mdLibKit11").Click();
+			context.Update();
+			require(text("mdLibDetail").rfind("KIT 12 · KIT 12", 0) == 0 && text("mdLibMachine0") == std::string("01  ") + g_pickName
+				&& element(doc, "mdLibKit11").IsClassSet("mdEdSelected"), "a Kit does not show its machines: \"" + text("mdLibDetail") + "\"");
+			snap("-library");
 			tabButton(doc, "mdEdit", "0").Click();
 			context.Update();
 		}

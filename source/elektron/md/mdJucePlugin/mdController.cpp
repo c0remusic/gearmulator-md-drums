@@ -391,6 +391,44 @@ namespace mdJucePlugin
 		return true;
 	}
 
+	bool Controller::readKitLibrary()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(!firmwareReadyForAutomation())
+			return false;
+		{
+			const std::lock_guard lock(m_libraryMutex);
+			m_library.assign(getKitLibrarySize(), LibraryKit{});
+		}
+		m_libraryProgress.store(0, std::memory_order_release);
+		m_libraryReading.store(true, std::memory_order_release);
+		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+		requestLibraryKit(0, milliseconds());
+		return true;
+	}
+
+	void Controller::requestLibraryKit(const size_t _slot, const uint64_t _now)
+	{
+		// One request at a time: each dump takes the MIDI line about 0.4 s
+		if(_slot >= getKitLibrarySize())
+		{
+			m_libraryReading.store(false, std::memory_order_release);
+			m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+			return;
+		}
+		m_libraryWaiting = _slot;
+		m_libraryRequestMs = _now;
+		sendEditorSysex(md::automation::sysex::kitRequest(m_model, static_cast<uint8_t>(_slot)));
+	}
+
+	std::optional<Controller::LibraryKit> Controller::getLibraryKit(const uint8_t _slot) const
+	{
+		const std::lock_guard lock(m_libraryMutex);
+		if(_slot >= m_library.size())
+			return std::nullopt;
+		return m_library[_slot];
+	}
+
 	std::optional<md::automation::sysex::TrackOutput> Controller::getTrackOutput(const uint8_t _track) const
 	{
 		if(_track >= m_trackOutputs.size())
@@ -615,6 +653,12 @@ namespace mdJucePlugin
 		drainRealtimeParameterChanges(RealtimeAutomationCapacity, false);
 		completeSynchronizationIfReady();
 		const auto now = milliseconds();
+		// A library Kit not answered: skip it (the firmware may drop a request while busy)
+		if(m_libraryReading.load(std::memory_order_acquire) && now - m_libraryRequestMs > g_dumpRequestRetryMs)
+		{
+			m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+			requestLibraryKit(m_libraryWaiting + 1, now);
+		}
 		if(m_automationReady.load(std::memory_order_acquire))
 		{
 			// Firmware Global is authoritative for the MIDI channel, and a front-panel
@@ -1182,6 +1226,18 @@ namespace mdJucePlugin
 		if(const auto kit = md::automation::sysex::parseKitDump(
 			m_model, _message))
 		{
+			// The library's Kit, read whatever the synchronization makes of the same dump
+			if(m_libraryReading.load(std::memory_order_acquire) && kit->slot == m_libraryWaiting)
+			{
+				{
+					const std::lock_guard lock(m_libraryMutex);
+					if(kit->slot < m_library.size())
+						m_library[kit->slot] = LibraryKit{true, kit->name, kit->machines};
+				}
+				m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+				m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+				requestLibraryKit(m_libraryWaiting + 1, milliseconds());
+			}
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
 			if(kit->slot == m_currentKit.load(std::memory_order_acquire))

@@ -134,6 +134,25 @@ namespace mdJucePlugin
 		// Increments whenever a track output changes or becomes known.
 		uint64_t getRoutingRevision() const { return m_routingRevision.load(std::memory_order_acquire); }
 
+		// BIBLIO: the stored Kits, name and machines, read one by one with Kit requests
+		// ($53) once readKitLibrary is called; a slot not answered within 2 s is
+		// skipped. Read only: nothing is loaded.
+		struct LibraryKit
+		{
+			bool read = false;
+			std::string name;
+			std::vector<uint16_t> machines;
+		};
+		// Starts, or starts again, reading every Kit. False while the firmware is not ready.
+		bool readKitLibrary();
+		bool isReadingKitLibrary() const { return m_libraryReading.load(std::memory_order_acquire); }
+		size_t getKitLibrarySize() const { return m_model == md::MachineModel::Monomachine ? 128 : 64; }
+		// Slots answered or skipped since the reading started
+		size_t getKitLibraryProgress() const { return m_libraryProgress.load(std::memory_order_acquire); }
+		std::optional<LibraryKit> getLibraryKit(uint8_t _slot) const;
+		// Increments whenever a library Kit is read or the reading starts or ends
+		uint64_t getKitLibraryRevision() const { return m_libraryRevision.load(std::memory_order_acquire); }
+
 		// Machinedrum only: asks the firmware for the current pattern number, then
 		// for that pattern's dump. False on the Monomachine or while the firmware is
 		// not ready. A pattern selected through SET STATUS is read again by itself.
@@ -248,6 +267,8 @@ namespace mdJucePlugin
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
 		// Same policy for the master effects
 		void storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, bool _authoritative);
+		// Asks for one library Kit, or ends the reading past the last slot
+		void requestLibraryKit(size_t _slot, uint64_t _now);
 		void sendEditorSysex(const md::automation::sysex::Message& _message) const;
 		void onControllerTimer() override;
 		void sendMissingSynchronizationRequests();
@@ -299,6 +320,13 @@ namespace mdJucePlugin
 		// a Global dump requested before a routing write does not show it yet.
 		uint64_t m_routingWrites = 0;
 		uint64_t m_routingWritesAtGlobalRequest = 0;
+		mutable std::mutex m_libraryMutex;
+		std::vector<LibraryKit> m_library;          // under m_libraryMutex
+		size_t m_libraryWaiting = 0;                // slot asked for, under m_synchronizationLock
+		uint64_t m_libraryRequestMs = 0;
+		std::atomic<bool> m_libraryReading{false};
+		std::atomic<size_t> m_libraryProgress{0};
+		std::atomic<uint64_t> m_libraryRevision{0};
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
 		// The dump behind m_pattern, edits included; both under m_patternMutex.

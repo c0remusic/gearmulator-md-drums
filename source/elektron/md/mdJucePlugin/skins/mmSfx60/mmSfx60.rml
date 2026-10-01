@@ -18,11 +18,11 @@
 			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 196dp;">FACE AVANT</button>
 			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 286dp;">ÉDITEUR</button>
 			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: 376dp; top: 4dp; width: 168dp;"><div id="mdEdScreenMain" class="mdEdScreenMain">KIT — · PATTERN —</div><div id="mdEdScreenName" class="mdEdScreenName"></div></div>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: 556dp;">JOUER</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: 646dp;">SON</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 736dp;">MIX</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: 826dp;">BIBLIO</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: 916dp;">SYSTÈME</button>
+			<button id="mdEdCat2" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: 556dp;">JOUER</button>
+			<button id="mdEdCat0" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: 646dp;">SON</button>
+			<button id="mdEdCat1" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 736dp;">MIX</button>
+			<button id="mdEdCat3" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: 826dp;">BIBLIO</button>
+			<button id="mdEdCat4" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: 916dp;">SYSTÈME</button>
 			<button id="mdEdOptions" class="jucePos juceButton mdEdSwitch" isToggle="0" style="left: 1006dp;">OPTIONS</button>
 		</div>
 		<!-- The front panel, unchanged, 1100 × 570 dp. ViewLayout (mdViewLayout.cpp) shows it or the editor, or both when the window is tall enough. -->
@@ -779,14 +779,7 @@
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 32dp; width: 316dp; height: 96dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">MAIN A/B</div>
 								<div id="mdEdBusActive0" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
-								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill0_0" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak0_0" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
-								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill0_1" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak0_1" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
+								<div id="mdEdMeters0" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
 								<div id="mdEdBusLevel0" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
 								<div id="mdEdBusTracks0" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
 								<div id="mdEdBusWarning0" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
@@ -794,14 +787,7 @@
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 136dp; width: 316dp; height: 96dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT C/D</div>
 								<div id="mdEdBusActive1" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
-								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill1_0" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak1_0" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
-								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill1_1" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak1_1" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
+								<div id="mdEdMeters1" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
 								<div id="mdEdBusLevel1" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
 								<div id="mdEdBusTracks1" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
 								<div id="mdEdBusWarning1" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
@@ -809,14 +795,7 @@
 							<div class="jucePos mdEdPanel" style="left: 16dp; top: 240dp; width: 316dp; height: 96dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT E/F</div>
 								<div id="mdEdBusActive2" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
-								<div class="jucePos mdEdMeter" style="left: 12dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill2_0" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak2_0" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
-								<div class="jucePos mdEdMeter" style="left: 24dp; top: 34dp; height: 54dp;">
-									<div id="mdEdMeterFill2_1" class="mdEdMeterFill mdEdHidden"/>
-									<div id="mdEdMeterPeak2_1" class="mdEdMeterPeak mdEdHidden"/>
-								</div>
+								<div id="mdEdMeters2" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
 								<div id="mdEdBusLevel2" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
 								<div id="mdEdBusTracks2" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
 								<div id="mdEdBusWarning2" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
@@ -825,17 +804,164 @@
 					</div>
 				</div>
 			</div>
+			<!-- JOUER: the current pattern and a lane (MD); the MM pattern format is not decoded yet. -->
 			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
-				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
-					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">JOUER</div>
-					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Pattern, piano roll et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation.</div>
-				</div></div>
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 120dp;">
+						<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">JOUER</div>
+						<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Pattern, piano roll et arrangement : à venir. Le format du pattern du MM n'est pas encore décodé (MCL : MNMPattern).</div>
+					</div>
+				</div>
 			</div>
+			<!-- BIBLIO: the stored Kits, read on request, and the machines of one. -->
 			<div id="mdEdPageLibrary" class="mdEdPage" tabgroup="mdEdit" tabpage="3">
-				<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">
-					<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">BIBLIO</div>
-					<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Kits et formes d'onde DigiPRO : à venir.</div>
-				</div></div>
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 538dp;">
+						<div id="mdLibKits" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 452dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">KITS</div>
+							<div id="mdLibInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: 822dp;">kits non lus</div>
+							<button id="mdLibRead" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 912dp; top: 4dp; width: 140dp;">LIRE LES KITS</button>
+							<div id="mdLibKit0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 60dp; width: 123dp;">01  —</div>
+							<div id="mdLibKit1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 84dp; width: 123dp;">02  —</div>
+							<div id="mdLibKit2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 108dp; width: 123dp;">03  —</div>
+							<div id="mdLibKit3" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 132dp; width: 123dp;">04  —</div>
+							<div id="mdLibKit4" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 156dp; width: 123dp;">05  —</div>
+							<div id="mdLibKit5" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 180dp; width: 123dp;">06  —</div>
+							<div id="mdLibKit6" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 204dp; width: 123dp;">07  —</div>
+							<div id="mdLibKit7" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 228dp; width: 123dp;">08  —</div>
+							<div id="mdLibKit8" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 252dp; width: 123dp;">09  —</div>
+							<div id="mdLibKit9" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 276dp; width: 123dp;">10  —</div>
+							<div id="mdLibKit10" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 300dp; width: 123dp;">11  —</div>
+							<div id="mdLibKit11" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 324dp; width: 123dp;">12  —</div>
+							<div id="mdLibKit12" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 348dp; width: 123dp;">13  —</div>
+							<div id="mdLibKit13" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 372dp; width: 123dp;">14  —</div>
+							<div id="mdLibKit14" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 396dp; width: 123dp;">15  —</div>
+							<div id="mdLibKit15" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 420dp; width: 123dp;">16  —</div>
+							<div id="mdLibKit16" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 60dp; width: 123dp;">17  —</div>
+							<div id="mdLibKit17" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 84dp; width: 123dp;">18  —</div>
+							<div id="mdLibKit18" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 108dp; width: 123dp;">19  —</div>
+							<div id="mdLibKit19" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 132dp; width: 123dp;">20  —</div>
+							<div id="mdLibKit20" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 156dp; width: 123dp;">21  —</div>
+							<div id="mdLibKit21" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 180dp; width: 123dp;">22  —</div>
+							<div id="mdLibKit22" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 204dp; width: 123dp;">23  —</div>
+							<div id="mdLibKit23" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 228dp; width: 123dp;">24  —</div>
+							<div id="mdLibKit24" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 252dp; width: 123dp;">25  —</div>
+							<div id="mdLibKit25" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 276dp; width: 123dp;">26  —</div>
+							<div id="mdLibKit26" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 300dp; width: 123dp;">27  —</div>
+							<div id="mdLibKit27" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 324dp; width: 123dp;">28  —</div>
+							<div id="mdLibKit28" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 348dp; width: 123dp;">29  —</div>
+							<div id="mdLibKit29" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 372dp; width: 123dp;">30  —</div>
+							<div id="mdLibKit30" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 396dp; width: 123dp;">31  —</div>
+							<div id="mdLibKit31" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 420dp; width: 123dp;">32  —</div>
+							<div id="mdLibKit32" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 60dp; width: 123dp;">33  —</div>
+							<div id="mdLibKit33" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 84dp; width: 123dp;">34  —</div>
+							<div id="mdLibKit34" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 108dp; width: 123dp;">35  —</div>
+							<div id="mdLibKit35" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 132dp; width: 123dp;">36  —</div>
+							<div id="mdLibKit36" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 156dp; width: 123dp;">37  —</div>
+							<div id="mdLibKit37" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 180dp; width: 123dp;">38  —</div>
+							<div id="mdLibKit38" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 204dp; width: 123dp;">39  —</div>
+							<div id="mdLibKit39" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 228dp; width: 123dp;">40  —</div>
+							<div id="mdLibKit40" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 252dp; width: 123dp;">41  —</div>
+							<div id="mdLibKit41" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 276dp; width: 123dp;">42  —</div>
+							<div id="mdLibKit42" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 300dp; width: 123dp;">43  —</div>
+							<div id="mdLibKit43" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 324dp; width: 123dp;">44  —</div>
+							<div id="mdLibKit44" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 348dp; width: 123dp;">45  —</div>
+							<div id="mdLibKit45" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 372dp; width: 123dp;">46  —</div>
+							<div id="mdLibKit46" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 396dp; width: 123dp;">47  —</div>
+							<div id="mdLibKit47" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 420dp; width: 123dp;">48  —</div>
+							<div id="mdLibKit48" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 60dp; width: 123dp;">49  —</div>
+							<div id="mdLibKit49" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 84dp; width: 123dp;">50  —</div>
+							<div id="mdLibKit50" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 108dp; width: 123dp;">51  —</div>
+							<div id="mdLibKit51" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 132dp; width: 123dp;">52  —</div>
+							<div id="mdLibKit52" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 156dp; width: 123dp;">53  —</div>
+							<div id="mdLibKit53" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 180dp; width: 123dp;">54  —</div>
+							<div id="mdLibKit54" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 204dp; width: 123dp;">55  —</div>
+							<div id="mdLibKit55" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 228dp; width: 123dp;">56  —</div>
+							<div id="mdLibKit56" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 252dp; width: 123dp;">57  —</div>
+							<div id="mdLibKit57" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 276dp; width: 123dp;">58  —</div>
+							<div id="mdLibKit58" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 300dp; width: 123dp;">59  —</div>
+							<div id="mdLibKit59" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 324dp; width: 123dp;">60  —</div>
+							<div id="mdLibKit60" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 348dp; width: 123dp;">61  —</div>
+							<div id="mdLibKit61" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 372dp; width: 123dp;">62  —</div>
+							<div id="mdLibKit62" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 396dp; width: 123dp;">63  —</div>
+							<div id="mdLibKit63" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 420dp; width: 123dp;">64  —</div>
+							<div id="mdLibKit64" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 60dp; width: 123dp;">65  —</div>
+							<div id="mdLibKit65" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 84dp; width: 123dp;">66  —</div>
+							<div id="mdLibKit66" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 108dp; width: 123dp;">67  —</div>
+							<div id="mdLibKit67" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 132dp; width: 123dp;">68  —</div>
+							<div id="mdLibKit68" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 156dp; width: 123dp;">69  —</div>
+							<div id="mdLibKit69" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 180dp; width: 123dp;">70  —</div>
+							<div id="mdLibKit70" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 204dp; width: 123dp;">71  —</div>
+							<div id="mdLibKit71" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 228dp; width: 123dp;">72  —</div>
+							<div id="mdLibKit72" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 252dp; width: 123dp;">73  —</div>
+							<div id="mdLibKit73" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 276dp; width: 123dp;">74  —</div>
+							<div id="mdLibKit74" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 300dp; width: 123dp;">75  —</div>
+							<div id="mdLibKit75" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 324dp; width: 123dp;">76  —</div>
+							<div id="mdLibKit76" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 348dp; width: 123dp;">77  —</div>
+							<div id="mdLibKit77" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 372dp; width: 123dp;">78  —</div>
+							<div id="mdLibKit78" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 396dp; width: 123dp;">79  —</div>
+							<div id="mdLibKit79" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 420dp; width: 123dp;">80  —</div>
+							<div id="mdLibKit80" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 60dp; width: 123dp;">81  —</div>
+							<div id="mdLibKit81" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 84dp; width: 123dp;">82  —</div>
+							<div id="mdLibKit82" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 108dp; width: 123dp;">83  —</div>
+							<div id="mdLibKit83" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 132dp; width: 123dp;">84  —</div>
+							<div id="mdLibKit84" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 156dp; width: 123dp;">85  —</div>
+							<div id="mdLibKit85" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 180dp; width: 123dp;">86  —</div>
+							<div id="mdLibKit86" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 204dp; width: 123dp;">87  —</div>
+							<div id="mdLibKit87" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 228dp; width: 123dp;">88  —</div>
+							<div id="mdLibKit88" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 252dp; width: 123dp;">89  —</div>
+							<div id="mdLibKit89" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 276dp; width: 123dp;">90  —</div>
+							<div id="mdLibKit90" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 300dp; width: 123dp;">91  —</div>
+							<div id="mdLibKit91" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 324dp; width: 123dp;">92  —</div>
+							<div id="mdLibKit92" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 348dp; width: 123dp;">93  —</div>
+							<div id="mdLibKit93" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 372dp; width: 123dp;">94  —</div>
+							<div id="mdLibKit94" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 396dp; width: 123dp;">95  —</div>
+							<div id="mdLibKit95" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 420dp; width: 123dp;">96  —</div>
+							<div id="mdLibKit96" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 60dp; width: 123dp;">97  —</div>
+							<div id="mdLibKit97" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 84dp; width: 123dp;">98  —</div>
+							<div id="mdLibKit98" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 108dp; width: 123dp;">99  —</div>
+							<div id="mdLibKit99" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 132dp; width: 123dp;">100  —</div>
+							<div id="mdLibKit100" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 156dp; width: 123dp;">101  —</div>
+							<div id="mdLibKit101" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 180dp; width: 123dp;">102  —</div>
+							<div id="mdLibKit102" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 204dp; width: 123dp;">103  —</div>
+							<div id="mdLibKit103" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 228dp; width: 123dp;">104  —</div>
+							<div id="mdLibKit104" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 252dp; width: 123dp;">105  —</div>
+							<div id="mdLibKit105" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 276dp; width: 123dp;">106  —</div>
+							<div id="mdLibKit106" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 300dp; width: 123dp;">107  —</div>
+							<div id="mdLibKit107" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 324dp; width: 123dp;">108  —</div>
+							<div id="mdLibKit108" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 348dp; width: 123dp;">109  —</div>
+							<div id="mdLibKit109" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 372dp; width: 123dp;">110  —</div>
+							<div id="mdLibKit110" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 396dp; width: 123dp;">111  —</div>
+							<div id="mdLibKit111" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 420dp; width: 123dp;">112  —</div>
+							<div id="mdLibKit112" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 60dp; width: 123dp;">113  —</div>
+							<div id="mdLibKit113" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 84dp; width: 123dp;">114  —</div>
+							<div id="mdLibKit114" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 108dp; width: 123dp;">115  —</div>
+							<div id="mdLibKit115" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 132dp; width: 123dp;">116  —</div>
+							<div id="mdLibKit116" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 156dp; width: 123dp;">117  —</div>
+							<div id="mdLibKit117" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 180dp; width: 123dp;">118  —</div>
+							<div id="mdLibKit118" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 204dp; width: 123dp;">119  —</div>
+							<div id="mdLibKit119" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 228dp; width: 123dp;">120  —</div>
+							<div id="mdLibKit120" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 252dp; width: 123dp;">121  —</div>
+							<div id="mdLibKit121" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 276dp; width: 123dp;">122  —</div>
+							<div id="mdLibKit122" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 300dp; width: 123dp;">123  —</div>
+							<div id="mdLibKit123" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 324dp; width: 123dp;">124  —</div>
+							<div id="mdLibKit124" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 348dp; width: 123dp;">125  —</div>
+							<div id="mdLibKit125" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 372dp; width: 123dp;">126  —</div>
+							<div id="mdLibKit126" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 396dp; width: 123dp;">127  —</div>
+							<div id="mdLibKit127" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 420dp; width: 123dp;">128  —</div>
+						</div>
+						<div id="mdLibMachines" class="jucePos mdEdBlock" style="left: 16dp; top: 476dp; width: 1068dp; height: 50dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">MACHINES</div>
+							<div id="mdLibDetail" class="jucePos juceLabel mdEdSub" style="left: 120dp; top: 4dp; width: 600dp;">KIT —</div>
+							<div id="mdLibMachine0" class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 28dp; width: 164dp;">01  —</div>
+							<div id="mdLibMachine1" class="jucePos juceLabel mdEdNote" style="left: 186dp; top: 28dp; width: 164dp;">02  —</div>
+							<div id="mdLibMachine2" class="jucePos juceLabel mdEdNote" style="left: 356dp; top: 28dp; width: 164dp;">03  —</div>
+							<div id="mdLibMachine3" class="jucePos juceLabel mdEdNote" style="left: 526dp; top: 28dp; width: 164dp;">04  —</div>
+							<div id="mdLibMachine4" class="jucePos juceLabel mdEdNote" style="left: 696dp; top: 28dp; width: 164dp;">05  —</div>
+							<div id="mdLibMachine5" class="jucePos juceLabel mdEdNote" style="left: 866dp; top: 28dp; width: 164dp;">06  —</div>
+						</div>
+					</div>
+				</div>
 			</div>
 			<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->
 			<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">

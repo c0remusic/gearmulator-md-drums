@@ -169,6 +169,21 @@
 .mdEdStepOut { opacity: 0.3; }
 .mdEdStepFocus { border: 2dp #ff6b1f; }
 
+/* JOUER (mdPatternView.cpp): a row per track; the edited track's name in orange, a step with locks
+   framed in blue (board 1); the lane is a canvas the view draws */
+.mdPlayTrack { height: 16dp; line-height: 16dp; font-size: 10dp; font-weight: bold; color: #8a8d93; cursor: pointer; }
+.mdPlayTrack:hover { color: #f4f1ea; }
+.mdPlayTrack.mdEdSelected { color: #ff6b1f; }
+.mdPlayStep { line-height: 16dp; }
+.mdPlayStep.mdPlayLocked { border: 2dp #4a90d9; }
+
+/* BIBLIO (mdLibraryView.cpp): a cell per stored Kit, the loaded one in amber, the chosen one framed */
+.mdLibKit { box-sizing: border-box; height: 22dp; line-height: 22dp; padding-left: 6dp; font-size: 11dp; color: #f4f1ea;
+	border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdLibKit:hover { background-color: #2a2c30; }
+.mdLibKit.mdEdSelected { background-color: #2e3034; border: 1dp #8a8d93; }
+.mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
+
 /* focused step: locked values in orange over the bound value, the other controls dimmed */
 .mdEdLockValue { color: #ff6b1f; font-weight: bold; }
 /* over a control while a step with a trig has the focus: dragging it writes a lock (mdStepGrid.cpp) */
@@ -207,14 +222,8 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 .mdEdUnread { opacity: 0.4; }
 .mdEdValue.mdEdUnread, .mdEdNum.mdEdUnread { opacity: 1; color: transparent; decorator: text("—" #8a8d93 center center); }
 
-/* output panels and meters (mdOutputMetersView.cpp): the fill and the peak line move by transform only,
-   so a meter moving 60 times a second does not lay the page out again */
+/* output panels (mdOutputMetersView.cpp); the meters are a canvas the view draws */
 .mdEdPanel { background-color: #1c1d1f; border: 1dp #2e3034; border-radius: 3dp; }
-.mdEdMeter { width: 8dp; height: 64dp; background-color: #2a2c30; }
-.mdEdMeterFill, .mdEdMeterPeak { position: absolute; left: 0dp; top: 0dp; width: 8dp; height: 100%; }
-.mdEdMeterFill { background-color: #c9c5bc; transform-origin: center bottom; }
-.mdEdMeterFill.mdEdMeterHot { background-color: #ff6b1f; }
-.mdEdMeterPeak { box-sizing: border-box; border-top: 2dp #f4f1ea; transform: translateY(100%); }
 .mdEdBusLevel { height: 16dp; line-height: 16dp; font-size: 12dp; font-weight: bold; color: #f4f1ea; }
 .mdEdWarning { color: #ff6b1f; }
 

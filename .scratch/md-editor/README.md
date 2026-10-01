@@ -50,7 +50,7 @@ build/source/elektron/md/mdLibTest/mdAutomationMidiTest
 build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-only
 ```
 
-- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-unread`, `-mix`, `-system`, `-son`, `-steps`, `-picker`, `-master`, `-panel`, `-stacked`, `-curves`. Avant chaque capture, le test fait ce que les minuteurs font dans le plug-in (valeurs poussées vers l'interface, composants de l'éditeur rafraîchis) : sans cela, textes et knobs gardent leur valeur de départ.
+- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-unread`, `-mix`, `-system`, `-play` (MD), `-library`, `-son`, `-steps`, `-picker`, `-master`, `-panel`, `-stacked`, `-curves`. Avant chaque capture, le test fait ce que les minuteurs font dans le plug-in (valeurs poussées vers l'interface, composants de l'éditeur rafraîchis) : sans cela, textes et knobs gardent leur valeur de départ.
 - Windows (VS 2022, `temp/cmake_vs22`) : régénérer les skins avec `PYTHONUTF8=1`, sinon Python lit les skins en cp1252. Les tests firmware du plug-in (`Harness`) cherchent la ROM dans le dossier de données du plug-in ou à côté de leur exécutable, pas dans `GEARMULATOR_*_FIRMWARE_BIN` : copier les `.bin` dans `…/mdJucePlugin/Release/`.
 - ASan comme la CI : configurer avec `-fsanitize=address,undefined` et lancer `ctest -R "mdAutomationMidiTest|mdAutomationArchitectureTest|mdAutomationParameterTest"`.
 - Avec une ROM, les tests firmware (`*FirmwareTest`, `mdAutomationRobustnessTest` sans option) tournent ; sans ROM ils sont ignorés.
@@ -111,7 +111,7 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
 ### 4. Vu-mètres, pistes routées, « ACTIF DANS LE DAW » (fait)
 
 - Mesure : `OutputMeters` (`mdOutputMeters.h`), dans `AudioPluginAudioProcessor::processBlock` après le traitement, pour chaque bus de sortie activé par l'hôte : crête et RMS du bloc, publiés par atomiques (maximum depuis la dernière lecture, quelques essais au plus, sans verrou ni allocation sur le fil audio). `pluginLib::Processor::processBlock` est passé de privé à protégé pour pouvoir l'envelopper.
-- Affichage : `mdOutputMetersView.*`, lu dans le minuteur de présentation (16 ms). Barre = RMS, trait = crête tenue 1 s ; les deux tombent de 20 dB/s ; échelle −60 à 0 dBFS ; orange à partir de −1 dBFS ; crête du bus en dB (texte rafraîchi 5 fois par seconde au plus). Les barres bougent par `transform` seulement, sans relayout de la page ; une barre à zéro est cachée (RmlUi dessine une échelle nulle sans transformation). Rien n'est redessiné tant que MIX est caché.
+- Affichage : `mdOutputMetersView.*`, lu dans le minuteur de présentation (16 ms). Barre = RMS, trait = crête tenue 1 s ; les deux tombent de 20 dB/s ; échelle −60 à 0 dBFS ; orange à partir de −1 dBFS ; crête du bus en dB (texte rafraîchi 5 fois par seconde au plus). Les deux vu-mètres d'un bus sont un canvas dessiné par JUCE : pas de relayout de la page à 60 Hz, et le même rendu avec OpenGL ou le rendu logiciel (qui ignore `transform`). Rien n'est redessiné tant que MIX est caché.
 - Pistes routées (MD) : « MAIN : 13 pistes · A : 9 », « C : 5 », plages « 2–4 » ; « routage : en attente du Global » tant qu'il est inconnu. MM : « routage des pistes : inconnu sur le MM ».
 - « ACTIF DANS LE DAW » : `getBus(false, i)->isEnabled()`, en orange si actif. Des pistes routées vers un bus coupé dans le DAW donnent « pistes muettes : activer Out C/D dans le DAW » (planche 7).
 - Non fait : niveau de l'entrée audio A/B (planche 10).
@@ -130,10 +130,13 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
 - L'état est relu deux fois par seconde au plus, seulement pendant que la page est affichée (certains états prennent le verrou du device).
 - Les états sont en français ; la fenêtre de réglages existante reste en anglais.
 
-### 6. JOUER et BIBLIO (long, à découper)
+### 6. JOUER et BIBLIO (première partie faite)
 
-- JOUER : lanes de pattern (MD) et piano roll (MM) d'après les planches 6/6b, puis arrangement. Il faudra le pattern complet (64 pas, swing, accent, slide ; `MdPatternEditor` garde déjà tous les octets) et le format de pattern du MM, absent pour l'instant. Pour le MM, voir `MNMPattern` dans MCL.
-- BIBLIO : liste des kits (requêtes `$53` par slot, noms), banque de samples UW (MD, transferts SDS : voir `sdsTransferTest` et `mdLib` SDS) et formes d'onde DigiPRO (MM, voir `mmSysexWorkflowTest`).
+- JOUER, MD (`mdPatternView.*`, planches 1 et 2) : le pattern courant, 16 pistes sur les 32 premiers pas (trig en blanc, pas avec locks encadré en bleu, au-delà de la longueur grisé) ; un clic sur un nom de piste en fait la piste éditée, un double-clic sur un pas pose ou retire un trig (écrit au firmware comme PAS). En dessous, la lane de la piste éditée pour un des 24 paramètres (boutons avec le nombre de locks) : barre grise = valeur du kit, orange avec un point = lock, seulement sur les pas qui jouent ; OUVRIR DANS SON montre la piste dans SON. Lane et vu-mètres sont des canvas dessinés par JUCE : le rendu logiciel de RmlUi (`RendererJuce`) ignore `transform`.
+- JOUER, MM : pas encore. Le format du pattern du MM n'est pas décodé (MCL : `MNMPattern`) ; le piano roll en dépend.
+- Reste à faire dans JOUER : pas 33 à 64, accent, slide, swing (octets gardés par `MdPatternEditor`, pas décodés ni vérifiés sur un vrai dump), tête de lecture, arrangement.
+- BIBLIO, KITS (`mdLibraryView.*`, planche 8) : LIRE LES KITS demande chaque kit stocké au firmware, un par un (`Controller::readKitLibrary`, `$53` ; un kit sans réponse en 2 s est sauté), puis montre numéro et nom, le kit chargé en ambre ; un clic montre les machines d'un kit sans le charger. Lecture seule : le chargement d'un kit (geste face avant ou SysEx) et les tags viendront plus tard. Durée : environ 0,4 s par kit MD sur la ligne MIDI.
+- Reste à faire dans BIBLIO : banque de samples UW (MD, transferts SDS : voir `sdsTransferTest` et `mdLib` SDS) et formes d'onde DigiPRO (MM, voir `mmSysexWorkflowTest`).
 
 ### Petits restes de l'éditeur
 

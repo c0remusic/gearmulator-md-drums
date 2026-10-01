@@ -11,6 +11,8 @@
 #include "mdTrackRoutingView.h"
 #include "mdOutputMetersView.h"
 #include "mdSystemPage.h"
+#include "mdPatternView.h"
+#include "mdLibraryView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -762,7 +764,7 @@ namespace mdJucePlugin
 		}
 
 		// MIX: the meters of the plug-in's three output buses.
-		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMeterFill0_0"))
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMeters0"))
 			m_outputMetersView = std::make_unique<OutputMetersView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()),
 				m_controller, *document);
 
@@ -774,6 +776,24 @@ namespace mdJucePlugin
 		{
 			if(auto* options = document->GetElementById("mdEdOptions"))
 				juceRmlUi::EventListener::Add(options, Rml::EventId::Click, [this](Rml::Event& _event) { openMenu(_event); });
+		}
+
+		// JOUER (Machinedrum): the current pattern and a lane. A track name selects the
+		// track as its tab in SON does.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdPlayStep0_0"))
+		{
+			m_patternView = std::make_unique<PatternView>(m_controller, *document, [document](const uint8_t _track)
+			{
+				if(auto* tab = document->GetElementById("editTrack" + std::to_string(_track)))
+					tab->Click();
+			});
+		}
+
+		// BIBLIO: the stored Kits.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdLibKit0"))
+		{
+			m_libraryView = std::make_unique<LibraryView>(m_controller, getModel(), *document);
+			m_libraryView->update();
 		}
 
 		// The COURBES row under SON, when the window leaves room for it.
@@ -2181,8 +2201,10 @@ namespace mdJucePlugin
 		const bool routingChanged = m_trackRoutingView && m_trackRoutingView->update();
 		const bool metersChanged = m_outputMetersView && m_outputMetersView->update(nowMilliseconds);
 		const bool systemChanged = m_systemPage && m_systemPage->update(nowMilliseconds);
+		const bool patternChanged = m_patternView && m_patternView->update();
+		const bool libraryChanged = m_libraryView && m_libraryView->update();
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
-			|| metersChanged || systemChanged)
+			|| metersChanged || systemChanged || patternChanged || libraryChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

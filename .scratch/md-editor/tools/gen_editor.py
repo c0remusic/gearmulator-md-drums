@@ -288,7 +288,7 @@ def mix_page(d, tracks):
     w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lh - note_h}dp; width: {span(8) - 32}dp;">{note}</div>')
     block_close(d)
     # SORTIES: the three stereo pairs the plug-in exposes to the DAW. OutputMetersView (mdOutputMetersView.cpp)
-    # moves the meters, writes the peak in dB, the tracks each pair carries and whether the DAW has it on.
+    # draws the meters, writes the peak in dB, the tracks each pair carries and whether the DAW has it on.
     sh = lh
     ph = (sh - TOP - 8 - 2 * 8) // 3
     pw = span(4) - 32
@@ -298,17 +298,90 @@ def mix_page(d, tracks):
         w(f'{ind(d + 1)}<div class="jucePos mdEdPanel" style="left: 16dp; top: {y}dp; width: {pw}dp; height: {ph}dp;">')
         w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">{bus}</div>')
         w(f'{ind(d + 2)}<div id="mdEdBusActive{i}" class="jucePos mdEdSeg" style="left: {pw - 12 - 150}dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>')
-        for m in range(2):
-            w(f'{ind(d + 2)}<div class="jucePos mdEdMeter" style="left: {12 + m * 12}dp; top: 34dp; height: {ph - 42}dp;">')
-            w(f'{ind(d + 3)}<div id="mdEdMeterFill{i}_{m}" class="mdEdMeterFill mdEdHidden"/>')
-            w(f'{ind(d + 3)}<div id="mdEdMeterPeak{i}_{m}" class="mdEdMeterPeak mdEdHidden"/>')
-            w(f'{ind(d + 2)}</div>')
+        # Both meters of the pair, drawn in one canvas
+        w(f'{ind(d + 2)}<div id="mdEdMeters{i}" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: {ph - 42}dp;"/>')
         w(f'{ind(d + 2)}<div id="mdEdBusLevel{i}" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>')
         w(f'{ind(d + 2)}<div id="mdEdBusTracks{i}" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: {pw - 56}dp;">—</div>')
         w(f'{ind(d + 2)}<div id="mdEdBusWarning{i}" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: {pw - 56}dp;"></div>')
         w(f'{ind(d + 1)}</div>')
     block_close(d)
     return 12 + max(lh, sh) + 12
+
+# ---------- JOUER (boards 1 and 2) ----------
+
+def play_page_md(d):
+    # The current pattern, every track on its 32 first steps, then the lane of the edited track and one
+    # parameter. PatternView (mdPatternView.cpp) fills both from the pattern dump.
+    rows, rh, label_w = 16, 18, 96
+    gw = span(12)
+    pitch = (gw - 32 - label_w) // 32
+    gh = TOP + rows * rh + 8
+    w(f'{ind(d)}<div class="mdEdContent" style="height: {{PLAY_H}}dp;">')
+    block_open(d + 1, "mdPlayGrid", "PATTERN", "", 0, 12, 12, gh)
+    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: {gw - 110 - 16 - 70}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
+    for t in range(rows):
+        y = TOP + t * rh
+        w(f'{ind(d + 2)}<div id="mdPlayTrack{t}" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: {y}dp; width: {label_w - 6}dp;">{t + 1:02d} —</div>')
+        for s in range(32):
+            beat = " mdEdStepBeat" if s % 4 == 0 else ""
+            w(f'{ind(d + 2)}<div id="mdPlayStep{t}_{s}" class="jucePos mdEdStep mdPlayStep{beat}" style="left: {16 + label_w + pitch * s}dp; top: {y}dp; width: {pitch - 2}dp; height: {rh - 2}dp;"/>')
+    block_close(d + 1)
+    ly = 12 + gh + GUT
+    lh = PAGE_H - ly - 12
+    block_open(d + 1, "mdPlayLane", "LANE", "", 0, 12, ly, lh)
+    w(f'{ind(d + 2)}<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: {gw - 80 - 16 - 160}dp;">—</div>')
+    w(f'{ind(d + 2)}<button id="mdPlayOpen" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 150}dp; top: 4dp; width: 150dp;">OUVRIR DANS SON</button>')
+    pb = (gw - 32) // 24
+    names = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "AMD", "AMF", "EQF", "EQG", "BASE", "WDTH", "Q", "SRR",
+             "DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"]
+    for p, name in enumerate(names):
+        w(f'{ind(d + 2)}<div id="mdPlayParam{p}" class="jucePos mdEdSeg mdEdSegChoice" style="left: {16 + pb * p}dp; top: {TOP}dp; width: {pb - 2}dp;">{name}</div>')
+    area_top = TOP + 32
+    area_h = lh - area_top - 8
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {area_top}dp; width: {label_w - 6}dp;">gris : kit<br/>orange : lock</div>')
+    # The 32 bars, drawn in a canvas under the steps
+    w(f'{ind(d + 2)}<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {area_top}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
+    block_close(d + 1)
+    w(f'{ind(d)}</div>')
+    return ly + lh + 12
+
+# ---------- BIBLIO (board 8) ----------
+
+def library_page(d):
+    # Every stored Kit, number and name, read on request; a click shows its machines without loading it.
+    # LibraryView (mdLibraryView.cpp) fills it.
+    kits, cols, kb = (64, 4, 8) if MD else (128, 8, 12)
+    rows, rh = 16, 24
+    kh = TOP + 28 + rows * rh + 8
+    w(f'{ind(d)}<div class="mdEdContent" style="height: {{LIB_H}}dp;">')
+    block_open(d + 1, "mdLibKits", "KITS", "", 0, kb, 12, kh)
+    w(f'{ind(d + 2)}<div id="mdLibInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: {span(kb) - 80 - 16 - 150}dp;">kits non lus</div>')
+    w(f'{ind(d + 2)}<button id="mdLibRead" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {span(kb) - 16 - 140}dp; top: 4dp; width: 140dp;">LIRE LES KITS</button>')
+    cw = (span(kb) - 32) // cols
+    for slot in range(kits):
+        c, r = slot // rows, slot % rows
+        w(f'{ind(d + 2)}<div id="mdLibKit{slot}" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: {16 + c * cw}dp; top: {TOP + 28 + r * rh}dp; width: {cw - 6}dp;">{slot + 1:02d}  —</div>')
+    block_close(d + 1)
+    tracks = 16 if MD else 6
+    if MD:
+        block_open(d + 1, "mdLibMachines", "MACHINES", "sans charger le kit", 8, 4, 12, kh)
+        w(f'{ind(d + 2)}<div id="mdLibDetail" class="jucePos juceLabel mdEdRowName" style="left: 16dp; top: {TOP - 4}dp; width: {span(4) - 32}dp;">KIT —</div>')
+        for t in range(tracks):
+            w(f'{ind(d + 2)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {TOP + 28 + t * rh}dp; width: {span(4) - 32}dp;">{t + 1:02d}  —</div>')
+        block_close(d + 1)
+        total = 12 + kh + 12
+    else:
+        my = 12 + kh + GUT
+        mh = PAGE_H - my - 12
+        block_open(d + 1, "mdLibMachines", "MACHINES", "", 0, 12, my, mh)
+        w(f'{ind(d + 2)}<div id="mdLibDetail" class="jucePos juceLabel mdEdSub" style="left: 120dp; top: 4dp; width: 600dp;">KIT —</div>')
+        for t in range(tracks):
+            w(f'{ind(d + 2)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: {16 + t * 170}dp; top: 28dp; width: 164dp;">{t + 1:02d}  —</div>')
+        block_close(d + 1)
+        total = my + mh + 12
+    w(f'{ind(d)}</div>')
+    return total
 
 # ---------- SYSTÈME (board 10) ----------
 
@@ -383,19 +456,32 @@ w('\t\t\t\t\t</div>')
 w('\t\t\t\t</div>')
 w('\t\t\t</div>')
 
-play_text = ("Pattern, lanes et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation." if MD else
-             "Pattern, piano roll et arrangement : à venir. Ils demandent de lire le pattern dans l'émulation.")
-lib_text = "Kits et banque de samples UW : à venir." if MD else "Kits et formes d'onde DigiPRO : à venir."
-for idx, pid, title, text in [
-    (2, "mdEdPagePlay", "JOUER", play_text),
-    (3, "mdEdPageLibrary", "BIBLIO", lib_text),
-]:
-    w(f'\t\t\t<div id="{pid}" class="mdEdPage" tabgroup="mdEdit" tabpage="{idx}">')
-    w(f'\t\t\t\t<div class="mdEdScroll"><div class="mdEdContent" style="height: 120dp;">')
-    w(f'\t\t\t\t\t<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">{title}</div>')
-    w(f'\t\t\t\t\t<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">{text}</div>')
-    w('\t\t\t\t</div></div>')
-    w('\t\t\t</div>')
+w('\t\t\t<!-- JOUER: the current pattern and a lane (MD); the MM pattern format is not decoded yet. -->')
+w('\t\t\t<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">')
+w('\t\t\t\t<div class="mdEdScroll">')
+play_h = None
+if MD:
+    marker = len(out)
+    play_h = play_page_md(5)
+    for i in range(marker, len(out)):
+        out[i] = out[i].replace("{PLAY_H}", str(play_h))
+else:
+    w('\t\t\t\t\t<div class="mdEdContent" style="height: 120dp;">')
+    w('\t\t\t\t\t\t<div class="jucePos juceLabel mdEdTitle" style="left: 32dp; top: 24dp; width: 1036dp;">JOUER</div>')
+    w('\t\t\t\t\t\t<div class="jucePos mdEdNote" style="left: 32dp; top: 56dp; width: 1036dp;">Pattern, piano roll et arrangement : à venir. Le format du pattern du MM n\'est pas encore décodé (MCL : MNMPattern).</div>')
+    w('\t\t\t\t\t</div>')
+w('\t\t\t\t</div>')
+w('\t\t\t</div>')
+
+w('\t\t\t<!-- BIBLIO: the stored Kits, read on request, and the machines of one. -->')
+w('\t\t\t<div id="mdEdPageLibrary" class="mdEdPage" tabgroup="mdEdit" tabpage="3">')
+w('\t\t\t\t<div class="mdEdScroll">')
+marker = len(out)
+lib_h = library_page(5)
+for i in range(marker, len(out)):
+    out[i] = out[i].replace("{LIB_H}", str(lib_h))
+w('\t\t\t\t</div>')
+w('\t\t\t</div>')
 
 w('\t\t\t<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->')
 w('\t\t\t<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">')
@@ -404,7 +490,7 @@ system_h = system_page(5)
 w('\t\t\t\t</div>')
 w('\t\t\t</div>')
 
-for name, h in [("SON", track_h), ("MASTER", master_h), ("MIX", mix_h), ("SYSTÈME", system_h)]:
+for name, h in [("SON", track_h), ("MASTER", master_h), ("MIX", mix_h), ("SYSTÈME", system_h), ("JOUER", play_h), ("BIBLIO", lib_h)]:
     if h and h > PAGE_H:
         sys.exit(f"{MODEL} {name} is {h} dp, more than the {PAGE_H} dp page")
 
@@ -415,11 +501,11 @@ topbar = f'''		<!-- ===== Top bar: name, the FACE AVANT / ÉDITEUR switch, kit/p
 			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(2)}dp;">FACE AVANT</button>
 			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(3)}dp;">ÉDITEUR</button>
 			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: {colx(4)}dp; top: 4dp; width: {span(2)}dp;"><div id="mdEdScreenMain" class="mdEdScreenMain">KIT — · PATTERN —</div><div id="mdEdScreenName" class="mdEdScreenName"></div></div>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: {colx(6)}dp;">JOUER</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: {colx(7)}dp;">SON</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: {colx(8)}dp;">MIX</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: {colx(9)}dp;">BIBLIO</button>
-			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: {colx(10)}dp;">SYSTÈME</button>
+			<button id="mdEdCat2" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: {colx(6)}dp;">JOUER</button>
+			<button id="mdEdCat0" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: {colx(7)}dp;">SON</button>
+			<button id="mdEdCat1" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: {colx(8)}dp;">MIX</button>
+			<button id="mdEdCat3" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: {colx(9)}dp;">BIBLIO</button>
+			<button id="mdEdCat4" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: {colx(10)}dp;">SYSTÈME</button>
 			<button id="mdEdOptions" class="jucePos juceButton mdEdSwitch" isToggle="0" style="left: {colx(11)}dp;">OPTIONS</button>
 		</div>
 '''
