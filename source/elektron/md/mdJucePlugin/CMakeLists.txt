@@ -19,6 +19,8 @@ set(SOURCES
 	mdCurveView.cpp mdCurveView.h
 	mdKitPatternScreen.cpp mdKitPatternScreen.h
 	mdUnreadValues.cpp mdUnreadValues.h
+	mdMasterEffectsView.cpp mdMasterEffectsView.h
+	mdTrackRoutingView.cpp mdTrackRoutingView.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h

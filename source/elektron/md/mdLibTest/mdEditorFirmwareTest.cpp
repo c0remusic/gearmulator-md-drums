@@ -1,6 +1,8 @@
 // The editor's firmware assumptions, checked against the real Machinedrum and
 // Monomachine: machine assignment ($5B) and what it does to a track, that a Kit
-// dump request returns the stored Kit, the Machinedrum pattern dump ($67) as
+// dump request returns the stored Kit, the Machinedrum master effects in the
+// Kit dump and their changes ($5D to $60), the track routing in the Global dump
+// and its change ($5C), the Machinedrum pattern dump ($67) as
 // MdPatternEditor reads it (with trigs and a lock placed on the front panel,
 // unsaved), and a pattern written back to its slot, stopped and playing. Every
 // message comes from the codec the editor uses (mdsysexautomation.h). The
@@ -374,6 +376,90 @@ namespace
 			playedBack == playing->toDump() ? "as sent" : differences(playedBack, playing->toDump()).c_str());
 	}
 
+	std::string describeEffects(const sysex::MasterEffects& _effects)
+	{
+		static constexpr const char* names[] = {"echo", "reverb", "EQ", "dynamix"};
+		std::string text;
+		for(uint8_t effect = 0; effect < sysex::MasterEffectCount; ++effect)
+		{
+			text += std::string(" ") + names[effect] + ":";
+			for(const auto value : _effects[effect])
+				text += " " + std::to_string(value);
+		}
+		return text;
+	}
+
+	// The master effects in the Kit dump, and $5D to $60: parameter n of the n-th
+	// effect set, the Kit saved and read again, shows where each effect sits.
+	void checkMasterEffects(md::Hardware& _hardware)
+	{
+		constexpr auto model = md::MachineModel::Machinedrum;
+		const auto slot = status(_hardware, sysex::StatusParameter::Kit);
+		const auto beforeDump = exchange(_hardware, sysex::kitRequest(model, slot), 0x52);
+		const auto before = sysex::parseKitDump(model, beforeDump);
+		require(before && before->masterEffects, "no master effects in the Kit dump");
+		std::printf("MD master effects of Kit %u:%s\n", slot + 1, describeEffects(*before->masterEffects).c_str());
+
+		auto expected = *before->masterEffects;
+		for(uint8_t effect = 0; effect < sysex::MasterEffectCount; ++effect)
+		{
+			auto& value = expected[effect][effect];
+			value = static_cast<uint8_t>((value + 37 + effect * 11) & 0x7f);
+			const auto message = sysex::masterEffectChange(static_cast<sysex::MasterEffect>(effect), effect, value);
+			require(message.has_value(), "codec refused a master effect change");
+			send(_hardware, *message);
+			advance(_hardware, md::g_samplerate / 10);
+		}
+		advance(_hardware, md::g_samplerate / 2);
+		send(_hardware, sysex::kitSave(model, slot));
+		advance(_hardware, md::g_samplerate);
+		const auto afterDump = exchange(_hardware, sysex::kitRequest(model, slot), 0x52);
+		const auto after = sysex::parseKitDump(model, afterDump);
+		require(after && after->masterEffects, "no master effects in the saved Kit dump");
+		std::printf("MD $5D-$60, parameter n of effect n, Kit saved:%s; dump: %s\n",
+			describeEffects(*after->masterEffects).c_str(), differences(afterDump, beforeDump).c_str());
+		require(*after->masterEffects == expected, "master effect changes not where the Kit dump decoder reads them");
+	}
+
+	std::string describeOutputs(const sysex::TrackOutputs& _outputs)
+	{
+		std::string text;
+		for(size_t track = 0; track < _outputs.size(); ++track)
+		{
+			const auto output = _outputs[track];
+			text += " T" + std::to_string(track + 1) + " "
+				+ (output == sysex::TrackOutput::Main ? std::string("MAIN") : std::string(1, static_cast<char>('A' + static_cast<int>(output))));
+		}
+		return text;
+	}
+
+	// The track routing in the Global dump, and $5C for one track.
+	void checkTrackRouting(md::Hardware& _hardware)
+	{
+		constexpr auto model = md::MachineModel::Machinedrum;
+		const auto slot = status(_hardware, sysex::StatusParameter::Global);
+		const auto beforeDump = exchange(_hardware, sysex::globalRequest(model, slot), 0x50);
+		const auto before = sysex::parseGlobalDump(model, beforeDump);
+		require(before && before->trackOutputs, "no track routing in the Global dump");
+		std::printf("MD Global %u routing:%s\n", slot + 1, describeOutputs(*before->trackOutputs).c_str());
+
+		constexpr uint8_t track = 4;
+		const auto output = (*before->trackOutputs)[track] == sysex::TrackOutput::C ? sysex::TrackOutput::D : sysex::TrackOutput::C;
+		const auto message = sysex::trackRouting(track, output);
+		require(message.has_value(), "codec refused a track routing");
+		send(_hardware, *message);
+		advance(_hardware, md::g_samplerate / 2);
+		const auto afterDump = exchange(_hardware, sysex::globalRequest(model, slot), 0x50);
+		const auto after = sysex::parseGlobalDump(model, afterDump);
+		require(after && after->trackOutputs, "no track routing in the Global dump after $5C");
+		std::printf("MD $5C track %u to %c: Global request shows%s; dump: %s\n", track + 1,
+			static_cast<char>('A' + static_cast<int>(output)), describeOutputs(*after->trackOutputs).c_str(),
+			differences(afterDump, beforeDump).c_str());
+		auto expected = *before->trackOutputs;
+		expected[track] = output;
+		require(*after->trackOutputs == expected, "$5C not where the Global dump decoder reads the routing");
+	}
+
 	std::unique_ptr<md::Hardware> start(const char* const _variable, const md::MachineModel _model)
 	{
 		const auto* path = std::getenv(_variable);
@@ -404,6 +490,8 @@ namespace
 			status(*hardware, sysex::StatusParameter::Pattern), machines.c_str());
 		checkAssignment(*hardware, 2, {17, 33});     // TRX-SD or EFM-SD: the plain machine table
 		checkAssignment(*hardware, 3, {128, 129});   // ROM-01 or ROM-02: sent with the UW flag
+		checkMasterEffects(*hardware);
+		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");
 		return true;

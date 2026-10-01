@@ -345,11 +345,30 @@ namespace
 			0x50, 0x06, 0x01, 0x05};
 		global.resize(0xb0, 0);
 		global[0xad] = 11;
+		// Track routing: 16 raw bytes at 0x0a, 0 to 5 for A to F, 6 for MAIN
+		for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+			global[0x0a + track] = static_cast<uint8_t>(track % 7);
 		finishDump(global);
 		const auto parsedGlobal = parseGlobalDump(md::MachineModel::Machinedrum, global);
 		require(parsedGlobal && parsedGlobal->slot == 5
 			&& parsedGlobal->baseChannel == 11,
 			"wrong MD base channel");
+		require(parsedGlobal->trackOutputs && (*parsedGlobal->trackOutputs)[0] == TrackOutput::A
+			&& (*parsedGlobal->trackOutputs)[6] == TrackOutput::Main && (*parsedGlobal->trackOutputs)[9] == TrackOutput::C,
+			"wrong MD track routing");
+		{
+			auto unknown = global;
+			unknown.resize(unknown.size() - 5);
+			unknown[0x0a + 3] = 7;
+			finishDump(unknown);
+			const auto parsed = parseGlobalDump(md::MachineModel::Machinedrum, unknown);
+			require(parsed && !parsed->trackOutputs, "MD routing accepted an output the machine does not have");
+		}
+		require(trackRouting(4, TrackOutput::C) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5c, 4, 2, 0xf7}
+			&& trackRouting(15, TrackOutput::Main) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5c, 15, 6, 0xf7},
+			"wrong SET TRACK ROUTING");
+		require(!trackRouting(16, TrackOutput::A) && !trackRouting(0, static_cast<TrackOutput>(7)),
+			"SET TRACK ROUTING accepted a track or output out of range");
 		global[0xad] = 0x7f;
 		global.resize(global.size() - 5);
 		finishDump(global);
@@ -402,6 +421,9 @@ namespace
 		// The name: 16 raw bytes at 0x0a, here padded with spaces and ended by a zero
 		const std::string name = "BROKEN DUB  ";
 		std::copy(name.begin(), name.end(), kit.begin() + 0x0a);
+		// Master effects: 32 raw bytes at 0x487, reverb, echo, EQ, dynamix (mdEditorFirmwareTest)
+		for(uint8_t index = 0; index < 32; ++index)
+			kit[0x487 + index] = static_cast<uint8_t>(index + 1);
 		finishDump(kit);
 		const auto parsedKit = parseKitDump(md::MachineModel::Machinedrum, kit);
 		require(parsedKit && parsedKit->slot == 4
@@ -417,6 +439,25 @@ namespace
 		require(parsedKit->machines[1] == 176, "MD ROM-33 lost the top bit of its 7-bit group");
 		require(parsedKit->machines[2] == 16, "MD TONAL flag leaked into the machine id");
 		require(parsedKit->name == "BROKEN DUB", ("wrong MD Kit name: \"" + parsedKit->name + "\"").c_str());
+		require(parsedKit->masterEffects.has_value(), "MD Kit master effects missing");
+		const auto& effects = *parsedKit->masterEffects;
+		require(effects[static_cast<uint8_t>(MasterEffect::Reverb)][0] == 1 && effects[static_cast<uint8_t>(MasterEffect::Echo)][0] == 9
+			&& effects[static_cast<uint8_t>(MasterEffect::Eq)][7] == 24 && effects[static_cast<uint8_t>(MasterEffect::Dynamix)][7] == 32,
+			"MD master effects not read in the dump's reverb, echo, EQ, dynamix order");
+		require(masterEffectChange(MasterEffect::Echo, 0, 5) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5d, 0, 5, 0xf7}
+			&& masterEffectChange(MasterEffect::Reverb, 2, 64) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x5e, 2, 64, 0xf7}
+			&& masterEffectChange(MasterEffect::Dynamix, 7, 127) == Message{0xf0, 0, 0x20, 0x3c, 2, 0, 0x60, 7, 127, 0xf7},
+			"wrong master effect messages");
+		require(!masterEffectChange(MasterEffect::Eq, 8, 0) && !masterEffectChange(MasterEffect::Eq, 0, 128),
+			"master effect message accepted a parameter or value out of range");
+		{
+			// A shorter dump (older format) holds no master effects
+			auto shortKit = kit;
+			shortKit.resize(0x4a7);
+			finishDump(shortKit);
+			const auto parsed = parseKitDump(md::MachineModel::Machinedrum, shortKit);
+			require(parsed && !parsed->masterEffects, "master effects read from a dump of another size");
+		}
 		kit[100] ^= 1;
 		require(!parseKitDump(md::MachineModel::Machinedrum, kit),
 			"accepted corrupt MD Kit checksum");

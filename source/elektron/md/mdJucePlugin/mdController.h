@@ -112,6 +112,27 @@ namespace mdJucePlugin
 		// Increments whenever the current Kit, its name or the current pattern changes.
 		uint64_t getSelectionRevision() const { return m_selectionRevision.load(std::memory_order_acquire); }
 
+		// Machinedrum: a master effect parameter of the live Kit as last read from a
+		// Kit dump or set through setMasterEffect, nullopt while unknown. As for the
+		// machines, an applied dump replaces the values and an inspection dump of the
+		// stored Kit only fills unknown ones.
+		std::optional<uint8_t> getMasterEffect(md::automation::sysex::MasterEffect _effect, uint8_t _parameter) const;
+		// Sends one master effect parameter ($5D to $60) and keeps it. False on the
+		// Monomachine, out of range, or while the firmware is not ready.
+		bool setMasterEffect(md::automation::sysex::MasterEffect _effect, uint8_t _parameter, uint8_t _value);
+		// Increments whenever a master effect value changes or becomes known.
+		uint64_t getMasterEffectRevision() const { return m_masterEffectRevision.load(std::memory_order_acquire); }
+
+		// Machinedrum: the output of a track as last read from the Global dump (read
+		// again with every 5 s poll) or set through setTrackOutput, nullopt while unknown.
+		std::optional<md::automation::sysex::TrackOutput> getTrackOutput(uint8_t _track) const;
+		// Sends SET TRACK ROUTING ($5C), which the firmware keeps in its Global, and
+		// keeps it. False on the Monomachine, out of range, or while the firmware is
+		// not ready.
+		bool setTrackOutput(uint8_t _track, md::automation::sysex::TrackOutput _output);
+		// Increments whenever a track output changes or becomes known.
+		uint64_t getRoutingRevision() const { return m_routingRevision.load(std::memory_order_acquire); }
+
 		// Machinedrum only: asks the firmware for the current pattern number, then
 		// for that pattern's dump. False on the Monomachine or while the firmware is
 		// not ready. A pattern selected through SET STATUS is read again by itself.
@@ -224,6 +245,8 @@ namespace mdJucePlugin
 		// An applied dump replaces every track's machine; an inspection dump only
 		// fills tracks whose machine is still unknown.
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
+		// Same policy for the master effects
+		void storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, bool _authoritative);
 		void sendEditorSysex(const md::automation::sysex::Message& _message) const;
 		void onControllerTimer() override;
 		void sendMissingSynchronizationRequests();
@@ -264,6 +287,17 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint16_t>, md::automation::machinedrum::TrackCount> m_trackMachines{};
 		std::atomic<uint64_t> m_machineRevision{0};
 		std::atomic<uint64_t> m_valueStateRevision{0};
+		// [effect * 8 + parameter], 0xff while unknown
+		std::array<std::atomic<uint8_t>, md::automation::sysex::MasterEffectCount
+			* md::automation::sysex::MasterEffectParameters> m_masterEffects{};
+		std::atomic<uint64_t> m_masterEffectRevision{0};
+		// TrackOutput per track, 0xff while unknown
+		std::array<std::atomic<uint8_t>, md::automation::machinedrum::TrackCount> m_trackOutputs{};
+		std::atomic<uint64_t> m_routingRevision{0};
+		// $5C messages sent, and their count when the pending Global request went out:
+		// a Global dump requested before a routing write does not show it yet.
+		uint64_t m_routingWrites = 0;
+		uint64_t m_routingWritesAtGlobalRequest = 0;
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
 		// The dump behind m_pattern, edits included; both under m_patternMutex.

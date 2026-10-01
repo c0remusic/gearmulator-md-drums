@@ -47,10 +47,12 @@ def control(d, x, y, item):
     kind, param, name = item
     (fader if kind == "f" else knob)(d, x, y, param, name, kind == "x")
 
-def selector(d, x, y, labels, widths):
-    # segmented selector drawn inactive: the choice is not a host parameter yet
-    for label, sw in zip(labels, widths):
-        w(f'{ind(d)}<div class="jucePos mdEdSeg mdEdOff" style="left: {x}dp; top: {y}dp; width: {sw}dp;">{label}</div>')
+def selector(d, x, y, labels, widths, ids=None):
+    # segmented selector; without ids it is drawn inactive (nothing behind it yet)
+    for i, (label, sw) in enumerate(zip(labels, widths)):
+        sid = f' id="{ids[i]}"' if ids else ""
+        cls = "mdEdSeg mdEdSegChoice" if ids else "mdEdSeg mdEdOff"
+        w(f'{ind(d)}<div{sid} class="jucePos {cls}" style="left: {x}dp; top: {y}dp; width: {sw}dp;">{label}</div>')
         x += sw
 
 def block_open(d, bid, title, sub, c0, ncols, y, h, model=None):
@@ -169,20 +171,26 @@ def md_sound(d):
     machine_picker(d + 1, picker_y)
     w(f'{ind(d)}</div>')
 
-    # MASTER: the MD master effects (board 5). Not host parameters yet, so the controls are inactive.
+    # MASTER: the MD master effects of the Kit (board 5), 8 parameters each. They are not host parameters:
+    # MasterEffectsView (mdMasterEffectsView.cpp) sets the knobs from the controller and sends their changes.
     w(f'{ind(d)}<div id="mdEdMasterView" class="mdEdView" data-if="page == 16" style="height: {{MASTER_H}}dp;">')
-    fx = [("mdEdEcho", "RHYTHM ECHO", [("x", None, "TIME"), ("x", None, "FB"), ("f", None, "LEV")]),
-          ("mdEdReverb", "GATE BOX REVERB", [("x", None, "DEC"), ("x", None, "DAMP"), ("f", None, "LEV")]),
-          ("mdEdEq", "EQ", [("x", None, "LF"), ("x", None, "LG"), ("x", None, "HF"), ("x", None, "HG")]),
-          ("mdEdDynamix", "DYNAMIX", [("x", None, "TRHD"), ("x", None, "RAT"), ("x", None, "KNEE"), ("f", None, "OUT")])]
-    h = rows_height(1)
-    for i, (bid, title, items) in enumerate(fx):
+    # In the order of their SysEx ids ($5D to $60); parameter names from MCL (MDParams.h)
+    fx = [("mdEdEcho", "RHYTHM ECHO", "envois : DEL des pistes", ["TIME", "MOD", "MFRQ", "FB", "FLTF", "FLTW", "MONO", "LEV"]),
+          ("mdEdReverb", "GATE BOX REVERB", "envois : REV des pistes", ["DVOL", "PRED", "DEC", "DAMP", "HP", "LP", "GATE", "LEV"]),
+          ("mdEdEq", "EQ", "", ["LF", "LG", "HF", "HG", "PF", "PG", "PQ", "GAIN"]),
+          ("mdEdDynamix", "DYNAMIX", "", ["ATCK", "REL", "TRHD", "RTIO", "KNEE", "HP", "OUTG", "MIX"])]
+    h = rows_height(2)
+    cell = span(6) // 4
+    for i, (bid, title, sub, names) in enumerate(fx):
         yb = 12 + (i // 2) * (h + GUT)
-        block_open(d + 1, bid, title, "envois : à venir" if i < 2 else "", 6 * (i % 2), 6, yb, h)
-        for j, (k, p, n) in enumerate(items):
-            (fader if k == "f" else knob)(d + 2, bx(j), TOP, None, n, True)
+        block_open(d + 1, bid, title, sub, 6 * (i % 2), 6, yb, h)
+        for j, n in enumerate(names):
+            x, y = (j % 4) * cell, TOP + (j // 4) * ROW
+            w(f'{ind(d + 2)}<knob id="mdEdFx{i}_{j}" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: {x + (cell - KNOB) // 2}dp; top: {y}dp;"/>')
+            w(f'{ind(d + 2)}<div id="mdEdFxVal{i}_{j}" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: {x}dp; top: {y + KNOB}dp; width: {cell}dp;">—</div>')
+            w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdName" style="left: {x}dp; top: {y + KNOB + 14}dp; width: {cell}dp;">{n}</div>')
         block_close(d + 1)
-    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: {12 + 2 * (h + GUT)}dp; width: 1036dp;">Effets master du kit : ils ne sont pas encore des paramètres du plug-in. Seules les pistes en MAIN passent par ces effets.</div>')
+    w(f'{ind(d + 1)}<div id="mdEdMasterInfo" class="jucePos juceLabel mdEdNote" style="left: 32dp; top: {12 + 2 * (h + GUT)}dp; width: 1036dp;">Effets master du kit, envoyés au firmware à chaque mouvement ; l\'hôte ne les automatise pas (hors paramètres du plug-in). Seules les pistes en MAIN y passent.</div>')
     master_h = 12 + 2 * (h + GUT) + 28
     w(f'{ind(d)}</div>')
     w(f'{ind(d - 1)}</div>')
@@ -269,11 +277,13 @@ def mix_page(d, tracks):
         for param, c in fields:
             w(f'{ind(d + 2)}<knob class="jucePos mdEdNum" param="{param}" style="left: {bx(c)}dp; top: 1dp;">{{{{{param}_text}}}}</knob>')
         if MD:
-            selector(d + 2, bx(6) + 16, 1, ["MAIN", "A", "B", "C", "D", "E", "F"], [40] + [16] * 6)
+            # TrackRoutingView (mdTrackRoutingView.cpp): mdEdOut<track>_<output>, outputs 0 to 5 = A to F, 6 = MAIN
+            selector(d + 2, bx(6) + 16, 1, ["MAIN", "A", "B", "C", "D", "E", "F"], [40] + [16] * 6,
+                     [f"mdEdOut{t}_{o}" for o in [6, 0, 1, 2, 3, 4, 5]])
         else:
             selector(d + 2, bx(5) + 16, 1, ["AB", "CD", "EF"], [30, 30, 30])
         w(f'{ind(d + 2)}</div>')
-    note = "MD : MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F. Choix de sortie : à venir." if MD else \
+    note = "MD : MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F ; réglage du Global, envoyé au firmware." if MD else \
            "MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir."
     w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lh - note_h}dp; width: {span(8) - 32}dp;">{note}</div>')
     block_close(d)

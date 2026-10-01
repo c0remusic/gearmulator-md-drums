@@ -145,6 +145,11 @@
 	border: 1dp #3a3d42;
 }
 
+/* a segment that is a choice (track output in MIX, mdTrackRoutingView.cpp); the chosen one in orange */
+.mdEdSegChoice { cursor: pointer; }
+.mdEdSegChoice:hover { color: #f4f1ea; }
+.mdEdSegChoice.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+
 /* steps: 24 dp high, their width set by the RML */
 .mdEdStep
 {

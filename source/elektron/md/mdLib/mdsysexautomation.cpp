@@ -17,6 +17,8 @@ namespace md::automation::sysex
 		constexpr uint8_t g_patternDump = 0x67;
 		constexpr uint8_t g_patternRequest = 0x68;
 		constexpr uint8_t g_assignMachine = 0x5b;
+		constexpr uint8_t g_trackRouting = 0x5c;
+		constexpr uint8_t g_masterEffect = 0x5d;    // RHYTHM ECHO; then reverb, EQ, dynamix
 		constexpr uint8_t g_statusRequest = 0x70;
 		constexpr uint8_t g_setStatus = 0x71;
 		constexpr uint8_t g_statusResponse = 0x72;
@@ -228,6 +230,19 @@ namespace md::automation::sysex
 		// factory Global has both clear. Bits 5 and 6 are the outputs.
 		constexpr size_t g_mdGlobalSize = 0xc5;
 		constexpr size_t g_mdSyncPosition = 0xb2;
+		// Before the key map: one raw byte per track, 0 to 5 for outputs A to F, 6 for MAIN.
+		constexpr size_t g_mdRoutingPosition = 0x0a;
+
+		// Machinedrum Kit: after the LFOs, 32 raw bytes of master effects, 8 per effect,
+		// reverb first (mdEditorFirmwareTest checks the order).
+		constexpr size_t g_mdKitSize = 0x4d1;
+		constexpr size_t g_mdMasterEffectsPosition = 0x487;
+		constexpr std::array<uint8_t, MasterEffectCount> g_mdMasterEffectBlock{
+			1,      // Echo
+			0,      // Reverb
+			2,      // Eq
+			3       // Dynamix
+		};
 		constexpr uint8_t g_mdClockIn = 0x01;
 		constexpr uint8_t g_mdTransportInOff = 0x10;
 
@@ -568,12 +583,23 @@ namespace md::automation::sysex
 			return std::nullopt;
 
 		uint8_t channel = 0;
+		std::optional<TrackOutputs> outputs;
 		if(_model == MachineModel::Machinedrum)
 		{
 			constexpr size_t baseChannelPosition = 0xad;
 			if(_message.size() <= baseChannelPosition)
 				return std::nullopt;
 			channel = _message[baseChannelPosition];
+			TrackOutputs routing{};
+			bool valid = true;
+			for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+			{
+				const auto output = _message[g_mdRoutingPosition + track];
+				valid &= output <= static_cast<uint8_t>(TrackOutput::Main);
+				routing[track] = static_cast<TrackOutput>(output);
+			}
+			if(valid)
+				outputs = routing;
 		}
 		else
 		{
@@ -584,7 +610,7 @@ namespace md::automation::sysex
 		}
 
 		return channel < 16 || channel == 0x7f
-			? std::optional<GlobalDump>(GlobalDump{slot, channel}) : std::nullopt;
+			? std::optional<GlobalDump>(GlobalDump{slot, channel, outputs}) : std::nullopt;
 	}
 
 	namespace
@@ -659,10 +685,21 @@ namespace md::automation::sysex
 				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
 					machines.push_back(raw[track * 4 + 3]);
 			}
+			std::optional<MasterEffects> effects;
+			if(_message.size() == g_mdKitSize)
+			{
+				MasterEffects values{};
+				for(uint8_t effect = 0; effect < MasterEffectCount; ++effect)
+				{
+					const auto* block = &_message[g_mdMasterEffectsPosition + g_mdMasterEffectBlock[effect] * MasterEffectParameters];
+					std::copy_n(block, MasterEffectParameters, values[effect].begin());
+				}
+				effects = values;
+			}
 			// 16 raw bytes between the slot and the parameters
 			constexpr size_t namePosition = 0x0a;
 			return KitDump{slot, std::move(result), std::move(machines),
-				kitName(&_message[namePosition], parameterPosition - namePosition)};
+				kitName(&_message[namePosition], parameterPosition - namePosition), effects};
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -714,6 +751,23 @@ namespace md::automation::sysex
 				_track, static_cast<uint8_t>(_machine), 0x00, 0xf7};
 		return Message{0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_assignMachine,
 			_track, static_cast<uint8_t>(_machine & 0x7f), static_cast<uint8_t>(_machine >= 128 ? 1 : 0), 0xf7};
+	}
+
+	std::optional<Message> masterEffectChange(const MasterEffect _effect, const uint8_t _parameter, const uint8_t _value)
+	{
+		const auto effect = static_cast<uint8_t>(_effect);
+		if(effect >= MasterEffectCount || _parameter >= MasterEffectParameters || _value > 0x7f)
+			return std::nullopt;
+		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00,
+			static_cast<uint8_t>(g_masterEffect + effect), _parameter, _value, 0xf7};
+	}
+
+	std::optional<Message> trackRouting(const uint8_t _track, const TrackOutput _output)
+	{
+		if(_track >= machinedrum::TrackCount || _output > TrackOutput::Main)
+			return std::nullopt;
+		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, g_trackRouting,
+			_track, static_cast<uint8_t>(_output), 0xf7};
 	}
 
 	Message globalReload(const MachineModel _model, const uint8_t _slot)

@@ -17,7 +17,9 @@
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
 #include "mdMachinePicker.h"
+#include "mdMasterEffectsView.h"
 #include "mdStepGrid.h"
+#include "mdTrackRoutingView.h"
 #include "mdUnreadValues.h"
 #include "mdLib/mdmachines.h"
 
@@ -69,6 +71,10 @@ namespace mdJucePlugin
 				_editor.m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_curveView)
 				_editor.m_curveView->update();
+			if(_editor.m_masterEffectsView)
+				_editor.m_masterEffectsView->update();
+			if(_editor.m_trackRoutingView)
+				_editor.m_trackRoutingView->update();
 			updateScreen(_editor);
 			updateUnread(_editor);
 		}
@@ -374,8 +380,10 @@ int main()
 		context.Update();
 		require(visible(element(doc, "mdEdMasterView")) && !visible(element(doc, "mdEdTrackView")), "MASTER tab did not show the master effects");
 		requireTiled(element(doc, "mdEdMasterView"), "MASTER");
-		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 12, 528, 124, "RHYTHM ECHO (6 columns)");
-		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 148, 528, 124, "DYNAMIX (6 columns)");
+		requireRect(element(doc, "mdEdEcho"), 16, pageTop + 12, 528, 208, "RHYTHM ECHO (6 columns, two rows of knobs)");
+		requireRect(element(doc, "mdEdDynamix"), 556, pageTop + 232, 528, 208, "DYNAMIX (6 columns, two rows of knobs)");
+		require(element(doc, "mdEdFxVal0_0").IsClassSet("mdEdUnread") && element(doc, "mdEdFx3_7").IsClassSet("mdEdUnread"),
+			"master effects shown before any Kit dump");
 		fits("mdEdMasterView");
 		require(controller.getCurrentPart() == 0, "MASTER tab changed the edited part");
 		element(doc, "editTrack0").Click();
@@ -683,6 +691,61 @@ int main()
 
 			loadKit();
 			require(!unread("mdEdCtl_" + next) && !mixRowValues(0, mm ? "AmpVolume" : "Volume"), "values still greyed after the Kit was applied");
+
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			// MASTER: the Kit's master effects, 8 knobs each, from the Kit dump (byte n of the
+			// effects is 64 + n there, reverb first), and a turned knob sends its value.
+			using Effect = md::automation::sysex::MasterEffect;
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			element(doc, "editMaster").Click();
+			context.Update();
+			const auto text = [&](const std::string& _id) { return std::string(element(doc, _id).GetInnerRML()); };
+			require(md.getMasterEffect(Effect::Echo, 0) == uint8_t{64 + 8} && md.getMasterEffect(Effect::Reverb, 0) == uint8_t{64}
+				&& md.getMasterEffect(Effect::Dynamix, 7) == uint8_t{(64 + 31) & 0x7f}, "controller did not keep the Kit's master effects");
+			require(text("mdEdFxVal0_0") == "72" && text("mdEdFxVal1_0") == "64" && text("mdEdFxVal2_3") == "83"
+				&& !unread("mdEdFxVal0_0") && !unread("mdEdFx3_7"), "MASTER knobs do not show the Kit's master effects");
+			const auto revision = md.getMasterEffectRevision();
+			juceRmlUi::ElemValue::setValue(&element(doc, "mdEdFx2_4"), 20.0f);
+			require(md.getMasterEffect(Effect::Eq, 4) == uint8_t{20} && md.getMasterEffectRevision() > revision,
+				"a turned MASTER knob did not set its master effect");
+			require(text("mdEdFxVal2_4") == "20", "MASTER value line did not follow its knob");
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(text("mdEdFxVal2_4") == "20", "MASTER value line changed back after the turn");
+			element(doc, "editTrack0").Click();
+			context.Update();
+
+			// MIX, SORTIE: each track's output from the Global (MAIN for all in the test's
+			// Global), and a click routes the track.
+			using Output = md::automation::sysex::TrackOutput;
+			const auto selected = [&](const int _track, const int _output)
+			{
+				return element(doc, "mdEdOut" + std::to_string(_track) + "_" + std::to_string(_output)).IsClassSet("mdEdSelected");
+			};
+			tabButton(doc, "mdEdit", "1").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(selected(0, 6) && !selected(0, 0) && selected(15, 6) && !unread("mdEdOut0_6"), "SORTIE does not show MAIN from the Global");
+			element(doc, "mdEdOut4_2").Click();
+			context.Update();
+			require(md.getTrackOutput(4) == Output::C && selected(4, 2) && !selected(4, 6), "a click did not route track 5 to C");
+			// A Global dump requested before a routing write does not undo it
+			md.requestAutomationState();
+			status(0x01, 0);
+			element(doc, "mdEdOut4_3").Click();
+			md.parseSysexMessage(mdAutomationTest::makeGlobalDump(g_model, 0, 0), synthLib::MidiEventSource::Device);
+			require(md.getTrackOutput(4) == Output::D, "a Global dump requested before the routing write undid it");
+			// A Global requested after it is the firmware's word
+			loadKit();
+			require(md.getTrackOutput(4) == Output::Main, "a Global dump requested after the write did not replace the routing");
+			element(doc, "mdEdOut4_2").Click();
+			element(doc, "mdEdOut8_0").Click();
+			element(doc, "mdEdOut12_5").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(selected(4, 2) && selected(8, 0) && selected(12, 5) && selected(0, 6), "SORTIE does not show the routing");
+			tabButton(doc, "mdEdit", "0").Click();
+			context.Update();
+#endif
 		}
 
 		if(png)

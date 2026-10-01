@@ -321,6 +321,8 @@ namespace mdAutomationTest
 		// firmware's absolute base-channel offset 0xad maps to payload offset 0xa3.
 		std::vector<uint8_t> decoded(0xa6, 0);
 		decoded[0xa3] = _base;
+		// Every track on MAIN (6), as in the factory Global; the routing sits at 0x0a
+		std::fill_n(decoded.begin(), md::automation::machinedrum::TrackCount, uint8_t{6});
 		return makeDump(_model, 0x50, _slot, decoded);
 	}
 
@@ -390,6 +392,9 @@ namespace mdAutomationTest
 		std::vector<uint8_t> decoded(1218, 0);
 		// The name: 16 bytes right after the ten-byte header makeDump adds (0x0a of the message)
 		std::copy_n(_name.begin(), std::min<size_t>(_name.size(), 16), decoded.begin());
+		// Master effects, 32 bytes at 0x487 of the message (reverb, echo, EQ, dynamix): _value + n
+		for(uint8_t index = 0; index < 32; ++index)
+			decoded[0x487 - 0x0a + index] = static_cast<uint8_t>((_value + index) & 0x7f);
 		for(uint8_t track = 0; track < md::automation::machinedrum::TrackCount;
 			++track)
 		{

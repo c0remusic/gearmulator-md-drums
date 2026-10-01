@@ -650,64 +650,118 @@
 								<div id="mdEdPickerInfo" class="mdEdPickerInfo"/>
 							</div>
 						</div>
-						<div id="mdEdMasterView" class="mdEdView" data-if="page == 16" style="height: 312dp;">
-							<div id="mdEdEcho" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 528dp; height: 124dp;">
+						<div id="mdEdMasterView" class="mdEdView" data-if="page == 16" style="height: 480dp;">
+							<div id="mdEdEcho" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 528dp; height: 208dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">RHYTHM ECHO</div>
-								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">envois : à venir</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 16dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 0dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 0dp; top: 92dp; width: 78dp;">TIME</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 106dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 90dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 90dp; top: 92dp; width: 78dp;">FB</div>
-								<input type="range" orientation="vertical" class="jucePos mdEdFader mdEdOff" value="100" style="left: 213dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 180dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 180dp; top: 92dp; width: 78dp;">LEV</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">envois : DEL des pistes</div>
+								<knob id="mdEdFx0_0" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 32dp;"/>
+								<div id="mdEdFxVal0_0" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 132dp;">TIME</div>
+								<knob id="mdEdFx0_1" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 32dp;"/>
+								<div id="mdEdFxVal0_1" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 92dp; width: 132dp;">MOD</div>
+								<knob id="mdEdFx0_2" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 32dp;"/>
+								<div id="mdEdFxVal0_2" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 92dp; width: 132dp;">MFRQ</div>
+								<knob id="mdEdFx0_3" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 32dp;"/>
+								<div id="mdEdFxVal0_3" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 92dp; width: 132dp;">FB</div>
+								<knob id="mdEdFx0_4" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 116dp;"/>
+								<div id="mdEdFxVal0_4" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 132dp;">FLTF</div>
+								<knob id="mdEdFx0_5" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 116dp;"/>
+								<div id="mdEdFxVal0_5" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 176dp; width: 132dp;">FLTW</div>
+								<knob id="mdEdFx0_6" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 116dp;"/>
+								<div id="mdEdFxVal0_6" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 176dp; width: 132dp;">MONO</div>
+								<knob id="mdEdFx0_7" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 116dp;"/>
+								<div id="mdEdFxVal0_7" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 176dp; width: 132dp;">LEV</div>
 							</div>
-							<div id="mdEdReverb" class="jucePos mdEdBlock" style="left: 556dp; top: 12dp; width: 528dp; height: 124dp;">
+							<div id="mdEdReverb" class="jucePos mdEdBlock" style="left: 556dp; top: 12dp; width: 528dp; height: 208dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">GATE BOX REVERB</div>
-								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">envois : à venir</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 16dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 0dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 0dp; top: 92dp; width: 78dp;">DEC</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 106dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 90dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 90dp; top: 92dp; width: 78dp;">DAMP</div>
-								<input type="range" orientation="vertical" class="jucePos mdEdFader mdEdOff" value="100" style="left: 213dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 180dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 180dp; top: 92dp; width: 78dp;">LEV</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 496dp;">envois : REV des pistes</div>
+								<knob id="mdEdFx1_0" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 32dp;"/>
+								<div id="mdEdFxVal1_0" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 132dp;">DVOL</div>
+								<knob id="mdEdFx1_1" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 32dp;"/>
+								<div id="mdEdFxVal1_1" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 92dp; width: 132dp;">PRED</div>
+								<knob id="mdEdFx1_2" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 32dp;"/>
+								<div id="mdEdFxVal1_2" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 92dp; width: 132dp;">DEC</div>
+								<knob id="mdEdFx1_3" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 32dp;"/>
+								<div id="mdEdFxVal1_3" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 92dp; width: 132dp;">DAMP</div>
+								<knob id="mdEdFx1_4" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 116dp;"/>
+								<div id="mdEdFxVal1_4" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 132dp;">HP</div>
+								<knob id="mdEdFx1_5" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 116dp;"/>
+								<div id="mdEdFxVal1_5" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 176dp; width: 132dp;">LP</div>
+								<knob id="mdEdFx1_6" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 116dp;"/>
+								<div id="mdEdFxVal1_6" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 176dp; width: 132dp;">GATE</div>
+								<knob id="mdEdFx1_7" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 116dp;"/>
+								<div id="mdEdFxVal1_7" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 176dp; width: 132dp;">LEV</div>
 							</div>
-							<div id="mdEdEq" class="jucePos mdEdBlock" style="left: 16dp; top: 148dp; width: 528dp; height: 124dp;">
+							<div id="mdEdEq" class="jucePos mdEdBlock" style="left: 16dp; top: 232dp; width: 528dp; height: 208dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">EQ</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 16dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 0dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 0dp; top: 92dp; width: 78dp;">LF</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 106dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 90dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 90dp; top: 92dp; width: 78dp;">LG</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 196dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 180dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 180dp; top: 92dp; width: 78dp;">HF</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 286dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 270dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 270dp; top: 92dp; width: 78dp;">HG</div>
+								<knob id="mdEdFx2_0" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 32dp;"/>
+								<div id="mdEdFxVal2_0" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 132dp;">LF</div>
+								<knob id="mdEdFx2_1" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 32dp;"/>
+								<div id="mdEdFxVal2_1" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 92dp; width: 132dp;">LG</div>
+								<knob id="mdEdFx2_2" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 32dp;"/>
+								<div id="mdEdFxVal2_2" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 92dp; width: 132dp;">HF</div>
+								<knob id="mdEdFx2_3" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 32dp;"/>
+								<div id="mdEdFxVal2_3" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 92dp; width: 132dp;">HG</div>
+								<knob id="mdEdFx2_4" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 116dp;"/>
+								<div id="mdEdFxVal2_4" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 132dp;">PF</div>
+								<knob id="mdEdFx2_5" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 116dp;"/>
+								<div id="mdEdFxVal2_5" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 176dp; width: 132dp;">PG</div>
+								<knob id="mdEdFx2_6" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 116dp;"/>
+								<div id="mdEdFxVal2_6" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 176dp; width: 132dp;">PQ</div>
+								<knob id="mdEdFx2_7" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 116dp;"/>
+								<div id="mdEdFxVal2_7" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 176dp; width: 132dp;">GAIN</div>
 							</div>
-							<div id="mdEdDynamix" class="jucePos mdEdBlock" style="left: 556dp; top: 148dp; width: 528dp; height: 124dp;">
+							<div id="mdEdDynamix" class="jucePos mdEdBlock" style="left: 556dp; top: 232dp; width: 528dp; height: 208dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 496dp;">DYNAMIX</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 16dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 0dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 0dp; top: 92dp; width: 78dp;">TRHD</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 106dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 90dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 90dp; top: 92dp; width: 78dp;">RAT</div>
-								<knob class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdOff" style="left: 196dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 180dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 180dp; top: 92dp; width: 78dp;">KNEE</div>
-								<input type="range" orientation="vertical" class="jucePos mdEdFader mdEdOff" value="100" style="left: 303dp; top: 32dp;"/>
-								<div class="jucePos juceLabel mdEdValue mdEdOff" style="left: 270dp; top: 78dp; width: 78dp;">—</div>
-								<div class="jucePos juceLabel mdEdName mdEdOff" style="left: 270dp; top: 92dp; width: 78dp;">OUT</div>
+								<knob id="mdEdFx3_0" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 32dp;"/>
+								<div id="mdEdFxVal3_0" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 132dp;">ATCK</div>
+								<knob id="mdEdFx3_1" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 32dp;"/>
+								<div id="mdEdFxVal3_1" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 92dp; width: 132dp;">REL</div>
+								<knob id="mdEdFx3_2" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 32dp;"/>
+								<div id="mdEdFxVal3_2" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 92dp; width: 132dp;">TRHD</div>
+								<knob id="mdEdFx3_3" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 32dp;"/>
+								<div id="mdEdFxVal3_3" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 78dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 92dp; width: 132dp;">RTIO</div>
+								<knob id="mdEdFx3_4" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 43dp; top: 116dp;"/>
+								<div id="mdEdFxVal3_4" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 0dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 132dp;">KNEE</div>
+								<knob id="mdEdFx3_5" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 175dp; top: 116dp;"/>
+								<div id="mdEdFxVal3_5" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 132dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 132dp; top: 176dp; width: 132dp;">HP</div>
+								<knob id="mdEdFx3_6" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 307dp; top: 116dp;"/>
+								<div id="mdEdFxVal3_6" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 264dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 264dp; top: 176dp; width: 132dp;">OUTG</div>
+								<knob id="mdEdFx3_7" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob mdEdUnread" min="0" max="127" value="0" default="-1" style="left: 439dp; top: 116dp;"/>
+								<div id="mdEdFxVal3_7" class="jucePos juceLabel mdEdValue mdEdUnread" style="left: 396dp; top: 162dp; width: 132dp;">—</div>
+								<div class="jucePos juceLabel mdEdName" style="left: 396dp; top: 176dp; width: 132dp;">MIX</div>
 							</div>
-							<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 284dp; width: 1036dp;">Effets master du kit : ils ne sont pas encore des paramètres du plug-in. Seules les pistes en MAIN passent par ces effets.</div>
+							<div id="mdEdMasterInfo" class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 452dp; width: 1036dp;">Effets master du kit, envoyés au firmware à chaque mouvement ; l'hôte ne les automatise pas (hors paramètres du plug-in). Seules les pistes en MAIN y passent.</div>
 						</div>
 					</div>
 				</div>
@@ -734,13 +788,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut0_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut0_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut0_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut0_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut0_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut0_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut0_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow1" class="jucePos mdEdRow" data-model="part1" style="left: 0dp; top: 74dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -750,13 +804,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut1_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut1_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut1_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut1_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut1_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut1_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut1_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow2" class="jucePos mdEdRow" data-model="part2" style="left: 0dp; top: 100dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -766,13 +820,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut2_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut2_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut2_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut2_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut2_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut2_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut2_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow3" class="jucePos mdEdRow" data-model="part3" style="left: 0dp; top: 126dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -782,13 +836,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut3_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut3_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut3_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut3_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut3_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut3_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut3_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow4" class="jucePos mdEdRow" data-model="part4" style="left: 0dp; top: 152dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -798,13 +852,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut4_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut4_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut4_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut4_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut4_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut4_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut4_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow5" class="jucePos mdEdRow" data-model="part5" style="left: 0dp; top: 178dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -814,13 +868,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut5_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut5_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut5_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut5_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut5_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut5_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut5_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow6" class="jucePos mdEdRow" data-model="part6" style="left: 0dp; top: 204dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -830,13 +884,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut6_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut6_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut6_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut6_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut6_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut6_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut6_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow7" class="jucePos mdEdRow" data-model="part7" style="left: 0dp; top: 230dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -846,13 +900,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut7_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut7_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut7_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut7_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut7_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut7_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut7_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow8" class="jucePos mdEdRow" data-model="part8" style="left: 0dp; top: 256dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -862,13 +916,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut8_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut8_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut8_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut8_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut8_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut8_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut8_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow9" class="jucePos mdEdRow" data-model="part9" style="left: 0dp; top: 282dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -878,13 +932,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut9_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut9_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut9_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut9_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut9_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut9_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut9_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow10" class="jucePos mdEdRow" data-model="part10" style="left: 0dp; top: 308dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -894,13 +948,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut10_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut10_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut10_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut10_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut10_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut10_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut10_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow11" class="jucePos mdEdRow" data-model="part11" style="left: 0dp; top: 334dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -910,13 +964,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut11_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut11_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut11_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut11_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut11_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut11_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut11_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow12" class="jucePos mdEdRow" data-model="part12" style="left: 0dp; top: 360dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -926,13 +980,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut12_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut12_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut12_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut12_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut12_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut12_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut12_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow13" class="jucePos mdEdRow" data-model="part13" style="left: 0dp; top: 386dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -942,13 +996,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut13_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut13_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut13_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut13_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut13_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut13_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut13_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow14" class="jucePos mdEdRow" data-model="part14" style="left: 0dp; top: 412dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -958,13 +1012,13 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut14_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut14_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut14_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut14_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut14_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut14_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut14_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
 							<div id="mdEdLevelRow15" class="jucePos mdEdRow" data-model="part15" style="left: 0dp; top: 438dp; width: 708dp; height: 26dp;">
 								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
@@ -974,15 +1028,15 @@
 								<knob class="jucePos mdEdNum" param="Pan" style="left: 270dp; top: 1dp;">{{Pan_text}}</knob>
 								<knob class="jucePos mdEdNum" param="DelaySend" style="left: 360dp; top: 1dp;">{{DelaySend_text}}</knob>
 								<knob class="jucePos mdEdNum" param="ReverbSend" style="left: 450dp; top: 1dp;">{{ReverbSend_text}}</knob>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
-								<div class="jucePos mdEdSeg mdEdOff" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
+								<div id="mdEdOut15_6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 556dp; top: 1dp; width: 40dp;">MAIN</div>
+								<div id="mdEdOut15_0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 596dp; top: 1dp; width: 16dp;">A</div>
+								<div id="mdEdOut15_1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 612dp; top: 1dp; width: 16dp;">B</div>
+								<div id="mdEdOut15_2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 628dp; top: 1dp; width: 16dp;">C</div>
+								<div id="mdEdOut15_3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 644dp; top: 1dp; width: 16dp;">D</div>
+								<div id="mdEdOut15_4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 660dp; top: 1dp; width: 16dp;">E</div>
+								<div id="mdEdOut15_5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 676dp; top: 1dp; width: 16dp;">F</div>
 								</div>
-							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 472dp; width: 676dp;">MD : MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F. Choix de sortie : à venir.</div>
+							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 472dp; width: 676dp;">MD : MAIN (A/B stéréo, pan, effets master) ou une seule sortie A à F ; réglage du Global, envoyé au firmware.</div>
 						</div>
 						<div id="mdEdOutputs" class="jucePos mdEdBlock" style="left: 736dp; top: 12dp; width: 348dp; height: 496dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">SORTIES</div>

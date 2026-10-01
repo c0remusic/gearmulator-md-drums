@@ -72,6 +72,9 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 3. Écriture : le firmware garde le pattern envoyé tel quel (relu identique), à l'arrêt comme en lecture. En lecture, l'écriture est suivie de 75 à 81 ms de silence complet (0 ms sur les 3 s d'avant) : raté audible dans l'émulation. Non vérifié sur une vraie machine.
 4. Une requête de kit rend le kit stocké : la machine assignée n'y apparaît qu'après sauvegarde. Le dump de pattern rend l'état en cours : trigs et lock posés en face avant, non sauvés, y figurent.
 
+5. Effets master : 32 octets bruts à 0x487 du dump de kit, dans l'ordre **reverb, echo, EQ, dynamix**. `$5D` (echo), `$5E` (reverb), `$5F` (EQ) et `$60` (dynamix) `<paramètre> <valeur>` écrivent là où le décodeur lit (paramètre n de l'effet n changé, kit sauvé, relu : exactement ces 4 octets et la somme de contrôle changent). Valeurs du kit d'usine 1 : echo 16 0 32 27 0 44 0 71, reverb 0 0 68 50 1 82 71 109, EQ 64 ×7 puis 127, dynamix 127 ×6 puis 0 0.
+6. Routage des pistes : 16 octets bruts à 0x0a du dump Global (0 à 5 = A à F, 6 = MAIN ; tout en MAIN en usine). `$5C <piste> <sortie>` change l'octet de la piste, et une requête Global le montre aussitôt, sans sauvegarde : le Global est vivant.
+
 Non vérifié : l'ordre des pistes par la face avant (DOWN en enregistrement en grille ne change pas de piste) ; il repose sur la cohérence du pattern d'usine avec son kit.
 
 ## Travail restant
@@ -85,32 +88,25 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
 - Le contrôleur garde kit, nom et pattern (`getCurrentKit`, `getKitName`, `getCurrentPattern`, `getSelectionRevision`). Le statut Pattern est désormais sondé toutes les 5 s sur les deux modèles (le MM répond aussi).
 - Limite : une requête de kit rend le kit stocké, donc un nom changé en face avant et non sauvé ne s'affiche pas.
 
-### 2. Effets master (MD)
+### 2. Effets master (MD) (fait)
 
-- Vue MASTER : aujourd'hui 4 blocs inactifs de 3 ou 4 contrôles. Chaque effet a 8 paramètres (noms d'après MCL, `MDParams.h`) :
+- Vue MASTER : 4 blocs de 6 colonnes, 8 knobs chacun en 2 rangées (208 dp, la vue fait 480 dp). Noms d'après MCL (`MDParams.h`) :
   - RHYTHM ECHO : TIME MOD MFRQ FB FLTF FLTW MONO LEV
   - GATE BOX REVERB : DVOL PRED DEC DAMP HP LP GATE LEV
   - EQ : LF LG HF HG PF PG PQ GAIN
   - DYNAMIX : ATCK REL TRHD RTIO KNEE HP OUTG MIX
-- Lecture, dans le dump de kit MD : 32 octets bruts juste après la section LFO. Offsets calculés à partir de MCL (`MDKit::fromSysex`) :
-  - nom : 0x0a, 16 octets bruts ;
-  - paramètres : 0x1a, 16 × 24 octets bruts (déjà lus) ;
-  - niveaux : 0x19a, 16 octets bruts (déjà lus) ;
-  - machines : 0x1aa, 64 octets en groupes 7 bits, soit 74 octets (déjà lus) ;
-  - LFO : 0x1f4, 16 × 36 octets en 7 bits, soit 659 octets ;
-  - effets master : 0x487, 32 octets bruts, dans l'ordre **reverb, echo, EQ, dynamix** (8 chacun) ;
-  - groupes trig/mute : 0x4a7, 32 octets en 7 bits ;
-  - puis somme de contrôle, longueur et F7, pour une longueur totale de 0x4d1.
-  - À confirmer sur un vrai dump : l'ordre vient des noms de membres de MCL.
-- Écriture : un message par paramètre, `F0 00 20 3C 02 00 <id> <param 0..7> <valeur> F7`, avec `id` = `$5D` echo, `$5E` gate box reverb, `$5F` EQ, `$60` dynamix (`MDParams.h`, `MD::setFXParam` en 3 octets de données). MCL envoie parfois une forme à 4 octets (0x7F en plus) et une forme groupée `0x70 <id> 8 valeurs` : ce sont des extensions de son firmware, à ne pas utiliser.
-- Même politique que les machines : un dump appliqué remplace, un dump d'inspection du même slot ne remplit que l'inconnu.
-- UI proposée : 4 blocs de 6 colonnes, 8 knobs en 2 rangées (hauteur 208 dp chacun, la vue tient en 468 dp). Knobs non liés à un paramètre hôte (ce ne sont pas des paramètres du plug-in), valeurs posées par le C++ et événements `Change` renvoyés au contrôleur.
+- Lecture : `KitDump::masterEffects`, 32 octets bruts à 0x487 du dump de kit MD (longueur 0x4d1), dans l'ordre reverb, echo, EQ, dynamix (confirmé, voir « Vérifié avec une ROM » point 5). Pour mémoire, les sections du dump : nom 0x0a (16 octets bruts), paramètres 0x1a (16 × 24), niveaux 0x19a (16), machines 0x1aa (64 octets en 7 bits, 74), LFO 0x1f4 (16 × 36 en 7 bits, 659), effets master 0x487 (32 bruts), groupes trig/mute 0x4a7 (32 en 7 bits), puis somme de contrôle, longueur et F7.
+- Écriture : `masterEffectChange`, `F0 00 20 3C 02 00 <id> <param 0..7> <valeur> F7` avec `id` = `$5D` echo, `$5E` gate box reverb, `$5F` EQ, `$60` dynamix (confirmé). MCL envoie parfois une forme à 4 octets (0x7F en plus) et une forme groupée `0x70 <id> 8 valeurs` : extensions de son firmware, non utilisées.
+- Contrôleur : `getMasterEffect`, `setMasterEffect`, `getMasterEffectRevision`. Même politique que les machines : un dump appliqué remplace, un dump d'inspection du même slot ne remplit que l'inconnu.
+- `mdMasterEffectsView.*` : knobs non liés à un paramètre hôte (ce ne sont pas des paramètres du plug-in), valeurs posées par le C++, « — » et grisés tant qu'inconnus ; un mouvement envoie la valeur.
+- Limite : un effet changé en face avant n'apparaît qu'au prochain chargement de kit (la requête rend le kit stocké).
 
-### 3. Sortie par piste (MD) et bus (MM)
+### 3. Sortie par piste (MD) (fait) et bus (MM)
 
-- **MD** : routage dans le Global, 16 octets bruts à 0x0a..0x19 du dump Global (`$50`), avant la table des notes (0x1a, 128 octets en 7 bits), ce qui place le canal de base à 0xad comme dans `parseGlobalDump`. Valeurs : 0 à 5 = sorties A à F, 6 = MAIN. Écriture : `F0 00 20 3C 02 00 5C <piste> <sortie> F7` (`MD_SET_TRACK_ROUTING_ID`, `MD::setTrackRouting`). Le contrôleur lit déjà les dumps Global (canal de base, sync) : y ajouter le routage.
-  - UI : colonne SORTIE de MIX (`selector()` dans `gen_editor.py`, aujourd'hui des `div.mdEdSeg.mdEdOff`), à rendre cliquable avec l'état courant surligné.
-- **MM** : format inconnu. MCL ne connaît qu'un octet `globalRouting` dans le Global et déclare `MNM_SET_TRACK_ROUTING_ID = 0x5C` avec des drapeaux `AB=1, CD=2, EF=4`, sans jamais s'en servir. Il faut le manuel MM (annexe SysEx) ou un dump Global réel à comparer avant/après un changement de routage. En attendant, garder la colonne BUS inactive.
+- **MD** : `GlobalDump::trackOutputs`, 16 octets bruts à 0x0a du dump Global (0 à 5 = A à F, 6 = MAIN), et `trackRouting` (`$5C <piste> <sortie>`), confirmés (point 6). Le Global est vivant et relu à chaque sondage de 5 s : un routage changé en face avant apparaît en 5 s au plus.
+  - Contrôleur : `getTrackOutput`, `setTrackOutput`, `getRoutingRevision`. Un dump Global demandé avant une écriture de routage ne l'annule pas (il ne la contient pas encore) ; le suivant fait foi.
+  - UI : colonne SORTIE de MIX (`mdTrackRoutingView.*`), segments cliquables `mdEdOut<piste>_<sortie>`, la sortie choisie en orange, la rangée grisée tant que le routage est inconnu.
+- **MM** : format inconnu. MCL ne connaît qu'un octet `globalRouting` dans le Global et déclare `MNM_SET_TRACK_ROUTING_ID = 0x5C` avec des drapeaux `AB=1, CD=2, EF=4`, sans jamais s'en servir. Il faut le manuel MM (annexe SysEx) ou un dump Global réel à comparer avant/après un changement de routage. En attendant, la colonne BUS reste inactive.
 
 ### 4. Vu-mètres, pistes routées, « ACTIF DANS LE DAW »
 

@@ -42,11 +42,35 @@ namespace md::automation::sysex
 		uint8_t value;
 	};
 
+	// Where a Machinedrum track plays: one of the six individual outputs, or the
+	// main pair (stereo, pan and master effects).
+	enum class TrackOutput : uint8_t
+	{
+		A, B, C, D, E, F,
+		Main
+	};
+	using TrackOutputs = std::array<TrackOutput, machinedrum::TrackCount>;
+
 	struct GlobalDump
 	{
 		uint8_t slot;
 		uint8_t baseChannel;
+		// Machinedrum only: the output of each track.
+		std::optional<TrackOutputs> trackOutputs;
 	};
+
+	// The Machinedrum Kit's four master effects, in the order of their SysEx ids
+	// ($5D to $60), 8 parameters each.
+	enum class MasterEffect : uint8_t
+	{
+		Echo,       // RHYTHM ECHO
+		Reverb,     // GATE BOX REVERB
+		Eq,
+		Dynamix
+	};
+	constexpr uint8_t MasterEffectCount = 4;
+	constexpr uint8_t MasterEffectParameters = 8;
+	using MasterEffects = std::array<std::array<uint8_t, MasterEffectParameters>, MasterEffectCount>;
 
 	struct KitDump
 	{
@@ -57,6 +81,8 @@ namespace md::automation::sysex
 		// As the machine shows it, trailing spaces removed: up to 16 characters on
 		// the Machinedrum, 11 on the Monomachine.
 		std::string name;
+		// Machinedrum only, indexed by MasterEffect.
+		std::optional<MasterEffects> masterEffects;
 	};
 
 	// The first 32 steps of a Machinedrum pattern, as far as the editor shows them.
@@ -142,6 +168,12 @@ namespace md::automation::sysex
 	// go out as id - 128 with the UW flag; the Monomachine form asks for no page
 	// initialisation. Empty for a track or machine the model does not have.
 	std::optional<Message> assignMachine(MachineModel _model, uint8_t _track, uint16_t _machine);
+	// Machinedrum: one parameter (0..7) of a master effect of the live Kit, $5D to $60.
+	// Empty for a parameter or value out of range.
+	std::optional<Message> masterEffectChange(MasterEffect _effect, uint8_t _parameter, uint8_t _value);
+	// Machinedrum: the output of a track (SET TRACK ROUTING, $5C), kept in the Global.
+	// Empty for a track or output out of range.
+	std::optional<Message> trackRouting(uint8_t _track, TrackOutput _output);
 
 	std::optional<StatusResponse> parseStatusResponse(MachineModel _model,
 		MessageView _message);

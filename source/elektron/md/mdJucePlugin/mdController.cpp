@@ -47,6 +47,10 @@ namespace mdJucePlugin
 	{
 		for(auto& machine : m_trackMachines)
 			machine.store(md::machines::g_unknown, std::memory_order_relaxed);
+		for(auto& value : m_masterEffects)
+			value.store(0xff, std::memory_order_relaxed);
+		for(auto& output : m_trackOutputs)
+			output.store(0xff, std::memory_order_relaxed);
 		registerParams(_p, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
 			return _nonPartSensitive ? juce::String("Global")
@@ -338,6 +342,77 @@ namespace mdJucePlugin
 
 		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
 			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	void Controller::storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, const bool _authoritative)
+	{
+		bool changed = false;
+		for(uint8_t effect = 0; effect < _effects.size(); ++effect)
+		{
+			for(uint8_t parameter = 0; parameter < _effects[effect].size(); ++parameter)
+			{
+				auto& stored = m_masterEffects[effect * md::automation::sysex::MasterEffectParameters + parameter];
+				const auto previous = stored.load(std::memory_order_acquire);
+				if((!_authoritative && previous != 0xff) || previous == _effects[effect][parameter])
+					continue;
+				stored.store(_effects[effect][parameter], std::memory_order_release);
+				changed = true;
+			}
+		}
+		if(changed)
+			m_masterEffectRevision.fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	std::optional<uint8_t> Controller::getMasterEffect(const md::automation::sysex::MasterEffect _effect,
+		const uint8_t _parameter) const
+	{
+		const auto effect = static_cast<uint8_t>(_effect);
+		if(effect >= md::automation::sysex::MasterEffectCount || _parameter >= md::automation::sysex::MasterEffectParameters)
+			return std::nullopt;
+		const auto value = m_masterEffects[effect * md::automation::sysex::MasterEffectParameters + _parameter]
+			.load(std::memory_order_acquire);
+		return value <= 0x7f ? std::optional<uint8_t>(value) : std::nullopt;
+	}
+
+	bool Controller::setMasterEffect(const md::automation::sysex::MasterEffect _effect, const uint8_t _parameter,
+		const uint8_t _value)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::masterEffectChange(_effect, _parameter, _value);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		auto& stored = m_masterEffects[static_cast<uint8_t>(_effect) * md::automation::sysex::MasterEffectParameters + _parameter];
+		if(stored.exchange(_value, std::memory_order_acq_rel) != _value)
+			m_masterEffectRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	std::optional<md::automation::sysex::TrackOutput> Controller::getTrackOutput(const uint8_t _track) const
+	{
+		if(_track >= m_trackOutputs.size())
+			return std::nullopt;
+		const auto output = m_trackOutputs[_track].load(std::memory_order_acquire);
+		return output <= static_cast<uint8_t>(md::automation::sysex::TrackOutput::Main)
+			? std::optional<md::automation::sysex::TrackOutput>(static_cast<md::automation::sysex::TrackOutput>(output))
+			: std::nullopt;
+	}
+
+	bool Controller::setTrackOutput(const uint8_t _track, const md::automation::sysex::TrackOutput _output)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::trackRouting(_track, _output);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		++m_routingWrites;
+		if(m_trackOutputs[_track].exchange(static_cast<uint8_t>(_output), std::memory_order_acq_rel) != static_cast<uint8_t>(_output))
+			m_routingRevision.fetch_add(1, std::memory_order_acq_rel);
 		return true;
 	}
 
@@ -999,6 +1074,7 @@ namespace mdJucePlugin
 					m_synchronizationEpoch.fetch_add(1, std::memory_order_acq_rel);
 					m_haveGlobal.store(false, std::memory_order_release);
 					m_globalSynchronization.dumpRequestSent(now);
+					m_routingWritesAtGlobalRequest = m_routingWrites;
 					sendSynchronizationRequest(toPluginSysex(
 						md::automation::sysex::globalRequest(m_model, status->value)));
 				}
@@ -1086,6 +1162,19 @@ namespace mdJucePlugin
 			m_synchronizationEpoch.fetch_add(1, std::memory_order_acq_rel);
 			m_baseChannel.store(global->baseChannel, std::memory_order_release);
 			m_haveGlobal.store(true, std::memory_order_release);
+			// The Global is live: its routing replaces what was known, unless a routing
+			// write went out after this dump was requested.
+			if(global->trackOutputs && m_routingWrites == m_routingWritesAtGlobalRequest)
+			{
+				bool changed = false;
+				for(size_t track = 0; track < m_trackOutputs.size(); ++track)
+				{
+					const auto output = static_cast<uint8_t>((*global->trackOutputs)[track]);
+					changed |= m_trackOutputs[track].exchange(output, std::memory_order_acq_rel) != output;
+				}
+				if(changed)
+					m_routingRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
 			completeSynchronizationIfReady();
 			return true;
 		}
@@ -1108,10 +1197,14 @@ namespace mdJucePlugin
 			{
 				applyKitParameters(kit->parameters);
 				storeKitMachines(kit->machines, true);
+				if(kit->masterEffects)
+					storeMasterEffects(*kit->masterEffects, true);
 			}
 			else
 			{
 				storeKitMachines(kit->machines, false);
+				if(kit->masterEffects)
+					storeMasterEffects(*kit->masterEffects, false);
 				// Even when the stored dump must not replace the live cache, retain its
 				// raw values for firmware-backed diagnostics.
 				for(const auto& change : kit->parameters)

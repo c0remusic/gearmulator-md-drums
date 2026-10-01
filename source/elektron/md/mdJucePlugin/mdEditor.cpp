@@ -7,6 +7,8 @@
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
 #include "mdUnreadValues.h"
+#include "mdMasterEffectsView.h"
+#include "mdTrackRoutingView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -741,6 +743,20 @@ namespace mdJucePlugin
 		{
 			m_unreadValues = std::make_unique<UnreadValues>(m_controller, *document);
 			m_unreadValues->update();
+		}
+
+		// MASTER (Machinedrum): the Kit's master effects.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdFx0_0"))
+		{
+			m_masterEffectsView = std::make_unique<MasterEffectsView>(m_controller, *document);
+			m_masterEffectsView->update();
+		}
+
+		// MIX (Machinedrum): the output of each track.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdOut0_0"))
+		{
+			m_trackRoutingView = std::make_unique<TrackRoutingView>(m_controller, *document);
+			m_trackRoutingView->update();
 		}
 
 		// The COURBES row under SON, when the window leaves room for it.
@@ -2144,7 +2160,9 @@ namespace mdJucePlugin
 		const bool curvesChanged = m_curveView && m_curveView->update();
 		const bool screenChanged = m_kitPatternScreen && m_kitPatternScreen->update();
 		const bool unreadChanged = m_unreadValues && m_unreadValues->update();
-		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged)
+		const bool effectsChanged = m_masterEffectsView && m_masterEffectsView->update();
+		const bool routingChanged = m_trackRoutingView && m_trackRoutingView->update();
+		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 
