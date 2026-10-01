@@ -15,6 +15,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <string>
 
 namespace mdJucePlugin
 {
@@ -90,6 +91,18 @@ namespace mdJucePlugin
 		// and the editor keep the same values whatever the assignment did to them.
 		// False for a track or machine the model does not have.
 		bool assignMachine(uint8_t _part, uint16_t _machine);
+
+		// The Kit and pattern the firmware has selected, 0xff until a status reply
+		// told them. Status is polled every 5 s, so a selection made on the front
+		// panel shows within that time.
+		uint8_t getCurrentKit() const { return m_currentKit.load(std::memory_order_acquire); }
+		uint8_t getCurrentPattern() const { return m_currentPattern.load(std::memory_order_acquire); }
+		// Name of the current Kit, empty until its dump arrived. A Kit dump request
+		// returns the stored Kit: a name changed on the front panel and not saved
+		// does not show.
+		std::string getKitName() const;
+		// Increments whenever the current Kit, its name or the current pattern changes.
+		uint64_t getSelectionRevision() const { return m_selectionRevision.load(std::memory_order_acquire); }
 
 		// Machinedrum only: asks the firmware for the current pattern number, then
 		// for that pattern's dump. False on the Monomachine or while the firmware is
@@ -232,6 +245,10 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_transmittedAutomationDigest{14695981039346656037ull};
 		std::atomic<uint8_t> m_currentGlobal{0xff};
 		std::atomic<uint8_t> m_currentKit{0xff};
+		std::atomic<uint8_t> m_currentPattern{0xff};
+		mutable std::mutex m_kitNameMutex;
+		std::string m_kitName;                      // of m_currentKit, under m_kitNameMutex
+		std::atomic<uint64_t> m_selectionRevision{0};
 		std::array<std::atomic<uint16_t>, md::automation::machinedrum::TrackCount> m_trackMachines{};
 		std::atomic<uint64_t> m_machineRevision{0};
 		mutable std::mutex m_patternMutex;

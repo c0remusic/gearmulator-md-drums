@@ -357,6 +357,12 @@ namespace mdJucePlugin
 		return m_pattern;
 	}
 
+	std::string Controller::getKitName() const
+	{
+		const std::lock_guard lock(m_kitNameMutex);
+		return m_kitName;
+	}
+
 	bool Controller::editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit)
 	{
 		if(m_model != md::MachineModel::Machinedrum)
@@ -474,6 +480,10 @@ namespace mdJucePlugin
 			m_kitSynchronization.statusRequestSent(now);
 			sendSynchronizationRequest(toPluginSysex(md::automation::sysex::statusRequest(m_model,
 				md::automation::sysex::StatusParameter::Kit)));
+			// The pattern number with it, so the screen does not wait for the first poll
+			if(m_currentPattern.load(std::memory_order_acquire) == 0xff)
+				sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+					md::automation::sysex::StatusParameter::Pattern));
 		}
 	}
 
@@ -540,11 +550,10 @@ namespace mdJucePlugin
 					md::automation::sysex::statusRequest(m_model,
 						md::automation::sysex::StatusParameter::Kit)));
 			}
-			// Once a pattern is shown, notice another one selected on the front panel.
-			if(m_model == md::MachineModel::Machinedrum
-				&& m_patternRevision.load(std::memory_order_acquire) > 0)
-				sendEditorSysex(md::automation::sysex::statusRequest(m_model,
-					md::automation::sysex::StatusParameter::Pattern));
+			// The pattern number for the editor's screen; once a Machinedrum pattern
+			// is shown, another one selected on the front panel is read again.
+			sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+				md::automation::sysex::StatusParameter::Pattern));
 			return;
 		}
 		sendMissingSynchronizationRequests();
@@ -979,6 +988,15 @@ namespace mdJucePlugin
 					return true;
 				const auto previousKit = m_currentKit.exchange(status->value,
 					std::memory_order_acq_rel);
+				if(previousKit != status->value)
+				{
+					// The name follows with the new Kit's dump
+					{
+						const std::lock_guard lock(m_kitNameMutex);
+						m_kitName.clear();
+					}
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
 				if(observation.requestDump)
 				{
 					const auto forceApply = m_forceApplyRequestedKitDump.exchange(
@@ -1012,6 +1030,8 @@ namespace mdJucePlugin
 				return true;
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
+				if(m_currentPattern.exchange(status->value, std::memory_order_acq_rel) != status->value)
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
 				// A status reply leads to a dump when requestPattern asked for one, or
 				// when the pattern shown is no longer the current one.
 				if(m_model == md::MachineModel::Machinedrum && !m_patternWanted.load(std::memory_order_acquire))
@@ -1050,6 +1070,15 @@ namespace mdJucePlugin
 		{
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
+			if(kit->slot == m_currentKit.load(std::memory_order_acquire))
+			{
+				const std::lock_guard lock(m_kitNameMutex);
+				if(m_kitName != kit->name)
+				{
+					m_kitName = kit->name;
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
+			}
 			if(m_applyRequestedKitDump.exchange(false, std::memory_order_acq_rel))
 			{
 				applyKitParameters(kit->parameters);

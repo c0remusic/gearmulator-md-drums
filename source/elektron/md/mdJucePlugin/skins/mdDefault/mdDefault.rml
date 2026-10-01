@@ -16,7 +16,7 @@
 			<div class="jucePos juceLabel mdEdLogo" style="left: 16dp; top: 6dp; width: 168dp;">GEARMULATOR MD</div>
 			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 196dp;">FACE AVANT</button>
 			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 286dp;">ÉDITEUR</button>
-			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: 376dp; top: 4dp; width: 168dp;">KIT —  ·  PATTERN —</div>
+			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: 376dp; top: 4dp; width: 168dp;"><div id="mdEdScreenMain" class="mdEdScreenMain">KIT — · PATTERN —</div><div id="mdEdScreenName" class="mdEdScreenName"></div></div>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: 556dp;">JOUER</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: 646dp;">SON</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 736dp;">MIX</button>

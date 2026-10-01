@@ -5,6 +5,7 @@
 #include "mdStepGrid.h"
 #include "mdViewLayout.h"
 #include "mdCurveView.h"
+#include "mdKitPatternScreen.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -724,6 +725,13 @@ namespace mdJucePlugin
 		// The top bar shows the front panel or the editor, or both in a tall window.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
 			m_viewLayout = std::make_unique<ViewLayout>(*document);
+
+		// Its screen shows the selected Kit and pattern.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdScreenMain"))
+		{
+			m_kitPatternScreen = std::make_unique<KitPatternScreen>(m_controller, *document);
+			m_kitPatternScreen->update();
+		}
 
 		// The COURBES row under SON, when the window leaves room for it.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdCurves"))
@@ -2124,7 +2132,8 @@ namespace mdJucePlugin
 		const bool machineChanged = m_machinePicker && m_machinePicker->update();
 		const bool stepsChanged = m_stepGrid && m_stepGrid->update(nowMilliseconds);
 		const bool curvesChanged = m_curveView && m_curveView->update();
-		if(machineChanged || stepsChanged || curvesChanged)
+		const bool screenChanged = m_kitPatternScreen && m_kitPatternScreen->update();
+		if(machineChanged || stepsChanged || curvesChanged || screenChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

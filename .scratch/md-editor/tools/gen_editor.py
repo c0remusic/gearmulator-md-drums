@@ -352,7 +352,7 @@ topbar = f'''		<!-- ===== Top bar: name, the FACE AVANT / ÉDITEUR switch, kit/p
 			<div class="jucePos juceLabel mdEdLogo" style="left: 16dp; top: 6dp; width: 168dp;">{LOGO}</div>
 			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(2)}dp;">FACE AVANT</button>
 			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: {colx(3)}dp;">ÉDITEUR</button>
-			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: {colx(4)}dp; top: 4dp; width: {span(2)}dp;">KIT —  ·  PATTERN —</div>
+			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: {colx(4)}dp; top: 4dp; width: {span(2)}dp;"><div id="mdEdScreenMain" class="mdEdScreenMain">KIT — · PATTERN —</div><div id="mdEdScreenName" class="mdEdScreenName"></div></div>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: {colx(6)}dp;">JOUER</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: {colx(7)}dp;">SON</button>
 			<button class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: {colx(8)}dp;">MIX</button>

@@ -15,6 +15,7 @@
 #include "mdAutomationTestSupport.h"
 #include "mdController.h"
 #include "mdCurveView.h"
+#include "mdKitPatternScreen.h"
 #include "mdLib/mdmachines.h"
 
 #include "RmlUi/Core/Context.h"
@@ -39,6 +40,15 @@ namespace mdJucePlugin
 		static void useSyntheticFirmware(Controller& _controller)
 		{
 			_controller.m_syntheticFirmwareReadyForTests = true;
+		}
+	};
+
+	// What the presentation timer does for the top bar's screen; no timer runs here.
+	struct EditorIdentityTestAccess
+	{
+		static bool updateScreen(Editor& _editor)
+		{
+			return _editor.m_kitPatternScreen && _editor.m_kitPatternScreen->update();
 		}
 	};
 }
@@ -493,6 +503,56 @@ int main()
 		require(visible(element(doc, "mdFrontPanel")) && !visible(element(doc, "mdEditor")), "606 dp window still stacked");
 		element(doc, "mdViewEditor").Click();
 		context.Update();
+
+		// The top bar's screen: the Kit and pattern the firmware selected, the Kit's name under them.
+		{
+			using Screen = mdJucePlugin::KitPatternScreen;
+			require(Screen::mainLine(0xff, 0xff) == "KIT — · PATTERN —" && Screen::mainLine(63, 127) == "KIT 64 · PATTERN H16"
+				&& Screen::mainLine(127, 0) == "KIT 128 · PATTERN A01", "screen line does not number Kits from 1 and patterns A01 to H16");
+
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			// The replies below stand for the firmware, even where a ROM was found and never booted
+			mdJucePlugin::ControllerAutomationTestAccess::useSyntheticFirmware(md);
+			const auto text = [&](const char* _id) { return std::string(element(doc, _id).GetInnerRML()); };
+			mdJucePlugin::EditorIdentityTestAccess::updateScreen(*editor);
+			context.Update();
+			require(text("mdEdScreenMain").rfind("KIT — · PATTERN ", 0) == 0 && text("mdEdScreenName").empty(),
+				"screen names a Kit before any status reply");
+
+			const uint8_t product = g_model == md::MachineModel::Monomachine ? 0x03 : 0x02;
+			const auto status = [&](const uint8_t _parameter, const uint8_t _value)
+			{
+				md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, product, 0x00, 0x72, _parameter, _value, 0xf7},
+					synthLib::MidiEventSource::Device);
+			};
+			const std::string name = g_model == md::MachineModel::Monomachine ? "NIGHT BUS" : "BROKEN DUB";
+			md.onStateLoaded();
+			status(0x01, 0);
+			status(0x02, 2);
+			md.parseSysexMessage(mdAutomationTest::makeGlobalDump(g_model, 0, 0), synthLib::MidiEventSource::Device);
+			md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, 2, 64, {}, name), synthLib::MidiEventSource::Device);
+			status(0x04, 19);
+			require(md.getCurrentKit() == 2 && md.getKitName() == name && md.getCurrentPattern() == 19,
+				"controller did not keep the selected Kit, its name and the pattern");
+			require(mdJucePlugin::EditorIdentityTestAccess::updateScreen(*editor), "screen not refreshed after the selection changed");
+			context.Update();
+			require(text("mdEdScreenMain") == "KIT 03 · PATTERN B04" && text("mdEdScreenName") == name,
+				"screen shows \"" + text("mdEdScreenMain") + "\" / \"" + text("mdEdScreenName") + "\"");
+			require(!mdJucePlugin::EditorIdentityTestAccess::updateScreen(*editor), "screen rewritten without a change");
+
+			// Another Kit, as the 5 s poll finds it: its name is unknown until its dump arrives
+			md.requestAutomationState();
+			status(0x01, 0);
+			status(0x02, 5);
+			mdJucePlugin::EditorIdentityTestAccess::updateScreen(*editor);
+			context.Update();
+			require(text("mdEdScreenMain") == "KIT 06 · PATTERN B04" && text("mdEdScreenName").empty(),
+				"screen kept the previous Kit's name");
+			md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, 5, 64, {}, name), synthLib::MidiEventSource::Device);
+			mdJucePlugin::EditorIdentityTestAccess::updateScreen(*editor);
+			context.Update();
+			require(text("mdEdScreenName") == name, "screen did not show the new Kit's name");
+		}
 
 		// Optional: MD_EDITOR_TEST_PNG=<prefix> writes snapshots of the SON and MIX pages for review.
 		if(const char* png = std::getenv("MD_EDITOR_TEST_PNG"))

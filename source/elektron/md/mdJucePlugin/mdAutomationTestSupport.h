@@ -366,14 +366,16 @@ namespace mdAutomationTest
 		return {result.begin(), result.end()};
 	}
 
-	// _machines, when given, holds one machine id per track.
+	// _machines, when given, holds one machine id per track; _name is the Kit's name.
 	inline pluginLib::SysEx makeKitDump(
 		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value,
-		const std::vector<uint16_t>& _machines = {})
+		const std::vector<uint16_t>& _machines = {}, const std::string& _name = {})
 	{
 		if(_model == md::MachineModel::Monomachine)
 		{
 			std::vector<uint8_t> decoded(698, 0);
+			// The name: the first 11 decoded bytes
+			std::copy_n(_name.begin(), std::min<size_t>(_name.size(), 11), decoded.begin());
 			for(uint8_t track = 0; track < md::automation::monomachine::TrackCount;
 				++track)
 			{
@@ -386,6 +388,8 @@ namespace mdAutomationTest
 			return makeDump(_model, 0x52, _slot, decoded);
 		}
 		std::vector<uint8_t> decoded(1218, 0);
+		// The name: 16 bytes right after the ten-byte header makeDump adds (0x0a of the message)
+		std::copy_n(_name.begin(), std::min<size_t>(_name.size(), 16), decoded.begin());
 		for(uint8_t track = 0; track < md::automation::machinedrum::TrackCount;
 			++track)
 		{

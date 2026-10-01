@@ -100,15 +100,35 @@
 .mdEdScreen
 {
 	height: 28dp;
-	line-height: 26dp;
-	padding: 0dp 12dp;
+	padding: 1dp 12dp 0dp 12dp;
 	box-sizing: border-box;
-	font-size: 13dp;
-	font-weight: bold;
-	color: #7a4a2c;
 	background-color: #101112;
 	border: 1dp #3a3d42;
 	border-radius: 3dp;
+}
+
+/* Selected Kit and pattern */
+.mdEdScreenMain
+{
+	display: block;
+	height: 13dp;
+	line-height: 13dp;
+	font-size: 11dp;
+	font-weight: bold;
+	color: #ffb347;
+	white-space: nowrap;
+}
+
+/* The Kit's name, up to 16 characters */
+.mdEdScreenName
+{
+	display: block;
+	height: 12dp;
+	line-height: 12dp;
+	font-size: 10dp;
+	color: #c98f45;
+	white-space: nowrap;
+	overflow: hidden;
 }
 
 

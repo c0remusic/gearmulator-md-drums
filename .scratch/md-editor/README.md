@@ -77,12 +77,12 @@ Non vérifié : l'ordre des pistes par la face avant (DOWN en enregistrement en 
 
 Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au plus long.
 
-### 1. Écran KIT / PATTERN de la barre du haut
+### 1. Écran KIT / PATTERN de la barre du haut (fait)
 
-- Élément `mdEdScreen`, aujourd'hui un texte fixe inactif.
-- Le contrôleur connaît déjà le kit courant (`m_currentKit`, réponse de statut `$72` paramètre Kit) et le pattern (`m_pattern->slot`, ou statut Pattern).
-- Nom du kit : MD, 16 octets ASCII à 0x0a du dump de kit (`$52`), juste avant les paramètres (0x1a) ; MM, 11 premiers octets du contenu décodé (`decodeMonomachinePayload`), avant les niveaux (0x0b).
-- Affichage proposé : `KIT 03 · NOM · PATTERN B03`. Numérotation : kits 1–64 (MD) ou 1–128 (MM), patterns A01–H16.
+- `mdKitPatternScreen.*` : première ligne `KIT 03 · PATTERN B04`, seconde ligne le nom du kit (deux lignes : l'écran fait 2 colonnes, un nom de 16 caractères ne tient pas sur une ligne à côté des numéros). Couleur de la maquette « Châssis » (`#ffb347`).
+- Nom lu par `parseKitDump` (`KitDump::name`) : MD, 16 octets à 0x0a du dump ; MM, 11 premiers octets décodés. Confirmé sur les kits d'usine : « TRX UW » (MD), « SUPERWAVES » (MM).
+- Le contrôleur garde kit, nom et pattern (`getCurrentKit`, `getKitName`, `getCurrentPattern`, `getSelectionRevision`). Le statut Pattern est désormais sondé toutes les 5 s sur les deux modèles (le MM répond aussi).
+- Limite : une requête de kit rend le kit stocké, donc un nom changé en face avant et non sauvé ne s'affiche pas.
 
 ### 2. Effets master (MD)
 
