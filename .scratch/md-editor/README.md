@@ -190,7 +190,15 @@ Plug-in (fait) :
 - État du projet : chunk `CHAN` v1 (activation, nombre d'entrées, puis pattern, passages et longueur de chacune). Les longueurs reviennent avec le projet, comme les patterns de la machine.
 - `mdChainControlTest` (unitaire) : états, remise au lecteur et reprise, chunk relu. `mdChainPluginFirmwareTest` (firmware, ~30 s) : le plug-in entier, l'hôte qui joue à 150 BPM (tête de lecture simulée), `synthLib::MidiClock`, le device, la machine qui suit l'hôte ; le statut CURRENT PATTERN, demandé à chaque pas par l'hôte, suit la chaîne A01, A02, A01 (changements à ppq 7,77, 15,77, 23,77, 31,77 pour des fins à 8, 16, 24, 32). Comme dans le plug-in, le test demande le statut Global (le device en tire le slot actif pour `HostSync`) et finit l'initialisation d'usine par un redémarrage, ce que font les minuteurs du contrôleur et du processeur.
 
-Reste : l'interface (bandeau ARRANGEMENT de JOUER, comme la maquette).
+Interface (faite, `mdChainView.*`, capture `md-chain.png`) : le bloc du bas de JOUER a deux onglets, LANE et CHAÎNE (la maquette met l'arrangement au-dessus du pattern, mais la fenêtre de 606 dp n'a pas la place ; les onglets gardent la grille entière). CHAÎNE :
+
+- seize cases, une par entrée : « A04 ×2 » puis « 32 pas » (« … » tant que la longueur n'est pas lue) ; la case choisie encadrée, celle qui joue en orange ;
+- AJOUTER A04 ajoute le pattern de la machine (statut CURRENT PATTERN) après la case choisie ; PATTERN − / +, PASSAGES − / +, ‹ DÉPLACER / DÉPLACER › agissent sur la case choisie (la dernière si aucune) ; RETIRER, VIDER ; CHAÎNE ACTIVE (orange quand activée) ;
+- la ligne d'état dit ce que fait la chaîne : « chaîne inactive », « chaîne vide : … », « lecture de la longueur des patterns… », « en attente : la machine ne suit pas l'hôte (SYSTÈME, SUIVRE L'HÔTE) », « prête : joue avec le transport de l'hôte », et en lecture « joue A04 (passage 2/2) · ensuite A05 ».
+
+`mdEditorSectionTest` construit A04 ×2, A05 par les boutons, déplace, retire, active, et vérifie chaque ligne d'état.
+
+Reste : la chaîne sur le MM (règle du firmware à mesurer, longueurs sans décodage du pattern), un choix de pattern sans passer par la machine (sélecteur A–H × 16), et le bandeau ARRANGEMENT des sources DAW et SONG MACHINE de la maquette.
 
 Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), l'échelle et le double tempo, les patterns de plus de 32 pas, une vraie machine (tout ce qui précède vient de l'émulation du firmware).
 

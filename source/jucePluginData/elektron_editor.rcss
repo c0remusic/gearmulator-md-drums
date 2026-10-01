@@ -184,6 +184,16 @@
 .mdLibKit.mdEdSelected { background-color: #2e3034; border: 1dp #8a8d93; }
 .mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
 
+/* JOUER, CHAÎNE (mdChainView.cpp): a slot per entry, pattern then passes and length; the chosen one
+   framed, the one playing in orange, an empty one dimmed */
+.mdChainSlot { box-sizing: border-box; height: 44dp; padding: 4dp 6dp; font-size: 11dp; line-height: 17dp; color: #f4f1ea;
+	background-color: #2a2c30; border: 1dp #3a3d42; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdChainSlot:hover { border-color: #8a8d93; }
+.mdChainSlot.mdEdUnread { color: #55585e; background-color: transparent; cursor: default; }
+.mdChainSlot.mdEdSelected { border: 2dp #f4f1ea; }
+.mdChainSlot.mdChainPlaying { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdChainSlot.mdChainPlaying.mdEdSelected { border-color: #f4f1ea; }
+
 /* focused step: locked values in orange over the bound value, the other controls dimmed */
 .mdEdLockValue { color: #ff6b1f; font-weight: bold; }
 /* over a control while a step with a trig has the focus: dragging it writes a lock (mdStepGrid.cpp) */

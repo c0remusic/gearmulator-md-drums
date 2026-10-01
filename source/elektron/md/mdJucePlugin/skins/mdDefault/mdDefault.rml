@@ -1607,35 +1607,69 @@
 							<div id="mdPlayStep15_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 302dp; width: 27dp; height: 16dp;"/>
 						</div>
 						<div id="mdPlayLane" class="jucePos mdEdBlock" style="left: 16dp; top: 352dp; width: 1068dp; height: 174dp;">
-							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">LANE</div>
-							<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: 812dp;">—</div>
-							<button id="mdPlayOpen" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 902dp; top: 4dp; width: 150dp;">OUVRIR DANS SON</button>
-							<div id="mdPlayParam0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 32dp; width: 41dp;">P1</div>
-							<div id="mdPlayParam1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 59dp; top: 32dp; width: 41dp;">P2</div>
-							<div id="mdPlayParam2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 102dp; top: 32dp; width: 41dp;">P3</div>
-							<div id="mdPlayParam3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 145dp; top: 32dp; width: 41dp;">P4</div>
-							<div id="mdPlayParam4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 188dp; top: 32dp; width: 41dp;">P5</div>
-							<div id="mdPlayParam5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 231dp; top: 32dp; width: 41dp;">P6</div>
-							<div id="mdPlayParam6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 274dp; top: 32dp; width: 41dp;">P7</div>
-							<div id="mdPlayParam7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 317dp; top: 32dp; width: 41dp;">P8</div>
-							<div id="mdPlayParam8" class="jucePos mdEdSeg mdEdSegChoice" style="left: 360dp; top: 32dp; width: 41dp;">AMD</div>
-							<div id="mdPlayParam9" class="jucePos mdEdSeg mdEdSegChoice" style="left: 403dp; top: 32dp; width: 41dp;">AMF</div>
-							<div id="mdPlayParam10" class="jucePos mdEdSeg mdEdSegChoice" style="left: 446dp; top: 32dp; width: 41dp;">EQF</div>
-							<div id="mdPlayParam11" class="jucePos mdEdSeg mdEdSegChoice" style="left: 489dp; top: 32dp; width: 41dp;">EQG</div>
-							<div id="mdPlayParam12" class="jucePos mdEdSeg mdEdSegChoice" style="left: 532dp; top: 32dp; width: 41dp;">BASE</div>
-							<div id="mdPlayParam13" class="jucePos mdEdSeg mdEdSegChoice" style="left: 575dp; top: 32dp; width: 41dp;">WDTH</div>
-							<div id="mdPlayParam14" class="jucePos mdEdSeg mdEdSegChoice" style="left: 618dp; top: 32dp; width: 41dp;">Q</div>
-							<div id="mdPlayParam15" class="jucePos mdEdSeg mdEdSegChoice" style="left: 661dp; top: 32dp; width: 41dp;">SRR</div>
-							<div id="mdPlayParam16" class="jucePos mdEdSeg mdEdSegChoice" style="left: 704dp; top: 32dp; width: 41dp;">DIST</div>
-							<div id="mdPlayParam17" class="jucePos mdEdSeg mdEdSegChoice" style="left: 747dp; top: 32dp; width: 41dp;">VOL</div>
-							<div id="mdPlayParam18" class="jucePos mdEdSeg mdEdSegChoice" style="left: 790dp; top: 32dp; width: 41dp;">PAN</div>
-							<div id="mdPlayParam19" class="jucePos mdEdSeg mdEdSegChoice" style="left: 833dp; top: 32dp; width: 41dp;">DEL</div>
-							<div id="mdPlayParam20" class="jucePos mdEdSeg mdEdSegChoice" style="left: 876dp; top: 32dp; width: 41dp;">REV</div>
-							<div id="mdPlayParam21" class="jucePos mdEdSeg mdEdSegChoice" style="left: 919dp; top: 32dp; width: 41dp;">LFOS</div>
-							<div id="mdPlayParam22" class="jucePos mdEdSeg mdEdSegChoice" style="left: 962dp; top: 32dp; width: 41dp;">LFOD</div>
-							<div id="mdPlayParam23" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1005dp; top: 32dp; width: 41dp;">LFOM</div>
-							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock</div>
-							<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 102dp;"/>
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;"></div>
+							<button id="mdPlayTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdPlayBottom" tabbutton="0" style="left: 16dp; top: 4dp;">LANE</button>
+							<button id="mdPlayTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdPlayBottom" tabbutton="1" style="left: 100dp; top: 4dp;">CHAÎNE</button>
+							<div id="mdPlayLanePage" class="jucePos" tabgroup="mdPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 174dp;">
+								<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 196dp; top: 4dp; width: 696dp;">—</div>
+								<button id="mdPlayOpen" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 902dp; top: 4dp; width: 150dp;">OUVRIR DANS SON</button>
+								<div id="mdPlayParam0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 32dp; width: 41dp;">P1</div>
+								<div id="mdPlayParam1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 59dp; top: 32dp; width: 41dp;">P2</div>
+								<div id="mdPlayParam2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 102dp; top: 32dp; width: 41dp;">P3</div>
+								<div id="mdPlayParam3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 145dp; top: 32dp; width: 41dp;">P4</div>
+								<div id="mdPlayParam4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 188dp; top: 32dp; width: 41dp;">P5</div>
+								<div id="mdPlayParam5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 231dp; top: 32dp; width: 41dp;">P6</div>
+								<div id="mdPlayParam6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 274dp; top: 32dp; width: 41dp;">P7</div>
+								<div id="mdPlayParam7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 317dp; top: 32dp; width: 41dp;">P8</div>
+								<div id="mdPlayParam8" class="jucePos mdEdSeg mdEdSegChoice" style="left: 360dp; top: 32dp; width: 41dp;">AMD</div>
+								<div id="mdPlayParam9" class="jucePos mdEdSeg mdEdSegChoice" style="left: 403dp; top: 32dp; width: 41dp;">AMF</div>
+								<div id="mdPlayParam10" class="jucePos mdEdSeg mdEdSegChoice" style="left: 446dp; top: 32dp; width: 41dp;">EQF</div>
+								<div id="mdPlayParam11" class="jucePos mdEdSeg mdEdSegChoice" style="left: 489dp; top: 32dp; width: 41dp;">EQG</div>
+								<div id="mdPlayParam12" class="jucePos mdEdSeg mdEdSegChoice" style="left: 532dp; top: 32dp; width: 41dp;">BASE</div>
+								<div id="mdPlayParam13" class="jucePos mdEdSeg mdEdSegChoice" style="left: 575dp; top: 32dp; width: 41dp;">WDTH</div>
+								<div id="mdPlayParam14" class="jucePos mdEdSeg mdEdSegChoice" style="left: 618dp; top: 32dp; width: 41dp;">Q</div>
+								<div id="mdPlayParam15" class="jucePos mdEdSeg mdEdSegChoice" style="left: 661dp; top: 32dp; width: 41dp;">SRR</div>
+								<div id="mdPlayParam16" class="jucePos mdEdSeg mdEdSegChoice" style="left: 704dp; top: 32dp; width: 41dp;">DIST</div>
+								<div id="mdPlayParam17" class="jucePos mdEdSeg mdEdSegChoice" style="left: 747dp; top: 32dp; width: 41dp;">VOL</div>
+								<div id="mdPlayParam18" class="jucePos mdEdSeg mdEdSegChoice" style="left: 790dp; top: 32dp; width: 41dp;">PAN</div>
+								<div id="mdPlayParam19" class="jucePos mdEdSeg mdEdSegChoice" style="left: 833dp; top: 32dp; width: 41dp;">DEL</div>
+								<div id="mdPlayParam20" class="jucePos mdEdSeg mdEdSegChoice" style="left: 876dp; top: 32dp; width: 41dp;">REV</div>
+								<div id="mdPlayParam21" class="jucePos mdEdSeg mdEdSegChoice" style="left: 919dp; top: 32dp; width: 41dp;">LFOS</div>
+								<div id="mdPlayParam22" class="jucePos mdEdSeg mdEdSegChoice" style="left: 962dp; top: 32dp; width: 41dp;">LFOD</div>
+								<div id="mdPlayParam23" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1005dp; top: 32dp; width: 41dp;">LFOM</div>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock</div>
+								<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 102dp;"/>
+							</div>
+							<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 174dp;">
+								<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: 196dp; top: 4dp; width: 706dp;">chaîne inactive</div>
+								<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 912dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>
+								<div id="mdChainSlot0" class="jucePos mdChainSlot mdEdUnread" style="left: 16dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot1" class="jucePos mdChainSlot mdEdUnread" style="left: 80dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot2" class="jucePos mdChainSlot mdEdUnread" style="left: 144dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot3" class="jucePos mdChainSlot mdEdUnread" style="left: 208dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot4" class="jucePos mdChainSlot mdEdUnread" style="left: 272dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot5" class="jucePos mdChainSlot mdEdUnread" style="left: 336dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot6" class="jucePos mdChainSlot mdEdUnread" style="left: 400dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot7" class="jucePos mdChainSlot mdEdUnread" style="left: 464dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot8" class="jucePos mdChainSlot mdEdUnread" style="left: 528dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot9" class="jucePos mdChainSlot mdEdUnread" style="left: 592dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot10" class="jucePos mdChainSlot mdEdUnread" style="left: 656dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot11" class="jucePos mdChainSlot mdEdUnread" style="left: 720dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot12" class="jucePos mdChainSlot mdEdUnread" style="left: 784dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot13" class="jucePos mdChainSlot mdEdUnread" style="left: 848dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot14" class="jucePos mdChainSlot mdEdUnread" style="left: 912dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot15" class="jucePos mdChainSlot mdEdUnread" style="left: 976dp; top: 32dp; width: 60dp;">—</div>
+								<button id="mdChainAdd" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 16dp; top: 88dp; width: 109dp;">AJOUTER</button>
+								<button id="mdChainPatternDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 131dp; top: 88dp; width: 109dp;">PATTERN −</button>
+								<button id="mdChainPatternUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 246dp; top: 88dp; width: 109dp;">PATTERN +</button>
+								<button id="mdChainPassesDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 361dp; top: 88dp; width: 109dp;">PASSAGES −</button>
+								<button id="mdChainPassesUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 476dp; top: 88dp; width: 109dp;">PASSAGES +</button>
+								<button id="mdChainMoveLeft" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 591dp; top: 88dp; width: 109dp;">‹ DÉPLACER</button>
+								<button id="mdChainMoveRight" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 706dp; top: 88dp; width: 109dp;">DÉPLACER ›</button>
+								<button id="mdChainRemove" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 821dp; top: 88dp; width: 109dp;">RETIRER</button>
+								<button id="mdChainClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 936dp; top: 88dp; width: 109dp;">VIDER</button>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 122dp; width: 1036dp;">Joue avec le transport de l'hôte, la machine le suivant (SYSTÈME). AJOUTER prend le pattern de la machine ; changé dans le dernier pas, le suivant attend un tour.</div>
+							</div>
 						</div>
 					</div>
 				</div>

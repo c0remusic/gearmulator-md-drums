@@ -21,6 +21,7 @@
 #include "mdMasterEffectsView.h"
 #include "mdOutputMetersView.h"
 #include "mdPatternView.h"
+#include "mdChainView.h"
 #include "mdStepGrid.h"
 #include "mdSystemPage.h"
 #include "mdTrackRoutingView.h"
@@ -93,6 +94,8 @@ namespace mdJucePlugin
 			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_patternView)
 				_editor.m_patternView->update();
+			if(_editor.m_chainView)
+				_editor.m_chainView->update();
 			if(_editor.m_libraryView)
 				_editor.m_libraryView->update();
 			if(_editor.m_machinePicker)
@@ -973,6 +976,82 @@ int main()
 			element(doc, "mdPlayOpen").Click();
 			context.Update();
 			require(visible(element(doc, "mdEdPageSound")) && controller.getCurrentPart() == 0, "OUVRIR DANS SON did not open SON");
+		}
+
+		// JOUER, CHAÎNE: the project's chain, built from the machine's pattern, and what it does
+		{
+			using Entries = std::vector<mdJucePlugin::ChainControl::Entry>;
+			using View = mdJucePlugin::ChainView;
+			using State = mdJucePlugin::ChainControl::State;
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			auto& chain = processor.getChainControl();
+			const auto present = [&]
+			{
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				context.Update();
+			};
+			const auto has = [&](const std::string& _id, const char* _part) { return text(_id).find(_part) != std::string::npos; };
+			tabButton(doc, "mdEdit", "2").Click();
+			tabButton(doc, "mdPlayBottom", "1").Click();
+			context.Update();
+			present();
+			require(visible(element(doc, "mdPlayChainPage")) && !visible(element(doc, "mdPlayLanePage")), "CHAÎNE tab not shown");
+			require(text("mdChainState") == "chaîne inactive" && text("mdChainSlot0") == "—"
+				&& element(doc, "mdChainSlot0").IsClassSet("mdEdUnread"), "an empty chain not shown so");
+
+			// The machine on A04: AJOUTER adds it, twice, then the second becomes A05 and the first plays twice
+			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 3, 0xf7}, synthLib::MidiEventSource::Device);
+			present();
+			require(text("mdChainAdd") == "AJOUTER A04", "AJOUTER does not name the machine's pattern: \"" + text("mdChainAdd") + "\"");
+			element(doc, "mdChainAdd").Click();
+			element(doc, "mdChainPassesUp").Click();
+			element(doc, "mdChainAdd").Click();
+			element(doc, "mdChainPatternUp").Click();
+			present();
+			require(chain.getEntries() == Entries{{3, 2}, {4, 1}}, "the chain is not A04 x2, A05");
+			require(has("mdChainSlot0", "A04") && has("mdChainSlot0", "×2") && has("mdChainSlot0", "…")
+				&& has("mdChainSlot1", "A05") && element(doc, "mdChainSlot1").IsClassSet("mdEdSelected")
+				&& !element(doc, "mdChainSlot0").IsClassSet("mdEdSelected"), "slots do not show A04 x2 and A05 chosen");
+			require(text("mdChainState") == "chaîne inactive", "the chain turned itself on");
+			// A05 moved first, then removed; A04 chosen by a click
+			element(doc, "mdChainMoveLeft").Click();
+			require(chain.getEntries() == Entries{{4, 1}, {3, 2}}, "‹ DÉPLACER did not move A05 first");
+			element(doc, "mdChainRemove").Click();
+			element(doc, "mdChainSlot0").Click();
+			present();
+			require(chain.getEntries() == Entries{{3, 2}} && element(doc, "mdChainSlot0").IsClassSet("mdEdSelected"),
+				"RETIRER did not leave A04 x2");
+
+			// Turned on: the length first, then the host
+			element(doc, "mdChainEnable").Click();
+			present();
+			require(chain.isEnabled() && element(doc, "mdChainEnable").IsPseudoClassSet("checked")
+				&& text("mdChainState") == "lecture de la longueur des patterns…", "a chain without length not waiting for it");
+			chain.setLength(3, 32);
+			chain.update(false);
+			present();
+			require(text("mdChainState") == "en attente : la machine ne suit pas l'hôte (SYSTÈME, SUIVRE L'HÔTE)"
+				&& has("mdChainSlot0", "32 pas"), "a chain while the machine does not follow the host not said so");
+			require(chain.update(true) == State::Playing, "the chain does not play while following");
+			present();
+			require(text("mdChainState") == "prête : joue avec le transport de l'hôte", "a ready chain not said so");
+			snap("-chain");
+
+			// What it says while playing, and the names
+			require(View::stateLine(State::Playing, {{3, 2}, {4, 1}}, md::ChainPlayer::Playing{0, 1})
+				== "joue A04 (passage 2/2) · ensuite A05"
+				&& View::stateLine(State::Playing, {{3, 2}, {4, 1}}, md::ChainPlayer::Playing{1, 0}) == "joue A05 · ensuite A04"
+				&& View::patternName(0) == "A01" && View::patternName(127) == "H16", "the playing line or a pattern name wrong");
+
+			// Emptied and off again, back to the lane
+			element(doc, "mdChainClear").Click();
+			element(doc, "mdChainEnable").Click();
+			chain.update(false);
+			present();
+			require(chain.getEntries().empty() && !chain.isEnabled() && text("mdChainState") == "chaîne inactive",
+				"VIDER and CHAÎNE ACTIVE did not empty and stop the chain");
+			tabButton(doc, "mdPlayBottom", "0").Click();
+			context.Update();
 		}
 #endif
 

@@ -12,6 +12,7 @@
 #include "mdOutputMetersView.h"
 #include "mdSystemPage.h"
 #include "mdPatternView.h"
+#include "mdChainView.h"
 #include "mdLibraryView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
@@ -787,6 +788,14 @@ namespace mdJucePlugin
 				if(auto* tab = document->GetElementById("editTrack" + std::to_string(_track)))
 					tab->Click();
 			});
+		}
+
+		// JOUER, CHAÎNE (Machinedrum): the project's pattern chain.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdChainSlot0"))
+		{
+			m_chainView = std::make_unique<ChainView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl(),
+				m_controller, *document);
+			m_chainView->update();
 		}
 
 		// BIBLIO: the stored Kits.
@@ -2202,9 +2211,10 @@ namespace mdJucePlugin
 		const bool metersChanged = m_outputMetersView && m_outputMetersView->update(nowMilliseconds);
 		const bool systemChanged = m_systemPage && m_systemPage->update(nowMilliseconds);
 		const bool patternChanged = m_patternView && m_patternView->update();
+		const bool chainChanged = m_chainView && m_chainView->update();
 		const bool libraryChanged = m_libraryView && m_libraryView->update();
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
-			|| metersChanged || systemChanged || patternChanged || libraryChanged)
+			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

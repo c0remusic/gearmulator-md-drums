@@ -309,9 +309,12 @@ def mix_page(d, tracks):
 
 # ---------- JOUER (boards 1 and 2) ----------
 
+CHAIN_SLOTS = 16
+
 def play_page_md(d):
-    # The current pattern, every track on its 32 first steps, then the lane of the edited track and one
-    # parameter. PatternView (mdPatternView.cpp) fills both from the pattern dump.
+    # The current pattern, every track on its 32 first steps, then under it, as tabs, the lane of the
+    # edited track and one parameter, or the project's chain. PatternView (mdPatternView.cpp) fills the
+    # grid and the lane from the pattern dump, ChainView (mdChainView.cpp) the chain.
     rows, rh, label_w = 16, 18, 96
     gw = span(12)
     pitch = (gw - 32 - label_w) // 32
@@ -329,8 +332,14 @@ def play_page_md(d):
     block_close(d + 1)
     ly = 12 + gh + GUT
     lh = PAGE_H - ly - 12
-    block_open(d + 1, "mdPlayLane", "LANE", "", 0, 12, ly, lh)
-    w(f'{ind(d + 2)}<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: {gw - 80 - 16 - 160}dp;">—</div>')
+    # Tabs instead of a title: LANE, CHAÎNE
+    block_open(d + 1, "mdPlayLane", "", "", 0, 12, ly, lh)
+    for n, name in enumerate(["LANE", "CHAÎNE"]):
+        w(f'{ind(d + 2)}<button id="mdPlayTab{n}" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdPlayBottom" tabbutton="{n}" style="left: {16 + n * 84}dp; top: 4dp;">{name}</button>')
+    tabs_w = 16 + 2 * 84 + 12
+    d += 1
+    w(f'{ind(d + 1)}<div id="mdPlayLanePage" class="jucePos" tabgroup="mdPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
+    w(f'{ind(d + 2)}<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16 - 160}dp;">—</div>')
     w(f'{ind(d + 2)}<button id="mdPlayOpen" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 150}dp; top: 4dp; width: 150dp;">OUVRIR DANS SON</button>')
     pb = (gw - 32) // 24
     names = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "AMD", "AMF", "EQF", "EQG", "BASE", "WDTH", "Q", "SRR",
@@ -342,6 +351,26 @@ def play_page_md(d):
     w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {area_top}dp; width: {label_w - 6}dp;">gris : kit<br/>orange : lock</div>')
     # The 32 bars, drawn in a canvas under the steps
     w(f'{ind(d + 2)}<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {area_top}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
+    w(f'{ind(d + 1)}</div>')
+    # CHAÎNE: what it does on the title row, the entries in slots, the actions under them
+    w(f'{ind(d + 1)}<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
+    w(f'{ind(d + 2)}<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16 - 150}dp;">chaîne inactive</div>')
+    w(f'{ind(d + 2)}<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 140}dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>')
+    sw = (gw - 32) // CHAIN_SLOTS
+    for s in range(CHAIN_SLOTS):
+        w(f'{ind(d + 2)}<div id="mdChainSlot{s}" class="jucePos mdChainSlot mdEdUnread" style="left: {16 + sw * s}dp; top: {TOP}dp; width: {sw - 4}dp;">—</div>')
+    ay = TOP + 44 + 12
+    actions = [("mdChainAdd", "AJOUTER"), ("mdChainPatternDown", "PATTERN −"), ("mdChainPatternUp", "PATTERN +"),
+               ("mdChainPassesDown", "PASSAGES −"), ("mdChainPassesUp", "PASSAGES +"), ("mdChainMoveLeft", "‹ DÉPLACER"),
+               ("mdChainMoveRight", "DÉPLACER ›"), ("mdChainRemove", "RETIRER"), ("mdChainClear", "VIDER")]
+    step = (gw - 32) // len(actions)
+    for i, (bid, label) in enumerate(actions):
+        w(f'{ind(d + 2)}<button id="{bid}" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {16 + step * i}dp; top: {ay}dp; width: {step - 6}dp;">{label}</button>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {ay + 24 + 10}dp; width: {gw - 32}dp;">'
+      'Joue avec le transport de l\'hôte, la machine le suivant (SYSTÈME). AJOUTER prend le pattern de la machine ; '
+      'changé dans le dernier pas, le suivant attend un tour.</div>')
+    w(f'{ind(d + 1)}</div>')
+    d -= 1
     block_close(d + 1)
     w(f'{ind(d)}</div>')
     return ly + lh + 12
