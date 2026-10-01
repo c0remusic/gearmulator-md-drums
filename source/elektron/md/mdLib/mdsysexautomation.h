@@ -116,6 +116,9 @@ namespace md::automation::sysex
 		// A parameter (0..23) gets its lock row with its first lock and loses it
 		// with its last. False when the step has no trig or all 64 rows are taken.
 		bool setLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
+		// Sets the length, 1 to the steps the dump holds (32, or 64 in the long form).
+		// Trigs and locks past the length stay in the dump.
+		bool setLength(uint8_t _length);
 
 		Message toDump() const;
 

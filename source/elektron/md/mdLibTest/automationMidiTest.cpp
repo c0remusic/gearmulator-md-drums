@@ -660,6 +660,15 @@ namespace
 		require(editor->setLock(0, 5, 4, std::nullopt) && editor->setTrig(0, 1, false), "could not clear");
 		require(editor->toDump() == pattern, "clearing the edits did not restore the pattern");
 
+		// The length: within the steps the dump holds, trigs and locks past it kept.
+		require(editor->setLength(16), "could not shorten the pattern");
+		parsed = parseMdPatternDump(editor->toDump());
+		require(parsed && parsed->length == 16 && parsed->hasTrig(0, 31) && parsed->lock(0, 9, 31) == uint8_t{7},
+			"length not written, or a trig past it lost");
+		require(!editor->setTrig(0, 20, true), "trig accepted past the length");
+		require(!editor->setLength(0) && !editor->setLength(33), "length out of range accepted");
+		require(editor->setLength(32) && editor->toDump() == pattern, "length 32 did not restore the pattern");
+
 		// Clearing a trig clears its locks; an emptied row goes away.
 		require(editor->setTrig(0, 4, false), "could not clear a trig");
 		dump = editor->toDump();
@@ -698,6 +707,7 @@ namespace
 		require(longEditor->setTrig(2, 33, true) && longEditor->setLock(2, 23, 33, 77) && longEditor->setLock(2, 23, 1, 64),
 			"could not restore the second half");
 		require(longEditor->toDump() == longPattern, "64-step edits did not restore the pattern");
+		require(longEditor->setLength(64) && !longEditor->setLength(65), "64-step form length range wrong");
 
 		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");
 	}

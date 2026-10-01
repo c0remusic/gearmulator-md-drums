@@ -513,6 +513,14 @@ namespace md::automation::sysex
 		return true;
 	}
 
+	bool MdPatternEditor::setLength(const uint8_t _length)
+	{
+		if(_length == 0 || _length > stepCount())
+			return false;
+		m_plain[1] = _length;
+		return true;
+	}
+
 	Message MdPatternEditor::toDump() const
 	{
 		Message result(m_header);
