@@ -5,7 +5,8 @@
 //   GPU with OpenGL or Metal). It requires 60 Hz with an accelerated renderer (presentation and
 //   update under 16.7 ms on every page), checks that the editor asks 60 Hz of those renderers
 //   and 30 of the software one, and reports what the software renderer reaches.
-// - --window [seconds per page]: the editor in a real window with its default renderer, an
+// - --window [seconds per page] [--scale percent]: the editor in a real window of the size a
+//   host opens (1100 x 606 dp at the GUI scale, 100 % by default) with its default renderer, an
 //   audio thread running the machine in real time (the firmware when a ROM is found, as in the
 //   plug-in), values moving at 60 Hz; it counts the frames RmlUi delivers each second on each
 //   page (evPostUpdate) against 60.
@@ -326,7 +327,7 @@ namespace
 	}
 
 	// A real window: frames delivered per second, page by page, with the machine running
-	bool measureWindow(const md::MachineModel _model, const double _secondsPerPage)
+	bool measureWindow(const md::MachineModel _model, const double _secondsPerPage, const double _scalePercent)
 	{
 		// The ROM is found as in the plug-in; the config is not saved and no network server opens
 		mdJucePlugin::AudioPluginAudioProcessor processor(_model, mdJucePlugin::AudioPluginAudioProcessor::EphemeralConfig{}, false);
@@ -338,6 +339,7 @@ namespace
 		const auto channels = std::max(audioProcessor.getTotalNumInputChannels(), audioProcessor.getTotalNumOutputChannels());
 
 		std::atomic<bool> running{true};
+		std::atomic<bool> audioStopped{false};
 		std::thread audio([&]
 		{
 			// The host's audio callback, in real time: one block per block period
@@ -358,26 +360,36 @@ namespace
 				next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(period);
 				std::this_thread::sleep_until(next);
 			}
+			audioStopped = true;
 		});
 
 		progress("audio thread running");
 		auto* editor = audioProcessor.createEditorIfNeeded();
 		progress("editor created");
 		require(editor != nullptr, "no editor");
-		juce::DocumentWindow window("mdEditorFluidityTest", juce::Colours::black, 0);
-		window.setUsingNativeTitleBar(true);
-		window.setContentNonOwned(editor, true);
-		window.centreWithSize(editor->getWidth(), editor->getHeight());
-		window.setVisible(true);
-		// In front of everything, so the window draws as the user sees it
-		window.setAlwaysOnTop(true);
-		window.toFront(true);
-		progress("window shown");
-
 		auto* pluginEditor = dynamic_cast<mdJucePlugin::Editor*>(
 			static_cast<mdJucePlugin::PluginEditorState&>(processor.getOrCreateEditorState()).getEditor());
 		require(pluginEditor && pluginEditor->getRmlComponent(), "editor has no RmlUi component");
 		auto& component = *pluginEditor->getRmlComponent();
+
+		// The window a host opens: the skin's size at the GUI scale (1100 x 606 dp at 100 %).
+		// Without a host, the editor keeps its minimum size until something sizes it.
+		auto& state = processor.getOrCreateEditorState();
+		const auto scale = _scalePercent / 100.0 * state.getRootScale();
+		const auto width = juce::roundToInt(state.getWidth() * scale);
+		const auto height = juce::roundToInt(state.getHeight() * scale);
+		juce::DocumentWindow window("mdEditorFluidityTest", juce::Colours::black, 0);
+		window.setUsingNativeTitleBar(true);
+		window.setContentNonOwned(editor, true);
+		// A window not on the desktop yet gives its content its own minimum size: size it after
+		window.setContentComponentSize(width, height);
+		window.centreWithSize(window.getWidth(), window.getHeight());
+		window.setVisible(true);
+		// In front of everything, so the window draws as the user sees it
+		window.setAlwaysOnTop(true);
+		window.toFront(true);
+		std::printf("  ... window shown, %dx%d\n", editor->getWidth(), editor->getHeight());
+		std::fflush(stdout);
 
 		std::vector<double> frameTimes;
 		frameTimes.reserve(100000);
@@ -403,17 +415,29 @@ namespace
 		const double warmup = 20000.0;
 		size_t shownPage = ~size_t{0};
 		std::vector<std::pair<size_t, size_t>> pageFrames(pageList.size(), {0, 0});
+		bool firmware = false;
 		ticker.tick = [&]
 		{
 			const auto elapsed = juce::Time::getMillisecondCounterHiRes() - start;
-			mover.step(false, false);
+			if(running)
+				mover.step(false, false);
 			if(elapsed < warmup)
 				return;
 			const auto page = static_cast<size_t>((elapsed - warmup) / (_secondsPerPage * 1000.0));
 			if(page >= pageList.size())
 			{
-				juce::MessageManager::getInstance()->stopDispatchLoop();
+				// The audio thread stops while messages still flow: the machine may wait on them
+				running = false;
+				if(audioStopped)
+					juce::MessageManager::getInstance()->stopDispatchLoop();
 				return;
+			}
+			if(page == 0 && shownPage != 0)
+			{
+				firmware = processor.getPlugin().withDeviceLocked([](synthLib::Device* _device)
+				{
+					return dynamic_cast<md::Device*>(_device) != nullptr;
+				});
 			}
 			if(page != shownPage)
 			{
@@ -433,12 +457,9 @@ namespace
 		progress("dispatch loop ended");
 
 		const char* name = _model == md::MachineModel::Monomachine ? "MM" : "MD";
-		std::printf("mdEditorFluidityTest %s --window: renderer %s, frame cap %.0f Hz, audio %d samples at %.0f Hz on its own thread, %s\n",
-			name, juceRmlUi::RenderingTestAccess::renderer(component), juceRmlUi::RenderingTestAccess::targetFPS(component),
-			blockSize, sampleRate, processor.getPlugin().withDeviceLocked([](synthLib::Device* _device)
-			{
-				return dynamic_cast<md::Device*>(_device) != nullptr;
-			}) ? "firmware running" : "no firmware");
+		std::printf("mdEditorFluidityTest %s --window: %dx%d (%.0f %%), renderer %s, frame cap %.0f Hz, audio %d samples at %.0f Hz on its own thread, %s\n",
+			name, editor->getWidth(), editor->getHeight(), _scalePercent, juceRmlUi::RenderingTestAccess::renderer(component),
+			juceRmlUi::RenderingTestAccess::targetFPS(component), blockSize, sampleRate, firmware ? "firmware running" : "no firmware");
 		bool smooth = true;
 		for(size_t page = 0; page < pageList.size(); ++page)
 		{
@@ -464,18 +485,28 @@ namespace
 				pageList[page].name, fps, i.p50, i.p95, i.max, c.p95);
 			smooth &= fps >= 59.0;
 		}
+		std::fflush(stdout);
 
-		running = false;
 		audio.join();
+		progress("closing the editor");
 		window.clearContentComponent();
 		delete editor;
+		progress("releasing the processor");
 		audioProcessor.releaseResources();
+		progress("closed");
 		return smooth;
 	}
 }
 
 int main(const int _argc, const char* const* _argv)
 {
+	// Where a crash happens, with the symbols the build has
+	juce::SystemStats::setApplicationCrashHandler([](void*)
+	{
+		std::fflush(stdout);
+		std::fprintf(stderr, "mdEditorFluidityTest: CRASH\n%s\n", juce::SystemStats::getStackBacktrace().toRawUTF8());
+		std::fflush(stderr);
+	});
 	try
 	{
 		juce::ScopedJuceInitialiser_GUI gui;
@@ -486,6 +517,7 @@ int main(const int _argc, const char* const* _argv)
 #endif
 		bool window = false;
 		double secondsPerPage = 4.0;
+		double scalePercent = 100.0;
 		for(int argument = 1; argument < _argc; ++argument)
 		{
 			const std::string value(_argv[argument]);
@@ -495,15 +527,19 @@ int main(const int _argc, const char* const* _argv)
 				if(argument + 1 < _argc && std::atof(_argv[argument + 1]) > 0)
 					secondsPerPage = std::atof(_argv[++argument]);
 			}
+			else if(value == "--scale" && argument + 1 < _argc && std::atof(_argv[argument + 1]) > 0)
+				scalePercent = std::atof(_argv[++argument]);
 		}
-		const bool ok = window ? measureWindow(model, secondsPerPage) : measureFrameCost(model);
-		if(!ok && failuresRequired())
-		{
-			std::printf("mdEditorFluidityTest: FAIL below 60 frames per second\n");
-			return 1;
-		}
-		std::printf("mdEditorFluidityTest: %s\n", ok ? "PASS" : "below 60 frames per second (not required)");
-		return 0;
+		const bool ok = window ? measureWindow(model, secondsPerPage, scalePercent) : measureFrameCost(model);
+		const auto failed = !ok && failuresRequired();
+		std::printf("mdEditorFluidityTest: %s\n", failed ? "FAIL below 60 frames per second"
+			: ok ? "PASS" : "below 60 frames per second (not required)");
+		std::fflush(stdout);
+		// A real window shows the plug-in's disclaimer (a native message box on its own thread)
+		// with a fresh config; ending JUCE while it is open crashes in it. The measure is done.
+		if(window)
+			std::_Exit(failed ? 1 : 0);
+		return failed ? 1 : 0;
 	}
 	catch(const std::exception& _error)
 	{
