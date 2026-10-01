@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace md::automation::sysex
@@ -53,6 +54,9 @@ namespace md::automation::sysex
 		std::vector<ParameterChange> parameters;
 		// Machine id per track (see mdmachines.h), empty when the dump is too short to hold them.
 		std::vector<uint16_t> machines;
+		// As the machine shows it, trailing spaces removed: up to 16 characters on
+		// the Machinedrum, 11 on the Monomachine.
+		std::string name;
 	};
 
 	// The first 32 steps of a Machinedrum pattern, as far as the editor shows them.

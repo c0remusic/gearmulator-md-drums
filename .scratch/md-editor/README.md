@@ -34,7 +34,7 @@ Commits, du plus ancien au plus récent : éditeur RML MD puis MM, sélecteur de
 - **Grille de pas (MD)** : `mdStepGrid.*`. Lecture du pattern courant (`$70` statut puis `$68`/`$67`), clic = pas sélectionné, double-clic = trig, contrôles qui écrivent les locks pendant qu'un pas avec trig est sélectionné, double-clic sur un lock = effacement. Écriture du dump complet puis relecture (`Controller::sendPattern`, `getPatternWrite`). Codec du dump : `MdPatternEditor` dans `mdLib/mdsysexautomation.*`.
 - **Courbes** : `mdCurveView.*`. Rangée COURBES sous SON quand la page a la place (fenêtre ≥ 652 dp sur MD, ≥ 736 dp sur MM). Formes seulement, pas d'échelles réelles.
 
-Rien n'a été vérifié contre un vrai firmware : il n'y a pas de ROM dans l'environnement des sessions.
+Les sessions cloud n'ont pas de ROM ; les points vérifiés depuis sur un vrai firmware sont dans « Vérifié avec une ROM ».
 
 ## Construire et tester en local
 
@@ -50,6 +50,7 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 ```
 
 - Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-son`, `-steps`, `-picker`, `-mix`, `-master`, `-panel`, `-stacked`, `-curves`.
+- Windows (VS 2022, `temp/cmake_vs22`) : régénérer les skins avec `PYTHONUTF8=1`, sinon Python lit les skins en cp1252. Les tests firmware du plug-in (`Harness`) cherchent la ROM dans le dossier de données du plug-in ou à côté de leur exécutable, pas dans `GEARMULATOR_*_FIRMWARE_BIN` : copier les `.bin` dans `…/mdJucePlugin/Release/`.
 - ASan comme la CI : configurer avec `-fsanitize=address,undefined` et lancer `ctest -R "mdAutomationMidiTest|mdAutomationArchitectureTest|mdAutomationParameterTest"`.
 - Avec une ROM, les tests firmware (`*FirmwareTest`, `mdAutomationRobustnessTest` sans option) tournent ; sans ROM ils sont ignorés.
 
@@ -59,12 +60,18 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 - Quatre tests firmware ne compilent pas avec la configuration locale des sessions (`pmr` SysexBuffer contre `std::vector`) : `sdsFirmwareTest`, `mmSysexWorkflowTest`, `mmSysexExportFirmwareTest`, `userSysexFirmwareTest`. Les tests qui dépendent de leurs binaires apparaissent « Not Run ».
 - Les tests de l'éditeur sous UBSan signalent des alertes dans la destruction des documents RmlUi et dans `WidgetScroll`. Elles existent déjà sans l'éditeur (`mdLcdEditorPointerTest` non modifié donne les mêmes). La CI ne passe pas ces tests sous sanitizers.
 
-## À vérifier en premier avec une ROM
+## Vérifié avec une ROM (2026-10-01)
 
-1. `$5B` : le firmware accepte-t-il l'assignation, et que deviennent les paramètres de la piste ?
-2. Dump de pattern `$67` : les octets lus correspondent-ils au décodeur (trigs, masques, lignes de lock) ? Un vrai backup `.syx` peut être passé à `mdAutomationMidiTest <backup MD> <backup MM>`.
-3. Écriture du pattern : le firmware garde-t-il un pattern envoyé dans son slot ? La ligne d'info de PAS affiche « refusé par le firmware » si la relecture diffère. Écrire pendant la lecture fait-il un raté audible ?
-4. Une requête de kit pour le slot courant rend le kit stocké, pas le kit en cours (machines changées en face avant invisibles jusqu'au prochain chargement de kit). Vérifier que le dump de pattern, lui, reflète bien l'état en cours.
+`mdEditorFirmwareTest` (mdLibTest) pose ces questions au vrai firmware, SPS-1UW OS 1.63 et SFX-60 OS 1.32b, avec le codec de l'éditeur. Il tourne en ~50 s et s'ignore sans `GEARMULATOR_MD_FIRMWARE_BIN` / `GEARMULATOR_MM_FIRMWARE_BIN`.
+
+1. `$5B` est accepté : MD table normale (TRX-XC → TRX-SD) et table UW avec le drapeau (TRX-XT → ROM-01), MM sans initialisation des pages (SWAVE-SAW → DPRO-DDRW). Le kit sauvé porte la nouvelle machine.
+   - MD : l'assignation remet les valeurs par défaut de la machine sur les pages synthèse, effets et routage (16 valeurs sur 25 pour TRX-SD, 13 pour ROM-01), pas le niveau. Le contrôleur renvoie ensuite les valeurs de son cache : la nouvelle machine garde donc les réglages de l'ancienne, contrairement à la machine. À trancher.
+   - MM (forme sans initialisation) : 2 valeurs sur 57 changent, les pages sont gardées.
+2. Dump `$67` : `MdPatternEditor` réencode octet pour octet le dump réel (5 410 octets, pattern A01 d'usine, 32 pas). Les trigs d'usine se lisent de façon cohérente avec le kit (T1 TRX-B2 sur 1 et 17, T9 TRX-CH très dense). Des trigs posés en face avant (enregistrement en grille, pas 1 et 5) et un lock (TRIG 5 tenu, DATA ENTRY B tourné) se lisent exactement là où le décodeur les attend : piste 1, pas 1 et 5, paramètre 2 au pas 5.
+3. Écriture : le firmware garde le pattern envoyé tel quel (relu identique), à l'arrêt comme en lecture. En lecture, l'écriture est suivie de 75 à 81 ms de silence complet (0 ms sur les 3 s d'avant) : raté audible dans l'émulation. Non vérifié sur une vraie machine.
+4. Une requête de kit rend le kit stocké : la machine assignée n'y apparaît qu'après sauvegarde. Le dump de pattern rend l'état en cours : trigs et lock posés en face avant, non sauvés, y figurent.
+
+Non vérifié : l'ordre des pistes par la face avant (DOWN en enregistrement en grille ne change pas de piste) ; il repose sur la cohérence du pattern d'usine avec son kit.
 
 ## Travail restant
 

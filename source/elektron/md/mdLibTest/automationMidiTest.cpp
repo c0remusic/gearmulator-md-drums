@@ -399,6 +399,9 @@ namespace
 					kit[position++] = raw[group + bit] & 0x7f;
 			}
 		}
+		// The name: 16 raw bytes at 0x0a, here padded with spaces and ended by a zero
+		const std::string name = "BROKEN DUB  ";
+		std::copy(name.begin(), name.end(), kit.begin() + 0x0a);
 		finishDump(kit);
 		const auto parsedKit = parseKitDump(md::MachineModel::Machinedrum, kit);
 		require(parsedKit && parsedKit->slot == 4
@@ -413,6 +416,7 @@ namespace
 		require(parsedKit->machines[0] == 32 && parsedKit->machines[15] == 47, "wrong MD Kit machine ids");
 		require(parsedKit->machines[1] == 176, "MD ROM-33 lost the top bit of its 7-bit group");
 		require(parsedKit->machines[2] == 16, "MD TONAL flag leaked into the machine id");
+		require(parsedKit->name == "BROKEN DUB", ("wrong MD Kit name: \"" + parsedKit->name + "\"").c_str());
 		kit[100] ^= 1;
 		require(!parseKitDump(md::MachineModel::Machinedrum, kit),
 			"accepted corrupt MD Kit checksum");
@@ -441,6 +445,9 @@ namespace
 		}
 		for(uint8_t track = 0; track < monomachine::TrackCount; ++track)
 			kitData[0x11 + 6 * 72 + track] = static_cast<uint8_t>(track == 5 ? 33 : 3 + track);
+		// The name fills its 11 bytes: no terminator before the levels
+		const std::string name = "NIGHT BUS 2";
+		std::copy(name.begin(), name.end(), kitData.begin());
 		kitData.back() = 0xe5;
 		auto kit = makeMmDump(0x52, kitData);
 		const auto parsedKit = parseKitDump(md::MachineModel::Monomachine, kit);
@@ -455,6 +462,7 @@ namespace
 		require(parsedKit->machines.size() == monomachine::TrackCount
 			&& parsedKit->machines[0] == 3 && parsedKit->machines[4] == 7
 			&& parsedKit->machines[5] == 33, "wrong MM Kit machine ids");
+		require(parsedKit->name == "NIGHT BUS 2", ("wrong MM Kit name: \"" + parsedKit->name + "\"").c_str());
 		kit[12] ^= 1;
 		require(!parseKitDump(md::MachineModel::Monomachine, kit),
 			"accepted corrupt MM Kit checksum");

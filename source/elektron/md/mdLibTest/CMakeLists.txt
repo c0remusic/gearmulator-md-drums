@@ -179,6 +179,16 @@ add_test(NAME mdAutomationMidiTest COMMAND mdAutomationMidiTest)
 set_tests_properties(mdAutomationMidiTest PROPERTIES LABELS "UnitTest")
 set_property(TARGET mdAutomationMidiTest PROPERTY FOLDER "Elektron")
 
+# The editor's machine assignment and pattern dump against the real firmware
+add_executable(mdEditorFirmwareTest mdEditorFirmwareTest.cpp)
+target_link_libraries(mdEditorFirmwareTest PRIVATE mdLib)
+add_test(NAME mdEditorFirmwareTest COMMAND mdEditorFirmwareTest)
+set_tests_properties(mdEditorFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mdEditorFirmwareTest PROPERTY FOLDER "Elektron")
+
 add_executable(mdUwFirmwareTest mdUwFirmwareTest.cpp)
 target_link_libraries(mdUwFirmwareTest PRIVATE mdLib)
 # The audio oracle must detect NaN/Inf even in builds using -Ofast or /fp:fast.

@@ -587,6 +587,21 @@ namespace md::automation::sysex
 			? std::optional<GlobalDump>(GlobalDump{slot, channel}) : std::nullopt;
 	}
 
+	namespace
+	{
+		// A Kit name as the firmware stores it: ASCII up to a zero or the end of
+		// its field. Anything else shows as '?'.
+		std::string kitName(const uint8_t* _name, const size_t _size)
+		{
+			std::string name;
+			for(size_t index = 0; index < _size && _name[index] != 0; ++index)
+				name.push_back(_name[index] >= 0x20 && _name[index] < 0x7f ? static_cast<char>(_name[index]) : '?');
+			while(!name.empty() && name.back() == ' ')
+				name.pop_back();
+			return name;
+		}
+	}
+
 	std::optional<KitDump> parseKitDump(
 		const MachineModel _model, const MessageView _message)
 	{
@@ -644,7 +659,10 @@ namespace md::automation::sysex
 				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
 					machines.push_back(raw[track * 4 + 3]);
 			}
-			return KitDump{slot, std::move(result), std::move(machines)};
+			// 16 raw bytes between the slot and the parameters
+			constexpr size_t namePosition = 0x0a;
+			return KitDump{slot, std::move(result), std::move(machines),
+				kitName(&_message[namePosition], parameterPosition - namePosition)};
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -679,7 +697,8 @@ namespace md::automation::sysex
 			for(uint8_t track = 0; track < monomachine::TrackCount; ++track)
 				machines.push_back((*decoded)[machinePosition + track]);
 		}
-		return KitDump{slot, std::move(result), std::move(machines)};
+		// The first 11 decoded bytes, before the levels
+		return KitDump{slot, std::move(result), std::move(machines), kitName(decoded->data(), levelPosition)};
 	}
 
 	std::optional<Message> assignMachine(const MachineModel _model, const uint8_t _track,
