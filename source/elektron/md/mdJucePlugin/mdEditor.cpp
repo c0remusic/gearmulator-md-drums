@@ -6,6 +6,7 @@
 #include "mdViewLayout.h"
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
+#include "mdUnreadValues.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -719,6 +720,8 @@ namespace mdJucePlugin
 					m_machinePicker->update();
 				if(m_stepGrid)
 					m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
+				if(m_unreadValues)
+					m_unreadValues->update();
 			});
 		}
 
@@ -731,6 +734,13 @@ namespace mdJucePlugin
 		{
 			m_kitPatternScreen = std::make_unique<KitPatternScreen>(m_controller, *document);
 			m_kitPatternScreen->update();
+		}
+
+		// Values the firmware set without telling, after a machine assignment, are greyed.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
+		{
+			m_unreadValues = std::make_unique<UnreadValues>(m_controller, *document);
+			m_unreadValues->update();
 		}
 
 		// The COURBES row under SON, when the window leaves room for it.
@@ -2133,7 +2143,8 @@ namespace mdJucePlugin
 		const bool stepsChanged = m_stepGrid && m_stepGrid->update(nowMilliseconds);
 		const bool curvesChanged = m_curveView && m_curveView->update();
 		const bool screenChanged = m_kitPatternScreen && m_kitPatternScreen->update();
-		if(machineChanged || stepsChanged || curvesChanged || screenChanged)
+		const bool unreadChanged = m_unreadValues && m_unreadValues->update();
+		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

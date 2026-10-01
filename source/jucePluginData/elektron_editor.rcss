@@ -197,6 +197,10 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 	decorator: none; background-color: transparent; border-width: 0dp; box-shadow: none; }
 .mdEdNum:hover { color: #ff6b1f; }
 
+/* a value the firmware set without telling (machine assigned; mdUnreadValues.cpp): greyed, its number shown as — */
+.mdEdUnread { opacity: 0.4; }
+.mdEdValue.mdEdUnread, .mdEdNum.mdEdUnread { opacity: 1; color: transparent; decorator: text("—" #8a8d93 center center); }
+
 /* output panels and meters */
 .mdEdPanel { background-color: #1c1d1f; border: 1dp #2e3034; border-radius: 3dp; }
 .mdEdMeter { width: 8dp; height: 64dp; background-color: #3a3d42; }

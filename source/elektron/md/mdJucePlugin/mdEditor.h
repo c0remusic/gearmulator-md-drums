@@ -50,6 +50,7 @@ namespace mdJucePlugin
 	class ViewLayout;
 	class CurveView;
 	class KitPatternScreen;
+	class UnreadValues;
 	class PixelPerfectPanel;
 	struct EditorIdentityTestAccess;
 
@@ -179,6 +180,7 @@ namespace mdJucePlugin
 		std::unique_ptr<ViewLayout> m_viewLayout;
 		std::unique_ptr<CurveView> m_curveView;
 		std::unique_ptr<KitPatternScreen> m_kitPatternScreen;
+		std::unique_ptr<UnreadValues> m_unreadValues;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;
 		md::FrontPanel m_frontPanelSnapshot;
 		bool m_frontPanelSnapshotValid = false;

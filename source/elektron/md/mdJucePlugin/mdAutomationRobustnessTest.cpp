@@ -1238,7 +1238,9 @@ namespace
 	}
 
 	// The controller keeps a machine per track from applied Kit dumps and its own
-	// assignments; an assignment re-sends the track's machine pages from the cache.
+	// assignments. An assignment sends nothing else: the values the firmware set
+	// (mdEditorFirmwareTest) become unknown until an applied Kit dump, a value the
+	// firmware sends, or a host or editor write.
 	void verifyMachineAssignment(Harness& _harness)
 	{
 		auto& controller = _harness.controller;
@@ -1246,46 +1248,91 @@ namespace
 		const uint8_t tracks = mm ? 6 : 16;
 		const uint16_t first = mm ? 3 : 16;      // SID-6581, TRX-BD
 		const uint16_t second = mm ? 32 : 176;   // DPRO-DDRW, ROM-33
+		const auto loadKit = [&]
+		{
+			controller.onStateLoaded();
+			controller.parseSysexMessage(statusResponse(_harness.model,
+				md::automation::sysex::StatusParameter::Global, 0), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(statusResponse(_harness.model,
+				md::automation::sysex::StatusParameter::Kit, 0), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(makeGlobalDump(_harness.model, 0, 0), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(makeKitDump(_harness.model, 0, 23, std::vector<uint16_t>(tracks, first)),
+				synthLib::MidiEventSource::Device);
+		};
+		// The unknown values of a track, by page
+		const auto unknown = [&](const uint8_t _track)
+		{
+			std::map<uint8_t, size_t> pages;
+			for(auto* const parameter : parameters(_harness, true))
+			{
+				const auto& description = parameter->getDescription();
+				if(parameter->getPart() == _track && !controller.isValueKnown(description.page, _track, description.index))
+					++pages[description.page];
+			}
+			return pages;
+		};
+		const auto find = [&](const uint8_t _track, const uint8_t _page) -> pluginLib::Parameter&
+		{
+			for(auto* const parameter : parameters(_harness, true))
+				if(parameter->getPart() == _track && parameter->getDescription().page == _page)
+					return *parameter;
+			throw std::runtime_error("no parameter on that page");
+		};
 
-		std::vector<uint16_t> machines(tracks, first);
-		controller.onStateLoaded();
-		controller.parseSysexMessage(statusResponse(_harness.model,
-			md::automation::sysex::StatusParameter::Global, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(statusResponse(_harness.model,
-			md::automation::sysex::StatusParameter::Kit, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(makeGlobalDump(_harness.model, 0, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(makeKitDump(_harness.model, 0, 23, machines), synthLib::MidiEventSource::Device);
+		loadKit();
 		require(controller.isAutomationSynchronized(), "machine test did not synchronize");
 		for(uint8_t track = 0; track < tracks; ++track)
 			require(controller.getTrackMachine(track) == first, "applied Kit dump did not set the track machines");
+		require(unknown(2).empty(), "values unknown after an applied Kit dump");
+		require(snapshotIsComplete(controller.createAutomationSnapshot()), "synchronized snapshot not complete");
 
 		const auto revision = controller.getMachineRevision();
+		const auto valueRevision = controller.getValueStateRevision();
 		const auto sent = controller.getTransmittedAutomationChangeCount();
 		require(controller.assignMachine(2, second), "valid machine assignment refused");
 		require(controller.getTrackMachine(2) == second && controller.getTrackMachine(1) == first,
 			"assignment changed the wrong track");
 		require(controller.getMachineRevision() > revision, "assignment did not bump the machine revision");
-		// MD: synthesis, effects and routing pages (24); MM: the seven machine pages (56).
-		require(controller.getTransmittedAutomationChangeCount() - sent == (mm ? 56u : 24u),
-			"assignment did not re-send exactly the track's machine pages");
+		require(controller.getTransmittedAutomationChangeCount() == sent,
+			"assignment wrote cached values over the ones the firmware set");
+		// MD: synthesis, effects and routing pages (24), not the level; MM: synthesis (8).
+		const auto pages = unknown(2);
+		const auto expected = mm ? std::map<uint8_t, size_t>{{md::automation::monomachine::Synthesis, 8}}
+			: std::map<uint8_t, size_t>{{md::automation::machinedrum::Synthesis, 8},
+				{md::automation::machinedrum::Effects, 8}, {md::automation::machinedrum::Routing, 8}};
+		require(pages == expected, "assignment did not make exactly the machine's values unknown");
+		require(unknown(1).empty(), "assignment made another track's values unknown");
+		require(controller.getValueStateRevision() > valueRevision, "assignment did not bump the value state revision");
+		// Restoring cached values would overwrite what the firmware holds
+		require(!snapshotIsComplete(controller.createAutomationSnapshot()),
+			"snapshot with unknown values claims a complete baseline");
 
 		const auto refused = controller.getTransmittedAutomationChangeCount();
 		require(!controller.assignMachine(tracks, first), "assignment accepted a track the model does not have");
 		require(!controller.assignMachine(0, 6000), "assignment accepted an unknown machine");
 		require(controller.getTransmittedAutomationChangeCount() == refused, "refused assignment transmitted values");
+		require(unknown(0).empty(), "refused assignment made values unknown");
+
+		// A host write sets the value: it is known again, the others stay unknown.
+		auto& written = find(2, md::automation::machinedrum::Synthesis);
+		const auto writeRevision = controller.getValueStateRevision();
+		hostWrite(written, 77);
+		controller.processRealtimeParameterChanges(64);
+		require(controller.isValueKnown(written.getDescription().page, 2, written.getDescription().index),
+			"host write did not make the value known");
+		require(controller.getValueStateRevision() > writeRevision, "host write did not bump the value state revision");
+		require(unknown(2).at(md::automation::machinedrum::Synthesis) == 7, "host write made other values known");
 
 		// A same-slot inspection dump holds the stored Kit, not the live one: it
-		// must not undo the assignment. A state load applies its Kit and does.
+		// must not undo the assignment nor claim to know the firmware's values. A
+		// state load applies its Kit and does both.
 		primeSyntheticSnapshot(_harness);
 		require(controller.getTrackMachine(2) == second, "inspection dump undid a live machine assignment");
-		controller.onStateLoaded();
-		controller.parseSysexMessage(statusResponse(_harness.model,
-			md::automation::sysex::StatusParameter::Global, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(statusResponse(_harness.model,
-			md::automation::sysex::StatusParameter::Kit, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(makeGlobalDump(_harness.model, 0, 0), synthLib::MidiEventSource::Device);
-		controller.parseSysexMessage(makeKitDump(_harness.model, 0, 23, machines), synthLib::MidiEventSource::Device);
+		require(!unknown(2).empty(), "inspection dump of the stored Kit made the live values known");
+		loadKit();
 		require(controller.getTrackMachine(2) == first, "state load kept a machine its Kit does not hold");
+		require(unknown(2).empty(), "applied Kit dump left values unknown");
+		require(snapshotIsComplete(controller.createAutomationSnapshot()), "snapshot incomplete after the Kit reload");
 	}
 
 	// requestPattern asks for the current pattern number, then that pattern's dump;

@@ -188,9 +188,15 @@ namespace mdJucePlugin
 		if(m_pickerInfo)
 		{
 			const auto& family = families[m_selectedFamily];
+			// What the firmware does with the track's values (Controller::assignMachine)
+			const std::string values = m_model == md::MachineModel::Monomachine
+				? " ; ses réglages sont conservés, sauf ceux de synthèse que la machine adapte"
+				: ", avec ses réglages par défaut (synthèse, effets, routage)";
 			m_pickerInfo->SetInnerRML(std::string(family.name) + " · " + std::string(family.synthesis)
-				+ ". Un clic assigne la machine à la " + trackLabel(part)
-				+ " ; ses réglages actuels sont conservés. Une machine changée sur la face avant n'apparaît qu'au prochain chargement de kit.");
+				+ ". Un clic assigne la machine à la " + trackLabel(part) + values
+				+ ". Le plug-in ne peut pas relire ces valeurs : elles restent grisées (—) jusqu'au prochain chargement"
+				" de kit ou jusqu'à ce qu'un contrôle les fixe. Une machine changée sur la face avant n'apparaît"
+				" qu'au prochain chargement de kit.");
 		}
 	}
 }

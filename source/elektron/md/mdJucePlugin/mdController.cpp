@@ -119,13 +119,14 @@ namespace mdJucePlugin
 	std::vector<uint8_t> Controller::createAutomationSnapshot() const
 	{
 		const auto epoch = m_synchronizationEpoch.load(std::memory_order_acquire);
-		const auto complete = m_automationReady.load(std::memory_order_acquire)
+		const auto synchronized = m_automationReady.load(std::memory_order_acquire)
 			&& m_haveGlobal.load(std::memory_order_acquire)
 			&& m_haveKit.load(std::memory_order_acquire)
 			&& m_currentKit.load(std::memory_order_acquire) != 0xff;
 		std::vector<uint64_t> publications;
 		publications.reserve(getExposedParameters().size());
 		bool hasPendingIntent = false;
+		bool hasUnknownValue = false;
 		for(const auto& [address, parameters] : getExposedParameters())
 		{
 			if(parameters.empty())
@@ -137,7 +138,11 @@ namespace mdJucePlugin
 			const auto publication = slot->publication.load(std::memory_order_acquire);
 			publications.push_back(publication);
 			hasPendingIntent |= publicationIsDirty(publication);
+			hasUnknownValue |= slot->valueUnknown.load(std::memory_order_acquire);
 		}
+		// A value the firmware changed unseen is no baseline: restoring the cached
+		// one would overwrite what the firmware holds.
+		const auto complete = synchronized && !hasUnknownValue;
 		// Before the first coherent firmware snapshot, persist only meaningful host/UI
 		// intent. This avoids turning constructor defaults into writes merely because a
 		// host saved while the machine was still booting.
@@ -313,24 +318,41 @@ namespace mdJucePlugin
 
 		sendEditorSysex(*message);
 
-		// Before the first synchronization the cache holds no firmware values, so
-		// there is nothing trustworthy to re-send.
-		if(m_automationReady.load(std::memory_order_acquire))
+		// What the firmware does to the track's values (mdEditorFirmwareTest): the
+		// Machinedrum loads the new machine's defaults on its synthesis, effects and
+		// routing pages and keeps the level; the Monomachine, told not to initialise,
+		// keeps its pages but adapts some synthesis values to the new machine. A value
+		// not delivered yet reaches the firmware after the assignment and stays known.
+		const auto lastChangedPage = m_model == md::MachineModel::Monomachine
+			? md::automation::monomachine::Synthesis : md::automation::machinedrum::Routing;
+		bool changed = false;
+		for(auto& slot : m_automationSlots)
 		{
-			const auto lastMachinePage = m_model == md::MachineModel::Monomachine
-				? md::automation::monomachine::Lfo3 : md::automation::machinedrum::Routing;
-			for(const auto& slot : m_automationSlots)
-			{
-				if(slot.address.track != _part || slot.address.page > lastMachinePage)
-					continue;
-				transmitParameterChange({slot.address.page, slot.address.track, slot.address.index,
-					publicationValue(slot.publication.load(std::memory_order_acquire))});
-			}
+			if(slot.address.track != _part || slot.address.page > lastChangedPage
+				|| publicationIsDirty(slot.publication.load(std::memory_order_acquire)))
+				continue;
+			changed |= !slot.valueUnknown.exchange(true, std::memory_order_acq_rel);
 		}
+		if(changed)
+			m_valueStateRevision.fetch_add(1, std::memory_order_acq_rel);
 
 		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
 			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
 		return true;
+	}
+
+	bool Controller::isValueKnown(const uint8_t _page, const uint8_t _part, const uint8_t _index) const
+	{
+		const auto* const slot = findAutomationSlot({_page, _part, _index});
+		return slot == nullptr || !slot->valueUnknown.load(std::memory_order_acquire);
+	}
+
+	void Controller::markValueKnown(AutomationSlot& _slot)
+	{
+		// Lock-free: host automation calls this from the audio thread.
+		if(_slot.valueUnknown.load(std::memory_order_acquire)
+			&& _slot.valueUnknown.exchange(false, std::memory_order_acq_rel))
+			m_valueStateRevision.fetch_add(1, std::memory_order_acq_rel);
 	}
 
 	void Controller::sendEditorSysex(const md::automation::sysex::Message& _message) const
@@ -615,6 +637,7 @@ namespace mdJucePlugin
 		const auto publication = createPublication(_change.value, true);
 		auto& slot = m_automationSlots[found->second];
 		slot.publication.exchange(publication, std::memory_order_acq_rel);
+		markValueKnown(slot);
 		const auto advanceDeliveryFloor = [&slot](const uint64_t _revision)
 		{
 			// Keep the realtime producer strictly bounded: a fixed number of strong
@@ -678,6 +701,8 @@ namespace mdJucePlugin
 		auto* const slot = findAutomationSlot(_address);
 		if(slot == nullptr)
 			return _value;
+		// Either the firmware's value or a newer intent the firmware gets next
+		markValueKnown(*slot);
 
 		const auto desired = createPublication(_value, false);
 		auto observed = slot->publication.load(std::memory_order_acquire);

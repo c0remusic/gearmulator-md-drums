@@ -86,11 +86,19 @@ namespace mdJucePlugin
 		uint16_t getTrackMachine(uint8_t _part) const;
 		// Increments whenever a track's machine changes.
 		uint64_t getMachineRevision() const { return m_machineRevision.load(std::memory_order_acquire); }
-		// Sends ASSIGN MACHINE for a track of the live Kit. Once synchronized, it then
-		// re-sends the track's machine pages from the parameter cache, so the firmware
-		// and the editor keep the same values whatever the assignment did to them.
+		// Sends ASSIGN MACHINE for a track of the live Kit. The firmware then sets
+		// values the plug-in cannot read back (a Kit request returns the stored Kit):
+		// the Machinedrum loads the machine's defaults on its synthesis, effects and
+		// routing pages, the Monomachine adapts its synthesis page. Those values become
+		// unknown (isValueKnown) instead of being overwritten from the cache.
 		// False for a track or machine the model does not have.
 		bool assignMachine(uint8_t _part, uint16_t _machine);
+		// False while the firmware holds a value the plug-in could not read, until an
+		// applied Kit dump, a value the firmware sends, or a host or editor write
+		// makes it known again.
+		bool isValueKnown(uint8_t _page, uint8_t _part, uint8_t _index) const;
+		// Increments whenever a value becomes unknown or known again.
+		uint64_t getValueStateRevision() const { return m_valueStateRevision.load(std::memory_order_acquire); }
 
 		// The Kit and pattern the firmware has selected, 0xff until a status reply
 		// told them. Status is polled every 5 s, so a selection made on the front
@@ -168,6 +176,9 @@ namespace mdJucePlugin
 			// Raw value from the most recently accepted stored-Kit dump. This is
 			// diagnostic truth, distinct from the live/session publication above.
 			std::atomic<uint16_t> lastFirmwareKitValue{0x100};
+			// The firmware changed this value without telling (machine assignment);
+			// the publication above still holds the value from before.
+			std::atomic<bool> valueUnknown{false};
 		};
 
 		struct QueuedAutomationChange
@@ -206,6 +217,7 @@ namespace mdJucePlugin
 		static bool publicationIsDirty(uint64_t _publication);
 		AutomationSlot* findAutomationSlot(const Address& _address);
 		const AutomationSlot* findAutomationSlot(const Address& _address) const;
+		void markValueKnown(AutomationSlot& _slot);
 		void completeSynchronizationIfReady();
 		bool firmwareReadyForAutomation() const;
 		void applyKitParameters(const std::vector<md::automation::ParameterChange>& _changes);
@@ -251,6 +263,7 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_selectionRevision{0};
 		std::array<std::atomic<uint16_t>, md::automation::machinedrum::TrackCount> m_trackMachines{};
 		std::atomic<uint64_t> m_machineRevision{0};
+		std::atomic<uint64_t> m_valueStateRevision{0};
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
 		// The dump behind m_pattern, edits included; both under m_patternMutex.

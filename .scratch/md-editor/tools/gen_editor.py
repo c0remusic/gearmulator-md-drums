@@ -113,10 +113,11 @@ CURVE_H = TOP + 88 + 8
 def curves_row(d, y, blocks):
     # A row of curve blocks under the SON view, shown by CurveView (mdCurveView.cpp) only when the
     # page has room for it; each block's area gets a canvas drawn from the edited track's parameters.
+    # data-unread names those parameters: the area is greyed while one is unknown (mdUnreadValues.cpp).
     w(f'{ind(d)}<div id="mdEdCurves" class="mdEdCurves" style="display: none;">')
-    for bid, title, sub, c0, ncols in blocks:
+    for bid, title, sub, c0, ncols, params in blocks:
         block_open(d + 1, f"mdEdCurves{bid}", title, sub, c0, ncols, y, CURVE_H)
-        w(f'{ind(d + 2)}<div id="mdEdCurve{bid}" class="jucePos mdEdCurveArea" style="left: 16dp; top: {TOP}dp; width: {span(ncols) - 32}dp; height: 88dp;"/>')
+        w(f'{ind(d + 2)}<div id="mdEdCurve{bid}" class="jucePos mdEdCurveArea" data-unread="{params}" style="left: 16dp; top: {TOP}dp; width: {span(ncols) - 32}dp; height: 88dp;"/>')
         block_close(d + 1)
     w(f'{ind(d)}</div>')
     return CURVE_H
@@ -159,12 +160,12 @@ def md_sound(d):
     block_open(d + 1, "mdEdLfo", "MODULATION", "LFO de la piste", 0, 12, y, hc, "partCurrent")
     for i, item in enumerate([("k", "LFOShape", "FORME"), ("k", "LFOSpeed", "SPEED"), ("k", "LFOAmount", "DEPTH")]):
         control(d + 2, bx(i), TOP, item)
-    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: {bx(3) + 16}dp; top: {TOP + 12}dp; width: {span(9) - 32}dp;">LFO forme {{{{LFOShape_text}}}} · vitesse {{{{LFOSpeed_text}}}} · profondeur {{{{LFOAmount_text}}}} · destination : à venir</div>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" data-unread="LFOShape LFOSpeed LFOAmount" style="left: {bx(3) + 16}dp; top: {TOP + 12}dp; width: {span(9) - 32}dp;">LFO forme {{{{LFOShape_text}}}} · vitesse {{{{LFOSpeed_text}}}} · profondeur {{{{LFOAmount_text}}}} · destination : à venir</div>')
     block_close(d + 1)
     track_h = y + hc + 12
     roomy_h = track_h + curves_row(d + 1, y + hc + GUT, [
-        ("Filter", "FILTRE", "BASE, WIDTH, Q · allure, pas une mesure", 0, 6),
-        ("Eq", "EQ", "EQF, EQG · allure, pas une mesure", 6, 6)]) + GUT
+        ("Filter", "FILTRE", "BASE, WIDTH, Q · allure, pas une mesure", 0, 6, "FilterBase FilterWidth FilterQ"),
+        ("Eq", "EQ", "EQF, EQG · allure, pas une mesure", 6, 6, "EQFrequency EQGain")]) + GUT
     machine_picker(d + 1, picker_y)
     w(f'{ind(d)}</div>')
 
@@ -222,7 +223,7 @@ def mm_sound(d):
     for n in range(3):
         L = f"Lfo{n + 1}"
         w(f'{ind(d + 2)}<div id="mmLfoPage{n}" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="{n}" style="left: 0dp; top: {TOP}dp; width: {span(8)}dp; height: {h - TOP - 8}dp;">')
-        w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 8dp; width: {span(4) - 32}dp;">LFO {n + 1} : page {{{{{L}Page_text}}}}, destination {{{{{L}Destination_text}}}}, forme {{{{{L}Waveform_text}}}}, déclenchement {{{{{L}Trigger_text}}}}</div>')
+        w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdNote" data-unread="{L}Page {L}Destination {L}Waveform {L}Trigger" style="left: 16dp; top: 8dp; width: {span(4) - 32}dp;">LFO {n + 1} : page {{{{{L}Page_text}}}}, destination {{{{{L}Destination_text}}}}, forme {{{{{L}Waveform_text}}}}, déclenchement {{{{{L}Trigger_text}}}}</div>')
         items = [("k", f"{L}Page", "PAGE"), ("k", f"{L}Destination", "DEST"), ("k", f"{L}Trigger", "TRIG"), ("k", f"{L}Waveform", "WAVE"),
                  ("k", f"{L}Multiplier", "MULT"), ("k", f"{L}Speed", "SPD"), ("k", f"{L}Interlace", "INTL"), ("k", f"{L}Depth", "DEP")]
         for i, item in enumerate(items):
@@ -231,9 +232,9 @@ def mm_sound(d):
     block_close(d + 1)
     track_h = y + h + 12
     roomy_h = track_h + curves_row(d + 1, y + h + GUT, [
-        ("Amp", "AMPLI", "ATK, HOLD, DEC · proportions", 0, 4),
-        ("Filter", "FILTRE", "BASE, WDTH, HPQ, LPQ · allure", 4, 4),
-        ("Eq", "EQ", "EQF, EQG · allure", 8, 4)]) + GUT
+        ("Amp", "AMPLI", "ATK, HOLD, DEC · proportions", 0, 4, "AmpAttack AmpHold AmpDecay"),
+        ("Filter", "FILTRE", "BASE, WDTH, HPQ, LPQ · allure", 4, 4, "FilterBase FilterWidth FilterHighpassQ FilterLowpassQ"),
+        ("Eq", "EQ", "EQF, EQG · allure", 8, 4, "EffectsEqFrequency EffectsEqGain")]) + GUT
     machine_picker(d + 1, picker_y)
     w(f'{ind(d)}</div>')
     w(f'{ind(d - 1)}</div>')

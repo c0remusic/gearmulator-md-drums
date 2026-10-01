@@ -12,7 +12,7 @@ Branche : `claude/md-editor-rml`, PR c0remusic/gearmulator-md-mm#4 (brouillon), 
 | `tools/splice_editor.py` | Remplace la barre du haut et l'éditeur dans `mdDefault.rml` et `mmSfx60.rml` par la sortie du script. |
 | `mockups/md-editor.html` | Maquette haute fidélité (look « Châssis »), ouvrir dans un navigateur. |
 | `mockups/md-wireframes.html` | Wireframes des planches 0 à 7 (référence de mise en page et d'interaction). |
-| `screenshots/` | Captures de l'état actuel, produites par les tests (sans ROM : les valeurs sont à 0). |
+| `screenshots/` | Captures de l'état actuel, produites par les tests sans ROM (kit synthétique : valeurs à 64). |
 
 Régénérer les skins :
 
@@ -33,6 +33,7 @@ Commits, du plus ancien au plus récent : éditeur RML MD puis MM, sélecteur de
 - **Sélecteur de machine** : `mdMachinePicker.*`, table `mdLib/mdmachines.*` (142 machines MD, 20 MM, ids et noms d'après MCL), `$5B` ASSIGN MACHINE, machines lues dans le dump de kit.
 - **Grille de pas (MD)** : `mdStepGrid.*`. Lecture du pattern courant (`$70` statut puis `$68`/`$67`), clic = pas sélectionné, double-clic = trig, contrôles qui écrivent les locks pendant qu'un pas avec trig est sélectionné, double-clic sur un lock = effacement. Écriture du dump complet puis relecture (`Controller::sendPattern`, `getPatternWrite`). Codec du dump : `MdPatternEditor` dans `mdLib/mdsysexautomation.*`.
 - **Courbes** : `mdCurveView.*`. Rangée COURBES sous SON quand la page a la place (fenêtre ≥ 652 dp sur MD, ≥ 736 dp sur MM). Formes seulement, pas d'échelles réelles.
+- **Assignation de machine** : `Controller::assignMachine` n'envoie que `$5B`. Les valeurs que le firmware change sans le dire (MD : synthèse, effets et routage ; MM : synthèse) deviennent inconnues (`isValueKnown`, `getValueStateRevision`) au lieu d'être écrasées par le cache. `mdUnreadValues.*` les grise (classe `mdEdUnread`, valeur affichée « — »), avec les lignes de résumé et les courbes qui les montrent (attribut `data-unread` posé par `gen_editor.py`). Elles redeviennent connues avec un dump de kit appliqué, une valeur envoyée par le firmware, ou une écriture de l'hôte ou de l'éditeur. Un instantané d'état pris pendant ce temps n'est pas complet : le restaurer n'écrase pas ce que le firmware tient.
 
 Les sessions cloud n'ont pas de ROM ; les points vérifiés depuis sur un vrai firmware sont dans « Vérifié avec une ROM ».
 
@@ -49,7 +50,7 @@ build/source/elektron/md/mdLibTest/mdAutomationMidiTest
 build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-only
 ```
 
-- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-son`, `-steps`, `-picker`, `-mix`, `-master`, `-panel`, `-stacked`, `-curves`.
+- Captures d'écran : `MD_EDITOR_TEST_PNG=/chemin/prefixe build/.../mdEditorSectionTest` écrit `-unread`, `-son`, `-steps`, `-picker`, `-mix`, `-master`, `-panel`, `-stacked`, `-curves`. Avant chaque capture, le test fait ce que les minuteurs font dans le plug-in (valeurs poussées vers l'interface, composants de l'éditeur rafraîchis) : sans cela, textes et knobs gardent leur valeur de départ.
 - Windows (VS 2022, `temp/cmake_vs22`) : régénérer les skins avec `PYTHONUTF8=1`, sinon Python lit les skins en cp1252. Les tests firmware du plug-in (`Harness`) cherchent la ROM dans le dossier de données du plug-in ou à côté de leur exécutable, pas dans `GEARMULATOR_*_FIRMWARE_BIN` : copier les `.bin` dans `…/mdJucePlugin/Release/`.
 - ASan comme la CI : configurer avec `-fsanitize=address,undefined` et lancer `ctest -R "mdAutomationMidiTest|mdAutomationArchitectureTest|mdAutomationParameterTest"`.
 - Avec une ROM, les tests firmware (`*FirmwareTest`, `mdAutomationRobustnessTest` sans option) tournent ; sans ROM ils sont ignorés.
@@ -65,8 +66,8 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 `mdEditorFirmwareTest` (mdLibTest) pose ces questions au vrai firmware, SPS-1UW OS 1.63 et SFX-60 OS 1.32b, avec le codec de l'éditeur. Il tourne en ~50 s et s'ignore sans `GEARMULATOR_MD_FIRMWARE_BIN` / `GEARMULATOR_MM_FIRMWARE_BIN`.
 
 1. `$5B` est accepté : MD table normale (TRX-XC → TRX-SD) et table UW avec le drapeau (TRX-XT → ROM-01), MM sans initialisation des pages (SWAVE-SAW → DPRO-DDRW). Le kit sauvé porte la nouvelle machine.
-   - MD : l'assignation remet les valeurs par défaut de la machine sur les pages synthèse, effets et routage (16 valeurs sur 25 pour TRX-SD, 13 pour ROM-01), pas le niveau. Le contrôleur renvoie ensuite les valeurs de son cache : la nouvelle machine garde donc les réglages de l'ancienne, contrairement à la machine. À trancher.
-   - MM (forme sans initialisation) : 2 valeurs sur 57 changent, les pages sont gardées.
+   - MD : l'assignation remet les valeurs par défaut de la machine sur les pages synthèse, effets et routage (16 valeurs sur 25 pour TRX-SD, 13 pour ROM-01), pas le niveau. Le contrôleur renvoyait ensuite les valeurs de son cache ; tranché le 2026-10-01 : il ne le fait plus (voir « Assignation de machine » plus haut).
+   - MM (forme sans initialisation) : 2 valeurs sur 57 changent, toutes deux sur la page synthèse (SYN B et SYN F pour SWAVE-SAW → DPRO-DDRW) ; les autres pages sont gardées.
 2. Dump `$67` : `MdPatternEditor` réencode octet pour octet le dump réel (5 410 octets, pattern A01 d'usine, 32 pas). Les trigs d'usine se lisent de façon cohérente avec le kit (T1 TRX-B2 sur 1 et 17, T9 TRX-CH très dense). Des trigs posés en face avant (enregistrement en grille, pas 1 et 5) et un lock (TRIG 5 tenu, DATA ENTRY B tourné) se lisent exactement là où le décodeur les attend : piste 1, pas 1 et 5, paramètre 2 au pas 5.
 3. Écriture : le firmware garde le pattern envoyé tel quel (relu identique), à l'arrêt comme en lecture. En lecture, l'écriture est suivie de 75 à 81 ms de silence complet (0 ms sur les 3 s d'avant) : raté audible dans l'émulation. Non vérifié sur une vraie machine.
 4. Une requête de kit rend le kit stocké : la machine assignée n'y apparaît qu'après sauvegarde. Le dump de pattern rend l'état en cours : trigs et lock posés en face avant, non sauvés, y figurent.

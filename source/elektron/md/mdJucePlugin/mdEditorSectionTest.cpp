@@ -16,9 +16,13 @@
 #include "mdController.h"
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
+#include "mdMachinePicker.h"
+#include "mdStepGrid.h"
+#include "mdUnreadValues.h"
 #include "mdLib/mdmachines.h"
 
 #include "RmlUi/Core/Context.h"
+#include "RmlUi/Core/DataModelHandle.h"
 #include "RmlUi/Core/ElementDocument.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -49,6 +53,24 @@ namespace mdJucePlugin
 		static bool updateScreen(Editor& _editor)
 		{
 			return _editor.m_kitPatternScreen && _editor.m_kitPatternScreen->update();
+		}
+
+		static bool updateUnread(Editor& _editor)
+		{
+			return _editor.m_unreadValues && _editor.m_unreadValues->update();
+		}
+
+		// Every editor component the presentation timer refreshes, for the snapshots
+		static void present(Editor& _editor)
+		{
+			if(_editor.m_machinePicker)
+				_editor.m_machinePicker->update();
+			if(_editor.m_stepGrid)
+				_editor.m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
+			if(_editor.m_curveView)
+				_editor.m_curveView->update();
+			updateScreen(_editor);
+			updateUnread(_editor);
 		}
 	};
 }
@@ -219,6 +241,41 @@ int main()
 		auto& context = *component->getContext();
 		auto& doc = *component->getDocument();
 		context.Update();
+
+		// Optional: MD_EDITOR_TEST_PNG=<prefix> writes snapshots of the editor for review.
+		const char* png = std::getenv("MD_EDITOR_TEST_PNG");
+		juceRmlUi::LookAndFeel lookAndFeel;
+		const auto snap = [&](const std::string& _suffix)
+		{
+			if(!png)
+				return;
+			// What the controller timer and JUCE's asynchronous Value listeners bring in the
+			// plug-in: parameter values flushed to the UI, then the knobs and texts that show them
+			for(const auto& [address, parameters] : processor.getController().getExposedParameters())
+			{
+				for(auto* parameter : parameters)
+				{
+					parameter->flushRealtimeValueToUi();
+					parameter->getValueObject().getValueSource().sendChangeMessage(true);
+				}
+			}
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			component->setLookAndFeel(&lookAndFeel);
+			juce::Image image;
+			for(int frame = 0; frame < 6; ++frame)
+			{
+				juceRmlUi::RenderingTestAccess::update(*component);
+				image = juce::Image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true);
+				lookAndFeel.getCurrentImage() = image;
+				juce::Graphics g(image);
+				component->paint(g);
+			}
+			component->setLookAndFeel(nullptr);
+			juce::FileOutputStream out(juce::File(std::string(png) + _suffix + ".png"));
+			out.setPosition(0);
+			out.truncate();
+			juce::PNGImageFormat().writeImageToStream(image, out);
+		};
 
 		// window: 1100 x 606 dp at scale 1, a top bar over the front panel; the height follows the window
 		const auto docSize = component->getDocumentSize();
@@ -554,27 +611,82 @@ int main()
 			require(text("mdEdScreenName") == name, "screen did not show the new Kit's name");
 		}
 
-		// Optional: MD_EDITOR_TEST_PNG=<prefix> writes snapshots of the SON and MIX pages for review.
-		if(const char* png = std::getenv("MD_EDITOR_TEST_PNG"))
+		// Values the firmware set without telling: after a machine assignment, the
+		// machine's values of the edited track are greyed and read "—" until a Kit is
+		// applied or a control sets them.
 		{
-			juceRmlUi::LookAndFeel lookAndFeel;
-			component->setLookAndFeel(&lookAndFeel);
-			const auto snap = [&](const std::string& _suffix)
+			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			const bool mm = g_model == md::MachineModel::Monomachine;
+			const uint8_t product = mm ? 0x03 : 0x02;
+			const auto status = [&](const uint8_t _parameter, const uint8_t _value)
 			{
-				juce::Image image;
-				for(int frame = 0; frame < 6; ++frame)
-				{
-					juceRmlUi::RenderingTestAccess::update(*component);
-					image = juce::Image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true);
-					lookAndFeel.getCurrentImage() = image;
-					juce::Graphics g(image);
-					component->paint(g);
-				}
-				juce::FileOutputStream out(juce::File(std::string(png) + _suffix + ".png"));
-				out.setPosition(0);
-				out.truncate();
-				juce::PNGImageFormat().writeImageToStream(image, out);
+				md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, product, 0x00, 0x72, _parameter, _value, 0xf7},
+					synthLib::MidiEventSource::Device);
 			};
+			const auto loadKit = [&]
+			{
+				md.onStateLoaded();
+				status(0x01, 0);
+				status(0x02, 0);
+				md.parseSysexMessage(mdAutomationTest::makeGlobalDump(g_model, 0, 0), synthLib::MidiEventSource::Device);
+				md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, 0, 64, std::vector<uint16_t>(g_trackCount, g_pickMachine)),
+					synthLib::MidiEventSource::Device);
+				mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor);
+				context.Update();
+			};
+			const auto unread = [&](const std::string& _id) { return element(doc, _id).IsClassSet("mdEdUnread"); };
+			const std::string synthesis = mm ? "SynthesisA" : "MachineParameter1";
+			// MD: effects (FilterBase) and routing (Volume) pages too; MM: the amp page is kept
+			const std::string other = mm ? "AmpVolume" : "FilterBase";
+			const auto mixRowValues = [&](const int _track, const std::string& _param)
+			{
+				Rml::ElementList knobs;
+				element(doc, "mdEdLevelRow" + std::to_string(_track)).GetElementsByTagName(knobs, "knob");
+				for(auto* knob : knobs)
+					if(knob->GetAttribute("param", std::string()) == _param)
+						return knob->IsClassSet("mdEdUnread");
+				throw std::runtime_error("MIX row " + std::to_string(_track + 1) + " has no " + _param);
+			};
+
+			element(doc, "editTrack0").Click();
+			loadKit();
+			require(md.isAutomationSynchronized(), "unread test did not synchronize");
+			require(!unread("mdEdCtl_" + synthesis) && !unread("mdEdVal_" + synthesis), "value greyed after an applied Kit dump");
+
+			require(md.assignMachine(0, g_otherFamilyMachine), "assignment refused");
+			require(mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor), "unread values not refreshed after an assignment");
+			context.Update();
+			require(unread("mdEdCtl_" + synthesis) && unread("mdEdVal_" + synthesis), "synthesis value not greyed after an assignment");
+			require(unread("mdEdCtl_" + other) == !mm, mm ? "kept amp value greyed" : "effects value not greyed after an assignment");
+			require(mixRowValues(0, mm ? "AmpVolume" : "Volume") == !mm && !mixRowValues(1, mm ? "AmpVolume" : "Volume"),
+				"MIX rows do not grey exactly the assigned track's routing");
+			// What shows those values elsewhere: the filter curve (MD effects page; kept on the MM)
+			require(unread("mdEdCurveFilter") == !mm, "filter curve does not follow its values");
+			require(!mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor), "unread values rewritten without a change");
+			snap("-unread");
+
+			// Another track shows its own values; the assigned one is greyed again on return
+			element(doc, "editTrack1").Click();
+			context.Update();
+			require(!unread("mdEdCtl_" + synthesis), "another track's value greyed");
+			element(doc, "editTrack0").Click();
+			context.Update();
+			require(unread("mdEdCtl_" + synthesis), "assigned track's value no longer greyed after a track change");
+
+			// A control sets the value: known again, the others stay greyed
+			juceRmlUi::ElemValue::setValue(&element(doc, "mdEdCtl_" + synthesis), 90.0f);
+			mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor);
+			context.Update();
+			const std::string next = mm ? "SynthesisB" : "MachineParameter2";
+			require(!unread("mdEdCtl_" + synthesis) && !unread("mdEdVal_" + synthesis) && unread("mdEdCtl_" + next),
+				"a control did not make exactly its own value known");
+
+			loadKit();
+			require(!unread("mdEdCtl_" + next) && !mixRowValues(0, mm ? "AmpVolume" : "Volume"), "values still greyed after the Kit was applied");
+		}
+
+		if(png)
+		{
 			// the editor is shown (see above); the front panel, then the stacked tall window
 			snap("-son");
 #if !defined(MD_EDITOR_SECTION_TEST_MM)

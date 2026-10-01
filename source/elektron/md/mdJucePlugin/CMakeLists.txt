@@ -18,6 +18,7 @@ set(SOURCES
 	mdController.cpp mdController.h
 	mdCurveView.cpp mdCurveView.h
 	mdKitPatternScreen.cpp mdKitPatternScreen.h
+	mdUnreadValues.cpp mdUnreadValues.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h
