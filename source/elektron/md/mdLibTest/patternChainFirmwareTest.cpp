@@ -22,16 +22,26 @@
 // prints, for each request, the steps that played around the switch, when the
 // status first answered A02 and when the machine sent its Program Change.
 //
-// Two more checks. SONG POSITION and CONTINUE, which the plug-in sends when the
-// host starts later in the song, start A01 at that position within the pattern,
-// modulo its length, on the first clock. And with A02 on another Kit, which the
+// More checks. SONG POSITION and CONTINUE, which the plug-in sends when the host
+// starts later in the song, start A01 at that position within the pattern,
+// modulo its length, on the first clock. With A02 on another Kit, which the
 // machine loads at the switch, A02 still takes over on time: with TRX-CH on
 // track 3 of both patterns, every step sounds across the switch, its attack as
 // early as before, with no silence. Audio tracks send a note of their own on
-// each trig (track 3: note 40), below the locked notes.
+// each trig (track 3: note 40), below the locked notes. Selecting, while
+// stopped, the pattern the machine already has loads its Kit again: a change
+// to the Kit not saved is lost. A pattern asked for while playing and still
+// waiting at STOP plays at the next START, though CURRENT PATTERN still
+// answers the old one.
+//
+// Last, md::ChainPlayer between the transport and the machine, as the Device
+// runs it: the chain A01 (16 steps) twice then A02 plays every step as the
+// chain says, from START over two rounds and from a song position inside A02,
+// and a chain beginning with A02 starts on A02 though the machine had A01.
 //
 // Firmware from GEARMULATOR_MD_FIRMWARE_BIN; 77 without it.
 
+#include "mdLib/mdchainplayer.h"
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdmachines.h"
 #include "mdLib/mdmidiprotocol.h"
@@ -144,6 +154,7 @@ namespace
 		int songPosition = 0;			// in sixteenths; above 0, SONG POSITION and CONTINUE instead of START
 		std::optional<Request> request;
 		int ticks = 0;
+		bool selectA01 = true;			// select A01 before starting, as it is already
 	};
 
 	struct Run
@@ -399,7 +410,8 @@ namespace
 		const auto framesPerTick = _tempo.framesPerTick();
 		_md.send({0xfc});
 		_md.advance(framesPerTick * 12);
-		_md.selectPattern(0);
+		if(_playback.selectA01)
+			_md.selectPattern(0);
 		_md.drain();
 
 		Run run;
@@ -657,6 +669,191 @@ namespace
 		}
 	}
 
+	// Whether selecting the pattern the machine already has, while stopped, loads its Kit again and so
+	// drops the Kit's unsaved changes: track 3 (TRX-CH on every step of A01) turned down live, then
+	// played without selecting A01 and after selecting it
+	bool reselectionReloadsKit(Machinedrum& _md, const Tempo& _tempo, const uint8_t _baseChannel)
+	{
+		const auto loudest = [](const Run& _run)
+		{
+			float peak = 0;
+			for(const auto& [tick, value] : _run.peaks)
+				peak = std::max(peak, value);
+			return peak;
+		};
+		const auto turnedDown = md::automation::encodeParameterChange(Model,
+			{md::automation::machinedrum::Level, 2, 0, 0}, _baseChannel);
+		require(turnedDown.has_value(), "codec refused the Level of track 3");
+		_md.send({(*turnedDown)[0], (*turnedDown)[1], (*turnedDown)[2]});
+		_md.advance(md::g_samplerate / 2);
+		Playback playback{0, std::nullopt, 8 * TicksPerStep, false};
+		const auto kept = loudest(play(_md, _tempo, 32, playback, _baseChannel));
+		playback.selectA01 = true;
+		const auto reselected = loudest(play(_md, _tempo, 32, playback, _baseChannel));
+		std::printf("MD track 3 turned down live: peak %.4f when played as it is, %.4f after selecting A01 again%s\n",
+			kept, reselected, reselected > 10 * std::max(kept, 1e-4f) ? ": the Kit was loaded again" : ": the Kit kept the change");
+		require(kept < 0.01f, "the live Level change did not silence track 3");
+		return reselected > 10 * std::max(kept, 1e-4f);
+	}
+
+	// A02 asked for while A01 plays, then STOP before A01 ends: the pattern the machine has then, by its
+	// status and by what START plays
+	std::pair<uint8_t, int> patternAfterStop(Machinedrum& _md, const Tempo& _tempo, const uint8_t _baseChannel)
+	{
+		const Playback asked{0, Request{false, 0, 1}, 36 * TicksPerStep};
+		(void)play(_md, _tempo, 32, asked, _baseChannel);
+		const auto status = _md.status(Status::Pattern);
+		const Playback resumed{0, std::nullopt, 2 * TicksPerStep, false};
+		const auto run = play(_md, _tempo, 32, resumed, _baseChannel);
+		const int played = run.steps.empty() ? -1 : run.steps.front().pattern;
+		std::printf("MD A02 asked for at A01's second pass, STOP four steps later: CURRENT PATTERN %s, START plays %s\n",
+			patternName(status).c_str(), played < 0 ? "nothing" : patternName(played).c_str());
+		return {status, played};
+	}
+
+	// The chain the plug-in plays: the transport goes through ChainPlayer, as the Device runs it, then to
+	// the machine, and what the machine sends goes back to the player
+	Run playChain(Machinedrum& _md, const Tempo& _tempo, md::ChainPlayer& _player, const int _songPosition, const int _ticks)
+	{
+		const auto framesPerTick = _tempo.framesPerTick();
+		auto& hardware = _md.hardware();
+		std::vector<synthLib::SMidiEvent> out;
+		const auto forward = [&](const synthLib::SMidiEvent& _event)
+		{
+			out.clear();
+			_player.process(_event, out);
+			for(const auto& event : out)
+				require(hardware.sendMidi(event), "MIDI rejected by the input");
+		};
+		const auto transport = [&](const uint8_t _a, const uint8_t _b = 0, const uint8_t _c = 0)
+		{
+			forward(synthLib::SMidiEvent(synthLib::MidiEventSource::Internal, _a, _b, _c));
+		};
+		Run run;
+		std::vector<synthLib::SMidiEvent> events;
+		const auto listen = [&](const std::optional<double> _tick)
+		{
+			events.clear();
+			hardware.readMidiOut(events);
+			for(const auto& event : events)
+			{
+				_player.observe(event);
+				if(_tick)
+					record(run, event, *_tick);
+			}
+		};
+		const auto idle = [&](const uint32_t _ticks)
+		{
+			for(uint32_t frame = 0; frame < framesPerTick * _ticks; frame += _tempo.chunk)
+			{
+				hardware.advance(_tempo.chunk);
+				listen(std::nullopt);
+			}
+		};
+
+		transport(0xfc);
+		idle(12);
+		if(_songPosition > 0)
+		{
+			transport(0xf2, static_cast<uint8_t>(_songPosition & 0x7f), static_cast<uint8_t>(_songPosition >> 7));
+			transport(0xfb);
+		}
+		else
+		{
+			transport(0xfa);
+		}
+		for(int tick = 0; tick < _ticks; ++tick)
+		{
+			transport(0xf8);
+			for(uint32_t frame = 0; frame < framesPerTick; frame += _tempo.chunk)
+			{
+				hardware.advance(_tempo.chunk);
+				listen(tick + static_cast<double>(frame + _tempo.chunk) / framesPerTick);
+			}
+		}
+		transport(0xfc);
+		idle(12);
+		return run;
+	}
+
+	// Every clock step played what the chain plays there, from _songPosition: one note, its pattern and step
+	std::string checkChain(const Run& _run, const md::PatternChain& _chain, const int _songPosition, const int _ticks)
+	{
+		const int steps = _ticks / TicksPerStep;
+		std::vector<std::vector<PlayedStep>> byStep(static_cast<size_t>(steps));
+		for(const auto& step : _run.steps)
+		{
+			const auto index = static_cast<int>(std::floor(step.tick / TicksPerStep));
+			if(index >= 0 && index < steps)
+				byStep[static_cast<size_t>(index)].push_back(step);
+		}
+		for(int index = 0; index < steps; ++index)
+		{
+			const auto tick = static_cast<uint64_t>(_songPosition + index) * TicksPerStep;
+			const auto pass = _chain.passAt(tick);
+			const int expected = static_cast<int>((tick - pass->start) / TicksPerStep);
+			const auto& played = byStep[static_cast<size_t>(index)];
+			if(played.size() == 1 && played.front().pattern == pass->pattern && played.front().step == expected)
+				continue;
+			std::string found;
+			for(const auto& step : played)
+				found += " " + describe(step);
+			return "clock step " + std::to_string(index) + " played" + (found.empty() ? std::string(" nothing") : found)
+				+ ", the chain plays " + patternName(pass->pattern) + " " + std::to_string(expected + 1);
+		}
+		return {};
+	}
+
+	// ChainPlayer between the transport and the machine: the chain A01 (16 steps) twice then A02 (32 steps),
+	// from START over two rounds and from a song position inside A02; then a chain beginning with A02 while
+	// the machine has A01, which START must play from its first step
+	void checkChainPlayer(Machinedrum& _md, const Tempo& _tempo, std::vector<std::string>& _failures)
+	{
+		writePattern(_md, 0, 16);
+		writePattern(_md, 1, 32);
+		md::PatternChain chain;
+		require(chain.setEntries({{0, 2}, {1, 1}}), "chain refused");
+		chain.setLength(0, 16);
+		chain.setLength(1, 32);
+		md::ChainPlayer player(Model);
+		player.setChain(std::make_shared<md::PatternChain>(chain));
+
+		const auto report = [&](const char* _what, const std::string& _failure)
+		{
+			std::printf("MD chain A01 x2, A02 %s: %s\n", _what, _failure.empty() ? "every step as the chain plays it" : _failure.c_str());
+			if(!_failure.empty())
+				_failures.push_back("chain " + std::string(_what) + ": " + _failure);
+		};
+		const int round = static_cast<int>(chain.roundTicks());
+		report("from START, two rounds", checkChain(playChain(_md, _tempo, player, 0, 2 * round + 8 * TicksPerStep), chain, 0,
+			2 * round + 8 * TicksPerStep));
+		report("from SONG POSITION 40 (A02's ninth step)", checkChain(playChain(_md, _tempo, player, 40, round), chain, 40, round));
+
+		// The machine on A01, selected through the player as the editor would
+		synthLib::SMidiEvent selection(synthLib::MidiEventSource::Host);
+		const auto body = md::midiProtocol::selectPattern(Model, 0);
+		selection.sysex.push_back(0xf0);
+		selection.sysex.insert(selection.sysex.end(), body.begin(), body.end());
+		selection.sysex.push_back(0xf7);
+		std::vector<synthLib::SMidiEvent> out;
+		player.process(selection, out);
+		for(const auto& event : out)
+			require(_md.hardware().sendMidi(event), "MIDI rejected by the input");
+		_md.advance(md::g_samplerate / 2);
+		require(_md.status(Status::Pattern) == 0 && player.getStartPattern() == uint8_t{0}, "A01 not selected");
+		md::PatternChain fromA02;
+		require(fromA02.setEntries({{1, 1}, {0, 1}}), "chain refused");
+		fromA02.setLength(0, 16);
+		fromA02.setLength(1, 32);
+		player.setChain(std::make_shared<md::PatternChain>(fromA02));
+		const int ticks = static_cast<int>(fromA02.roundTicks()) + 8 * TicksPerStep;
+		const auto failure = checkChain(playChain(_md, _tempo, player, 0, ticks), fromA02, 0, ticks);
+		std::printf("MD chain A02, A01 from START with the machine on A01: %s\n",
+			failure.empty() ? "A02 selected before START and played from its first step" : failure.c_str());
+		if(!failure.empty())
+			_failures.push_back("chain beginning with A02: " + failure);
+	}
+
 	bool runMachinedrum()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
@@ -719,6 +916,16 @@ namespace
 
 		// A02 on another Kit, with an audible track on both patterns
 		checkKitChange(machine, tempo, failures, [&](const Request& _request) { return run(tempo, 32, _request, true); });
+
+		// Selecting the pattern the machine already has loads its Kit again: ChainPlayer avoids it
+		if(!reselectionReloadsKit(machine, tempo, baseChannel))
+			failures.push_back("selecting the pattern the machine has kept the Kit's unsaved change");
+		// A request still queued when the transport stops plays at START, though the status does not show it
+		if(patternAfterStop(machine, tempo, baseChannel) != std::pair<uint8_t, int>{0, 1})
+			failures.push_back("a pattern asked for before STOP did not wait, unseen, for START");
+
+		// The chain the plug-in plays, through ChainPlayer
+		checkChainPlayer(machine, tempo, failures);
 
 		require(failures.empty(), std::to_string(failures.size()) + " checks of " + std::to_string(count)
 			+ " requests and the song positions did not follow the rule");
