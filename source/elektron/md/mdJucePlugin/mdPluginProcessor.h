@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jucePluginEditorLib/pluginProcessor.h"
+#include "mdChainControl.h"
 #include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdtypes.h"
@@ -85,6 +86,9 @@ namespace mdJucePlugin
 
 		// Levels of the three output buses after each block, for the editor's meters
 		OutputMeters& getOutputMeters() { return m_outputMeters; }
+
+		// The project's pattern chain (Machinedrum), played while the machine follows the host
+		ChainControl& getChainControl() { return m_chainControl; }
 		using jucePluginEditorLib::Processor::processBlock;
 		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
 
@@ -108,6 +112,8 @@ namespace mdJucePlugin
 		bool serviceStateRestoreFailure();
 		void recordStandaloneStartupDiagnostics();
 		void reportProjectStateRestoreFailure(const std::string& _error);
+		// Hands the chain to the device as the host sync allows, and reads the lengths it lacks
+		void serviceChain();
 		void timerCallback() override;
 
 		std::unique_ptr<synthLib::PerformanceReport> m_performanceReport;
@@ -126,6 +132,9 @@ namespace mdJucePlugin
 		bool m_ramRecordingModeChunkSeen = false;
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
 		OutputMeters m_outputMeters;
+		ChainControl m_chainControl{m_model};
+		std::optional<uint8_t> m_chainLengthAsked;	// the pattern whose dump was asked for, and when
+		double m_chainLengthAskedAt = 0.0;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 	};
 }

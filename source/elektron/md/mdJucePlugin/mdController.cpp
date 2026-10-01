@@ -486,6 +486,15 @@ namespace mdJucePlugin
 		return true;
 	}
 
+	bool Controller::requestPatternDump(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || _slot >= 128 || !firmwareReadyForAutomation())
+			return false;
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, _slot));
+		return true;
+	}
+
 	std::optional<md::automation::sysex::PatternDump> Controller::getPattern() const
 	{
 		const std::lock_guard lock(m_patternMutex);
@@ -1281,6 +1290,8 @@ namespace mdJucePlugin
 		{
 			if(auto pattern = md::automation::sysex::parseMdPatternDump(_message))
 			{
+				// Any pattern's length, for the chain
+				static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
 				if(m_patternWanted.load(std::memory_order_acquire)
 					&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
 				{

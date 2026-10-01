@@ -122,6 +122,11 @@ namespace mdJucePlugin
 			baseLib::ChunkWriter chunk(_stream, "AUTO", 1);
 			_stream.write(snapshot);
 		}
+		if(m_model == md::MachineModel::Machinedrum)
+		{
+			baseLib::ChunkWriter chunk(_stream, "CHAN", 1);
+			m_chainControl.save(_stream);
+		}
 	}
 
 	void AudioPluginAudioProcessor::loadChunkData(baseLib::ChunkReader& _reader)
@@ -133,6 +138,11 @@ namespace mdJucePlugin
 			_stream.read(snapshot);
 			auto& controller = dynamic_cast<Controller&>(getController());
 			(void)controller.restoreAutomationSnapshot(snapshot);
+		});
+		_reader.add("CHAN", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		{
+			if(m_model == md::MachineModel::Machinedrum)
+				(void)m_chainControl.load(_stream);
 		});
 		_reader.add("RAMF", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
@@ -840,9 +850,28 @@ namespace mdJucePlugin
 		m_startupDiagnosticsFile.appendText(line);
 	}
 
+	void AudioPluginAudioProcessor::serviceChain()
+	{
+		if(m_model != md::MachineModel::Machinedrum)
+			return;
+		m_chainControl.update(getHostSyncState() == md::HostSync::State::Following);
+		// A pattern of the chain whose length is not known: its dump, one pattern at a time,
+		// asked for again after three seconds without an answer
+		const auto missing = m_chainControl.getMissingLength();
+		const auto now = juce::Time::getMillisecondCounterHiRes();
+		if(!missing || !hasController() || (m_chainLengthAsked == missing && now - m_chainLengthAskedAt < 3000.0))
+			return;
+		if(dynamic_cast<Controller&>(getController()).requestPatternDump(*missing))
+		{
+			m_chainLengthAsked = missing;
+			m_chainLengthAskedAt = now;
+		}
+	}
+
 	void AudioPluginAudioProcessor::timerCallback()
 	{
 		recordStandaloneStartupDiagnostics();
+		serviceChain();
 		if(serviceProjectStateRestore())
 			return;
 		(void)serviceFactoryInitialization();
@@ -869,6 +898,8 @@ namespace mdJucePlugin
 		d->setRamRecordingMode(getRamRecordingMode());
 		d->setParallelTransport(getParallelTransportSetting());
 		d->setHostSyncControl(m_hostSyncControl);
+		if(m_model == md::MachineModel::Machinedrum)
+			d->setChainPlayer(m_chainControl.getPlayer());
 		return d.release();
 	}
 

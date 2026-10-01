@@ -15,6 +15,7 @@ endif()
 add_compile_definitions(MDMM_DIAGNOSTICS_REVISION="${MDMM_DIAGNOSTICS_REVISION}")
 
 set(SOURCES
+	mdChainControl.cpp mdChainControl.h
 	mdController.cpp mdController.h
 	mdCurveView.cpp mdCurveView.h
 	mdKitPatternScreen.cpp mdKitPatternScreen.h
@@ -160,6 +161,13 @@ if(BUILD_TESTING)
 				ENVIRONMENT "GEARMULATOR_DATA_ROOT=${CMAKE_CURRENT_BINARY_DIR}/program-metadata/${plugin_target}")
 		endif()
 	endforeach()
+
+	# The project's pattern chain: states, lengths and the saved chunk, without firmware
+	add_executable(mdChainControlTest mdChainControlTest.cpp mdChainControl.cpp)
+	target_link_libraries(mdChainControlTest PRIVATE mdLib)
+	add_test(NAME mdChainControlTest COMMAND mdChainControlTest)
+	set_tests_properties(mdChainControlTest PROPERTIES LABELS "UnitTest")
+	set_property(TARGET mdChainControlTest PROPERTY FOLDER "Elektron/test")
 
 	add_executable(mdLcdInteractionModelTest
 		mdLcdInteractionModelTest.cpp mdLcdInteractionModel.cpp)
@@ -373,6 +381,13 @@ if(BUILD_TESTING)
 		mdProgramChangeFirmwareTest.cpp)
 	add_test(NAME mdProgramChangeFirmwareTest COMMAND mdProgramChangeFirmwareTest)
 	set_tests_properties(mdProgramChangeFirmwareTest PROPERTIES
+		LABELS "Integration;FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 300)
+
+	# The project's pattern chain through the whole plug-in, the host playing
+	add_md_automation_firmware_test(mdChainPluginFirmwareTest
+		mdChainPluginFirmwareTest.cpp)
+	add_test(NAME mdChainPluginFirmwareTest COMMAND mdChainPluginFirmwareTest)
+	set_tests_properties(mdChainPluginFirmwareTest PROPERTIES
 		LABELS "Integration;FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 	add_md_automation_firmware_test(mdAutomationRobustnessTest

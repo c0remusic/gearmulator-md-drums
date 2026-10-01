@@ -183,7 +183,14 @@ Moteur (mdLib, fait) :
 - `patternChainTest` (unitaire) et la fin de `patternChainFirmwareTest` (firmware) : la chaîne A01 (16 pas) ×2 puis A02 joue chaque pas comme prévu depuis START sur deux tours et depuis SONG POSITION 40 ; une chaîne commençant par A02 démarre sur A02 alors que la machine avait A01.
 - Limite connue : un départ dans les 7 derniers ticks d'un passage laisse la machine rejouer ce pattern une fois ; la chaîne se recale à son prochain changement de pattern.
 
-Reste : le processeur (chaîne dans l'état du projet, longueurs lues dans les dumps de pattern, chaîne active seulement avec « suivre l'hôte »), puis l'interface (bandeau ARRANGEMENT de JOUER, comme la maquette).
+Plug-in (fait) :
+
+- `mdChainControl.*` : la chaîne du projet (activation, entrées, longueur par pattern). Le processeur la possède et pose son `ChainPlayer` sur chaque `md::Device` MD qu'il crée. Elle n'est confiée au lecteur que si elle est activée, non vide, avec toutes ses longueurs, et si la machine suit l'hôte (`HostSync` en Following) : états `Off`, `Empty`, `ReadingLengths`, `NotFollowing`, `Playing`. Une modification arrive au lecteur aussitôt ; une longueur nouvelle au tour de minuteur suivant.
+- Longueurs : le contrôleur donne la longueur de **tout** dump de pattern MD qu'il voit (`setLength`), et le minuteur du processeur (1 s) demande le dump d'un pattern de la chaîne sans longueur (`Controller::requestPatternDump`), un à la fois, redemandé après 3 s sans réponse. Un dump fait ~2,7 Ko : environ 1 s par pattern sur la ligne MIDI.
+- État du projet : chunk `CHAN` v1 (activation, nombre d'entrées, puis pattern, passages et longueur de chacune). Les longueurs reviennent avec le projet, comme les patterns de la machine.
+- `mdChainControlTest` (unitaire) : états, remise au lecteur et reprise, chunk relu. `mdChainPluginFirmwareTest` (firmware, ~30 s) : le plug-in entier, l'hôte qui joue à 150 BPM (tête de lecture simulée), `synthLib::MidiClock`, le device, la machine qui suit l'hôte ; le statut CURRENT PATTERN, demandé à chaque pas par l'hôte, suit la chaîne A01, A02, A01 (changements à ppq 7,77, 15,77, 23,77, 31,77 pour des fins à 8, 16, 24, 32). Comme dans le plug-in, le test demande le statut Global (le device en tire le slot actif pour `HostSync`) et finit l'initialisation d'usine par un redémarrage, ce que font les minuteurs du contrôleur et du processeur.
+
+Reste : l'interface (bandeau ARRANGEMENT de JOUER, comme la maquette).
 
 Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), l'échelle et le double tempo, les patterns de plus de 32 pas, une vraie machine (tout ce qui précède vient de l'émulation du firmware).
 

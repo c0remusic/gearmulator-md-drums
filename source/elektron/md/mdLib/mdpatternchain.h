@@ -60,6 +60,9 @@ namespace md
 		// The pass after _pass
 		Pass next(const Pass& _pass) const;
 
+		bool operator==(const PatternChain& _other) const { return m_entries == _other.m_entries && m_lengths == _other.m_lengths; }
+		bool operator!=(const PatternChain& _other) const { return !(*this == _other); }
+
 	private:
 		uint32_t passTicks(uint8_t _pattern) const { return m_lengths[_pattern] * TicksPerStep; }
 
