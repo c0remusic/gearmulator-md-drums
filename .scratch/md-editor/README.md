@@ -127,7 +127,7 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
 
 ### 5. OPTIONS et SYSTÈME (fait)
 
-- OPTIONS (barre du haut) : bouton qui ouvre le menu du plug-in (`Editor::openMenu`, comme un clic droit) : échelle, verrous de régions, enregistrement RAM, diagnostics, fichier SysEx, réglages.
+- OPTIONS (barre du haut) : bouton qui ouvre le menu du plug-in (`Editor::openMenu`, comme un clic droit) : échelle, enregistrement RAM (MD), diagnostics, fichier SysEx, réglages.
 - SYSTÈME (`mdSystemPage.*`, planche 10) : une ligne par sujet, libellé 3 colonnes, état 7, action 2 :
   - RÉGLAGES GLOBAUX : Global et canaux MIDI (`getCurrentGlobal`, canal de base ; MD 4 canaux, MM 6) ; réglage sur la face avant ;
   - SYNCHRO DAW : « suivre le tempo de l'hôte » (`FollowHostTempoConfigKey`) et l'état de `HostSync` ;
@@ -135,7 +135,10 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
   - ENREGISTREMENT RAM (MD) : queues complètes ou finalisation d'origine, grisé si la machine ne le permet pas ;
   - TRANSFERT SYSEX : fichier, reprise ou annulation selon l'état du transfert ;
   - STOCKAGE MACHINE : chargement d'une image (avec la confirmation existante) ;
+  - ÉCHELLE DE L'INTERFACE : les échelles du menu (50 à 300 %) et 130 %, l'échelle d'une installation neuve ; l'échelle courante en orange, et en clair à droite (une taille tirée au coin de la fenêtre n'en coche aucune). Comme la fenêtre de réglages : `scale` dans la config, puis `evSetGuiScale` ;
+  - DIAGNOSTICS : état de la capture de performance en français (`performanceDiagnosticsState`), CAPTURE la démarre ou l'arrête (orange pendant l'enregistrement), JOURNAUX… ouvre le dossier des rapports ;
   - PLUG-IN : fenêtre de réglages.
+- Chaque entrée du menu du plug-in a donc sa ligne. « Lock Regions » et « Copy/Replace Patch » n'existent pas pour MD/MM : pas de régions dans `parameterDescriptions_md/mm.json`, pas d'élément `patchmanager` dans les skins ; le menu ne les montre pas non plus.
 - L'état est relu deux fois par seconde au plus, seulement pendant que la page est affichée (certains états prennent le verrou du device).
 - Les états sont en français ; la fenêtre de réglages existante reste en anglais.
 

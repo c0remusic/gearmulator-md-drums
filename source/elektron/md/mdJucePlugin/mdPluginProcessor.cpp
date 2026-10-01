@@ -481,6 +481,12 @@ namespace mdJucePlugin
 			|| status == synthLib::PerformanceReport::Status::Recording;
 	}
 
+	std::optional<synthLib::PerformanceReport::Status> AudioPluginAudioProcessor::performanceDiagnosticsState() const
+	{
+		if(!m_performanceReport) return std::nullopt;
+		return m_performanceReport->status();
+	}
+
 	std::string AudioPluginAudioProcessor::performanceDiagnosticsStatus() const
 	{
 		if(m_performanceFolderError) return "Could not create the logs folder.";

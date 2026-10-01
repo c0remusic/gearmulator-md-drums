@@ -4,6 +4,8 @@
 #include "mdEditor.h"
 #include "mdPluginProcessor.h"
 
+#include "jucePluginEditorLib/pluginEditorState.h"
+
 #include "juceRmlUi/rmlElemButton.h"
 #include "juceRmlUi/rmlEventListener.h"
 
@@ -108,6 +110,43 @@ namespace mdJucePlugin
 				later(m_editor, [](Editor& _editor) { _editor.showSettings(true); });
 			});
 		}
+		for(size_t i = 0; i < Scales.size(); ++i)
+		{
+			m_scales[i] = _document.GetElementById("mdSysScale" + std::to_string(Scales[i]));
+			if(!m_scales[i])
+				continue;
+			// As the settings window does: the config, then the window takes the scale
+			juceRmlUi::EventListener::Add(m_scales[i], Rml::EventId::Click, [this, &config, scale = Scales[i]](Rml::Event&)
+			{
+				config.setValue("scale", juce::var(scale));
+				config.saveIfNeeded();
+				if(const auto* state = m_processor.getEditorState())
+					state->evSetGuiScale(scale);
+				m_dirty = true;
+			});
+		}
+		m_scaleState = _document.GetElementById("mdSysScaleState");
+		m_capture = _document.GetElementById("mdSysCapture");
+		m_diagnosticsState = _document.GetElementById("mdSysDiagnosticsState");
+		if(m_capture)
+		{
+			juceRmlUi::EventListener::Add(m_capture, Rml::EventId::Click, [this](Rml::Event&)
+			{
+				m_processor.setPerformanceDiagnosticsEnabled(!m_processor.performanceDiagnosticsActive());
+				m_dirty = true;
+			});
+		}
+		if(auto* logs = _document.GetElementById("mdSysLogs"))
+		{
+			juceRmlUi::EventListener::Add(logs, Rml::EventId::Click, [this](Rml::Event&)
+			{
+				later(m_editor, [folder = m_processor.performanceDiagnosticsFolder()](Editor&)
+				{
+					if(folder.createDirectory().wasOk())
+						folder.revealToUser();
+				});
+			});
+		}
 	}
 
 	std::string SystemPage::globalLine(const md::MachineModel _model, const uint8_t _global, const bool _known, const uint8_t _baseChannel)
@@ -144,6 +183,34 @@ namespace mdJucePlugin
 				: "la machine n'a pas pris le réglage : GLOBAL > SYNC sur la machine";
 		}
 		return {};
+	}
+
+	std::string SystemPage::diagnosticsLine(const std::optional<synthLib::PerformanceReport::Status> _state, const bool _folderError)
+	{
+		using Status = synthLib::PerformanceReport::Status;
+		if(_folderError)
+			return "dossier des journaux impossible à créer";
+		switch(_state.value_or(Status::Idle))
+		{
+		case Status::Starting:
+			return "démarrage de la capture…";
+		case Status::Recording:
+			return "capture en cours : 10 minutes ou 8 Mio au plus";
+		case Status::Stopped:
+			return "rapport enregistré ; JOURNAUX… ouvre son dossier";
+		case Status::LimitReached:
+			return "limite atteinte : rapport enregistré, capture arrêtée";
+		case Status::Error:
+			return "rapport non écrit : vérifier l'espace libre et les droits";
+		case Status::Idle:
+			break;
+		}
+		return "aucune capture ; CAPTURE mesure l'émulation dans un rapport";
+	}
+
+	int SystemPage::currentScale() const
+	{
+		return juce::roundToInt(m_processor.getConfig().getDoubleValue("scale", 100));
 	}
 
 	bool SystemPage::setText(Rml::Element* _element, std::string& _shown, const std::string& _text)
@@ -229,6 +296,24 @@ namespace mdJucePlugin
 			sysex = "aucun transfert ; envoie un fichier .syx à la machine";
 		changed |= setText(m_sysexState, m_shownSysex, sysex);
 		changed |= setText(m_sysex, m_shownSysexButton, button);
+
+		// A size dragged with the window's corner selects no scale; the right column shows it
+		const auto scale = currentScale();
+		if(scale != m_shownScaleChoice)
+		{
+			m_shownScaleChoice = scale;
+			for(size_t i = 0; i < Scales.size(); ++i)
+			{
+				if(m_scales[i])
+					m_scales[i]->SetClass("mdEdSelected", Scales[i] == scale);
+			}
+			changed = true;
+		}
+		changed |= setText(m_scaleState, m_shownScale, std::to_string(scale) + " %");
+
+		changed |= setChecked(m_capture, m_shownCaptureChecked, m_processor.performanceDiagnosticsActive());
+		changed |= setText(m_diagnosticsState, m_shownDiagnostics,
+			diagnosticsLine(m_processor.performanceDiagnosticsState(), m_processor.performanceDiagnosticsFolderError()));
 		return changed;
 	}
 }

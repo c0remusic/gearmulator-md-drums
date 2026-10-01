@@ -1740,8 +1740,8 @@
 			<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->
 			<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">
 				<div class="mdEdScroll">
-					<div class="mdEdContent" style="height: 372dp;">
-						<div id="mdSysList" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 320dp;">
+					<div class="mdEdContent" style="height: 452dp;">
+						<div id="mdSysList" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 400dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">SYSTÈME</div>
 							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 1036dp;">machine entière et plug-in</div>
 							<div class="jucePos mdEdRow" style="left: 16dp; top: 32dp; width: 1036dp; height: 40dp;">
@@ -1775,12 +1775,34 @@
 								<button id="mdSysStorage" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">CHARGER…</button>
 							</div>
 							<div class="jucePos mdEdRow" style="left: 16dp; top: 272dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">ÉCHELLE DE L'INTERFACE</div>
+								<div id="mdSysScale50" class="jucePos mdEdSeg mdEdSegChoice" style="left: 254dp; top: 8dp; width: 51dp;">50 %</div>
+								<div id="mdSysScale65" class="jucePos mdEdSeg mdEdSegChoice" style="left: 305dp; top: 8dp; width: 51dp;">65 %</div>
+								<div id="mdSysScale75" class="jucePos mdEdSeg mdEdSegChoice" style="left: 356dp; top: 8dp; width: 51dp;">75 %</div>
+								<div id="mdSysScale85" class="jucePos mdEdSeg mdEdSegChoice" style="left: 407dp; top: 8dp; width: 51dp;">85 %</div>
+								<div id="mdSysScale100" class="jucePos mdEdSeg mdEdSegChoice" style="left: 458dp; top: 8dp; width: 51dp;">100 %</div>
+								<div id="mdSysScale125" class="jucePos mdEdSeg mdEdSegChoice" style="left: 509dp; top: 8dp; width: 51dp;">125 %</div>
+								<div id="mdSysScale130" class="jucePos mdEdSeg mdEdSegChoice" style="left: 560dp; top: 8dp; width: 51dp;">130 %</div>
+								<div id="mdSysScale150" class="jucePos mdEdSeg mdEdSegChoice" style="left: 611dp; top: 8dp; width: 51dp;">150 %</div>
+								<div id="mdSysScale175" class="jucePos mdEdSeg mdEdSegChoice" style="left: 662dp; top: 8dp; width: 51dp;">175 %</div>
+								<div id="mdSysScale200" class="jucePos mdEdSeg mdEdSegChoice" style="left: 713dp; top: 8dp; width: 51dp;">200 %</div>
+								<div id="mdSysScale250" class="jucePos mdEdSeg mdEdSegChoice" style="left: 764dp; top: 8dp; width: 51dp;">250 %</div>
+								<div id="mdSysScale300" class="jucePos mdEdSeg mdEdSegChoice" style="left: 815dp; top: 8dp; width: 51dp;">300 %</div>
+								<div id="mdSysScaleState" class="jucePos juceLabel mdEdNote mdEdRight" style="left: 884dp; top: 12dp; width: 152dp;">—</div>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 312dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">DIAGNOSTICS</div>
+								<div id="mdSysDiagnosticsState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 438dp;">—</div>
+								<button id="mdSysLogs" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 704dp; top: 8dp; width: 152dp;">JOURNAUX…</button>
+								<button id="mdSysCapture" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">CAPTURE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 352dp; width: 1036dp; height: 40dp;">
 								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">PLUG-IN</div>
-								<div id="mdSysPluginState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">échelle, skin, rendu, ports MIDI, MIDI Learn, entrée audio ; menu aussi dans OPTIONS</div>
+								<div id="mdSysPluginState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">skin, rendu, ports MIDI, MIDI Learn, entrée audio ; le même menu dans OPTIONS ou au clic droit</div>
 								<button id="mdSysSettings" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">RÉGLAGES…</button>
 							</div>
 						</div>
-						<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 344dp; width: 1036dp;">Les réglages de la machine (canal MIDI, table de notes, sync, routage) se font sur sa face avant, menu GLOBAL ; le routage des pistes aussi dans MIX.</div>
+						<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 424dp; width: 1036dp;">Les réglages de la machine (canal MIDI, table de notes, sync, routage) se font sur sa face avant, menu GLOBAL ; le routage des pistes aussi dans MIX.</div>
 					</div>
 				</div>
 			</div>

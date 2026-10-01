@@ -385,9 +385,13 @@ def library_page(d):
 
 # ---------- SYSTÈME (board 10) ----------
 
+# The plug-in menu's GUI scales (PluginEditorState::openMenu) and 130, the scale a new install opens at
+SCALES = [50, 65, 75, 85, 100, 125, 130, 150, 175, 200, 250, 300]
+
 def system_page(d):
     # One row per subject: label 3 columns, state 7, action 2. SystemPage (mdSystemPage.cpp) fills the
-    # states and acts on the buttons.
+    # states and acts on the buttons. ÉCHELLE and DIAGNOSTICS hold what the plug-in menu (OPTIONS, right
+    # click) has besides RAM recording, SysEx and the settings: every entry of that menu has a row here.
     rows = [("mdSysGlobal", "RÉGLAGES GLOBAUX", None, "face avant"),
             ("mdSysFollow", "SYNCHRO DAW", "mdSysFollowTempo", "SUIVRE L'HÔTE"),
             ("mdSysParallel", "TRANSPORT PARALLÈLE", "mdSysParallel", "PARALLÈLE")]
@@ -395,9 +399,11 @@ def system_page(d):
         rows.append(("mdSysRam", "ENREGISTREMENT RAM", "mdSysRamComplete", "QUEUES COMPLÈTES"))
     rows += [("mdSysSysex", "TRANSFERT SYSEX", "mdSysSysex", "FICHIER…"),
              ("mdSysStorage", "STOCKAGE MACHINE", "mdSysStorage", "CHARGER…"),
+             ("mdSysScale", "ÉCHELLE DE L'INTERFACE", None, "—"),
+             ("mdSysDiagnostics", "DIAGNOSTICS", "mdSysCapture", "CAPTURE"),
              ("mdSysPlugin", "PLUG-IN", "mdSysSettings", "RÉGLAGES…")]
     states = {"mdSysStorage": "remplace toute la mémoire de la machine (kits, patterns, samples) ; confirmation demandée",
-              "mdSysPlugin": "échelle, skin, rendu, ports MIDI, MIDI Learn, entrée audio ; menu aussi dans OPTIONS"}
+              "mdSysPlugin": "skin, rendu, ports MIDI, MIDI Learn, entrée audio ; le même menu dans OPTIONS ou au clic droit"}
     rh = 40
     h = TOP + len(rows) * rh + 8
     w(f'{ind(d)}<div class="mdEdContent" style="height: {12 + h + 12 + 28}dp;">')
@@ -407,11 +413,21 @@ def system_page(d):
         w(f'{ind(d + 2)}<div class="jucePos mdEdRow" style="left: 16dp; top: {y}dp; width: {span(12) - 32}dp; height: {rh}dp;">')
         w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: {span(3)}dp;">{label}</div>')
         state = states.get(sid, "—")
-        w(f'{ind(d + 3)}<div id="{sid}State" class="jucePos juceLabel mdEdNote" style="left: {bx(3) - 16}dp; top: 12dp; width: {span(7)}dp;">{state}</div>')
+        if sid == "mdSysScale":
+            # The scales as a selector in the state columns, the current one (also a dragged size) on the right
+            sw = span(7) // len(SCALES)
+            selector(d + 3, bx(3) - 16, 8, [f"{s} %" for s in SCALES], [sw] * len(SCALES), [f"mdSysScale{s}" for s in SCALES])
+        elif sid == "mdSysDiagnostics":
+            # The capture's state in 5 columns, the logs folder in the 2 before the action
+            w(f'{ind(d + 3)}<div id="{sid}State" class="jucePos juceLabel mdEdNote" style="left: {bx(3) - 16}dp; top: 12dp; width: {span(5)}dp;">{state}</div>')
+            w(f'{ind(d + 3)}<button id="mdSysLogs" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {bx(8) - 16}dp; top: 8dp; width: {span(2) - 16}dp;">JOURNAUX…</button>')
+        else:
+            w(f'{ind(d + 3)}<div id="{sid}State" class="jucePos juceLabel mdEdNote" style="left: {bx(3) - 16}dp; top: 12dp; width: {span(7)}dp;">{state}</div>')
         if button:
             w(f'{ind(d + 3)}<button id="{button}" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {bx(10) - 16}dp; top: 8dp; width: {span(2) - 16}dp;">{action}</button>')
         else:
-            w(f'{ind(d + 3)}<div class="jucePos juceLabel mdEdNote mdEdRight" style="left: {bx(10) - 16}dp; top: 12dp; width: {span(2) - 16}dp;">{action}</div>')
+            aid = f' id="{sid}State"' if sid == "mdSysScale" else ""
+            w(f'{ind(d + 3)}<div{aid} class="jucePos juceLabel mdEdNote mdEdRight" style="left: {bx(10) - 16}dp; top: 12dp; width: {span(2) - 16}dp;">{action}</div>')
         w(f'{ind(d + 2)}</div>')
     block_close(d + 1)
     note = ("Les réglages de la machine (canal MIDI, table de notes, sync, routage) se font sur sa face avant, menu GLOBAL ; "

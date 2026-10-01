@@ -49,6 +49,9 @@ namespace mdJucePlugin
 		void setPerformanceDiagnosticsEnabled(bool _enabled);
 		bool performanceDiagnosticsActive() const;
 		std::string performanceDiagnosticsStatus() const;
+		// The capture's state for the editor's own text; nullopt without a report
+		std::optional<synthLib::PerformanceReport::Status> performanceDiagnosticsState() const;
+		bool performanceDiagnosticsFolderError() const { return m_performanceFolderError; }
 		juce::File performanceDiagnosticsFolder() const;
 		juce::File performanceDiagnosticsFile() const { return m_performanceReportFile; }
 		void setRamRecordingMode(md::RamRecordingMode _mode);

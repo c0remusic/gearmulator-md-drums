@@ -879,6 +879,33 @@ int main()
 			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
 			context.Update();
 			require(processor.getFollowHostTempoSetting() == follow && processor.getParallelTransportSetting() == parallel, "settings not toggled back");
+			// The plug-in menu's other entries. ÉCHELLE: a new install opens at 130 %, which the selector has.
+			const auto scaleSetting = [&] { return juce::roundToInt(processor.getConfig().getDoubleValue("scale", 100)); };
+			const auto scaleId = [](const int _scale) { return "mdSysScale" + std::to_string(_scale); };
+			const auto scale = scaleSetting();
+			require(text("mdSysScaleState") == std::to_string(scale) + " %" && element(doc, scaleId(scale)).IsClassSet("mdEdSelected"),
+				"ÉCHELLE does not show the scale: \"" + text("mdSysScaleState") + "\"");
+			element(doc, scaleId(150)).Click();
+			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
+			context.Update();
+			require(scaleSetting() == 150 && element(doc, scaleId(150)).IsClassSet("mdEdSelected")
+				&& !element(doc, scaleId(scale)).IsClassSet("mdEdSelected") && text("mdSysScaleState") == "150 %",
+				"ÉCHELLE did not set the scale");
+			element(doc, scaleId(scale)).Click();
+			mdJucePlugin::EditorIdentityTestAccess::updateSystem(*editor, now += 1);
+			context.Update();
+			require(scaleSetting() == scale && !element(doc, scaleId(150)).IsClassSet("mdEdSelected"), "scale not set back");
+			// DIAGNOSTICS: the capture's state in French, CAPTURE on while it records. Not started here: it writes a report.
+			using Status = synthLib::PerformanceReport::Status;
+			require(Page::diagnosticsLine(std::nullopt, false) == "aucune capture ; CAPTURE mesure l'émulation dans un rapport"
+				&& Page::diagnosticsLine(Status::Recording, false) == "capture en cours : 10 minutes ou 8 Mio au plus"
+				&& Page::diagnosticsLine(Status::Recording, true) == "dossier des journaux impossible à créer",
+				"diagnostics line wrong for no capture, a capture or a logs folder error");
+			require(text("mdSysDiagnosticsState") == Page::diagnosticsLine(processor.performanceDiagnosticsState(),
+					processor.performanceDiagnosticsFolderError())
+				&& element(doc, "mdSysCapture").IsPseudoClassSet("checked") == processor.performanceDiagnosticsActive()
+				&& element(doc, "mdSysLogs").GetTagName() == "button",
+				"SYSTÈME does not show the performance capture: \"" + text("mdSysDiagnosticsState") + "\"");
 #if !defined(MD_EDITOR_SECTION_TEST_MM)
 			require(doc.GetElementById("mdSysRamComplete") != nullptr && !text("mdSysRamState").empty(), "MD has no RAM recording row");
 #else
