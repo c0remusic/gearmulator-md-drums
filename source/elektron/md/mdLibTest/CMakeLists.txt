@@ -189,6 +189,16 @@ set_tests_properties(mdEditorFirmwareTest PROPERTIES
 	TIMEOUT 600)
 set_property(TARGET mdEditorFirmwareTest PROPERTY FOLDER "Elektron")
 
+# A pattern selected while the sequencer plays, as a chain the plug-in plays relies on
+add_executable(patternChainFirmwareTest patternChainFirmwareTest.cpp)
+target_link_libraries(patternChainFirmwareTest PRIVATE mdLib)
+add_test(NAME patternChainFirmwareTest COMMAND patternChainFirmwareTest)
+set_tests_properties(patternChainFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET patternChainFirmwareTest PROPERTY FOLDER "Elektron")
+
 add_executable(mdUwFirmwareTest mdUwFirmwareTest.cpp)
 target_link_libraries(mdUwFirmwareTest PRIVATE mdLib)
 # The audio oracle must detect NaN/Inf even in builds using -Ofast or /fp:fast.

@@ -77,6 +77,8 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 
 Non vérifié : l'ordre des pistes par la face avant (DOWN en enregistrement en grille ne change pas de piste) ; il repose sur la cohérence du pattern d'usine avec son kit.
 
+Le changement de pattern pendant la lecture a son propre test, `patternChainFirmwareTest` : voir « 7. Chaînage de patterns ».
+
 ## Fluidité (60 Hz)
 
 - `mdEditorFluidityTest` et `mmEditorFluidityTest` (ctest) mesurent le coût d'une image, page par page, pendant que valeurs et vu-mètres bougent à 60 Hz, en trois parts : minuteur de présentation, mise à jour RmlUi (mise en page et appels de dessin, sur le fil des messages quel que soit le rendu), rastérisation par le rendu logiciel (faite par le GPU avec OpenGL ou Metal).
@@ -154,6 +156,21 @@ Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au
 - Reste à faire dans JOUER : pas 33 à 64, accent, slide, swing (octets gardés par `MdPatternEditor`, pas décodés ni vérifiés sur un vrai dump), tête de lecture, arrangement.
 - BIBLIO, KITS (`mdLibraryView.*`, planche 8) : LIRE LES KITS demande chaque kit stocké au firmware, un par un (`Controller::readKitLibrary`, `$53` ; un kit sans réponse en 2 s est sauté), puis montre numéro et nom, le kit chargé en ambre ; un clic montre les machines d'un kit sans le charger. Lecture seule : le chargement d'un kit (geste face avant ou SysEx) et les tags viendront plus tard. Durée : environ 0,4 s par kit MD sur la ligne MIDI.
 - Reste à faire dans BIBLIO : banque de samples UW (MD, transferts SDS : voir `sdsTransferTest` et `mdLib` SDS) et formes d'onde DigiPRO (MM, voir `mmSysexWorkflowTest`).
+
+### 7. Chaînage de patterns (règle du firmware vérifiée, chaîne à construire)
+
+Choix du 2026-10-01 : une chaîne jouée par le plug-in (« A01 ×2, A02, B04 ×4 »), calée sur le transport de l'hôte. Le plug-in envoie le pattern suivant pendant que le courant joue ; la machine bascule seule en fin de pattern.
+
+`patternChainFirmwareTest` (mdLibTest, MD, ~3 min) vérifie ce que la chaîne peut supposer. La machine suit l'horloge et le transport MIDI (le Global de `HostSync`), avec program change IN et OUT. Les pistes 1 et 2 portent MID-01 et MID-02 : chaque pas joué sort une note MIDI, et la note lockée par pas dit quel pattern et quel pas ont joué. Le test envoie l'horloge tick par tick et lit la sortie MIDI à ~1 ms près. A01 joue un tour, puis A02 est demandé pendant le deuxième, à 98, 150 et 210 BPM, A01 de 32 puis 16 pas, A02 de 32 pas. Constats (SPS-1UW OS 1.63) :
+
+- La machine s'engage sur le pattern suivant **7 ticks d'horloge avant la fin** du pattern qui joue, au dernier tick de l'avant-dernier pas, quels que soient le tempo et la longueur : la limite se compte en ticks, pas en millisecondes.
+- Demandé avant ce tick (SET STATUS CURRENT PATTERN ou program change sur le canal de base, même règle) : le pattern suivant joue à la fin du courant, depuis son pas 1, sans pas perdu ni doublé. Demandé sur ce tick ou après : il attend un tour de plus. La demande n'est jamais perdue.
+- Le statut CURRENT PATTERN répond le pattern suivant seulement à partir de l'engagement : avant, il répond le pattern qui joue. La file d'attente de la machine ne se lit donc pas ; le plug-in doit garder la sienne.
+- Le program change OUT de la machine part 12 ticks avant la fin, à l'entrée dans l'avant-dernier pas, seulement si le suivant est déjà demandé. Demandé entre 12 et 7 ticks avant la fin, le pattern bascule à l'heure mais l'annonce arrive 12 ticks avant la fin de ce pattern-là. Ce n'est donc pas un signal fiable de bascule.
+
+Pour la chaîne : envoyer le pattern suivant tôt, dès le début du pattern courant. Le plug-in connaît la longueur (dump de pattern) et la position (l'horloge qu'il envoie). Un changement de chaîne fait moins de 7 ticks avant la fin passe au tour d'après : l'interface doit le montrer. `MdPatternEditor::setLength` a été ajouté pour le test.
+
+Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), deux patterns sur des kits différents (en mode Extended, le kit du suivant se charge à la bascule : temps de chargement, raté audio ?), l'échelle et le double tempo, les patterns de plus de 32 pas, un départ au milieu d'un pattern (song position pointer).
 
 ### Petits restes de l'éditeur
 
