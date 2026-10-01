@@ -79,6 +79,11 @@ namespace mdJucePlugin
 		std::unique_ptr<jucePluginEditorLib::SettingsDeviceSpecific> createDeviceSpecificSettings(
 			const std::string& _templateName, Rml::Element* _root) override;
 		std::string getSettingsTemplateSuffix() const override;
+		// 60 Hz with OpenGL or Metal, whatever the GPU: meters, LEDs and the LCD move with the
+		// sound, and a frame costs the message thread about 2 ms (mdEditorFluidityTest). The
+		// software renderer keeps 30: it rasterizes the whole frame in 9 to 35 ms. A
+		// "refreshRateLimitHz" in the config still wins.
+		int getAcceleratedRefreshRateHz() const override { return 60; }
 
 		// Reapplies the configured wheel/encoder drag-speed percentages to the
 		// panel knobs. Called on create and from the settings page.

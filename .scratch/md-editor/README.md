@@ -77,6 +77,15 @@ build/source/elektron/md/mdJucePlugin/mdAutomationRobustnessTest --architecture-
 
 Non vérifié : l'ordre des pistes par la face avant (DOWN en enregistrement en grille ne change pas de piste) ; il repose sur la cohérence du pattern d'usine avec son kit.
 
+## Fluidité (60 Hz)
+
+- `mdEditorFluidityTest` et `mmEditorFluidityTest` (ctest) mesurent le coût d'une image, page par page, pendant que valeurs et vu-mètres bougent à 60 Hz, en trois parts : minuteur de présentation, mise à jour RmlUi (mise en page et appels de dessin, sur le fil des messages quel que soit le rendu), rastérisation par le rendu logiciel (faite par le GPU avec OpenGL ou Metal).
+- Mesuré le 2026-10-01 (Windows, Release, 1100 × 606 dp à l'échelle 1) : minuteur 0,1 ms et mise à jour RmlUi 0,9 à 2,0 ms (p95) sur toutes les pages MD et MM. Avec OpenGL, le fil des messages tient donc 60 Hz avec une large marge. Rastérisation logicielle (p95) : SYSTÈME 9 ms, MASTER 20, SON 23 à 25, MIX 24 à 28, FACE AVANT 23 à 33, soit 28 à 50 images/s : pas 60.
+- L'éditeur MD/MM demande donc 60 Hz aux rendus accélérés (`Editor::getAcceleratedRefreshRateHz`, champ `RmlComponentConfig::acceleratedRefreshRateHz`). Avant, Windows et Linux restaient à 30 Hz sauf OpenGL 3 sur NVIDIA ou AMD. Le rendu logiciel garde 30 Hz : à 60, il saturerait le fil des messages sans les atteindre. Un `refreshRateLimitHz` dans la config l'emporte toujours.
+- Vu-mètres et lane sont des canvas : le rendu logiciel ignore `transform` (`RendererJuce::SetTransform` garde la matrice sans l'appliquer).
+- Reste à mesurer avec un écran allumé : `mdEditorFluidityTest --window 4` ouvre l'éditeur dans une vraie fenêtre, fait tourner la machine en temps réel sur un fil audio et compte les images livrées par seconde sur chaque page. Lancé le 2026-10-01 vers 5 h, écran éteint (capture d'écran figée), le test a parcouru les pages, puis s'est bloqué avant d'afficher ses chiffres et a été arrêté au bout du délai.
+- Pour accélérer le rendu logiciel, il faudrait ne redessiner que les zones changées. Une première piste (remplir directement les bordures fines alignées sur les pixels au lieu de passer par `juce::Path`) n'a rien gagné et a été abandonnée.
+
 ## Travail restant
 
 Le périmètre demandé est « tout câbler ». Ordre proposé, du plus court au plus long.

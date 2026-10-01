@@ -97,6 +97,8 @@ namespace juceRmlUi
 			m_targetFPS = static_cast<float>(_config.refreshRateLimitHz);
 		else
 			m_targetFPS = g_defaultSoftwareFPS;
+		m_defaultAcceleratedFPS = _config.acceleratedRefreshRateHz > 0 && _config.acceleratedRefreshRateHz <= 300
+			? static_cast<float>(_config.acceleratedRefreshRateHz) : g_defaultAcceleratedFPS;
 
 		m_renderProxy.reset(new RendererProxy(m_coreInstance, m_dataProvider));
 
@@ -239,7 +241,7 @@ namespace juceRmlUi
 		const bool haveCustomFPS = m_hasCustomFPS;
 
 		if (!haveCustomFPS)
-			m_targetFPS = g_defaultAcceleratedFPS;
+			m_targetFPS = m_defaultAcceleratedFPS;
 		int major = 0, minor = 0;
 
 #if JUCE_MAC
@@ -277,7 +279,7 @@ namespace juceRmlUi
 						vendorStr.find("amd") != std::string::npos ||
 						vendorStr.find("advanced micro devices") != std::string::npos
 						)
-						m_targetFPS = 60;
+						m_targetFPS = std::max(m_targetFPS, 60.0f);
 				}
 			}
 			m_renderProxy->setTextureParameters(static_cast<uint32_t>(maxSize), true);
@@ -1090,7 +1092,7 @@ namespace juceRmlUi
 		if (m_hasCustomFPS)
 			return;
 		m_targetFPS = _renderer == Renderer::Software
-			? g_defaultSoftwareFPS : g_defaultAcceleratedFPS;
+			? g_defaultSoftwareFPS : m_defaultAcceleratedFPS;
 	}
 
 	void RmlComponent::enableDebugger(const bool _enable)

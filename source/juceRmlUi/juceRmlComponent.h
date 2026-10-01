@@ -224,6 +224,7 @@ namespace juceRmlUi
 		double m_time = 0;
 		float m_fps = 0;
 		float m_targetFPS = 30;
+		float m_defaultAcceleratedFPS = 30;
 		bool m_hasCustomFPS = false;
 
 		uint32_t m_pendingUpdates = 0;

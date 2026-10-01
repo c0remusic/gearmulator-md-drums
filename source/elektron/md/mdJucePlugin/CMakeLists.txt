@@ -219,6 +219,27 @@ if(BUILD_TESTING)
 	set_tests_properties(mmEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
 	set_property(TARGET mmEditorSectionTest PROPERTY FOLDER "Elektron/test")
 
+	# How fast the editor draws: the cost of a frame with the software renderer, and with
+	# --window the frames a real window delivers while the machine runs
+	add_executable(mdEditorFluidityTest mdEditorFluidityTest.cpp)
+	target_include_directories(mdEditorFluidityTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mdEditorFluidityTest PRIVATE mdJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mdEditorFluidityTest COMMAND mdEditorFluidityTest)
+	set_tests_properties(mdEditorFluidityTest PROPERTIES LABELS "IntegrationTest;Editor;Performance")
+	set_property(TARGET mdEditorFluidityTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mmEditorFluidityTest mdEditorFluidityTest.cpp)
+	target_compile_definitions(mmEditorFluidityTest PRIVATE MD_EDITOR_FLUIDITY_TEST_MM=1)
+	target_include_directories(mmEditorFluidityTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mmEditorFluidityTest PRIVATE mmJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mmEditorFluidityTest COMMAND mmEditorFluidityTest)
+	set_tests_properties(mmEditorFluidityTest PROPERTIES LABELS "IntegrationTest;Editor;Performance")
+	set_property(TARGET mmEditorFluidityTest PROPERTY FOLDER "Elektron/test")
+
 	add_executable(mmLcdEditorPointerTest mdLcdEditorPointerTest.cpp)
 	target_compile_definitions(mmLcdEditorPointerTest PRIVATE MD_LCD_POINTER_TEST_MM=1)
 	target_include_directories(mmLcdEditorPointerTest PRIVATE

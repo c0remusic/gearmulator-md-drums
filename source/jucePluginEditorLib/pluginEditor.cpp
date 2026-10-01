@@ -867,6 +867,7 @@ namespace jucePluginEditorLib
 		}
 
 		config.refreshRateLimitHz = m_processor.getConfig().getIntValue("refreshRateLimitHz", -1);
+		config.acceleratedRefreshRateHz = getAcceleratedRefreshRateHz();
 
 		if (const auto sessionOverride = m_processor.getForceSoftwareRendererForSession())
 			config.forceSoftwareRenderer = *sessionOverride
