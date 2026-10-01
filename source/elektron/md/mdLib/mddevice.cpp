@@ -695,6 +695,11 @@ namespace md
 	{
 		const auto first = _midiOut.size();
 		m_hardware->readMidiOut(_midiOut);
+		if(m_chainPlayer)
+		{
+			for(size_t index = first; index < _midiOut.size(); ++index)
+				m_chainPlayer->observe(_midiOut[index]);
+		}
 		serviceHostSync(_midiOut, first);
 	}
 
@@ -857,6 +862,14 @@ namespace md
 				return true;
 		}
 
-		return m_hardware->scheduleMidi(_ev, hardwareLatency());
+		if(!m_chainPlayer)
+			return m_hardware->scheduleMidi(_ev, hardwareLatency());
+		// The chain selects patterns around the transport and moves the song position
+		m_chainEvents.clear();
+		m_chainPlayer->process(_ev, m_chainEvents);
+		bool scheduled = true;
+		for(const auto& event : m_chainEvents)
+			scheduled &= m_hardware->scheduleMidi(event, hardwareLatency());
+		return scheduled;
 	}
 }

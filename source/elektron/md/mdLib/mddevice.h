@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "mdasyncrender.h"
+#include "mdchainplayer.h"
 #include "mdhardware.h"
 #include "mdhostsync.h"
 #include "mdsyseximport.h"
@@ -214,6 +215,9 @@ namespace md
 		{
 			m_hostSyncControl = std::move(_control);
 		}
+		// The pattern chain the plug-in plays (Machinedrum): the Device runs it on its MIDI
+		// on the rendering thread. Set before the Device renders.
+		void setChainPlayer(std::shared_ptr<ChainPlayer> _player) { m_chainPlayer = std::move(_player); }
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -328,6 +332,8 @@ namespace md
 		std::shared_ptr<HostSyncControl> m_hostSyncControl;
 		uint32_t m_hostSyncRequest = 0;		// the last request handed to m_hostSync
 		uint8_t m_hostSyncSlot = 0xff;		// active Global slot, from status answers
+		std::shared_ptr<ChainPlayer> m_chainPlayer;
+		std::vector<synthLib::SMidiEvent> m_chainEvents;	// what the chain forwards for one event
 		// Last member: destroyed (render thread stopped) before everything it renders.
 		std::unique_ptr<AsyncRender> m_async;
 	};

@@ -189,6 +189,13 @@ set_tests_properties(mdEditorFirmwareTest PROPERTIES
 	TIMEOUT 600)
 set_property(TARGET mdEditorFirmwareTest PROPERTY FOLDER "Elektron")
 
+# PatternChain's positions and ChainPlayer's MIDI, without firmware
+add_executable(patternChainTest patternChainTest.cpp)
+target_link_libraries(patternChainTest PRIVATE mdLib)
+add_test(NAME patternChainTest COMMAND patternChainTest)
+set_tests_properties(patternChainTest PROPERTIES LABELS "UnitTest")
+set_property(TARGET patternChainTest PROPERTY FOLDER "Elektron")
+
 # A pattern selected while the sequencer plays, as a chain the plug-in plays relies on
 add_executable(patternChainFirmwareTest patternChainFirmwareTest.cpp)
 target_link_libraries(patternChainFirmwareTest PRIVATE mdLib)
