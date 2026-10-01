@@ -22,6 +22,14 @@
 // prints, for each request, the steps that played around the switch, when the
 // status first answered A02 and when the machine sent its Program Change.
 //
+// Two more checks. SONG POSITION and CONTINUE, which the plug-in sends when the
+// host starts later in the song, start A01 at that position within the pattern,
+// modulo its length, on the first clock. And with A02 on another Kit, which the
+// machine loads at the switch, A02 still takes over on time: with TRX-CH on
+// track 3 of both patterns, every step sounds across the switch, its attack as
+// early as before, with no silence. Audio tracks send a note of their own on
+// each trig (track 3: note 40), below the locked notes.
+//
 // Firmware from GEARMULATOR_MD_FIRMWARE_BIN; 77 without it.
 
 #include "mdLib/mdhardware.h"
@@ -33,6 +41,7 @@
 #include "baseLib/filesystem.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -74,8 +83,8 @@ namespace
 	constexpr uint8_t ProgramChangeInOut = 3;
 	// MID-01 and MID-02 (mdmachines.cpp), on tracks 1 and 2
 	constexpr uint16_t MidMachines[2] = {96, 97};
-	// The note locked on step 1: A01 plays 24 and up, A02 72 and up
-	constexpr int FirstNotes[2] = {24, 72};
+	// The note locked on step 1: A01 plays 60 to 91, A02 92 to 123, above the notes the audio tracks send
+	constexpr int FirstNotes[2] = {60, 92};
 
 	void require(const bool _condition, const std::string& _message)
 	{
@@ -129,13 +138,22 @@ namespace
 		int tick;			// clock tick within that step, 0 to 5, sent right after it
 	};
 
+	// How a run starts and what it asks for
+	struct Playback
+	{
+		int songPosition = 0;			// in sixteenths; above 0, SONG POSITION and CONTINUE instead of START
+		std::optional<Request> request;
+		int ticks = 0;
+	};
+
 	struct Run
 	{
-		int requestTick = 0;
+		int requestTick = -1;
 		std::vector<PlayedStep> steps;
 		std::vector<int> otherNotes;
 		std::optional<double> statusA02;	// the first CURRENT PATTERN status answering A02
 		std::vector<std::pair<double, uint8_t>> programChanges;	// sent by the machine
+		std::vector<std::pair<double, float>> peaks;	// the main output's peak of every chunk, at its end
 	};
 
 	class Machinedrum
@@ -294,8 +312,29 @@ namespace
 			kit + 1, saved->name.c_str(), kitA02 + 1);
 	}
 
-	// Pattern _slot (0 or 1), _length steps, plays track _slot + 1 alone on each step, each step's note locked
-	void writePattern(Machinedrum& _md, const uint8_t _slot, const int _length)
+	// Track 3 of _kit holds TRX-CH, a short sound that shows on the main output when each step plays;
+	// tracks 1 and 2 MID-01 and MID-02. Saved.
+	void prepareAudioKit(Machinedrum& _md, const uint8_t _kit)
+	{
+		constexpr uint16_t trxCh = 22;
+		for(uint8_t track = 0; track < 3; ++track)
+		{
+			const auto message = sysex::assignMachine(Model, track, track < 2 ? MidMachines[track] : trxCh);
+			require(message.has_value(), "codec refused a machine");
+			_md.send(*message);
+			_md.advance(md::g_samplerate / 2);
+		}
+		_md.send(sysex::kitSave(Model, _kit));
+		_md.advance(md::g_samplerate);
+		const auto saved = sysex::parseKitDump(Model, _md.exchange(sysex::kitRequest(Model, _kit), 0x52));
+		require(saved && saved->machines.size() > 2 && saved->machines[0] == MidMachines[0]
+			&& saved->machines[1] == MidMachines[1] && saved->machines[2] == trxCh, "Kit " + std::to_string(_kit + 1)
+			+ " does not hold MID-01, MID-02 and TRX-CH");
+	}
+
+	// Pattern _slot (0 or 1), _length steps, plays track _slot + 1 on each step, each step's note locked;
+	// with _audio, track 3 on each step too
+	void writePattern(Machinedrum& _md, const uint8_t _slot, const int _length, const bool _audio = false)
 	{
 		const auto dump = _md.readPattern(_slot);
 		auto editor = sysex::MdPatternEditor::fromDump(dump);
@@ -309,15 +348,16 @@ namespace
 		{
 			const auto note = static_cast<uint8_t>(FirstNotes[_slot] + step);
 			require(editor->setTrig(_slot, static_cast<uint8_t>(step), true)
-				&& editor->setLock(_slot, 0, static_cast<uint8_t>(step), note), "pattern edit refused");
+				&& editor->setLock(_slot, 0, static_cast<uint8_t>(step), note)
+				&& (!_audio || editor->setTrig(2, static_cast<uint8_t>(step), true)), "pattern edit refused");
 		}
 		require(editor->setLength(static_cast<uint8_t>(_length)), "length refused");
 		const auto written = editor->toDump();
 		_md.send(written);
 		_md.advance(md::g_samplerate);
 		require(_md.readPattern(_slot) == written, "the firmware did not keep " + patternName(_slot) + " as sent");
-		std::printf("MD %s: %d steps, track %u on every step, NOTE locked to %d and up\n", patternName(_slot).c_str(),
-			_length, _slot + 1, FirstNotes[_slot]);
+		std::printf("MD %s: %d steps, track %u on every step, NOTE locked to %d and up%s\n", patternName(_slot).c_str(),
+			_length, _slot + 1, FirstNotes[_slot], _audio ? ", track 3 on every step" : "");
 	}
 
 	void record(Run& _run, const synthLib::SMidiEvent& _event, const double _tick)
@@ -352,9 +392,9 @@ namespace
 		}
 	}
 
-	// A01 from START, A02 asked for as _request says, until A02 has played eight steps
-	// after the latest switch the rule allows
-	Run play(Machinedrum& _md, const Tempo& _tempo, const int _lengthA01, const Request& _request, const uint8_t _baseChannel)
+	// A01 from START, or from a song position as synthLib::MidiClock starts the machine later in the
+	// song; A02 asked for during A01's second pass as the request says
+	Run play(Machinedrum& _md, const Tempo& _tempo, const int _lengthA01, const Playback& _playback, const uint8_t _baseChannel)
 	{
 		const auto framesPerTick = _tempo.framesPerTick();
 		_md.send({0xfc});
@@ -362,18 +402,33 @@ namespace
 		_md.selectPattern(0);
 		_md.drain();
 
-		const int pass = _lengthA01 * TicksPerStep;
 		Run run;
-		run.requestTick = pass + _request.step * TicksPerStep + _request.tick;
+		if(_playback.request)
+			run.requestTick = (_lengthA01 + _playback.request->step) * TicksPerStep + _playback.request->tick;
 		auto& hardware = _md.hardware();
 		std::vector<synthLib::SMidiEvent> events;
-		_md.send({0xfa});
-		for(int tick = 0; tick < 3 * pass + 8 * TicksPerStep; ++tick)
+		std::array<std::vector<float>, 2> audio;
+		synthLib::TAudioOutputs outputs{};
+		for(size_t channel = 0; channel < audio.size(); ++channel)
+		{
+			audio[channel].resize(_tempo.chunk);
+			outputs[channel] = audio[channel].data();
+		}
+		if(_playback.songPosition > 0)
+		{
+			_md.send({0xf2, static_cast<uint8_t>(_playback.songPosition & 0x7f), static_cast<uint8_t>(_playback.songPosition >> 7)});
+			_md.send({0xfb});
+		}
+		else
+		{
+			_md.send({0xfa});
+		}
+		for(int tick = 0; tick < _playback.ticks; ++tick)
 		{
 			_md.send({0xf8});
 			if(tick == run.requestTick)
 			{
-				if(_request.programChange)
+				if(_playback.request->programChange)
 					_md.send({static_cast<uint8_t>(0xc0 | _baseChannel), 1});
 				else
 					_md.send(wrap(md::midiProtocol::selectPattern(Model, 1)));
@@ -383,10 +438,17 @@ namespace
 				_md.send(sysex::statusRequest(Model, Status::Pattern));
 			for(uint32_t frame = 0; frame < framesPerTick; frame += _tempo.chunk)
 			{
-				hardware.advance(_tempo.chunk);
+				hardware.processAudio(outputs, _tempo.chunk, 0);
+				const double now = tick + static_cast<double>(frame + _tempo.chunk) / framesPerTick;
+				float peak = 0;
+				for(const auto& channel : audio)
+				{
+					for(const auto sample : channel)
+						peak = std::max(peak, std::abs(sample));
+				}
+				run.peaks.emplace_back(now, peak);
 				events.clear();
 				hardware.readMidiOut(events);
-				const double now = tick + static_cast<double>(frame + _tempo.chunk) / framesPerTick;
 				for(const auto& event : events)
 					record(run, event, now);
 			}
@@ -402,7 +464,9 @@ namespace
 	}
 
 	// Prints what happened around the switch; returns what departs from the rule, empty when nothing does
-	std::string check(const Run& _run, const Tempo& _tempo, const int _lengthA01, const int _lengthA02, const Request& _request)
+	// _audioTrack: track 3 plays too, and sends its own notes
+	std::string check(const Run& _run, const Tempo& _tempo, const int _lengthA01, const int _lengthA02, const Request& _request,
+		const bool _audioTrack)
 	{
 		const int pass = _lengthA01 * TicksPerStep;
 		const int boundary = (_run.requestTick / pass + 1) * pass;
@@ -437,7 +501,13 @@ namespace
 		}
 		std::printf("  Program Changes from the machine:%s\n", changes.empty() ? " none" : changes.c_str());
 		if(!_run.otherNotes.empty())
-			return std::to_string(_run.otherNotes.size()) + " notes no step locked, the first " + std::to_string(_run.otherNotes.front());
+		{
+			const auto text = std::to_string(_run.otherNotes.size()) + " notes no step locked, the first "
+				+ std::to_string(_run.otherNotes.front());
+			if(!_audioTrack)
+				return text;
+			std::printf("  %s (track 3)\n", text.c_str());
+		}
 
 		// One note per step, at its tick: A01 before the switch, A02 from its first step on
 		const int steps = 3 * _lengthA01 + 8;
@@ -485,6 +555,108 @@ namespace
 		return {};
 	}
 
+	// SONG POSITION and CONTINUE: where A01 starts, for a position inside the pattern and one past its length
+	void checkSongPosition(Machinedrum& _md, const Tempo& _tempo, const int _length, std::vector<std::string>& _failures)
+	{
+		for(const int position : {8, _length + 8})
+		{
+			const Playback playback{position, std::nullopt, 2 * _length * TicksPerStep};
+			const auto run = play(_md, _tempo, _length, playback, 0);
+			std::string first;
+			for(size_t i = 0; i < run.steps.size() && i < 4; ++i)
+			{
+				char text[64];
+				std::snprintf(text, sizeof(text), " %s @%.1f", describe(run.steps[i]).c_str(), run.steps[i].tick);
+				first += text;
+			}
+			std::printf("MD SONG POSITION %d (sixteenths) and CONTINUE, A01 of %d steps: first steps%s\n", position, _length,
+				first.empty() ? " none" : first.c_str());
+			// At the position within the pattern, on the first clock
+			const int expected = position % _length;
+			if(run.steps.empty() || run.steps.front().pattern != 0 || run.steps.front().step != expected || run.steps.front().tick >= 1)
+			{
+				_failures.push_back("SONG POSITION " + std::to_string(position) + " did not start A01 at step "
+					+ std::to_string(expected + 1) + " on the first clock");
+			}
+		}
+	}
+
+	// A02 on another Kit, which the machine loads when A02 takes over. Track 3 plays TRX-CH on every
+	// step of both patterns: the main output shows whether every step still sounds, and when, across
+	// the switch.
+	template<typename RunRequest>
+	void checkKitChange(Machinedrum& _md, const Tempo& _tempo, std::vector<std::string>& _failures, const RunRequest& _runRequest)
+	{
+		_md.selectPattern(0);
+		const auto kit = _md.status(Status::Kit);
+		prepareAudioKit(_md, kit);
+		const auto other = static_cast<uint8_t>((kit + 1) % 64);
+		_md.selectPattern(1);
+		// Extended mode: the selected pattern remembers the Kit selected with it
+		_md.send(wrap(md::midiProtocol::setStatus(Model, static_cast<uint8_t>(Status::Kit), other)));
+		_md.advance(md::g_samplerate / 2);
+		prepareAudioKit(_md, other);
+		_md.selectPattern(0);
+		_md.selectPattern(1);
+		require(_md.status(Status::Kit) == other, "A02 did not keep Kit " + std::to_string(other + 1));
+		writePattern(_md, 0, 32, true);
+		writePattern(_md, 1, 32, true);
+		std::printf("MD A01 on Kit %u, A02 on Kit %u, track 3 TRX-CH on every step of both\n", kit + 1, other + 1);
+
+		const auto run = _runRequest(Request{false, 16, 0});
+		// The loudest chunk of each step, and the attack: how long after the step's clock tick
+		// the output first reached half of it
+		const int steps = 3 * 32 + 8;
+		const int switchStep = 2 * 32;
+		const double msPerTick = 60000.0 / (_tempo.bpm * 24.0);
+		const auto stepOf = [](const double _tick) { return static_cast<int>(std::floor((_tick - 1e-9) / TicksPerStep)); };
+		std::vector<float> loudest(static_cast<size_t>(steps), 0.0f);
+		std::vector<double> delay(static_cast<size_t>(steps), -1.0);
+		size_t silent = 0;
+		size_t longestSilence = 0;
+		for(const auto& [tick, peak] : run.peaks)
+		{
+			const auto index = stepOf(tick);
+			if(std::abs(tick - switchStep * TicksPerStep) < 2 * TicksPerStep)
+			{
+				silent = peak < 1e-4f ? silent + 1 : 0;
+				longestSilence = std::max(longestSilence, silent);
+			}
+			if(index >= 0 && index < steps)
+				loudest[static_cast<size_t>(index)] = std::max(loudest[static_cast<size_t>(index)], peak);
+		}
+		for(const auto& [tick, peak] : run.peaks)
+		{
+			const auto index = stepOf(tick);
+			if(index < 0 || index >= steps || delay[static_cast<size_t>(index)] >= 0
+				|| peak < loudest[static_cast<size_t>(index)] / 2)
+				continue;
+			delay[static_cast<size_t>(index)] = (tick - index * TicksPerStep) * msPerTick;
+		}
+		std::vector<float> steady(loudest.begin() + 4, loudest.begin() + switchStep - 4);
+		std::sort(steady.begin(), steady.end());
+		const auto median = steady[steady.size() / 2];
+		std::string around;
+		for(int index = switchStep - 3; index < switchStep + 4; ++index)
+		{
+			char text[64];
+			std::snprintf(text, sizeof(text), " %d:%.3f@%+.1fms", index + 1, loudest[static_cast<size_t>(index)],
+				delay[static_cast<size_t>(index)]);
+			around += text;
+		}
+		std::printf("  track 3 on the main output, median step peak %.3f; steps around the switch (clock step:peak@delay):%s;"
+			" longest silence within two steps of it %.1f ms\n", median, around.c_str(),
+			static_cast<double>(longestSilence) * _tempo.chunk * 1000.0 / md::g_samplerate);
+		for(int index = 1; index < steps; ++index)
+		{
+			if(loudest[static_cast<size_t>(index)] < median / 4)
+			{
+				_failures.push_back("with a Kit change, clock step " + std::to_string(index + 1) + " did not sound");
+				break;
+			}
+		}
+	}
+
 	bool runMachinedrum()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
@@ -511,31 +683,45 @@ namespace
 		};
 		// Early, in the middle, on either side of the Program Change and of the commit, and late;
 		// as SET STATUS and as a Program Change. The commit at three tempos.
+		const Tempo tempo{150, 49};
 		const std::vector<Case> cases{
-			{{150, 49}, 32, {{false, 0, 1}, {false, 16, 0}, {false, 29, 5}, {false, 30, 0}, {false, 30, 3}, {false, 30, 4},
-				{false, 30, 5}, {false, 31, 0}, {false, 31, 5}, {true, 16, 0}, {true, 30, 4}, {true, 30, 5}}},
-			{{150, 49}, 16, {{false, 8, 0}, {false, 14, 3}, {false, 14, 4}, {false, 14, 5}, {false, 15, 0}}},
-			{{98, 45}, 16, {{false, 14, 3}, {false, 14, 4}, {false, 14, 5}}},
-			{{210, 35}, 16, {{false, 14, 3}, {false, 14, 4}, {false, 14, 5}}}};
+			{tempo, 32, {{false, 0, 1}, {false, 16, 0}, {false, 29, 5}, {false, 30, 4}, {false, 30, 5}, {false, 31, 5},
+				{true, 16, 0}, {true, 30, 4}, {true, 30, 5}}},
+			{tempo, 16, {{false, 8, 0}, {false, 14, 4}, {false, 14, 5}, {false, 15, 0}}},
+			{{98, 45}, 16, {{false, 14, 4}, {false, 14, 5}}},
+			{{210, 35}, 16, {{false, 14, 4}, {false, 14, 5}}}};
 		size_t count = 0;
 		std::vector<std::string> failures;
+		const auto run = [&](const Tempo& _tempo, const int _lengthA01, const Request& _request, const bool _audioTrack)
+		{
+			++count;
+			const Playback playback{0, _request, 3 * _lengthA01 * TicksPerStep + 8 * TicksPerStep};
+			const auto result = play(machine, _tempo, _lengthA01, playback, baseChannel);
+			const auto failure = check(result, _tempo, _lengthA01, LengthA02, _request, _audioTrack);
+			if(!failure.empty())
+			{
+				std::printf("  FAIL %s\n", failure.c_str());
+				failures.push_back(failure);
+			}
+			return result;
+		};
 		for(const auto& c : cases)
 		{
 			require(c.tempo.valid(), "a tempo whose clock tick is not a whole number of chunks");
 			writePattern(machine, 0, c.lengthA01);
 			for(const auto& request : c.requests)
-			{
-				++count;
-				const auto failure = check(play(machine, c.tempo, c.lengthA01, request, baseChannel), c.tempo,
-					c.lengthA01, LengthA02, request);
-				if(failure.empty())
-					continue;
-				std::printf("  FAIL %s\n", failure.c_str());
-				failures.push_back(failure);
-			}
+				run(c.tempo, c.lengthA01, request, false);
 		}
-		require(failures.empty(), std::to_string(failures.size()) + " of " + std::to_string(count)
-			+ " requests did not follow the rule");
+
+		// SONG POSITION and CONTINUE, as the plug-in starts the machine when the host starts later in the song
+		writePattern(machine, 0, 32);
+		checkSongPosition(machine, tempo, 32, failures);
+
+		// A02 on another Kit, with an audible track on both patterns
+		checkKitChange(machine, tempo, failures, [&](const Request& _request) { return run(tempo, 32, _request, true); });
+
+		require(failures.empty(), std::to_string(failures.size()) + " checks of " + std::to_string(count)
+			+ " requests and the song positions did not follow the rule");
 		std::printf("patternChainFirmwareTest: MD PASS\n");
 		return true;
 	}

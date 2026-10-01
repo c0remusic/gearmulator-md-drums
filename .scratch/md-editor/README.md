@@ -168,9 +168,13 @@ Choix du 2026-10-01 : une chaîne jouée par le plug-in (« A01 ×2, A02, B04 ×
 - Le statut CURRENT PATTERN répond le pattern suivant seulement à partir de l'engagement : avant, il répond le pattern qui joue. La file d'attente de la machine ne se lit donc pas ; le plug-in doit garder la sienne.
 - Le program change OUT de la machine part 12 ticks avant la fin, à l'entrée dans l'avant-dernier pas, seulement si le suivant est déjà demandé. Demandé entre 12 et 7 ticks avant la fin, le pattern bascule à l'heure mais l'annonce arrive 12 ticks avant la fin de ce pattern-là. Ce n'est donc pas un signal fiable de bascule.
 
-Pour la chaîne : envoyer le pattern suivant tôt, dès le début du pattern courant. Le plug-in connaît la longueur (dump de pattern) et la position (l'horloge qu'il envoie). Un changement de chaîne fait moins de 7 ticks avant la fin passe au tour d'après : l'interface doit le montrer. `MdPatternEditor::setLength` a été ajouté pour le test.
+- SONG POSITION puis CONTINUE (ce que `synthLib::MidiClock` envoie quand l'hôte démarre plus loin que le début) : la machine démarre le pattern à cette position, **modulo sa longueur**, dès la première horloge (position 8 ou 40 sur un pattern de 32 pas : pas 9).
+- Pattern suivant sur un autre kit (mode Extended : le kit se charge à la bascule) : bascule toujours à l'heure. Avec TRX-CH sur la piste 3 des deux patterns, chaque pas sonne, attaque à +4 à +7 ms du tick avant comme après la bascule, aucun silence. Le chargement du kit ne s'entend pas dans l'émulation.
+- Au passage : les pistes audio envoient leur propre note MIDI à chaque trig (piste 3 : note 40). Le test lock ses notes au-dessus (60 et plus).
 
-Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), deux patterns sur des kits différents (en mode Extended, le kit du suivant se charge à la bascule : temps de chargement, raté audio ?), l'échelle et le double tempo, les patterns de plus de 32 pas, un départ au milieu d'un pattern (song position pointer).
+Pour la chaîne : envoyer le pattern suivant tôt, dès le début du pattern courant. Le plug-in connaît la longueur (dump de pattern) et la position (l'horloge qu'il envoie). Un changement de chaîne fait moins de 7 ticks avant la fin passe au tour d'après : l'interface doit le montrer. Au démarrage plus loin dans le morceau, la position SONG POSITION envoyée par l'hôte est prise modulo la longueur du pattern : le plug-in doit la ramener à la position dans le pattern de la chaîne (ou sélectionner le bon pattern et envoyer sa propre position). `MdPatternEditor::setLength` a été ajouté pour le test.
+
+Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), l'échelle et le double tempo, les patterns de plus de 32 pas, une vraie machine (tout ce qui précède vient de l'émulation du firmware).
 
 ### Petits restes de l'éditeur
 
