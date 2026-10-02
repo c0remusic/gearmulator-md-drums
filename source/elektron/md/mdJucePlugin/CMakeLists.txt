@@ -64,6 +64,7 @@ set(SOURCES
 set(COMMON_ASSETS
 	"../../../jucePluginData/elektronKnobBlankAtlas.png"
 	"../../../jucePluginData/elektronMasterKnobAtlas.png"
+	"../../../jucePluginData/elektronEditorKnobAtlas.png"
 	"../../../jucePluginData/elektronButtonBevelAtlas.png"
 	"../../../jucePluginData/elektronLedLens.png"
 	"../../../jucePluginData/elektronLedLensSoft.png"
