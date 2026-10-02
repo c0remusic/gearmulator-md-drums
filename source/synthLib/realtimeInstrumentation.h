@@ -29,10 +29,12 @@ namespace synthLib
 		uint64_t synthNanoseconds = 0, lockWaitNanoseconds = 0;
 		uint64_t resamplerNanoseconds = 0, deviceNanoseconds = 0;
 		uint64_t deferredNanoseconds = 0, liveJitCompilations = 0, deferredJitCompilations = 0;
-		// A device rendering on its own thread: waiting for a block it had not rendered yet, and the
-		// blocks it could not take while paused.
+		// A device rendering on its own thread: waiting for a block it had not rendered yet, the blocks it
+		// could not take (paused, or every slot busy), and the late ones played as silence rather than
+		// waited for longer.
 		uint64_t renderWaitNanoseconds = 0;
 		uint32_t renderDroppedBlocks = 0;
+		uint32_t renderMissedBlocks = 0;
 		uint32_t frames = 0, outputBuses = 0, outputChannels = 0;
 		uint32_t midiEvents = 0, midiBytes = 0, deviceSampleRate = 0;
 		uint32_t resamplerMode = 0, dspClockPercent = 100;
@@ -98,6 +100,7 @@ namespace synthLib
 		uint64_t renderWaitNanoseconds = 0;
 		uint64_t renderWaitMaxNanoseconds = 0;
 		uint64_t renderDroppedBlockCount = 0;
+		uint64_t renderMissedBlockCount = 0;
 	};
 
 	// Opt-in counters for diagnosing work performed on the host audio callback.
@@ -219,6 +222,7 @@ namespace synthLib
 		// delivered, or could not hand a block over while the device was paused.
 		static void recordCurrentRenderWait(uint64_t _nanoseconds) noexcept;
 		static void recordCurrentDroppedBlock() noexcept;
+		static void recordCurrentMissedBlock() noexcept;
 
 	private:
 		friend class CallbackScope;
@@ -299,5 +303,6 @@ namespace synthLib
 		std::atomic<uint64_t> m_renderWaitNanoseconds{0};
 		std::atomic<uint64_t> m_renderWaitMaxNanoseconds{0};
 		std::atomic<uint64_t> m_renderDroppedBlockCount{0};
+		std::atomic<uint64_t> m_renderMissedBlockCount{0};
 	};
 }

@@ -118,6 +118,12 @@ namespace synthLib
 		virtual void pauseRendering() {}
 		virtual void resumeRendering() {}
 
+		// Whether the host plays in real time (false: it renders offline, faster or slower than real
+		// time). Plugin sets it before every process() call. A device rendering on a thread of its own
+		// waits for that thread without limit offline, and only within a block's time in real time.
+		void setHostRealtime(const bool _realtime) { m_hostRealtime = _realtime; }
+		bool isHostRealtime() const { return m_hostRealtime; }
+
 		auto& getMidiTranslator() { return m_midiTranslator; }
 		void reserveMidiEventCapacity(size_t _capacity)
 		{
@@ -138,6 +144,7 @@ namespace synthLib
 		std::vector<SMidiEvent> m_midiIn;
 
 		uint32_t m_extraLatency = 0;
+		bool m_hostRealtime = true;	// the thread calling process() only
 
 		MidiTranslator m_midiTranslator;
 		std::vector<SMidiEvent> m_translatorOut;

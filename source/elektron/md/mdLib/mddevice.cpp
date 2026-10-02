@@ -797,7 +797,7 @@ namespace md
 		std::vector<synthLib::SMidiEvent>& _midiOut)
 	{
 		if(isRenderingAsync())
-			m_async->process(_inputs, _outputs, _size, _midiIn, _midiOut);
+			m_async->process(_inputs, _outputs, _size, _midiIn, _midiOut, isHostRealtime());
 		else
 		{
 			// The host's thread: not ours to pin to a core
@@ -863,7 +863,7 @@ namespace md
 					m_hardware->setPairPlacementAllowed(true);
 					synthLib::Device::process(_ins, _outs, _frames, _midiIn, _midiOut);
 				});
-			m_async->start(latency);
+			m_async->start(latency, getSamplerate());
 		}
 		m_hardware->retimeMidi(hardwareLatency());
 	}

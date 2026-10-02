@@ -258,11 +258,13 @@ namespace
 			owner = RI::current();
 			RI::recordCurrentRenderWait(250'000);
 			RI::recordCurrentDroppedBlock();
+			RI::recordCurrentMissedBlock();
 		}
 		require(owner == &ri && RI::current() == nullptr, "current() did not name the recording callback");
 		synthLib::RealtimeSlowCallback callback;
 		require(ri.popSlowCallback(callback) && callback.renderWaitNanoseconds == 250'000
-			&& callback.renderDroppedBlocks == 1, "render wait or dropped block missing from the callback");
+			&& callback.renderDroppedBlocks == 1 && callback.renderMissedBlocks == 1,
+			"render wait, dropped or missed block missing from the callback");
 		std::thread render([owner]
 		{
 			{
@@ -284,7 +286,8 @@ namespace
 		require(summary.renderJitCompilationCount == 3 && summary.renderJobsWithJitCompilation == 1
 			&& summary.jitCompilationCount == 3 && summary.liveJitCompilationCount == 2
 			&& summary.deferredCandidateJitCompilationCount == 1 && summary.renderLateBlockCount == 1
-			&& summary.renderWaitNanoseconds == 250'000 && summary.renderDroppedBlockCount == 1,
+			&& summary.renderWaitNanoseconds == 250'000 && summary.renderDroppedBlockCount == 1
+			&& summary.renderMissedBlockCount == 1,
 			"render thread work missing from the summary");
 
 		// Plugin::setDevice deletes the device it replaces; the last one stays the caller's

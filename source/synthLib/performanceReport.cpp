@@ -96,6 +96,7 @@ namespace synthLib
 		FIELD(deviceAccessHoldNanoseconds); FIELD(deviceAccessHoldMaxNanoseconds);
 		FIELD(renderJitCompilationCount); FIELD(renderJobsWithJitCompilation); FIELD(renderLateBlockCount);
 		FIELD(renderWaitNanoseconds); FIELD(renderWaitMaxNanoseconds); FIELD(renderDroppedBlockCount);
+		FIELD(renderMissedBlockCount);
 #undef FIELD
 		out << ",\"realtimeBudgetHistogram\":[";
 		for(size_t i = 0; i < s.realtimeBudgetHistogram.size(); ++i)
@@ -115,7 +116,7 @@ namespace synthLib
 		FIELD(liveJitCompilations); FIELD(deferredJitCompilations); FIELD(frames); FIELD(sampleRate);
 		FIELD(deviceSampleRate); FIELD(resamplerMode); FIELD(dspClockPercent);
 		FIELD(outputBuses); FIELD(outputChannels); FIELD(midiEvents); FIELD(midiBytes);
-		FIELD(renderWaitNanoseconds); FIELD(renderDroppedBlocks);
+		FIELD(renderWaitNanoseconds); FIELD(renderDroppedBlocks); FIELD(renderMissedBlocks);
 		out << std::boolalpha;
 		FIELD(bypassed); FIELD(playing); FIELD(offline); FIELD(resamplingActive); FIELD(dualMachine);
 #undef FIELD

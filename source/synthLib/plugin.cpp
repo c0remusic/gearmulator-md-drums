@@ -142,6 +142,7 @@ namespace synthLib
 			outputs[i] = _outputs[i] ? _outputs[i]
 				: getDiscardOutputBuffer(i, _count);
 
+		m_device->setHostRealtime(m_hostRealtime);
 		processMidiInEvents();
 		processMidiClock(_bpm, _ppqPos, _isPlaying, _count, _ppqKnown);
 

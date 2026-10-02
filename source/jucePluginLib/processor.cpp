@@ -899,6 +899,7 @@ namespace pluginLib
 
 		instrumentation.setHostState(isPlaying, isNonRealtime(), transportKnown);
 		instrumentation.setMidiInputSummary(diagnosticMidiEvents, diagnosticMidiBytes);
+		getPlugin().setHostRealtime(!isNonRealtime());
 		getPlugin().process(inputs, outputs, numSamples, bpm, ppqPos, isPlaying, ppqKnown);
 
 		applyOutputGain(outputs, numSamples);

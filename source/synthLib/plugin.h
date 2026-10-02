@@ -62,6 +62,9 @@ namespace synthLib
 
 		void process(const TAudioInputs& _inputs, const TAudioOutputs& _outputs,
 			size_t _count, double _bpm, double _ppqPos, bool _isPlaying, bool _ppqKnown = true);
+		// Whether the host plays in real time or renders offline; process() hands it to the device
+		// (Device::setHostRealtime). The thread calling process() only.
+		void setHostRealtime(const bool _realtime) { m_hostRealtime = _realtime; }
 		void getMidiOut(std::vector<SMidiEvent>& _midiOut);
 
 		bool isValid() const;
@@ -153,6 +156,7 @@ namespace synthLib
 		MidiClock m_midiClock;
 
 		uint32_t m_extraLatencyBlocks = 1;
+		bool m_hostRealtime = true;
 
 		float m_deviceSamplerate = 0.0f;
 		CallbackDeviceInvalid m_callbackDeviceInvalid;

@@ -61,16 +61,61 @@ namespace
 		}
 
 		// One host callback. Returns the first output sample.
-		float process()
+		float process(const bool _realtime = true)
 		{
 			synthLib::TAudioInputs ins{};
 			synthLib::TAudioOutputs outs{};
 			for(size_t c = 0; c < out.size(); ++c)
 				outs[c] = out[c].data();
-			render.process(ins, outs, g_frames, midiIn, midiOut);
+			render.process(ins, outs, g_frames, midiIn, midiOut, _realtime);
 			return out[0][0];
 		}
 	};
+
+	// A render thread far slower than real time: in real time the host never waits longer than half a
+	// block for it and plays what is missing as silence; offline it waits for every block.
+	void verifyRealtimeHostWaitsBounded()
+	{
+		constexpr double sampleRate = 44100.0;
+		const auto halfBlock = std::chrono::duration<double>(0.5 * g_frames / sampleRate);
+		{
+			Rig rig;
+			rig.renderCost = std::chrono::milliseconds(100);
+			rig.render.start(g_latency, sampleRate);
+			auto worst = Clock::duration::zero();
+			for(int i = 0; i < 60; ++i)
+			{
+				const auto start = Clock::now();
+				rig.process(true);
+				worst = std::max(worst, Clock::now() - start);
+			}
+			const auto worstMs = std::chrono::duration<double, std::milli>(worst).count();
+			std::cout << "mdAsyncRenderTest: longest real time host call with a render 70 times slower than real time: "
+				<< worstMs << " ms (half a block: " << std::chrono::duration<double, std::milli>(halfBlock).count() << " ms)\n";
+			// The bound plus generous scheduling slack (other tests load the machine), far below the
+			// 100 ms a block takes to render
+			require(worst < std::chrono::milliseconds(30), "a real time host waited for a render far behind");
+			require(rig.render.missedBlocks() > 0, "late blocks were not counted as missed");
+			require(rig.render.droppedBlocks() > 0, "a render JobCount blocks behind did not make the host drop blocks");
+			rig.render.stop();
+		}
+		{
+			Rig rig;
+			rig.renderCost = std::chrono::milliseconds(5);
+			rig.render.start(g_latency, sampleRate);
+			// The latency's silence, then every block rendered: the host waited for each
+			bool rendered = true;
+			for(int i = 0; i < 8; ++i)
+			{
+				const auto level = rig.process(false);
+				if(i >= 2)
+					rendered &= level == 1.0f;
+			}
+			require(rendered, "an offline host did not wait for the rendered blocks");
+			require(rig.render.missedBlocks() == 0 && rig.render.droppedBlocks() == 0, "an offline host missed or dropped a block");
+			rig.render.stop();
+		}
+	}
 
 	// Blocks handed over before finish() are rendered when it returns.
 	void verifyFinishCoversHandedOverBlocks()
@@ -111,10 +156,14 @@ namespace
 		rig.render.resume();
 		rig.render.finish();
 		require(rig.rendered > before, "blocks handed over during the pause were not rendered after it");
-		// Dropped blocks play as silence, then the rendered audio comes back.
+		// Dropped blocks play as silence, then the rendered audio comes back. A real time host does not
+		// wait for the render thread: it gets the time of a block to catch up, which finish() gives here.
 		bool back = false;
 		for(int i = 0; i < 200 && !back; ++i)
+		{
 			back = rig.process() == 1.0f;
+			rig.render.finish();
+		}
 		require(back, "rendered audio did not come back after the dropped blocks");
 		rig.render.stop();
 	}
@@ -192,6 +241,8 @@ int main()
 		verifyPauseHoldsAndHostDoesNotWait();
 		std::cout << "mdAsyncRenderTest: slow device" << std::endl;
 		verifyControlAccessWithSlowDevice();
+		std::cout << "mdAsyncRenderTest: bounded host wait" << std::endl;
+		verifyRealtimeHostWaitsBounded();
 		std::cout << "mdAsyncRenderTest: PASS\n";
 		return 0;
 	}

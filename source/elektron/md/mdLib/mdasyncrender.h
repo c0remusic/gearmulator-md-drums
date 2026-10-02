@@ -52,15 +52,20 @@ namespace md
 		AsyncRender(const AsyncRender&) = delete;
 		AsyncRender& operator=(const AsyncRender&) = delete;
 
-		// Starts the render thread with _latency frames of silence queued.
-		void start(uint32_t _latency);
+		// Starts the render thread with _latency frames of silence queued; frames are at _sampleRate.
+		void start(uint32_t _latency, double _sampleRate = 44100.0);
 		// Renders what was handed over, then stops the thread and drops the queue.
 		void stop();
 		bool running() const { return m_running.load(std::memory_order_acquire); }
 
+		// A block the render thread has not delivered yet is waited for: offline (_realtime false)
+		// until it comes, in real time only while the render thread is on it and for half a block at
+		// most. Past that the host would be late with every other track, and for a render thread further
+		// behind it would wait for audio it plays as silence anyway: what is missing plays as silence
+		// (missedBlocks), and the render thread catches up on the blocks after it.
 		void process(const synthLib::TAudioInputs& _inputs, const synthLib::TAudioOutputs& _outputs,
 			size_t _frames, const std::vector<synthLib::SMidiEvent>& _midiIn,
-			std::vector<synthLib::SMidiEvent>& _midiOut);
+			std::vector<synthLib::SMidiEvent>& _midiOut, bool _realtime = true);
 
 		// Returns once the blocks handed over before the call are rendered, or
 		// at once while a pause holds (they cannot be rendered then).
@@ -73,6 +78,8 @@ namespace md
 		uint64_t lateBlocks() const { return m_lateBlocks.load(std::memory_order_relaxed); }
 		// Host blocks dropped while paused with every job slot in use.
 		uint64_t droppedBlocks() const { return m_droppedBlocks.load(std::memory_order_relaxed); }
+		// Late host blocks played with silence in real time instead of waiting longer (see process()).
+		uint64_t missedBlocks() const { return m_missedBlocks.load(std::memory_order_relaxed); }
 		struct Stats
 		{
 			uint64_t jobs = 0;
@@ -152,6 +159,8 @@ namespace md
 		std::chrono::microseconds m_idleSpin{0};	// extra spin for the next job before parking (MDMM_RENDER_SPIN_US)
 		std::atomic<uint64_t> m_lateBlocks{0};
 		std::atomic<uint64_t> m_droppedBlocks{0};
+		std::atomic<uint64_t> m_missedBlocks{0};
+		double m_sampleRate = 44100.0;		// of the frames handed over; set by start()
 		std::atomic<uint64_t> m_statJobs{0};
 		std::atomic<uint64_t> m_statRenderNs{0};
 		std::atomic<uint64_t> m_statWaitNs{0};

@@ -118,6 +118,7 @@ namespace synthLib
 		m_renderWaitNanoseconds.store(0, std::memory_order_relaxed);
 		m_renderWaitMaxNanoseconds.store(0, std::memory_order_relaxed);
 		m_renderDroppedBlockCount.store(0, std::memory_order_relaxed);
+		m_renderMissedBlockCount.store(0, std::memory_order_relaxed);
 	}
 
 	RealtimeInstrumentationSnapshot RealtimeInstrumentation::snapshot() const noexcept
@@ -173,6 +174,7 @@ namespace synthLib
 		result.renderWaitNanoseconds = m_renderWaitNanoseconds.load(std::memory_order_relaxed);
 		result.renderWaitMaxNanoseconds = m_renderWaitMaxNanoseconds.load(std::memory_order_relaxed);
 		result.renderDroppedBlockCount = m_renderDroppedBlockCount.load(std::memory_order_relaxed);
+		result.renderMissedBlockCount = m_renderMissedBlockCount.load(std::memory_order_relaxed);
 		return result;
 	}
 
@@ -337,7 +339,8 @@ namespace synthLib
 				&& _callback.durationNanoseconds >= _callback.budgetNanoseconds * 3 / 4)
 			|| _callback.lockWaitNanoseconds >= 100'000 || _callback.dualMachine
 			|| _callback.liveJitCompilations || _callback.deferredJitCompilations
-			|| _callback.renderWaitNanoseconds >= 100'000 || _callback.renderDroppedBlocks;
+			|| _callback.renderWaitNanoseconds >= 100'000 || _callback.renderDroppedBlocks
+			|| _callback.renderMissedBlocks;
 		if(!interesting) return;
 		auto& slot = m_slowCallbacks[m_writePosition % SlowCallbackCapacity];
 		if(slot.ready.load(std::memory_order_acquire))
@@ -590,6 +593,15 @@ namespace synthLib
 			return;
 		++g_callbackContext.callback.renderDroppedBlocks;
 		owner->m_renderDroppedBlockCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void RealtimeInstrumentation::recordCurrentMissedBlock() noexcept
+	{
+		auto* const owner = g_callbackContext.owner;
+		if(!owner || !owner->isEnabled())
+			return;
+		++g_callbackContext.callback.renderMissedBlocks;
+		owner->m_renderMissedBlockCount.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void RealtimeInstrumentation::recordDeferredCandidate(
