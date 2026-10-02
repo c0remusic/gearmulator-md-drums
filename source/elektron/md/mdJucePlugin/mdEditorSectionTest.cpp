@@ -254,6 +254,12 @@ namespace
 	constexpr const char* g_pickName = "SID-6581";
 	constexpr const char* g_pickFamily = "SID";
 	constexpr uint16_t g_otherFamilyMachine = 1;
+	// SON's first synthesis control as the skin names it and as SID-6581 does; GND-SIN uses only TUNE
+	constexpr const char* g_firstSynthesis = "SynthesisA";
+	constexpr const char* g_genericParameterName = "SYN A";
+	constexpr const char* g_pickParameterName = "PW";
+	constexpr const char* g_otherFamilyUnused = "SynthesisA";
+	constexpr const char* g_otherFamilyUsed = "SynthesisH";
 	constexpr float g_pickerTop = 12 + 64 + 4;
 	constexpr const char* g_name = "mmEditorSectionTest";
 	constexpr int g_trackCount = 6;
@@ -275,6 +281,12 @@ namespace
 	constexpr const char* g_pickName = "TRX-BD";
 	constexpr const char* g_pickFamily = "TRX";
 	constexpr uint16_t g_otherFamilyMachine = 1;
+	// SON's first synthesis control as the skin names it and as TRX-BD does; GND-SN uses 1 to 4
+	constexpr const char* g_firstSynthesis = "MachineParameter1";
+	constexpr const char* g_genericParameterName = "PARAM 1";
+	constexpr const char* g_pickParameterName = "PTCH";
+	constexpr const char* g_otherFamilyUnused = "MachineParameter5";
+	constexpr const char* g_otherFamilyUsed = "MachineParameter1";
 	constexpr float g_pickerTop = 12 + 64 + 4;
 	constexpr const char* g_name = "mdEditorSectionTest";
 	constexpr int g_trackCount = 16;
@@ -481,6 +493,8 @@ int main()
 			auto& picker = element(doc, "mdEdMachinePicker");
 			require(!visible(picker), "machine picker open before it was asked for");
 			require(element(doc, "mdEdMachineName").GetInnerRML() == "—", "unknown machine not shown as unknown");
+			const auto firstName = [&] { return std::string(element(doc, std::string("mdEdName_") + g_firstSynthesis).GetInnerRML()); };
+			require(firstName() == g_genericParameterName, "unknown machine's synthesis control not named as in the skin");
 			element(doc, "mdEdMachineChange").Click();
 			context.Update();
 			require(visible(picker), "CHANGER DE MACHINE did not open the picker");
@@ -509,13 +523,16 @@ int main()
 			require(!visible(picker), "picker stayed open after the assignment");
 			require(element(doc, "mdEdMachineName").GetInnerRML() == g_pickName
 				&& element(doc, "mdEdMachineFamily").GetInnerRML() == g_pickFamily, "MACHINE block does not show the assigned machine");
+			require(firstName() == g_pickParameterName, "synthesis control not named after the assigned machine");
 
 			element(doc, "editTrack1").Click();
 			context.Update();
 			require(element(doc, "mdEdMachineName").GetInnerRML() == "—", "MACHINE block kept the previous track's machine");
+			require(firstName() == g_genericParameterName, "synthesis control kept the previous track's name");
 			element(doc, "editTrack0").Click();
 			context.Update();
 			require(element(doc, "mdEdMachineName").GetInnerRML() == g_pickName, "MACHINE block lost the machine of track 1");
+			require(firstName() == g_pickParameterName, "synthesis control lost the name of track 1's machine");
 		}
 
 #if !defined(MD_EDITOR_SECTION_TEST_MM)
@@ -736,6 +753,13 @@ int main()
 			require(md.assignMachine(0, g_otherFamilyMachine), "assignment refused");
 			require(mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor), "unread values not refreshed after an assignment");
 			context.Update();
+			// A synthesis parameter the machine does not use: dimmed, named "—"
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(element(doc, std::string("mdEdCtl_") + g_otherFamilyUnused).IsClassSet("mdEdUnused")
+				&& element(doc, std::string("mdEdName_") + g_otherFamilyUnused).GetInnerRML() == "—"
+				&& !element(doc, std::string("mdEdCtl_") + g_otherFamilyUsed).IsClassSet("mdEdUnused"),
+				"synthesis parameters not dimmed exactly where the machine does not use them");
 			require(unread("mdEdCtl_" + synthesis) && unread("mdEdVal_" + synthesis), "synthesis value not greyed after an assignment");
 			require(unread("mdEdCtl_" + other) == !mm, mm ? "kept amp value greyed" : "effects value not greyed after an assignment");
 			require(mixRowValues(0, mm ? "AmpVolume" : "Volume") == !mm && !mixRowValues(1, mm ? "AmpVolume" : "Volume"),
@@ -1004,7 +1028,8 @@ int main()
 			const auto& lane = mdJucePlugin::EditorIdentityTestAccess::pattern(*editor);
 			require(lane.barValue(0) == 77 && lane.barLocked(0) && lane.barValue(4) == 64 && !lane.barLocked(4) && lane.barValue(1) == -1,
 				"lane does not show the lock and the Kit value");
-			require(text("mdPlayLaneInfo") == "piste 01 · P1 : 1 lock · kit 64" && text("mdPlayParam0") == "P1 · 1",
+			// Track 1 holds TRX-BD, whose first parameter is PTCH
+			require(text("mdPlayLaneInfo") == "piste 01 · PTCH : 1 lock · kit 64" && text("mdPlayParam0") == "PTCH · 1",
 				"lane does not count the locks: \"" + text("mdPlayLaneInfo") + "\"");
 			// The sequencer plays step 5, then 6: its column is lit, the previous one no longer; stopped, none
 			Access::setPlayingStep(md, uint8_t{4});

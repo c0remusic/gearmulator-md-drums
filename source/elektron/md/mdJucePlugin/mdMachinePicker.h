@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "mdLib/mdmachines.h"
@@ -16,7 +18,9 @@ namespace mdJucePlugin
 	class Controller;
 
 	// The MACHINE block of the editor's SON page: family, name and synthesis type
-	// of the edited track's machine, and the picker that assigns another one.
+	// of the edited track's machine, and the picker that assigns another one. It
+	// also names the page's eight synthesis controls after the machine (PTCH, DEC...)
+	// and dims those the machine does not use.
 	// Families and machines come from md::machines; the element ids from the skin
 	// (mdEdMachine*, mdEdPicker*). Does nothing when the skin has no MACHINE block.
 	class MachinePicker
@@ -36,6 +40,7 @@ namespace mdJucePlugin
 	private:
 		void createPicker();
 		void renderHeader();
+		void renderParameterNames();
 		void renderPicker();
 
 		Controller& m_controller;
@@ -49,6 +54,16 @@ namespace mdJucePlugin
 		Rml::Element* m_families = nullptr;
 		Rml::Element* m_machines = nullptr;
 		Rml::Element* m_pickerInfo = nullptr;
+
+		// The synthesis controls of SON: knob, value and name (mdEdCtl_, mdEdVal_, mdEdName_)
+		struct SynthesisControl
+		{
+			Rml::Element* control = nullptr;
+			Rml::Element* value = nullptr;
+			Rml::Element* name = nullptr;
+			std::string generic;	// the skin's name (PARAM 1, SYN A), shown while the machine is unknown
+		};
+		std::array<SynthesisControl, 8> m_synthesis;
 
 		// Created once and only shown, hidden or highlighted afterwards: removing an
 		// element from inside its own click handler would destroy it mid-dispatch.

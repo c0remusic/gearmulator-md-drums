@@ -1,6 +1,7 @@
 #include "mdmachines.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace md::machines
 {
@@ -62,7 +63,9 @@ namespace md::machines
 				{68, "P-I-MA", MdPi, true}, {69, "P-I-RS", MdPi, true}, {70, "P-I-RC", MdPi, true}, {71, "P-I-CC", MdPi, true},
 				{72, "P-I-HH", MdPi, true},
 				{80, "INP-GA", MdInp, true}, {81, "INP-GB", MdInp, true}, {82, "INP-FA", MdInp, true}, {83, "INP-FB", MdInp, true},
-				{84, "INP-EA", MdInp, true}, {85, "INP-EB", MdInp, true}, {86, "INP-CA", MdInp, true}, {87, "INP-CB", MdInp, true},
+				{84, "INP-EA", MdInp, true}, {85, "INP-EB", MdInp, true},
+				// Not in the OS 1.63 machine table (see parameterNames): a later OS's.
+				{86, "INP-CA", MdInp, false}, {87, "INP-CB", MdInp, false},
 				{112, "CTR-AL", MdCtr, true}, {113, "CTR-8P", MdCtr, true},
 				{120, "CTR-RE", MdCtr, true}, {121, "CTR-GB", MdCtr, true}, {122, "CTR-EQ", MdCtr, true}, {123, "CTR-DX", MdCtr, true},
 				{160, "RAM-R1", MdRam, true}, {161, "RAM-R2", MdRam, true}, {162, "RAM-P1", MdRam, true}, {163, "RAM-P2", MdRam, true},
@@ -107,7 +110,125 @@ namespace md::machines
 				{11, "VO-VO-6", MmVo, true},
 				{12, "FX-THRU", MmFx, true}, {13, "FX-REVERB", MmFx, true}, {15, "FX-CHORUS", MmFx, true},
 				{16, "FX-DYNAMIX", MmFx, true}, {17, "FX-RINGMOD", MmFx, true},
+				// In the OS 1.32b machine table, not in MCL's; ASSIGN MACHINE not tried with them.
+				{18, "FX-PHASER", MmFx, false}, {19, "FX-FLANGER", MmFx, false},
 			};
+		}
+
+		// The synthesis parameter names of the firmware's machine table, which the OS unpacks into RAM:
+		// Machinedrum OS 1.63 from $24ef55 (records of 86 bytes: id, family and model in 5 characters,
+		// 8 names of 4), Monomachine OS 1.32b from $257fc4 (records of 176 bytes: id, family, model,
+		// 8 names of 6). Read with mdPlayheadProbe --dump. An empty name: the machine does not use the
+		// parameter (the Monomachine's table says "---"). The Machinedrum's GND-SW, GND-PU, NFX-* and
+		// INP-CA/CB are not in its table.
+		using Names = std::pair<uint16_t, ParameterNames>;
+
+		const std::vector<Names> g_mdParameterNames =
+		{
+			{0, {"", "", "", "", "", "", "", ""}},
+			{1, {"PTCH", "DEC", "RAMP", "RDEC", "", "", "", ""}},
+			{2, {"DEC", "", "", "", "", "", "", ""}},
+			{3, {"UP", "UVAL", "DOWN", "DVAL", "", "", "", ""}},
+			{16, {"PTCH", "DEC", "RAMP", "RDEC", "STRT", "NOIS", "HARM", "CLIP"}},
+			{17, {"PTCH", "DEC", "BUMP", "BENV", "SNAP", "TONE", "TUNE", "CLIP"}},
+			{18, {"PTCH", "DEC", "RAMP", "RDEC", "DAMP", "DIST", "DTYP", ""}},
+			{19, {"CLPY", "TONE", "HARD", "RICH", "RATE", "ROOM", "RSIZ", "RTUN"}},
+			{20, {"PTCH", "DEC", "DIST", "", "", "", "", ""}},
+			{21, {"PTCH", "DEC", "ENH", "DAMP", "TONE", "BUMP", "", ""}},
+			{22, {"GAP", "DEC", "HPF", "LPF", "MTAL", "", "", ""}},
+			{23, {"GAP", "DEC", "HPF", "LPF", "MTAL", "", "", ""}},
+			{24, {"RICH", "DEC", "TOP", "TTUN", "SIZE", "PEAK", "", ""}},
+			{25, {"ATT", "SUS", "REV", "DAMP", "RATL", "RTYP", "TONE", "HARD"}},
+			{26, {"PTCH", "DEC", "DUAL", "ENH", "TUNE", "CLIC", "", ""}},
+			{27, {"PTCH", "DEC", "RAMP", "RDEC", "DAMP", "DIST", "DTYP", ""}},
+			{28, {"PTCH", "DEC", "RAMP", "HOLD", "TICK", "NOIS", "DIRT", "DIST"}},
+			{29, {"PTCH", "DEC", "NOIS", "NDEC", "POWR", "TUNE", "NTUN", "NTYP"}},
+			{32, {"PTCH", "DEC", "RAMP", "RDEC", "MOD", "MFRQ", "MDEC", "MFB"}},
+			{33, {"PTCH", "DEC", "NOIS", "NDEC", "MOD", "MFRQ", "MDEC", "HPF"}},
+			{34, {"PTCH", "DEC", "RAMP", "RDEC", "MOD", "MFRQ", "MDEC", "CLIC"}},
+			{35, {"PTCH", "DEC", "CLPS", "CDEC", "MOD", "MFRQ", "MDEC", "HPF"}},
+			{36, {"PTCH", "DEC", "MOD", "HPF", "SNAR", "SPTC", "SDEC", "SMOD"}},
+			{37, {"PTCH", "DEC", "SNAP", "FB", "MOD", "MFRQ", "MDEC", ""}},
+			{38, {"PTCH", "DEC", "TREM", "TFRQ", "MOD", "MFRQ", "MDEC", "FB"}},
+			{39, {"PTCH", "DEC", "FB", "HPF", "MOD", "MFRQ", "MDEC", ""}},
+			{48, {"PTCH", "DEC", "SNAP", "SPLN", "STRT", "RTRG", "RTIM", "BEND"}},
+			{49, {"PTCH", "DEC", "HP", "RING", "STRT", "RTRG", "RTIM", "BEND"}},
+			{50, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{51, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{52, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{53, {"PTCH", "DEC", "HP", "RATL", "STRT", "RTRG", "RTIM", "BEND"}},
+			{54, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{55, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{56, {"PTCH", "DEC", "HP", "STOP", "STRT", "RTRG", "RTIM", "BEND"}},
+			{57, {"PTCH", "DEC", "HP", "BELL", "STRT", "RTRG", "RTIM", "BEND"}},
+			{58, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{59, {"PTCH", "DEC", "HP", "REAL", "STRT", "RTRG", "RTIM", "BEND"}},
+			{60, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{61, {"PTCH", "DEC", "HP", "HPQ", "STRT", "RTRG", "RTIM", "BEND"}},
+			{62, {"PTCH", "DEC", "HP", "SLEW", "STRT", "RTRG", "RTIM", "BEND"}},
+			{63, {"PTCH", "DEC", "HP", "BC", "STRT", "RTRG", "RTIM", "BEND"}},
+			{64, {"PTCH", "DEC", "HARD", "HAMR", "TENS", "DAMP", "", ""}},
+			{65, {"PTCH", "DEC", "HARD", "RING", "TENS", "RVOL", "RDEC", ""}},
+			{66, {"PTCH", "DEC", "HARD", "HAMR", "TUNE", "DAMP", "SIZE", "POS"}},
+			{67, {"PTCH", "DEC", "HARD", "TENS", "", "", "", ""}},
+			{68, {"GRNS", "DEC", "GLEN", "", "SIZE", "HARD", "", ""}},
+			{69, {"PTCH", "DEC", "HARD", "RING", "RVOL", "RDEC", "", ""}},
+			{70, {"PTCH", "DEC", "HARD", "RING", "AG", "AU", "BR", "GRAB"}},
+			{71, {"PTCH", "DEC", "HARD", "RING", "AG", "AU", "BR", "GRAB"}},
+			{72, {"PTCH", "DEC", "CLSN", "RING", "AG", "AU", "BR", "CLOS"}},
+			{80, {"VOL", "GATE", "ATCK", "HLD", "DEC", "", "", ""}},
+			{81, {"VOL", "GATE", "ATCK", "HLD", "DEC", "", "", ""}},
+			{82, {"ALEV", "GATE", "FATK", "FHLD", "FDEC", "FDPH", "FFRQ", "FQ"}},
+			{83, {"ALEV", "GATE", "FATK", "FHLD", "FDEC", "FDPH", "FFRQ", "FQ"}},
+			{84, {"ALEV", "AHLD", "ADEC", "FQ", "FDPH", "FHLD", "FDEC", "FFRQ"}},
+			{85, {"ALEV", "AHLD", "ADEC", "FQ", "FDPH", "FHLD", "FDEC", "FFRQ"}},
+			{96, {"NOTE", "N2", "N3", "LEN", "VEL", "PB", "MW", "AT"}},		// MID-01, as MID-02..16
+			{112, {"SYN1", "SYN2", "SYN3", "SYN4", "SYN5", "SYN6", "SYN7", "SYN8"}},
+			{113, {"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"}},
+			{120, {"TIME", "MOD", "MFRQ", "FB", "FLTF", "FLTW", "MONO", "LEV"}},
+			{121, {"DVOL", "PRED", "DEC", "DAMP", "HP", "LP", "GATE", "LEV"}},
+			{122, {"LF", "LG", "HF", "HG", "PF", "PG", "PQ", "GAIN"}},
+			{123, {"ATCK", "REL", "TRHD", "RTIO", "KNEE", "HP", "OUTG", "MIX"}},
+			{128, {"PTCH", "DEC", "HOLD", "BRR", "STRT", "END", "RTRG", "RTIM"}},	// ROM-01, as ROM-02..48, RAM-P1..4
+			{160, {"MLEV", "MBAL", "ILEV", "IBAL", "CUE1", "CUE2", "LEN", "RATE"}},	// RAM-R1, as RAM-R2..4
+		};
+
+		const std::vector<Names> g_mmParameterNames =
+		{
+			{0, {"", "", "", "", "", "", "", ""}},
+			{1, {"", "", "", "", "", "", "", "TUNE"}},
+			{2, {"ST", "RED", "STON", "", "", "", "", "TUNE"}},
+			{3, {"PW", "PWAD", "PWRS", "WAVE", "MOD", "MSRC", "MFRQ", "TUNE"}},
+			{4, {"UNIL", "UNIW", "UNIX", "", "SUBX", "SUB1", "SUB2", "TUNE"}},
+			{5, {"UNIL", "UNIW", "SUB1", "SUB2", "PW", "PWAD", "PWRS", "TUNE"}},
+			{6, {"WAVE", "WP", "WPM", "WPRS", "SYNC", "SFRQ", "", "TUNE"}},
+			{7, {"PTCH", "STRT", "", "", "RTRG", "RTIM", "", ""}},
+			{8, {"1FRQ", "1FIN", "1ENV", "1FB", "2FRQ", "2VOL", "TONE", "TUNE"}},
+			{9, {"1FRQ", "1ENV", "2FRQ", "2ENV", "3FRQ", "3ENV", "TONE", "TUNE"}},
+			{10, {"1FRQ", "1FEN", "1VOL", "1VEN", "2FRQ", "2ENV", "2FB", "TUNE"}},
+			{11, {"VOC1", "VOC2", "V-SW", "VOIC", "CONS", "CLEN", "CVOL", "TUNE"}},
+			{12, {"", "", "", "", "", "", "", "INP"}},
+			{13, {"DEC", "DAMP", "GATE", "MIX", "HP", "LP", "", "INP"}},
+			{14, {"PCH2", "PCH3", "PCH4", "WAVE", "PW", "CHRL", "CHRW", "TUNE"}},
+			{15, {"DEL", "DEP", "SPD", "MIX", "FB", "WID", "LP", "INP"}},
+			{16, {"ATK", "REL", "THRS", "MIX", "RAT", "GAIN", "RMS", "INP"}},
+			{17, {"WAVE", "EXT", "", "MIX", "", "", "", "INP"}},
+			{18, {"CNTR", "DEP", "SPD", "MIX", "FB", "WID", "", "INP"}},
+			{19, {"DEL", "DEP", "SPD", "MIX", "FB", "WID", "", "INP"}},
+			{32, {"WAV1", "MIX", "WAV2", "TIME", "BR1", "WID", "BR2", "TUNE"}},
+			{33, {"PCH2", "PCH3", "PCH4", "WAVE", "", "CHRL", "CHRW", "TUNE"}},
+		};
+
+		// The Machinedrum machines that share their names with one entry of the table
+		uint16_t mdNamesId(const uint16_t _id)
+		{
+			if(_id >= 96 && _id <= 111)
+				return 96;
+			if((_id >= 128 && _id <= 159) || (_id >= 176 && _id <= 191) || _id == 162 || _id == 163 || _id == 167 || _id == 168)
+				return 128;
+			if(_id == 160 || _id == 161 || _id == 165 || _id == 166)
+				return 160;
+			return _id;
 		}
 	}
 
@@ -134,5 +255,14 @@ namespace md::machines
 	{
 		const auto* machine = find(_model, _id);
 		return machine ? &families(_model)[machine->family] : nullptr;
+	}
+
+	const ParameterNames* parameterNames(const MachineModel _model, const uint16_t _id)
+	{
+		const bool mm = _model == MachineModel::Monomachine;
+		const auto& table = mm ? g_mmParameterNames : g_mdParameterNames;
+		const auto id = mm ? _id : mdNamesId(_id);
+		const auto it = std::find_if(table.begin(), table.end(), [id](const Names& _n) { return _n.first == id; });
+		return it == table.end() ? nullptr : &it->second;
 	}
 }

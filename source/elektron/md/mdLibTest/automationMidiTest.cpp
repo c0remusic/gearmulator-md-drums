@@ -886,10 +886,27 @@ namespace
 				require(std::any_of(list.begin(), list.end(), [family](const auto& _m) { return _m.family == family; }),
 					"machine family without machines");
 		}
-		require(md::machines::machines(md).size() == 142 && md::machines::machines(mm).size() == 20,
+		require(md::machines::machines(md).size() == 142 && md::machines::machines(mm).size() == 22,
 			"unexpected machine count");
 		require(md::machines::find(mm, 11)->name == "VO-VO-6" && md::machines::find(md, 176)->name == "ROM-33",
 			"wrong machine names");
+
+		// Parameter names from the firmware's machine table: every machine offered has them, as the OS has it
+		for(const auto model : {md, mm})
+		{
+			for(const auto& machine : md::machines::machines(model))
+				require(!machine.assignable || md::machines::parameterNames(model, machine.id), "machine offered without parameter names");
+		}
+		const auto name = [](const md::MachineModel _model, const uint16_t _id, const size_t _index)
+		{
+			const auto* names = md::machines::parameterNames(_model, _id);
+			return names ? std::string((*names)[_index]) : std::string("?");
+		};
+		require(name(md, 16, 0) == "PTCH" && name(md, 16, 7) == "CLIP" && name(md, 1, 4).empty(), "wrong TRX-BD or GND-SN names");
+		require(name(md, 150, 2) == "HOLD" && name(md, 162, 2) == "HOLD" && name(md, 166, 0) == "MLEV" && name(md, 105, 0) == "NOTE",
+			"ROM, RAM or MID machines do not share their family's names");
+		require(name(mm, 3, 0) == "PW" && name(mm, 4, 3).empty() && name(mm, 18, 0) == "CNTR", "wrong Monomachine names");
+		require(!md::machines::parameterNames(md, 86) && !md::machines::parameterNames(md, 4), "names for a machine the OS lacks");
 	}
 
 	void testBackupFile(const char* const _path, const md::MachineModel _model)

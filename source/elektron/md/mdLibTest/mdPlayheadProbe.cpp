@@ -2,6 +2,8 @@
 // presses PLAY and prints, every time it changes, the front panel's step LEDs, and counts what the
 // machine sends on its MIDI output (clock, start, stop, song position). For the editor's JOUER page,
 // which has no playhead yet. Firmware from GEARMULATOR_MD_FIRMWARE_BIN and GEARMULATOR_MM_FIRMWARE_BIN.
+// --dump <prefix> writes the RAM of both booted machines to <prefix>-md.bin and <prefix>-mm.bin, where the
+// OS keeps what its flash holds compressed, such as the machine table (md::machines::parameterNames).
 
 #include "mmFirmwareMachine.h"
 
@@ -470,6 +472,43 @@ namespace
 		scanRunFlag(*hardware, "MD");
 	}
 
+	// Writes the RAM from $100000 to $400000 of a booted machine to _file, the SIM's registers left as
+	// zeros: the decompressed OS, for strings such as the machines' parameter names.
+	void dumpRam(md::Hardware& _hardware, const std::string& _file)
+	{
+		auto& uc = _hardware.getUC();
+		std::vector<uint8_t> bytes(0x00300000);
+		for(uint32_t i = 0; i < bytes.size(); ++i)
+		{
+			const auto address = 0x00100000 + i;
+			if(address < 0x00300000 || address >= 0x00310000)
+				bytes[i] = uc.read8(address);
+		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write " + _file);
+		std::printf("%s written\n", _file.c_str());
+	}
+
+	void dumpMachines(const std::string& _prefix)
+	{
+		if(const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN"))
+		{
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			auto hardware = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Machinedrum);
+			while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+				advance(*hardware, 64);
+			advance(*hardware, md::g_samplerate * 20);
+			dumpRam(*hardware, _prefix + "-md.bin");
+		}
+		if(const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN"))
+		{
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			md::test::Monomachine machine(rom, path);
+			dumpRam(machine.hardware(), _prefix + "-mm.bin");
+		}
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -507,6 +546,11 @@ int main(const int _argc, const char* const* _argv)
 		{
 			syncMachinedrum();
 			syncMonomachine();
+			return 0;
+		}
+		if(_argc > 2 && std::string(_argv[1]) == "--dump")
+		{
+			dumpMachines(_argv[2]);
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);

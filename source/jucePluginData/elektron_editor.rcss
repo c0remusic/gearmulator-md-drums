@@ -95,6 +95,8 @@
 
 /* inactive: laid out, but the data behind it is not available yet (wireframe board 0b, third state) */
 .mdEdOff { opacity: 0.35; pointer-events: none; }
+/* a synthesis control the track's machine does not use (MachinePicker) */
+.mdEdUnused { opacity: 0.25; pointer-events: none; }
 
 /* header screen: kit and pattern */
 .mdEdScreen

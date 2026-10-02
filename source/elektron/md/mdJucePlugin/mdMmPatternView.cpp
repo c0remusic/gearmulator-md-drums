@@ -24,7 +24,7 @@ namespace mdJucePlugin
 
 		constexpr const char* g_pageNames[MmPatternView::PageCount] = {"SYN", "AMP", "FILT", "EFX", "LFO 1", "LFO 2", "LFO 3"};
 
-		// The 8 parameters of each page, as SON names them
+		// The 8 parameters of each page, as SON names them; SYN's while the track's machine is unknown
 		constexpr const char* g_shortNames[MmPatternView::PageCount][8] = {
 			{"A", "B", "C", "D", "E", "F", "G", "H"},
 			{"ATK", "HOLD", "DEC", "REL", "DIST", "VOL", "PAN", "PORT"},
@@ -411,21 +411,27 @@ namespace mdJucePlugin
 			}
 		}
 		const auto page = static_cast<uint8_t>(parameter / 8);
+		// SYN as the track's machine names its parameters; one it does not use is dimmed
+		const auto* names = page == 0 ? md::machines::parameterNames(md::MachineModel::Monomachine, m_controller.getTrackMachine(track)) : nullptr;
+		const auto label = [names, page](const uint8_t _index)
+		{
+			return names && !(*names)[_index].empty() ? std::string((*names)[_index]) : std::string(g_shortNames[page][_index]);
+		};
 		for(uint8_t index = 0; index < m_parameters.size(); ++index)
 		{
 			if(auto* button = m_parameters[index])
 			{
 				const auto count = counts[page * 8 + index];
-				setText(button, m_shownParameterLabels[index],
-					std::string(g_shortNames[page][index]) + (count ? " · " + std::to_string(count) : std::string()));
+				setText(button, m_shownParameterLabels[index], label(index) + (count ? " · " + std::to_string(count) : std::string()));
 				button->SetClass("mdEdSelected", index == parameter % 8);
+				button->SetClass("mdEdUnused", names && (*names)[index].empty() && !count && index != parameter % 8);
 			}
 		}
 		size_t others = 0;
 		for(uint8_t bit = ParameterCount; bit < Pattern::LockBitCount; ++bit)
 			others += counts[bit];
 		const auto locks = counts[parameter];
-		std::string text = "piste " + number(track + 1u) + " · " + g_pageNames[page] + " " + g_shortNames[page][parameter % 8] + " : "
+		std::string text = "piste " + number(track + 1u) + " · " + g_pageNames[page] + " " + label(parameter % 8) + " : "
 			+ std::to_string(locks) + (locks == 1 ? " lock" : " locks") + " · kit " + std::to_string(m_shownKit);
 		if(others)
 			text += " · " + std::to_string(others) + " autres locks (paramètres sans nom)";

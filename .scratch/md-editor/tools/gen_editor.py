@@ -24,10 +24,11 @@ def knob(d, x, y, param, name, off=False, cw=COL):
     p = f' param="{param}"' if param and not off else ""
     cid = f' id="mdEdCtl_{param}"' if p else ""
     vid = f' id="mdEdVal_{param}"' if p else ""
+    nid = f' id="mdEdName_{param}"' if p else ""
     w(f'{ind(d)}<knob{cid} class="{cls}"{p} style="left: {x + (cw - KNOB) // 2}dp; top: {y}dp;"/>')
     value = f"{{{{{param}_text}}}}" if param and not off else "—"
     w(f'{ind(d)}<div{vid} class="jucePos juceLabel mdEdValue{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + KNOB}dp; width: {cw}dp;">{value}</div>')
-    w(f'{ind(d)}<div class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + KNOB + 14}dp; width: {cw}dp;">{name}</div>')
+    w(f'{ind(d)}<div{nid} class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + KNOB + 14}dp; width: {cw}dp;">{name}</div>')
 
 def fader(d, x, y, param, name, off=False, fh=KNOB, cw=COL):
     # vertical fader in a knob cell; orientation="vertical" puts the maximum at the top
@@ -37,11 +38,12 @@ def fader(d, x, y, param, name, off=False, fh=KNOB, cw=COL):
     rest = "" if p else ' value="100"'
     cid = f' id="mdEdCtl_{param}"' if p else ""
     vid = f' id="mdEdVal_{param}"' if p else ""
+    nid = f' id="mdEdName_{param}"' if p else ""
     tall = f" height: {fh}dp;" if fh != KNOB else ""
     w(f'{ind(d)}<input{cid} type="range" orientation="vertical" class="{cls}"{p}{rest} style="left: {x + (cw - 12) // 2}dp; top: {y}dp;{tall}"/>')
     value = f"{{{{{param}_text}}}}" if param and not off else "—"
     w(f'{ind(d)}<div{vid} class="jucePos juceLabel mdEdValue{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + fh}dp; width: {cw}dp;">{value}</div>')
-    w(f'{ind(d)}<div class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + fh + 14}dp; width: {cw}dp;">{name}</div>')
+    w(f'{ind(d)}<div{nid} class="jucePos juceLabel mdEdName{" mdEdOff" if off else ""}" style="left: {x}dp; top: {y + fh + 14}dp; width: {cw}dp;">{name}</div>')
 
 def control(d, x, y, item):
     kind, param, name = item

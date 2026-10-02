@@ -44,6 +44,19 @@ namespace mdJucePlugin
 		m_machines = _document.GetElementById("mdEdPickerMachines");
 		m_pickerInfo = _document.GetElementById("mdEdPickerInfo");
 
+		for(size_t i = 0; i < m_synthesis.size(); ++i)
+		{
+			const auto param = m_model == md::MachineModel::Monomachine
+				? "Synthesis" + std::string(1, static_cast<char>('A' + i))
+				: "MachineParameter" + std::to_string(i + 1);
+			auto& c = m_synthesis[i];
+			c.control = _document.GetElementById("mdEdCtl_" + param);
+			c.value = _document.GetElementById("mdEdVal_" + param);
+			c.name = _document.GetElementById("mdEdName_" + param);
+			if(c.name)
+				c.generic = c.name->GetInnerRML();
+		}
+
 		createPicker();
 		if(m_button && m_picker)
 		{
@@ -116,6 +129,7 @@ namespace mdJucePlugin
 		if(m_family)
 			m_family->SetInnerRML(family ? std::string(family->name) : "—");
 		m_name->SetInnerRML(machine ? std::string(machine->name) : "—");
+		renderParameterNames();
 		if(!m_info)
 			return;
 		if(machine)
@@ -124,6 +138,26 @@ namespace mdJucePlugin
 			m_info->SetInnerRML("machine inconnue : en attente du kit");
 		else
 			m_info->SetInnerRML("machine " + std::to_string(m_shownMachine) + " : absente de la table du plug-in");
+	}
+
+	void MachinePicker::renderParameterNames()
+	{
+		// An unknown machine keeps the skin's generic names; a parameter the machine does not use is
+		// dimmed and does not take the pointer, as turning it changes nothing
+		const auto* names = md::machines::parameterNames(m_model, m_shownMachine);
+		for(size_t i = 0; i < m_synthesis.size(); ++i)
+		{
+			const auto& c = m_synthesis[i];
+			if(!c.name)
+				continue;
+			const bool unused = names && (*names)[i].empty();
+			c.name->SetInnerRML(!names ? c.generic : unused ? std::string("—") : std::string((*names)[i]));
+			for(auto* element : {c.control, c.value, c.name})
+			{
+				if(element)
+					element->SetClass("mdEdUnused", unused);
+			}
+		}
 	}
 
 	void MachinePicker::createPicker()

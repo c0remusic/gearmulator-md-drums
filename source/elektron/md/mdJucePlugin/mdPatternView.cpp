@@ -20,7 +20,8 @@ namespace mdJucePlugin
 {
 	namespace
 	{
-		// The 24 parameters a Machinedrum lock row can hold, as SON names them
+		// The 24 parameters a Machinedrum lock row can hold, as SON names them; P1 to P8 while the
+		// track's machine is unknown
 		constexpr const char* g_shortNames[PatternView::ParameterCount] = {
 			"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8",
 			"AMD", "AMF", "EQF", "EQG", "BASE", "WDTH", "Q", "SRR",
@@ -309,6 +310,13 @@ namespace mdJucePlugin
 		}
 		if(m_lane)
 			m_lane->repaint();
+		// The synthesis parameters as the track's machine names them; one it does not use is dimmed
+		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, m_controller.getTrackMachine(part));
+		const auto label = [names](const uint8_t _parameter)
+		{
+			return _parameter < 8 && names && !(*names)[_parameter].empty() ? std::string((*names)[_parameter])
+				: std::string(g_shortNames[_parameter]);
+		};
 		size_t laneLocks = 0;
 		for(uint8_t parameter = 0; parameter < ParameterCount; ++parameter)
 		{
@@ -317,12 +325,13 @@ namespace mdJucePlugin
 				laneLocks = count;
 			if(auto* button = m_parameters[parameter])
 			{
-				setText(button, m_shownParameterLabels[parameter],
-					std::string(g_shortNames[parameter]) + (count ? " · " + std::to_string(count) : std::string()));
+				setText(button, m_shownParameterLabels[parameter], label(parameter) + (count ? " · " + std::to_string(count) : std::string()));
 				button->SetClass("mdEdSelected", parameter == m_laneParameter);
+				button->SetClass("mdEdUnused", parameter < 8 && names && (*names)[parameter].empty() && !count
+					&& parameter != m_laneParameter);
 			}
 		}
-		setText(m_laneInfo, m_shownLaneInfo, "piste " + number(part + 1u) + " · " + g_shortNames[m_laneParameter] + " : "
+		setText(m_laneInfo, m_shownLaneInfo, "piste " + number(part + 1u) + " · " + label(m_laneParameter) + " : "
 			+ std::to_string(laneLocks) + (laneLocks == 1 ? " lock" : " locks") + " · kit " + std::to_string(m_shownKit));
 	}
 }

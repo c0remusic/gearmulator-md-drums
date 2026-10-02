@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string_view>
 #include <vector>
@@ -30,4 +31,10 @@ namespace md::machines
 
 	const Machine* find(MachineModel _model, uint16_t _id);
 	const Family* familyOf(MachineModel _model, uint16_t _id);
+
+	// The machine's eight synthesis parameters as the machine's display names them ("PTCH", "DEC"...),
+	// in parameter order; an empty name for a parameter the machine does not use. nullptr when the id
+	// is not in the firmware's machine table.
+	using ParameterNames = std::array<std::string_view, 8>;
+	const ParameterNames* parameterNames(MachineModel _model, uint16_t _id);
 }
