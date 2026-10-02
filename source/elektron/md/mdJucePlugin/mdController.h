@@ -153,12 +153,14 @@ namespace mdJucePlugin
 		// Increments whenever a library Kit is read or the reading starts or ends
 		uint64_t getKitLibraryRevision() const { return m_libraryRevision.load(std::memory_order_acquire); }
 
-		// Machinedrum only: asks the firmware for the current pattern number, then
-		// for that pattern's dump. False on the Monomachine or while the firmware is
-		// not ready. A pattern selected through SET STATUS is read again by itself.
+		// Asks the firmware for the current pattern number, then for that pattern's
+		// dump. False while the firmware is not ready. A pattern selected through SET
+		// STATUS, or another current pattern in a status reply, is read again by itself.
 		bool requestPattern();
-		// The pattern as last read, nullopt before the first dump.
+		// The pattern as last read, nullopt before the first dump: getPattern() on the
+		// Machinedrum, getMmPattern() on the Monomachine.
 		std::optional<md::automation::sysex::PatternDump> getPattern() const;
+		std::optional<md::automation::sysex::MmPatternDump> getMmPattern() const;
 		// Increments whenever a new pattern dump is stored or the pattern is edited.
 		uint64_t getPatternRevision() const { return m_patternRevision.load(std::memory_order_acquire); }
 		// Asks for a pattern's dump, for its length (the processor's ChainControl takes the length of
@@ -332,6 +334,7 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_libraryRevision{0};
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
+		std::optional<md::automation::sysex::MmPatternDump> m_mmPattern;	// under m_patternMutex
 		// The dump behind m_pattern, edits included; both under m_patternMutex.
 		md::automation::sysex::Message m_patternDump;
 		bool m_patternEdited = false;               // edits not sent yet

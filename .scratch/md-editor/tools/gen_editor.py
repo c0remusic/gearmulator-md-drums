@@ -335,36 +335,109 @@ def chain_contents(d, gw, state_x):
       'Joue avec le transport de l\'hôte (SYSTÈME, SUIVRE L\'HÔTE). AJOUTER prend le pattern de la machine ; '
       'A–H et 01–16 changent celui de la case choisie.</div>')
 
+MM_PAGES = ["SYN", "AMP", "FILT", "EFX", "LFO 1", "LFO 2", "LFO 3"]
+MM_AMP = ["ATK", "HOLD", "DEC", "REL", "DIST", "VOL", "PAN", "PORT"]
+
+# JOUER's grid, under its block's title row: the 32 steps' numbers (<prefix>Head<step>), a band behind every
+# other beat of 4 steps, a line between the two bars, then a row per track: its name (<prefix>Track<track>)
+# and its 32 steps (<prefix>Step<track>_<step>), a cell 24 dp wide in a 29 dp column (stepColumns in
+# mdStepColumns.h paints the canvases under it on the same columns); the legend under the rows.
+# Returns the block's height.
+PLAY_LABEL_W = 96
+
+def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend):
+    pitch = (gw - 32 - PLAY_LABEL_W) // 32
+    cw = pitch - 5
+    x0 = 16 + PLAY_LABEL_W
+    rows_top = TOP + 16
+    rows_bottom = rows_top + rows * rh
+    for g in range(1, 8, 2):
+        w(f'{ind(d)}<div class="jucePos mdPlayBand" style="left: {x0 + 4 * g * pitch - 3}dp; top: {TOP - 2}dp; width: {3 * pitch + cw + 6}dp; height: {rows_bottom - TOP + 2}dp;"/>')
+    w(f'{ind(d)}<div class="jucePos mdPlayBar" style="left: {x0 + 16 * pitch - 4}dp; top: {TOP - 2}dp; width: 2dp; height: {rows_bottom - TOP + 2}dp;"/>')
+    for s in range(32):
+        beat = " mdPlayHeadBeat" if s % 4 == 0 else ""
+        w(f'{ind(d)}<div id="{prefix}Head{s}" class="jucePos juceLabel mdPlayHead{beat}" style="left: {x0 + pitch * s}dp; top: {TOP}dp; width: {cw}dp;">{s + 1}</div>')
+    for t in range(rows):
+        y = rows_top + t * rh
+        w(f'{ind(d)}<div id="{prefix}Track{t}" class="jucePos juceLabel mdPlayTrack{track_class}" style="left: 16dp; top: {y}dp; width: {PLAY_LABEL_W - 6}dp;">{t + 1:02d} —</div>')
+        for s in range(32):
+            w(f'{ind(d)}<div id="{prefix}Step{t}_{s}" class="jucePos mdEdStep mdPlayStep{step_class}" style="left: {x0 + pitch * s}dp; top: {y}dp; width: {cw}dp; height: {rh - 2}dp;"/>')
+    chips = "".join(f'<span class="mdPlayChip mdPlayChip{kind}"/>{text}' for kind, text in legend[0])
+    w(f'{ind(d)}<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: {rows_bottom + 4}dp; width: {gw - 32}dp;">{chips} · {legend[1]}</div>')
+    return rows_bottom + 4 + 16 + 6
+
 def play_page_mm(d):
-    # The chain, in a block of its own (ChainView); the pattern and piano roll wait for the MM pattern's trigs
+    # The current pattern, the 6 tracks on 32 steps at a time (1-32 or 33-64), each trig with its note; then
+    # under it, as tabs, the edited track's piano roll, the lane of one parameter, or the project's chain.
+    # MmPatternView (mdMmPatternView.cpp) fills the grid, the roll and the lane, ChainView (mdChainView.cpp)
+    # the chain.
+    label_w = PLAY_LABEL_W
     gw = span(12)
-    w(f'{ind(d)}<div class="mdEdContent" style="height: {12 + CHAIN_H + 12 + 28}dp;">')
-    block_open(d + 1, "mdPlayChainPage", "CHAÎNE", "", 0, 12, 12, CHAIN_H)
-    chain_contents(d + 2, gw, 110)
+    pitch = (gw - 32 - label_w) // 32
+    w(f'{ind(d)}<div class="mdEdContent" style="height: {{PLAY_H}}dp;">')
+    marker = len(out)
+    block_open(d + 1, "mmPlayGrid", "PATTERN", "", 0, 12, 12, "{GRID_H}")
+    selector(d + 2, 110, 4, ["PAS 1–32", "PAS 33–64"], [84, 84], ["mmPlayPage0", "mmPlayPage1"])
+    info_x = 110 + 2 * 84 + 12
+    w(f'{ind(d + 2)}<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {gw - info_x - 16 - 70}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
+    gh = play_grid(d + 2, "mmPlay", 6, 26, gw, " mmPlayTrack", " mmPlayStep",
+                   ([("Trig", "trig et sa note"), ("Lock", "trig avec locks"), ("Silent", "trig sans enveloppe d'ampli"),
+                     ("Out", "au-delà de la longueur")],
+                    "clic sur un nom : sa piste dans le piano roll · lecture seule"))
+    for i in range(marker, len(out)):
+        out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)
-    w(f'{ind(d + 1)}<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: {12 + CHAIN_H + 12}dp; width: 1036dp;">'
-      'Pattern et piano roll : à venir. Du pattern du MM, seuls la longueur, le double tempo et le kit sont lus (MCL : MNMPattern).</div>')
+    ly = 12 + gh + GUT
+    lh = PAGE_H - ly - 12
+    # Tabs instead of a title: PIANO ROLL, LANE, CHAÎNE
+    block_open(d + 1, "mmPlayBottom", "", "", 0, 12, ly, lh)
+    for n, name in enumerate(["PIANO ROLL", "LANE", "CHAÎNE"]):
+        w(f'{ind(d + 2)}<button id="mmPlayTab{n}" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="{n}" style="left: {16 + n * 96}dp; top: 4dp; width: 90dp;">{name}</button>')
+    tabs_w = 16 + 3 * 96 + 12
+    d += 1
+    area_h = lh - TOP - 8
+    # The roll: a keyboard in the names' column, the notes on the steps' columns
+    w(f'{ind(d + 1)}<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
+    w(f'{ind(d + 2)}<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16}dp;">—</div>')
+    w(f'{ind(d + 2)}<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: {TOP}dp; width: {label_w - 6}dp; height: {area_h}dp;"/>')
+    w(f'{ind(d + 2)}<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {TOP}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
+    w(f'{ind(d + 1)}</div>')
+    # The lane: a page, then a parameter of it, each with its count of locks
+    w(f'{ind(d + 1)}<div id="mmPlayLanePage" class="jucePos" tabgroup="mmPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
+    w(f'{ind(d + 2)}<div id="mmPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16}dp;">—</div>')
+    pw, iw = 80, 57
+    selector(d + 2, 16, TOP, MM_PAGES, [pw] * len(MM_PAGES), [f"mmPlayParamPage{p}" for p in range(len(MM_PAGES))])
+    selector(d + 2, 16 + pw * len(MM_PAGES) + 16, TOP, MM_AMP, [iw] * 8, [f"mmPlayParam{i}" for i in range(8)])
+    lane_top = TOP + 32
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lane_top}dp; width: {label_w - 6}dp;">gris : kit<br/>orange : lock</div>')
+    w(f'{ind(d + 2)}<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {lane_top}dp; width: {pitch * 32}dp; height: {lh - lane_top - 8}dp;"/>')
+    w(f'{ind(d + 1)}</div>')
+    w(f'{ind(d + 1)}<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
+    chain_contents(d + 2, gw, tabs_w)
+    w(f'{ind(d + 1)}</div>')
+    d -= 1
+    block_close(d + 1)
     w(f'{ind(d)}</div>')
-    return 12 + CHAIN_H + 12 + 28
+    return ly + lh + 12
 
 def play_page_md(d):
     # The current pattern, every track on its 32 first steps, then under it, as tabs, the lane of the
     # edited track and one parameter, or the project's chain. PatternView (mdPatternView.cpp) fills the
     # grid and the lane from the pattern dump, ChainView (mdChainView.cpp) the chain.
-    rows, rh, label_w = 16, 18, 96
+    label_w = PLAY_LABEL_W
     gw = span(12)
     pitch = (gw - 32 - label_w) // 32
-    gh = TOP + rows * rh + 8
     w(f'{ind(d)}<div class="mdEdContent" style="height: {{PLAY_H}}dp;">')
-    block_open(d + 1, "mdPlayGrid", "PATTERN", "", 0, 12, 12, gh)
+    marker = len(out)
+    block_open(d + 1, "mdPlayGrid", "PATTERN", "", 0, 12, 12, "{GRID_H}")
     w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: {gw - 110 - 16 - 70}dp;">pattern : en attente du firmware</div>')
     w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
-    for t in range(rows):
-        y = TOP + t * rh
-        w(f'{ind(d + 2)}<div id="mdPlayTrack{t}" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: {y}dp; width: {label_w - 6}dp;">{t + 1:02d} —</div>')
-        for s in range(32):
-            beat = " mdEdStepBeat" if s % 4 == 0 else ""
-            w(f'{ind(d + 2)}<div id="mdPlayStep{t}_{s}" class="jucePos mdEdStep mdPlayStep{beat}" style="left: {16 + label_w + pitch * s}dp; top: {y}dp; width: {pitch - 2}dp; height: {rh - 2}dp;"/>')
+    gh = play_grid(d + 2, "mdPlay", 16, 16, gw, "", "",
+                   ([("Trig", "trig"), ("Lock", "trig avec locks"), ("Out", "au-delà de la longueur")],
+                    "clic sur un nom : sa piste dans la lane · double-clic sur un pas : poser ou retirer un trig"))
+    for i in range(marker, len(out)):
+        out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)
     ly = 12 + gh + GUT
     lh = PAGE_H - ly - 12
@@ -522,17 +595,13 @@ w('\t\t\t\t\t</div>')
 w('\t\t\t\t</div>')
 w('\t\t\t</div>')
 
-w('\t\t\t<!-- JOUER: the current pattern, a lane and the chain (MD); the chain (MM, its pattern\'s trigs not decoded yet). -->')
+w('\t\t\t<!-- JOUER: the current pattern, then a lane and the chain (MD), or a piano roll, a lane and the chain (MM). -->')
 w('\t\t\t<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">')
 w('\t\t\t\t<div class="mdEdScroll">')
-play_h = None
-if MD:
-    marker = len(out)
-    play_h = play_page_md(5)
-    for i in range(marker, len(out)):
-        out[i] = out[i].replace("{PLAY_H}", str(play_h))
-else:
-    play_h = play_page_mm(5)
+marker = len(out)
+play_h = play_page_md(5) if MD else play_page_mm(5)
+for i in range(marker, len(out)):
+    out[i] = out[i].replace("{PLAY_H}", str(play_h))
 w('\t\t\t\t</div>')
 w('\t\t\t</div>')
 

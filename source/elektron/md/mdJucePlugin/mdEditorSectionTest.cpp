@@ -21,6 +21,7 @@
 #include "mdMasterEffectsView.h"
 #include "mdOutputMetersView.h"
 #include "mdPatternView.h"
+#include "mdMmPatternView.h"
 #include "mdChainView.h"
 #include "mdStepGrid.h"
 #include "mdSystemPage.h"
@@ -59,6 +60,19 @@ namespace mdJucePlugin
 			_controller.m_libraryRequestMs = Controller::milliseconds() - 2001;
 			_controller.onControllerTimer();
 		}
+
+		// The tracks' machines, as an applied Kit dump sets them
+		static std::vector<uint16_t> machines(const Controller& _controller)
+		{
+			std::vector<uint16_t> result;
+			for(uint8_t track = 0; track < _controller.getPartCount(); ++track)
+				result.push_back(_controller.getTrackMachine(track));
+			return result;
+		}
+		static void setMachines(Controller& _controller, const std::vector<uint16_t>& _machines)
+		{
+			_controller.storeKitMachines(_machines, true);
+		}
 	};
 
 	// What the presentation timer does for the top bar's screen; no timer runs here.
@@ -86,6 +100,7 @@ namespace mdJucePlugin
 
 		static const OutputMetersView& meters(const Editor& _editor) { return *_editor.m_outputMetersView; }
 		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
+		static const MmPatternView& mmPattern(const Editor& _editor) { return *_editor.m_mmPatternView; }
 
 		// Every editor component the presentation timer refreshes, for the snapshots
 		static void present(Editor& _editor)
@@ -94,6 +109,8 @@ namespace mdJucePlugin
 			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_patternView)
 				_editor.m_patternView->update();
+			if(_editor.m_mmPatternView)
+				_editor.m_mmPatternView->update(juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_chainView)
 				_editor.m_chainView->update();
 			if(_editor.m_libraryView)
@@ -922,14 +939,24 @@ int main()
 		}
 
 #if !defined(MD_EDITOR_SECTION_TEST_MM)
-		// JOUER: the current pattern on every track, a step with locks framed, and the lane
-		// of the edited track: the Kit value in grey, a lock in orange, on the steps that play.
+		// JOUER: the current pattern on every track under the steps' numbers, a trig with locks in orange,
+		// and the lane of the edited track: the Kit value in grey, a lock in orange, on the steps that play.
+		// A groove on a drum Kit for the snapshot: kick on the beats (a lock of 77 on P1 at step 1), snare on
+		// 5 and 13, closed hats on the eighths, open hats between them, clap, rimshot, tom and cowbell.
 		{
 			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			using Access = mdJucePlugin::ControllerAutomationTestAccess;
+			const auto kitMachines = Access::machines(md);
+			Access::setMachines(md, {16, 17, 22, 23, 19, 20, 18, 21, 24, 25, 26, 32, 33, 50, 51, 0});
 			std::array<uint32_t, 16> trigs{};
-			trigs[0] = 0x11;            // track 1: steps 1 and 5, a lock of 77 on parameter 1 at step 1
-			trigs[2] = 0xf0f0f0f0u;
-			trigs[8] = 0xffffffffu;
+			trigs[0] = 0x11111111u;
+			trigs[1] = 0x10101010u;
+			trigs[2] = 0x55555555u;
+			trigs[3] = 0x44444444u;
+			trigs[4] = 0x10001000u;
+			trigs[5] = 0x00480048u;
+			trigs[6] = 0x54000000u;
+			trigs[7] = 0x04000400u;
 			require(md.requestPattern(), "pattern read refused");
 			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 20, 0xf7}, synthLib::MidiEventSource::Device);
 			// The PAS test left writes waiting for their read-back: each dump answers one
@@ -945,23 +972,27 @@ int main()
 			{
 				return element(doc, "mdPlayStep" + std::to_string(_track) + "_" + std::to_string(_step));
 			};
-			require(text("mdPlayInfo").rfind("pattern B05 · 32 pas · 50 trigs", 0) == 0, "JOUER does not name the pattern: \"" + text("mdPlayInfo") + "\"");
+			require(text("mdPlayInfo") == "pattern B05 · 32 pas · 47 trigs", "JOUER does not name the pattern: \"" + text("mdPlayInfo") + "\"");
+			require(text("mdPlayHead0") == "1" && text("mdPlayHead31") == "32" && text("mdPlayTrack1") == "02 TRX-SD",
+				"JOUER does not number the steps or name the tracks");
 			require(cell(0, 0).IsClassSet("mdEdStepTrig") && cell(0, 0).IsClassSet("mdPlayLocked") && cell(0, 4).IsClassSet("mdEdStepTrig")
 				&& !cell(0, 4).IsClassSet("mdPlayLocked") && !cell(0, 1).IsClassSet("mdEdStepTrig") && cell(2, 4).IsClassSet("mdEdStepTrig")
-				&& !cell(2, 0).IsClassSet("mdEdStepTrig") && cell(8, 31).IsClassSet("mdEdStepTrig"), "JOUER grid does not show the pattern");
+				&& !cell(2, 1).IsClassSet("mdEdStepTrig") && cell(3, 30).IsClassSet("mdEdStepTrig") && !cell(8, 0).IsClassSet("mdEdStepTrig"),
+				"JOUER grid does not show the pattern");
 			const auto& lane = mdJucePlugin::EditorIdentityTestAccess::pattern(*editor);
 			require(lane.barValue(0) == 77 && lane.barLocked(0) && lane.barValue(4) == 64 && !lane.barLocked(4) && lane.barValue(1) == -1,
 				"lane does not show the lock and the Kit value");
 			require(text("mdPlayLaneInfo") == "piste 01 · P1 : 1 lock · kit 64" && text("mdPlayParam0") == "P1 · 1",
 				"lane does not count the locks: \"" + text("mdPlayLaneInfo") + "\"");
+			snap("-play");
 			element(doc, "mdPlayParam17").Click();
 			context.Update();
 			require(text("mdPlayLaneInfo") == "piste 01 · VOL : 0 locks · kit 64" && !lane.barLocked(0) && lane.barValue(0) == 64,
 				"choosing VOL did not change the lane");
 			// A track name makes it the edited track; its lane follows
-			element(doc, "mdPlayTrack2").Click();
+			element(doc, "mdPlayTrack1").Click();
 			context.Update();
-			require(controller.getCurrentPart() == 2 && element(doc, "mdPlayTrack2").IsClassSet("mdEdSelected")
+			require(controller.getCurrentPart() == 1 && element(doc, "mdPlayTrack1").IsClassSet("mdEdSelected")
 				&& lane.barValue(0) == -1 && lane.barValue(4) == 64, "a track name did not take the lane");
 			// A double click writes a trig, as in PAS
 			cell(1, 3).DispatchEvent(Rml::EventId::Dblclick, Rml::Dictionary());
@@ -970,19 +1001,122 @@ int main()
 				&& cell(1, 3).IsClassSet("mdEdStepTrig"), "a double click did not write the trig");
 			element(doc, "mdPlayParam0").Click();
 			element(doc, "mdPlayTrack0").Click();
-			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
-			snap("-play");
 			// OUVRIR DANS SON shows the edited track's sound
 			element(doc, "mdPlayOpen").Click();
 			context.Update();
 			require(visible(element(doc, "mdEdPageSound")) && controller.getCurrentPart() == 0, "OUVRIR DANS SON did not open SON");
+			Access::setMachines(md, kitMachines);
+		}
+#else
+		// JOUER (Monomachine): the current pattern under the steps' numbers, each trig with its note, a trig
+		// with locks in orange, steps 33 to 64 on the second page; the edited track's piano roll, and the lane
+		// of one of its parameters: the Kit value in grey, a lock in orange, on the steps that play. For the
+		// snapshots, B05 of 48 steps on a Kit of bass, lead, pad, arpeggio, hats and kick: the bass with AMP
+		// VOL locked at 90 on step 1 and FILT BASE locked on steps 9, 25 and 41.
+		{
+			using View = mdJucePlugin::MmPatternView;
+			using Access = mdJucePlugin::ControllerAutomationTestAccess;
+			auto& mm = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			const auto kitMachines = Access::machines(mm);
+			Access::setMachines(mm, {4, 3, 6, 8, 2, 5});
+			auto pattern = md::automation::sysex::MmPatternEditor::fromDump(mdAutomationTest::makeMmPatternDump(20, 48));
+			require(pattern.has_value(), "MM test pattern not built");
+			using Notes = std::vector<std::pair<uint8_t, uint8_t>>;
+			const auto play = [&](const uint8_t _track, const Notes& _notes)
+			{
+				for(const auto& [step, note] : _notes)
+					require(pattern->setTrig(_track, step, note), "MM test pattern not built");
+			};
+			play(0, {{0, 36}, {3, 36}, {6, 39}, {8, 36}, {10, 43}, {12, 34}, {14, 36}, {16, 36}, {19, 36}, {22, 39}, {24, 36},
+				{26, 43}, {28, 34}, {30, 36}, {32, 36}, {35, 36}, {38, 41}, {40, 36}, {42, 43}, {44, 46}, {46, 48}});
+			play(1, {{0, 67}, {2, 70}, {4, 72}, {7, 70}, {10, 67}, {12, 65}, {14, 67}, {16, 75}, {20, 74}, {24, 72}, {28, 70},
+				{32, 67}, {34, 70}, {36, 72}, {39, 74}, {42, 75}, {44, 77}, {46, 79}});
+			play(2, {{0, 60}, {16, 63}, {32, 65}});
+			constexpr uint8_t arpeggio[] = {72, 67, 75, 67};
+			for(uint8_t step = 0; step < 48; step += 2)
+				play(3, {{step, arpeggio[step / 2 % 4]}});
+			for(uint8_t step = 2; step < 48; step += 4)
+				play(4, {{step, 60}});
+			for(uint8_t step = 0; step < 48; step += 4)
+				play(5, {{step, 24}});
+			const auto volume = md::automation::sysex::mmLockBit(md::automation::monomachine::Amplification, 5);
+			const auto base = md::automation::sysex::mmLockBit(md::automation::monomachine::Filter, 0);
+			require(pattern->setLock(0, volume, 0, 90) && pattern->setLock(0, base, 8, 40) && pattern->setLock(0, base, 24, 70)
+				&& pattern->setLock(0, base, 40, 100), "MM test locks not set");
+			require(mm.requestPattern(), "pattern read refused");
+			mm.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x72, 0x04, 20, 0xf7}, synthLib::MidiEventSource::Device);
+			const auto dump = pattern->toDump();
+			mm.parseSysexMessage(pluginLib::SysEx(dump.begin(), dump.end()), synthLib::MidiEventSource::Device);
+			require(mm.getMmPattern() && mm.getMmPattern()->slot == 20, "pattern B05 not read");
+			element(doc, "editTrack0").Click();
+			tabButton(doc, "mdEdit", "2").Click();
+			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			const auto cell = [&](const int _track, const int _step) -> Rml::Element&
+			{
+				return element(doc, "mmPlayStep" + std::to_string(_track) + "_" + std::to_string(_step));
+			};
+			require(text("mmPlayInfo") == "pattern B05 · 48 pas · 90 trigs", "JOUER does not name the pattern: \"" + text("mmPlayInfo") + "\"");
+			require(text("mmPlayHead0") == "1" && text("mmPlayHead31") == "32" && text("mmPlayTrack0") == "01 SWAVE-SAW",
+				"JOUER does not number the steps or name the tracks");
+			require(text("mmPlayStep0_0") == "C2" && cell(0, 0).IsClassSet("mdPlayLocked") && cell(0, 8).IsClassSet("mdPlayLocked")
+				&& text("mmPlayStep0_3") == "C2" && cell(0, 3).IsClassSet("mdEdStepTrig") && !cell(0, 3).IsClassSet("mdPlayLocked")
+				&& text("mmPlayStep0_1").empty() && !cell(0, 1).IsClassSet("mdEdStepTrig") && text("mmPlayStep2_0") == "C4"
+				&& text("mmPlayStep1_4") == "C5", "JOUER grid does not show the notes");
+			const auto& view = mdJucePlugin::EditorIdentityTestAccess::mmPattern(*editor);
+			require(view.rollNote(0) == 36 && view.rollNote(6) == 39 && view.rollNote(1) == -1
+				&& View::rollRange(*mm.getMmPattern(), 0) == std::pair<uint8_t, uint8_t>{29, 53}
+				&& View::noteName(60) == "C4" && View::noteName(39) == "D#2", "the roll does not show track 1's notes");
+			require(text("mmPlayRollInfo") == "piste 01 · pas 1 à 32 · 14 notes · de F1 à F3", "roll line wrong: \"" + text("mmPlayRollInfo") + "\"");
+			require(view.barValue(0) == 90 && view.barLocked(0) && view.barValue(3) >= 0 && !view.barLocked(3) && view.barValue(1) == -1
+				&& text("mmPlayLaneInfo").rfind("piste 01 · AMP VOL : 1 lock · kit ", 0) == 0
+				&& text("mmPlayParamPage1") == "AMP · 1" && text("mmPlayParamPage2") == "FILT · 3" && text("mmPlayParam5") == "VOL · 1"
+				&& element(doc, "mmPlayParam5").IsClassSet("mdEdSelected"), "lane does not show AMP VOL's lock: \"" + text("mmPlayLaneInfo") + "\"");
+			snap("-play");
+			// FILT keeps the index (DEC, no lock); BASE shows its three locks
+			element(doc, "mmPlayParamPage2").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(text("mmPlayLaneInfo").rfind("piste 01 · FILT DEC : 0 locks", 0) == 0 && !view.barLocked(0) && text("mmPlayParam5") == "DEC"
+				&& text("mmPlayParam0") == "BASE · 3", "choosing FILT did not change the lane");
+			element(doc, "mmPlayParam0").Click();
+			tabButton(doc, "mmPlayBottom", "1").Click();
+			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(visible(element(doc, "mmPlayLanePage")) && !visible(element(doc, "mmPlayRollPage")) && view.barValue(8) == 40
+				&& view.barLocked(8) && view.barLocked(24) && !view.barLocked(0), "LANE does not show FILT BASE's locks");
+			snap("-lane");
+			tabButton(doc, "mmPlayBottom", "0").Click();
+			// Steps 33 to 64: F2 on step 39, past the length from step 49
+			element(doc, "mmPlayPage1").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(text("mmPlayStep0_6") == "F2" && view.rollNote(6) == 41 && cell(0, 16).IsClassSet("mdEdStepOut")
+				&& !cell(0, 15).IsClassSet("mdEdStepOut") && text("mmPlayHead0") == "33" && text("mmPlayHead16") == "49"
+				&& element(doc, "mmPlayHead16").IsClassSet("mdEdStepOut") && element(doc, "mmPlayPage1").IsClassSet("mdEdSelected"),
+				"steps 33 to 64 not shown");
+			element(doc, "mmPlayPage0").Click();
+			// A track name makes it the edited track; the roll follows
+			element(doc, "mmPlayTrack2").Click();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(controller.getCurrentPart() == 2 && element(doc, "mmPlayTrack2").IsClassSet("mdEdSelected")
+				&& view.rollNote(0) == 60 && view.rollNote(4) == -1, "a track name did not take the roll");
+			element(doc, "mmPlayParamPage1").Click();
+			element(doc, "mmPlayParam5").Click();
+			element(doc, "mmPlayTrack0").Click();
+			context.Update();
+			Access::setMachines(mm, kitMachines);
 		}
 #endif
 
-		// JOUER, CHAÎNE: the project's chain, built from the machine's pattern, and what it does. The
-		// Machinedrum shows it under a tab of the bottom block, the Monomachine in a block of its own.
+		// JOUER, CHAÎNE: the project's chain, built from the machine's pattern, and what it does, under a
+		// tab of the bottom block: the second on the Machinedrum, the third on the Monomachine.
 		{
-			constexpr bool tabs = g_model == md::MachineModel::Machinedrum;
+			constexpr bool machinedrum = g_model == md::MachineModel::Machinedrum;
+			const std::string bottom = machinedrum ? "mdPlayBottom" : "mmPlayBottom";
 			using Entries = std::vector<mdJucePlugin::ChainControl::Entry>;
 			using View = mdJucePlugin::ChainView;
 			using State = mdJucePlugin::ChainControl::State;
@@ -995,11 +1129,11 @@ int main()
 			};
 			const auto has = [&](const std::string& _id, const char* _part) { return text(_id).find(_part) != std::string::npos; };
 			tabButton(doc, "mdEdit", "2").Click();
-			if(tabs)
-				tabButton(doc, "mdPlayBottom", "1").Click();
+			tabButton(doc, bottom, machinedrum ? "1" : "2").Click();
 			context.Update();
 			present();
-			require(visible(element(doc, "mdPlayChainPage")) && (!tabs || !visible(element(doc, "mdPlayLanePage"))), "CHAÎNE not shown");
+			require(visible(element(doc, "mdPlayChainPage")) && !visible(element(doc, machinedrum ? "mdPlayLanePage" : "mmPlayRollPage")),
+				"CHAÎNE not shown");
 			require(text("mdChainState") == "chaîne inactive" && text("mdChainSlot0") == "—"
 				&& element(doc, "mdChainSlot0").IsClassSet("mdEdUnread"), "an empty chain not shown so");
 
@@ -1063,8 +1197,7 @@ int main()
 			present();
 			require(chain.getEntries().empty() && !chain.isEnabled() && text("mdChainState") == "chaîne inactive",
 				"VIDER and CHAÎNE ACTIVE did not empty and stop the chain");
-			if(tabs)
-				tabButton(doc, "mdPlayBottom", "0").Click();
+			tabButton(doc, bottom, "0").Click();
 			context.Update();
 		}
 

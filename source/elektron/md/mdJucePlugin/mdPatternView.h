@@ -28,8 +28,9 @@ namespace mdJucePlugin
 	class Controller;
 
 	// JOUER (Machinedrum, boards 1 and 2): the current pattern, every track on its
-	// 32 first steps (mdPlayStep<track>_<step>: trig, a frame for a step with locks,
-	// greyed past the length), and under it the lane of the edited track and one
+	// 32 first steps (mdPlayStep<track>_<step>: a trig in white, in orange with locks;
+	// the steps and their numbers, mdPlayHead<step>, greyed past the length), and
+	// under it the lane of the edited track and one
 	// parameter, a canvas in mdPlayLaneArea: the Kit value in grey, a lock in orange
 	// with a dot, for the steps that play; mdPlayParam<parameter> chooses the
 	// parameter and counts its locks. A click on a track name (mdPlayTrack<track>) makes it the edited track;
@@ -71,6 +72,7 @@ namespace mdJucePlugin
 		Rml::Element* m_root = nullptr;
 		Rml::Element* m_info = nullptr;
 		Rml::Element* m_laneInfo = nullptr;
+		std::array<Rml::Element*, StepCount> m_heads{};
 		std::array<Rml::Element*, TrackCount> m_tracks{};
 		std::array<std::array<Rml::Element*, StepCount>, TrackCount> m_steps{};
 		std::array<Rml::Element*, ParameterCount> m_parameters{};

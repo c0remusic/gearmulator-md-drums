@@ -169,13 +169,31 @@
 .mdEdStepOut { opacity: 0.3; }
 .mdEdStepFocus { border: 2dp #ff6b1f; }
 
-/* JOUER (mdPatternView.cpp): a row per track; the edited track's name in orange, a step with locks
-   framed in blue (board 1); the lane is a canvas the view draws */
-.mdPlayTrack { height: 16dp; line-height: 16dp; font-size: 10dp; font-weight: bold; color: #8a8d93; cursor: pointer; }
+/* JOUER (mdPatternView.cpp, mdMmPatternView.cpp): the steps' numbers over the grid, the first of each beat
+   brighter; a band behind every other beat and a line between the bars; a row per track, the edited
+   track's name in orange; a trig in white, a trig with locks in orange (as a lock in the lane), on the
+   Monomachine a trig that does not start the amp envelope in grey; a legend under the rows. The lane and
+   the piano roll are canvases the views draw on the same columns. */
+.mdPlayHead { height: 14dp; line-height: 14dp; font-size: 9dp; text-align: center; color: #55585e; }
+.mdPlayHead.mdPlayHeadBeat { color: #c9c6bf; font-weight: bold; }
+.mdPlayBand { background-color: #2e3035; border-radius: 3dp; }
+.mdPlayBar { background-color: #55585e; }
+.mdPlayTrack { height: 14dp; line-height: 14dp; font-size: 10dp; font-weight: bold; color: #8a8d93; cursor: pointer; }
 .mdPlayTrack:hover { color: #f4f1ea; }
 .mdPlayTrack.mdEdSelected { color: #ff6b1f; }
-.mdPlayStep { line-height: 16dp; }
-.mdPlayStep.mdPlayLocked { border: 2dp #4a90d9; }
+.mdPlayStep { height: 14dp; line-height: 14dp; background-color: #1b1c1f; border-radius: 2dp; }
+.mmPlayTrack { height: 24dp; line-height: 24dp; }
+.mmPlayStep { line-height: 24dp; font-size: 10dp; font-weight: bold; }
+.mdPlayStep.mdEdStepTrig { background-color: #f4f1ea; color: #141516; }
+.mmPlayStep.mmPlaySilent { background-color: #8a8d93; color: #141516; }
+.mdPlayStep.mdPlayLocked { background-color: #ff6b1f; color: #141516; }
+.mdPlayLegend { height: 16dp; line-height: 16dp; }
+.mdPlayChip { display: inline-block; width: 10dp; height: 10dp; margin-left: 14dp; margin-right: 5dp; border-radius: 2dp; vertical-align: middle; }
+.mdPlayChip:first-child { margin-left: 0dp; }
+.mdPlayChipTrig { background-color: #f4f1ea; }
+.mdPlayChipLock { background-color: #ff6b1f; }
+.mdPlayChipSilent { background-color: #8a8d93; }
+.mdPlayChipOut { background-color: #1b1c1f; border: 1dp #3a3d42; }
 
 /* BIBLIO (mdLibraryView.cpp): a cell per stored Kit, the loaded one in amber, the chosen one framed */
 .mdLibKit { box-sizing: border-box; height: 22dp; line-height: 22dp; padding-left: 6dp; font-size: 11dp; color: #f4f1ea;

@@ -478,7 +478,7 @@ namespace mdJucePlugin
 	bool Controller::requestPattern()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
-		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+		if(!firmwareReadyForAutomation())
 			return false;
 		m_patternWanted.store(true, std::memory_order_release);
 		sendEditorSysex(md::automation::sysex::statusRequest(m_model,
@@ -499,6 +499,12 @@ namespace mdJucePlugin
 	{
 		const std::lock_guard lock(m_patternMutex);
 		return m_pattern;
+	}
+
+	std::optional<md::automation::sysex::MmPatternDump> Controller::getMmPattern() const
+	{
+		const std::lock_guard lock(m_patternMutex);
+		return m_mmPattern;
 	}
 
 	std::string Controller::getKitName() const
@@ -700,8 +706,8 @@ namespace mdJucePlugin
 					md::automation::sysex::statusRequest(m_model,
 						md::automation::sysex::StatusParameter::Kit)));
 			}
-			// The pattern number for the editor's screen; once a Machinedrum pattern
-			// is shown, another one selected on the front panel is read again.
+			// The pattern number for the editor's screen; once a pattern is shown,
+			// another one selected on the front panel is read again.
 			sendEditorSysex(md::automation::sysex::statusRequest(m_model,
 				md::automation::sysex::StatusParameter::Pattern));
 			return;
@@ -1188,10 +1194,10 @@ namespace mdJucePlugin
 					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
 				// A status reply leads to a dump when requestPattern asked for one, or
 				// when the pattern shown is no longer the current one.
-				if(m_model == md::MachineModel::Machinedrum && !m_patternWanted.load(std::memory_order_acquire))
+				if(!m_patternWanted.load(std::memory_order_acquire))
 				{
 					const std::lock_guard lock(m_patternMutex);
-					if(m_pattern && m_pattern->slot != status->value)
+					if((m_pattern && m_pattern->slot != status->value) || (m_mmPattern && m_mmPattern->slot != status->value))
 						m_patternWanted.store(true, std::memory_order_release);
 				}
 				if(m_patternWanted.load(std::memory_order_acquire))
@@ -1320,10 +1326,20 @@ namespace mdJucePlugin
 				return true;
 			}
 		}
-		else if(const auto pattern = md::automation::sysex::parseMmPatternDump(_message))
+		else if(auto pattern = md::automation::sysex::parseMmPatternDump(_message))
 		{
 			// Any pattern's length, for the chain
 			static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+			if(m_patternWanted.load(std::memory_order_acquire)
+				&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
+			{
+				{
+					const std::lock_guard lock(m_patternMutex);
+					m_mmPattern = std::move(*pattern);
+				}
+				m_patternWanted.store(false, std::memory_order_release);
+				m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
 			return true;
 		}
 

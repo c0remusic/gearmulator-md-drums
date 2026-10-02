@@ -368,6 +368,17 @@ namespace mdAutomationTest
 		return {result.begin(), result.end()};
 	}
 
+	// An empty Monomachine pattern dump of _length steps, laid out as MCL's MNMPattern: no trig, no
+	// note (from byte 676), no lock row (from 1367); the length at 1060. Edit it with MmPatternEditor.
+	inline pluginLib::SysEx makeMmPatternDump(const uint8_t _slot, const uint8_t _length)
+	{
+		std::vector<uint8_t> decoded(6520, 0);
+		std::fill_n(decoded.begin() + 676, 6 * 64, uint8_t{0xff});
+		decoded[1060] = _length;
+		std::fill_n(decoded.begin() + 1367, 62 * 64, uint8_t{0xff});
+		return makeDump(md::MachineModel::Monomachine, 0x67, _slot, decoded);
+	}
+
 	// _machines, when given, holds one machine id per track; _name is the Kit's name.
 	inline pluginLib::SysEx makeKitDump(
 		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value,

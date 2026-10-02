@@ -12,6 +12,7 @@
 #include "mdOutputMetersView.h"
 #include "mdSystemPage.h"
 #include "mdPatternView.h"
+#include "mdMmPatternView.h"
 #include "mdChainView.h"
 #include "mdLibraryView.h"
 #include "mdPanelAffordances.h"
@@ -790,7 +791,17 @@ namespace mdJucePlugin
 			});
 		}
 
-		// JOUER, CHAÎNE (Machinedrum): the project's pattern chain.
+		// JOUER (Monomachine): the current pattern, a piano roll and a lane.
+		if(auto* const document = getDocument(); document && document->GetElementById("mmPlayStep0_0"))
+		{
+			m_mmPatternView = std::make_unique<MmPatternView>(m_controller, *document, [document](const uint8_t _track)
+			{
+				if(auto* tab = document->GetElementById("editTrack" + std::to_string(_track)))
+					tab->Click();
+			});
+		}
+
+		// JOUER, CHAÎNE: the project's pattern chain.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdChainSlot0"))
 		{
 			m_chainView = std::make_unique<ChainView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl(),
@@ -2210,7 +2221,9 @@ namespace mdJucePlugin
 		const bool routingChanged = m_trackRoutingView && m_trackRoutingView->update();
 		const bool metersChanged = m_outputMetersView && m_outputMetersView->update(nowMilliseconds);
 		const bool systemChanged = m_systemPage && m_systemPage->update(nowMilliseconds);
-		const bool patternChanged = m_patternView && m_patternView->update();
+		// One of the two, by model
+		const bool patternChanged = (m_patternView && m_patternView->update())
+			|| (m_mmPatternView && m_mmPatternView->update(nowMilliseconds));
 		const bool chainChanged = m_chainView && m_chainView->update();
 		const bool libraryChanged = m_libraryView && m_libraryView->update();
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged

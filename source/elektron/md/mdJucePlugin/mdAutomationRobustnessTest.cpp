@@ -1343,7 +1343,32 @@ namespace
 		using Status = md::automation::sysex::StatusParameter;
 		if(_harness.model == md::MachineModel::Monomachine)
 		{
-			require(!controller.requestPattern(), "Monomachine accepted a pattern read");
+			// The same on the Monomachine, its pattern from getMmPattern: a dump with one trig playing _note
+			const auto mmDump = [](const uint8_t _slot, const uint8_t _length, const uint8_t _note)
+			{
+				auto editor = md::automation::sysex::MmPatternEditor::fromDump(makeMmPatternDump(_slot, _length));
+				require(editor && editor->setTrig(0, 0, _note), "MM test pattern not built");
+				const auto dump = editor->toDump();
+				return pluginLib::SysEx(dump.begin(), dump.end());
+			};
+			require(controller.getPatternRevision() == 0 && !controller.getMmPattern(), "pattern known before any read");
+			require(controller.requestPattern(), "pattern read refused on a ready controller");
+			controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 18), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(mmDump(5, 16, 48), synthLib::MidiEventSource::Device);
+			require(controller.getPatternRevision() == 0, "dump of a pattern that was not asked for was stored");
+			controller.parseSysexMessage(mmDump(18, 24, 60), synthLib::MidiEventSource::Device);
+			const auto pattern = controller.getMmPattern();
+			require(controller.getPatternRevision() == 1 && pattern && pattern->slot == 18 && pattern->length == 24
+				&& pattern->note(0, 0) == uint8_t{60} && !controller.getPattern(), "requested pattern dump was not stored");
+			controller.parseSysexMessage(mmDump(18, 16, 48), synthLib::MidiEventSource::Device);
+			require(controller.getPatternRevision() == 1, "unsolicited pattern dump replaced the stored one");
+			controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 18), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(mmDump(18, 16, 48), synthLib::MidiEventSource::Device);
+			require(controller.getPatternRevision() == 1, "status for the shown pattern led to a new read");
+			controller.parseSysexMessage(statusResponse(_harness.model, Status::Pattern, 20), synthLib::MidiEventSource::Device);
+			controller.parseSysexMessage(mmDump(20, 16, 48), synthLib::MidiEventSource::Device);
+			require(controller.getPatternRevision() == 2 && controller.getMmPattern()->slot == 20,
+				"another current pattern was not read");
 			return;
 		}
 		std::array<uint32_t, 16> trigs{};

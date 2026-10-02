@@ -56,6 +56,7 @@ namespace mdJucePlugin
 	class OutputMetersView;
 	class SystemPage;
 	class PatternView;
+	class MmPatternView;
 	class ChainView;
 	class LibraryView;
 	class PixelPerfectPanel;
@@ -198,6 +199,7 @@ namespace mdJucePlugin
 		std::unique_ptr<OutputMetersView> m_outputMetersView;
 		std::unique_ptr<SystemPage> m_systemPage;
 		std::unique_ptr<PatternView> m_patternView;
+		std::unique_ptr<MmPatternView> m_mmPatternView;
 		std::unique_ptr<ChainView> m_chainView;
 		std::unique_ptr<LibraryView> m_libraryView;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;

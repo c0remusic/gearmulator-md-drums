@@ -1,6 +1,7 @@
 #include "mdPatternView.h"
 
 #include "mdController.h"
+#include "mdStepColumns.h"
 
 #include "mdLib/mdmachines.h"
 
@@ -36,10 +37,6 @@ namespace mdJucePlugin
 			return std::string(1, static_cast<char>('A' + _slot / 16)) + (step < 10 ? "0" : "") + std::to_string(step);
 		}
 
-		const juce::Colour g_kitBar(0xff8a8d93);
-		const juce::Colour g_lockBar(0xffff6b1f);
-		const juce::Colour g_beat(0xff2e3034);
-
 		void setText(Rml::Element* _element, std::string& _shown, const std::string& _text)
 		{
 			if(!_element || _text == _shown)
@@ -56,6 +53,8 @@ namespace mdJucePlugin
 		m_root = _document.GetElementById("mdEdPagePlay");
 		m_info = _document.GetElementById("mdPlayInfo");
 		m_laneInfo = _document.GetElementById("mdPlayLaneInfo");
+		for(uint8_t step = 0; step < StepCount; ++step)
+			m_heads[step] = _document.GetElementById("mdPlayHead" + std::to_string(step));
 		for(uint8_t track = 0; track < TrackCount; ++track)
 		{
 			m_tracks[track] = _document.GetElementById("mdPlayTrack" + std::to_string(track));
@@ -194,24 +193,8 @@ namespace mdJucePlugin
 		const auto h = static_cast<float>(_image.getHeight());
 		if(w < StepCount || h < 8.0f)
 			return;
-		// The steps' columns, as in the grid above; a beat line every four steps
-		const auto pitch = w / StepCount;
-		_g.setColour(g_beat);
-		for(uint8_t step = 4; step < StepCount; step += 4)
-			_g.drawVerticalLine(static_cast<int>(pitch * step), 0.0f, h);
-		const auto dot = std::max(3.0f, pitch / 4.0f);
-		for(uint8_t step = 0; step < StepCount; ++step)
-		{
-			if(m_barValues[step] < 0)
-				continue;
-			const auto top = h - (h - dot - 2.0f) * static_cast<float>(m_barValues[step]) / 127.0f;
-			const auto x = pitch * step + 2.0f;
-			_g.setColour(m_barLocks[step] ? g_lockBar : g_kitBar);
-			_g.fillRect(x, top, pitch - 4.0f, h - top);
-			// A lock carries a dot above its bar (board 2)
-			if(m_barLocks[step])
-				_g.fillEllipse(x + (pitch - 4.0f - dot) / 2.0f, top - dot - 1.0f, dot, dot);
-		}
+		// On the grid's columns; a lock carries a dot above its bar (board 2)
+		stepColumns::paintLane(_g, w, h, m_barValues, m_barLocks);
 	}
 
 	void PatternView::renderGrid(const md::automation::sysex::PatternDump* _pattern)
@@ -239,8 +222,13 @@ namespace mdJucePlugin
 				cell->SetClass("mdPlayLocked", trig && ((locked >> step) & 1u));
 			}
 		}
+		for(uint8_t step = 0; step < StepCount; ++step)
+		{
+			if(m_heads[step])
+				m_heads[step]->SetClass("mdEdStepOut", _pattern && step >= length);
+		}
 		setText(m_info, m_shownInfo, _pattern ? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
-			+ (length > StepCount ? " (32 affichés)" : "") + " · " + std::to_string(trigs) + " trigs · double-clic : trig"
+			+ (length > StepCount ? " (32 affichés)" : "") + " · " + std::to_string(trigs) + " trigs"
 			: std::string("pattern : en attente du firmware"));
 	}
 
