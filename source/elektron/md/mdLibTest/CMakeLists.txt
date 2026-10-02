@@ -189,6 +189,11 @@ set_tests_properties(mdEditorFirmwareTest PROPERTIES
 	TIMEOUT 600)
 set_property(TARGET mdEditorFirmwareTest PROPERTY FOLDER "Elektron")
 
+# Probe, run by hand: what shows the playing step (front panel step LEDs, MIDI clock out)
+add_executable(mdPlayheadProbe mdPlayheadProbe.cpp)
+target_link_libraries(mdPlayheadProbe PRIVATE mdLib)
+set_property(TARGET mdPlayheadProbe PROPERTY FOLDER "Elektron")
+
 # PatternChain's positions and ChainPlayer's MIDI, without firmware
 add_executable(patternChainTest patternChainTest.cpp)
 target_link_libraries(patternChainTest PRIVATE mdLib)

@@ -836,6 +836,11 @@ namespace md
 		values.parallelTransportActive = m_hardware->isProducerThreaded();
 		values.ramRecordingModeSupported = m_hardware->supportsRamRecordingMode();
 		values.userSysexState = userSysexImportProgress().state;
+		if(const auto position = m_hardware->readSequencerPosition())
+		{
+			values.sequencerPlaying = position->playing;
+			values.sequencerStep = position->step;
+		}
 		values.hardwareEpoch = m_hardwareEpoch;
 		values.restoreGeneration = m_deferredStateGeneration;
 		m_status->publish(values);

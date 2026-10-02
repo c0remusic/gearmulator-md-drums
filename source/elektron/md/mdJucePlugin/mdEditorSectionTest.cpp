@@ -72,6 +72,12 @@ namespace mdJucePlugin
 			return _controller.m_patternWriteFirstMs != 0;
 		}
 
+		// The sequencer plays _step, or is stopped (nullopt), as the machine's RAM would say
+		static void setPlayingStep(Controller& _controller, const std::optional<uint8_t> _step)
+		{
+			_controller.m_syntheticPlayingStepForTests = _step;
+		}
+
 		// The tracks' machines, as an applied Kit dump sets them
 		static std::vector<uint16_t> machines(const Controller& _controller)
 		{
@@ -1000,7 +1006,21 @@ int main()
 				"lane does not show the lock and the Kit value");
 			require(text("mdPlayLaneInfo") == "piste 01 · P1 : 1 lock · kit 64" && text("mdPlayParam0") == "P1 · 1",
 				"lane does not count the locks: \"" + text("mdPlayLaneInfo") + "\"");
+			// The sequencer plays step 5, then 6: its column is lit, the previous one no longer; stopped, none
+			Access::setPlayingStep(md, uint8_t{4});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(cell(0, 4).IsClassSet("mdPlayNow") && cell(15, 4).IsClassSet("mdPlayNow")
+				&& element(doc, "mdPlayHead4").IsClassSet("mdPlayNow") && !cell(0, 3).IsClassSet("mdPlayNow"),
+				"the playing step's column is not lit");
 			snap("-play");
+			Access::setPlayingStep(md, uint8_t{5});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(cell(0, 5).IsClassSet("mdPlayNow") && !cell(0, 4).IsClassSet("mdPlayNow")
+				&& !element(doc, "mdPlayHead4").IsClassSet("mdPlayNow"), "the lit column did not follow the playing step");
+			Access::setPlayingStep(md, std::nullopt);
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(!cell(0, 5).IsClassSet("mdPlayNow") && lane.getShownPlayStep() == -1, "a column stays lit once stopped");
 			element(doc, "mdPlayParam17").Click();
 			context.Update();
 			require(text("mdPlayLaneInfo") == "piste 01 · VOL : 0 locks · kit 64" && !lane.barLocked(0) && lane.barValue(0) == 64,
@@ -1106,7 +1126,17 @@ int main()
 				&& text("mmPlayLaneInfo").rfind("piste 01 · AMP VOL : 1 lock · kit ", 0) == 0
 				&& text("mmPlayParamPage1") == "AMP · 1" && text("mmPlayParamPage2") == "FILT · 3" && text("mmPlayParam5") == "VOL · 1"
 				&& element(doc, "mmPlayParam5").IsClassSet("mdEdSelected"), "lane does not show AMP VOL's lock: \"" + text("mmPlayLaneInfo") + "\"");
+			// The sequencer plays step 5: its column is lit
+			Access::setPlayingStep(mm, uint8_t{4});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(cell(0, 4).IsClassSet("mdPlayNow") && cell(5, 4).IsClassSet("mdPlayNow") && element(doc, "mmPlayHead4").IsClassSet("mdPlayNow")
+				&& view.getShownPlayColumn() == 4, "the playing step's column is not lit");
 			snap("-play");
+			// Step 37, on the steps not shown: no column until they are
+			Access::setPlayingStep(mm, uint8_t{36});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(view.getShownPlayColumn() == -1 && !cell(0, 4).IsClassSet("mdPlayNow"), "a column is lit for a step not shown");
 			// FILT keeps the index (DEC, no lock); BASE shows its three locks
 			element(doc, "mmPlayParamPage2").Click();
 			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
@@ -1130,6 +1160,10 @@ int main()
 				&& !cell(0, 15).IsClassSet("mdEdStepOut") && text("mmPlayHead0") == "33" && text("mmPlayHead16") == "49"
 				&& element(doc, "mmPlayHead16").IsClassSet("mdEdStepOut") && element(doc, "mmPlayPage1").IsClassSet("mdEdSelected"),
 				"steps 33 to 64 not shown");
+			require(view.getShownPlayColumn() == 4 && cell(0, 4).IsClassSet("mdPlayNow"), "step 37 not lit once steps 33 to 64 show");
+			Access::setPlayingStep(mm, std::nullopt);
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(view.getShownPlayColumn() == -1 && !cell(0, 4).IsClassSet("mdPlayNow"), "a column stays lit once stopped");
 			element(doc, "mmPlayPage0").Click();
 			// A track name makes it the edited track; the roll follows
 			element(doc, "mmPlayTrack2").Click();

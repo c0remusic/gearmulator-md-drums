@@ -202,8 +202,10 @@ namespace mdJucePlugin
 		if(m_root && !m_root->IsVisible(true))
 		{
 			m_shownPattern = ~uint64_t{0};
-			return disarmed;
+			return showPlayStep(-1) || disarmed;
 		}
+		const auto playing = m_controller.getPlayingStep();
+		const bool playStepChanged = showPlayStep(playing && *playing < StepCount ? *playing : -1);
 		const auto revision = m_controller.getPatternRevision();
 		const auto machines = m_controller.getMachineRevision();
 		const auto track = static_cast<uint8_t>(m_controller.getCurrentPart());
@@ -211,7 +213,7 @@ namespace mdJucePlugin
 		const auto kit = kitValue(track, m_laneParameter);
 		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack;
 		if(!grid && m_laneParameter == m_shownParameter && kit == m_shownKit)
-			return disarmed;
+			return disarmed || playStepChanged;
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;
@@ -221,6 +223,28 @@ namespace mdJucePlugin
 		if(grid)
 			renderGrid(pattern ? &*pattern : nullptr);
 		renderLane(pattern ? &*pattern : nullptr);
+		return true;
+	}
+
+	bool PatternView::showPlayStep(const int _step)
+	{
+		if(_step == m_shownPlayStep)
+			return false;
+		const auto light = [this](const int _column, const bool _on)
+		{
+			if(_column < 0 || _column >= StepCount)
+				return;
+			if(auto* head = m_heads[static_cast<size_t>(_column)])
+				head->SetClass("mdPlayNow", _on);
+			for(uint8_t track = 0; track < TrackCount; ++track)
+			{
+				if(auto* cell = m_steps[track][static_cast<size_t>(_column)])
+					cell->SetClass("mdPlayNow", _on);
+			}
+		};
+		light(m_shownPlayStep, false);
+		light(_step, true);
+		m_shownPlayStep = _step;
 		return true;
 	}
 

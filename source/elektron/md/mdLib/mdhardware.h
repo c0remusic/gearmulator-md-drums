@@ -128,6 +128,17 @@ namespace md
 				&& m_uc.isMidiReceiveReady();
 		}
 		uint64_t firmwareFingerprint() const { return m_firmwareFingerprint; }
+		// The sequencer's step (0 for the pattern's first) and whether it plays, as the firmware keeps
+		// them in its RAM; none for an image whose addresses are not known (mdPlayheadProbe finds them).
+		// Whether it plays comes from its tick moving between two calls: call it at least every quarter
+		// of a second of emulated time (Device does after every block). On the emulation thread, or with
+		// it paused.
+		struct SequencerPosition
+		{
+			uint8_t step = 0;
+			bool playing = false;
+		};
+		std::optional<SequencerPosition> readSequencerPosition();
 		bool supportsRamRecordingMode() const
 		{
 			return m_model == MachineModel::Machinedrum
@@ -820,6 +831,12 @@ namespace md
 		dsp56k::RingBuffer<synthLib::SMidiEvent, 16384, true> m_midiIn;
 		size_t m_midiInByteCursor = 0;
 		RealtimeMidiByteQueue<64> m_realtimeMidiIn;
+
+		// readSequencerPosition(): the sequencer's tick as last seen, and the emulated frame it last moved
+		// at (0: not since the first look)
+		uint8_t m_sequencerTick = 0;
+		bool m_sequencerTickKnown = false;
+		uint64_t m_sequencerTickFrame = 0;
 
 		// Panel input events pending delivery to UART2 RX. Shared with whoever pushes to it without the
 		// device lock (getPanelInput); this machine is its only consumer.

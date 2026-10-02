@@ -179,6 +179,9 @@ namespace mdJucePlugin
 		std::optional<md::automation::sysex::MmPatternDump> getMmPattern() const;
 		// Increments whenever a new pattern dump is stored or the pattern is edited.
 		uint64_t getPatternRevision() const { return m_patternRevision.load(std::memory_order_acquire); }
+		// The step the sequencer plays, 0 for the pattern's first; none while it is stopped, or when the
+		// firmware's position is not known (md::Hardware::readSequencerPosition)
+		std::optional<uint8_t> getPlayingStep() const;
 		// Asks for a pattern's dump, for its length (the processor's ChainControl takes the length of
 		// every pattern dump). False while the firmware is not ready.
 		bool requestPatternDump(uint8_t _slot);
@@ -388,6 +391,8 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_realtimeAutomationOverflows{0};
 		mutable std::atomic<uint64_t> m_synchronizationRequests{0};
 		bool m_syntheticFirmwareReadyForTests = false;
+		// Tests without a running machine: the step getPlayingStep() answers with, set
+		std::optional<std::optional<uint8_t>> m_syntheticPlayingStepForTests;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
 	};
 }

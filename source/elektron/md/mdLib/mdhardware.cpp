@@ -1328,6 +1328,41 @@ namespace md
 		m_mdLink.awaitFresh.store(true, std::memory_order_release);
 	}
 
+	std::optional<Hardware::SequencerPosition> Hardware::readSequencerPosition()
+	{
+		// Found with mdPlayheadProbe: a byte that counts 0 to 11 through a pattern of 12 steps, and the
+		// sequencer's tick, 0 to 5 through each step, which holds still while the sequencer is stopped
+		// (the machine's other tick counters run on: its clock serves the LFOs and delays too). No byte
+		// was found that tells running from stopped both when started from the front panel and by MIDI
+		// START with clock (the machine following the host): the sequencer plays while its tick moves.
+		uint32_t stepAddress = 0;
+		uint32_t tickAddress = 0;
+		if(m_firmwareFingerprint == g_mdOs163Fingerprint)
+		{
+			stepAddress = 0x00261aa7;
+			tickAddress = 0x01001f33;
+		}
+		else if(m_firmwareFingerprint == g_mmOs132bFingerprint)
+		{
+			stepAddress = 0x002bc287;
+			tickAddress = 0x002bc29f;
+		}
+		else
+			return std::nullopt;
+		const auto tick = m_uc.read8(tickAddress);
+		const auto now = getEmulatedFrames();
+		if(!m_sequencerTickKnown || tick != m_sequencerTick)
+		{
+			// The first value seen is no tick
+			m_sequencerTickFrame = m_sequencerTickKnown ? now : 0;
+			m_sequencerTick = tick;
+			m_sequencerTickKnown = true;
+		}
+		// A tick lasts 83 ms at the slowest tempo, 30 BPM: a quarter of a second without one is stopped
+		const bool playing = m_sequencerTickFrame && now - m_sequencerTickFrame < g_samplerate / 4;
+		return SequencerPosition{m_uc.read8(stepAddress), playing};
+	}
+
 	bool Hardware::trySendPanelEvent(const uint8_t _cmd, const uint8_t _arg)
 	{
 		registerExternalInteraction();

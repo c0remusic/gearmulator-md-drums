@@ -32,6 +32,11 @@ namespace md
 			bool ramRecordingModeSupported = false;
 			// The user's SysEx file import (Device::userSysexImportProgress): Idle when none was started
 			MidiSysexTransferState userSysexState = MidiSysexTransferState::Idle;
+			// The sequencer (Hardware::readSequencerPosition): whether it plays and its step, 0 for the
+			// pattern's first; NoStep for a firmware whose addresses are not known
+			static constexpr uint8_t NoStep = 0xff;
+			bool sequencerPlaying = false;
+			uint8_t sequencerStep = NoStep;
 			uint64_t hardwareEpoch = 0;			// Device::hardwareEpoch: one more for every machine committed
 			uint64_t restoreGeneration = 0;		// the project state restore the flags above refer to
 		};
@@ -49,6 +54,8 @@ namespace md
 			values.parallelTransportActive = (flags & ParallelTransportActive) != 0;
 			values.ramRecordingModeSupported = (flags & RamRecordingModeSupported) != 0;
 			values.userSysexState = static_cast<MidiSysexTransferState>((flags >> SysexStateShift) & 0xff);
+			values.sequencerStep = static_cast<uint8_t>((flags >> SequencerStepShift) & 0xff);
+			values.sequencerPlaying = (flags & SequencerPlaying) != 0;
 			values.hardwareEpoch = m_hardwareEpoch.load(std::memory_order_acquire);
 			values.restoreGeneration = m_restoreGeneration.load(std::memory_order_acquire);
 			return values;
@@ -67,7 +74,9 @@ namespace md
 				| (_values.factoryReadyForReboot ? FactoryReadyForReboot : 0u)
 				| (_values.parallelTransportActive ? ParallelTransportActive : 0u)
 				| (_values.ramRecordingModeSupported ? RamRecordingModeSupported : 0u)
-				| (static_cast<uint32_t>(_values.userSysexState) << SysexStateShift);
+				| (static_cast<uint32_t>(_values.userSysexState) << SysexStateShift)
+				| (static_cast<uint32_t>(_values.sequencerStep) << SequencerStepShift)
+				| (_values.sequencerPlaying ? SequencerPlaying : 0u);
 			// The counters first: a reader that sees the flags of a new machine also sees its epoch
 			if(m_hardwareEpoch.load(std::memory_order_relaxed) != _values.hardwareEpoch)
 				m_hardwareEpoch.store(_values.hardwareEpoch, std::memory_order_release);
@@ -87,9 +96,11 @@ namespace md
 			FactoryInitializationExpected = 1u << 4,
 			FactoryReadyForReboot = 1u << 5,
 			ParallelTransportActive = 1u << 6,
-			RamRecordingModeSupported = 1u << 7
+			RamRecordingModeSupported = 1u << 7,
+			SequencerPlaying = 1u << 24
 		};
 		static constexpr uint32_t SysexStateShift = 8;	// bits 8 to 15: userSysexState
+		static constexpr uint32_t SequencerStepShift = 16;	// bits 16 to 23: sequencerStep
 
 		std::atomic<uint32_t> m_flags{0};
 		std::atomic<uint64_t> m_hardwareEpoch{0};

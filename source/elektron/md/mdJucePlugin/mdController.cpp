@@ -1164,6 +1164,16 @@ namespace mdJucePlugin
 			RealtimeAutomationCapacity + m_automationSlots.size(), false);
 	}
 
+	std::optional<uint8_t> Controller::getPlayingStep() const
+	{
+		if(m_syntheticPlayingStepForTests)
+			return *m_syntheticPlayingStepForTests;
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		if(!status || !status->sequencerPlaying || status->sequencerStep == md::MachineStatus::Values::NoStep)
+			return std::nullopt;
+		return status->sequencerStep;
+	}
+
 	bool Controller::firmwareReadyForAutomation() const
 	{
 		if(m_syntheticFirmwareReadyForTests)

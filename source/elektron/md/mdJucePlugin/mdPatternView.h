@@ -36,7 +36,9 @@ namespace mdJucePlugin
 	// parameter and counts its locks. A click on a track name (mdPlayTrack<track>) makes it the edited track;
 	// a click on a step sets or clears its trig, written to the firmware as the PAS
 	// block does; TOUT EFFACER (mdPlayClear), clicked twice, clears every trig and lock.
-	// OUVRIR DANS SON (mdPlayOpen) shows the track in SON.
+	// OUVRIR DANS SON (mdPlayOpen) shows the track in SON. While the sequencer plays, the column of its
+	// step is lit (mdPlayNow on the step number and the cells), as the machine's position in its RAM
+	// gives it (Controller::getPlayingStep).
 	class PatternView
 	{
 	public:
@@ -49,9 +51,11 @@ namespace mdJucePlugin
 		PatternView(Controller& _controller, Rml::Element& _document, SelectTrack _selectTrack);
 
 		// Redraws, while JOUER is shown, what changed: the pattern, the machines or the
-		// edited track (grid and lane), the lane parameter or its Kit value (lane).
-		// Returns true when it changed the DOM.
+		// edited track (grid and lane), the lane parameter or its Kit value (lane), the
+		// playing step. Returns true when it changed the DOM.
 		bool update();
+		// The column lit as playing, -1 for none
+		int getShownPlayStep() const { return m_shownPlayStep; }
 
 		// Locks of one parameter on a track, bit n for step n + 1
 		static uint32_t parameterLocks(const md::automation::sysex::PatternDump& _pattern, uint8_t _track, uint8_t _parameter);
@@ -68,6 +72,8 @@ namespace mdJucePlugin
 
 	private:
 		void disarmClear();
+		// Lights the playing step's column, a class on each cell: the column moves without a layout
+		bool showPlayStep(int _step);
 		void renderGrid(const md::automation::sysex::PatternDump* _pattern);
 		void renderLane(const md::automation::sysex::PatternDump* _pattern);
 		uint8_t kitValue(uint8_t _track, uint8_t _parameter) const;
@@ -95,6 +101,7 @@ namespace mdJucePlugin
 		uint8_t m_shownTrack = 0xff;
 		uint8_t m_shownParameter = 0xff;
 		uint8_t m_shownKit = 0xff;
+		int m_shownPlayStep = -1;
 		std::array<std::string, TrackCount> m_shownLabels{};
 		std::array<std::string, ParameterCount> m_shownParameterLabels{};
 		std::string m_shownInfo;

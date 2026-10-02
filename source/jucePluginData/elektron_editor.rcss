@@ -199,6 +199,13 @@
 .mdPlayChipLock { background-color: #ff6b1f; }
 .mdPlayChipSilent { background-color: #8a8d93; }
 .mdPlayChipOut { background-color: #1b1c1f; border: 1dp #3a3d42; }
+/* the step the sequencer plays (mdPatternView.cpp, mdMmPatternView.cpp): its number in orange, its column
+   lit, a trig on it brighter; colours only, so the column moves without a layout */
+.mdPlayHead.mdPlayNow { color: #ff6b1f; }
+.mdPlayStep.mdPlayNow { background-color: #44474e; }
+.mdPlayStep.mdEdStepTrig.mdPlayNow { background-color: #ffffff; }
+.mmPlayStep.mmPlaySilent.mdPlayNow { background-color: #b3b6bc; }
+.mdPlayStep.mdPlayLocked.mdPlayNow { background-color: #ff9a5c; }
 
 /* BIBLIO (mdLibraryView.cpp): a cell per stored Kit, the loaded one in amber, the chosen one framed */
 .mdLibKit { box-sizing: border-box; height: 22dp; line-height: 20dp; padding-left: 5dp; font-size: 11dp; color: #f4f1ea;

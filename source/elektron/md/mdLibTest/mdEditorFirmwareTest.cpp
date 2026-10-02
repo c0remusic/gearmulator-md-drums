@@ -4,8 +4,9 @@
 // Kit dump and their changes ($5D to $60), the track routing in the Global dump
 // and its change ($5C), the Machinedrum pattern dump ($67) as
 // MdPatternEditor reads it (with trigs and a lock placed on the front panel,
-// unsaved), and a pattern written back to its slot, stopped and playing. Every
-// message comes from the codec the editor uses (mdsysexautomation.h). The
+// unsaved), and a pattern written back to its slot, stopped and playing; the
+// sequencer's step and running state as JOUER reads them in the firmware's RAM.
+// Every message comes from the codec the editor uses (mdsysexautomation.h). The
 // silence around a write during playback is printed, not checked.
 //
 // Firmware from GEARMULATOR_MD_FIRMWARE_BIN and GEARMULATOR_MM_FIRMWARE_BIN;
@@ -26,6 +27,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -567,6 +569,59 @@ namespace
 		return hardware;
 	}
 
+	// The playing step and whether the sequencer runs, as JOUER lights them (Hardware::readSequencerPosition,
+	// read from the firmware's RAM): a pattern of 12 steps played from PLAY counts 0 to 11 and starts over,
+	// and STOP stops it
+	void checkSequencerPosition(md::Hardware& _hardware)
+	{
+		// Whether it plays comes from the sequencer's tick moving between two reads: read as Device does,
+		// every block
+		const auto readFor = [&](const uint32_t _frames, const std::function<void(const md::Hardware::SequencerPosition&, uint32_t)>& _seen)
+		{
+			for(uint32_t frame = 0; frame < _frames; frame += 256)
+			{
+				advance(_hardware, 256);
+				const auto position = _hardware.readSequencerPosition();
+				require(position.has_value(), "sequencer position unknown");
+				_seen(*position, frame);
+			}
+		};
+		bool stopped = true;
+		readFor(md::g_samplerate / 2, [&](const md::Hardware::SequencerPosition& _position, uint32_t)
+		{
+			stopped &= !_position.playing;
+		});
+		require(stopped, "the sequencer plays before PLAY");
+		auto editor = sysex::MdPatternEditor::fromDump(readPattern(_hardware, status(_hardware, sysex::StatusParameter::Pattern)));
+		require(editor && editor->setLength(12), "pattern length refused");
+		send(_hardware, editor->toDump());
+		advance(_hardware, md::g_samplerate);
+		panelTap(_hardware, md::PanelControl::Play);
+		std::vector<uint8_t> steps;
+		bool playing = true;
+		readFor(3 * md::g_samplerate, [&](const md::Hardware::SequencerPosition& _position, const uint32_t _frame)
+		{
+			// From its first tick seen on
+			if(_frame >= md::g_samplerate / 4)
+				playing &= _position.playing;
+			if(steps.empty() || steps.back() != _position.step)
+				steps.push_back(_position.step);
+		});
+		panelTap(_hardware, md::PanelControl::Stop);
+		std::optional<md::Hardware::SequencerPosition> after;
+		readFor(md::g_samplerate / 2, [&](const md::Hardware::SequencerPosition& _position, uint32_t) { after = _position; });
+		bool counts = steps.size() >= 12;
+		for(size_t i = 1; i < steps.size(); ++i)
+			counts &= steps[i] == (steps[i - 1] + 1) % 12;
+		std::string seen;
+		for(const auto step : steps)
+			seen += " " + std::to_string(step);
+		std::printf("MD sequencer position, 12 steps for 3 s:%s; after STOP %s\n", seen.c_str(),
+			after && !after->playing ? "stopped" : "still playing");
+		require(playing && counts, "the sequencer position does not count the steps of the pattern");
+		require(after && !after->playing, "the sequencer position plays on after STOP");
+	}
+
 	bool runMachinedrum()
 	{
 		const auto hardware = start("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
@@ -584,6 +639,7 @@ namespace
 		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);
+		checkSequencerPosition(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");
 		return true;
 	}

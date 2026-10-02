@@ -231,8 +231,11 @@ namespace mdJucePlugin
 		if(m_root && !m_root->IsVisible(true))
 		{
 			forceRedraw();
-			return false;
+			return showPlayColumn(-1);
 		}
+		const auto playing = m_controller.getPlayingStep();
+		const bool playChanged = showPlayColumn(playing && *playing / VisibleSteps == m_stepPage
+			? *playing % VisibleSteps : -1);
 		// Shown without a pattern (none stored yet: revision 0): asked for, again every 2 s until one comes
 		const auto revision = m_controller.getPatternRevision();
 		if(revision == 0 && _nowMilliseconds - m_lastRequest > 2000.0)
@@ -248,7 +251,7 @@ namespace mdJucePlugin
 		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack
 			|| m_stepPage != m_shownStepPage;
 		if(!grid && parameter == m_shownParameter && kit == m_shownKit)
-			return false;
+			return playChanged;
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;
@@ -263,6 +266,29 @@ namespace mdJucePlugin
 			renderRoll(shown);
 		}
 		renderLane(shown);
+		return true;
+	}
+
+	bool MmPatternView::showPlayColumn(const int _column)
+	{
+		if(_column == m_shownPlayColumn)
+			return false;
+		// A class on each cell of the column: it moves without a layout
+		const auto light = [this](const int _cell, const bool _on)
+		{
+			if(_cell < 0 || _cell >= VisibleSteps)
+				return;
+			if(auto* head = m_heads[static_cast<size_t>(_cell)])
+				head->SetClass("mdPlayNow", _on);
+			for(uint8_t track = 0; track < TrackCount; ++track)
+			{
+				if(auto* element = m_steps[track][static_cast<size_t>(_cell)])
+					element->SetClass("mdPlayNow", _on);
+			}
+		};
+		light(m_shownPlayColumn, false);
+		light(_column, true);
+		m_shownPlayColumn = _column;
 		return true;
 	}
 

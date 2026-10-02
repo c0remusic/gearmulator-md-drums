@@ -10,6 +10,8 @@
 //   of the sine;
 // - lock mask bit b is the track parameter at page * 8 + index, its place in the Kit (mmLockBit): bit
 //   13, AMP VOL, at 0 silences its trig; bit 50 at 0 (an LFO 3 setting) leaves it as loud as the first.
+// Played again, the sequencer's step and running state as JOUER reads them in the firmware's RAM count
+// the 16 steps and stop with STOP.
 //
 // Firmware from GEARMULATOR_MM_FIRMWARE_BIN; 77 without it.
 
@@ -89,6 +91,56 @@ namespace
 		for(size_t step = 0; step < steps.size(); ++step)
 			steps[step].rms = counts[step] ? std::sqrt(sums[step] / counts[step]) : 0.0;
 		return steps;
+	}
+
+	// The playing step and whether the sequencer runs, as JOUER lights them (Hardware::readSequencerPosition,
+	// read from the firmware's RAM): the selected pattern of 16 steps played from START counts 0 to 15 and
+	// starts over, and STOP stops it
+	void checkSequencerPosition(Monomachine& _mm, std::vector<std::string>& _failures)
+	{
+		// Whether it plays comes from the sequencer's tick moving between two reads: read every tick,
+		// and as Device does, every block, while stopped
+		const auto stoppedFor = [&](const uint32_t _frames)
+		{
+			std::optional<md::Hardware::SequencerPosition> last;
+			for(uint32_t frame = 0; frame < _frames; frame += 256)
+			{
+				advanceFrames(_mm.hardware(), 256);
+				last = _mm.hardware().readSequencerPosition();
+			}
+			return last;
+		};
+		const auto before = stoppedFor(md::g_samplerate / 2);
+		if(!before || before->playing)
+			_failures.push_back("sequencer position unknown, or playing before START");
+		_mm.send({0xfa});
+		std::vector<uint8_t> steps;
+		bool playing = true;
+		for(int tick = 0; tick < 20 * TicksPerStep; ++tick)
+		{
+			_mm.send({0xf8});
+			advanceFrames(_mm.hardware(), FramesPerTick);
+			const auto position = _mm.hardware().readSequencerPosition();
+			// From its second tick on, the first seen moving
+			if(tick >= 2)
+				playing &= position && position->playing;
+			if(position && (steps.empty() || steps.back() != position->step))
+				steps.push_back(position->step);
+		}
+		_mm.send({0xfc});
+		const auto after = stoppedFor(md::g_samplerate / 2);
+		bool counts = steps.size() >= 16;
+		for(size_t i = 1; i < steps.size(); ++i)
+			counts &= steps[i] == (steps[i - 1] + 1) % 16;
+		std::string seen;
+		for(const auto step : steps)
+			seen += " " + std::to_string(step);
+		std::printf("MM sequencer position, 20 steps of 16:%s; after STOP %s\n", seen.c_str(),
+			after && !after->playing ? "stopped" : "still playing");
+		if(!playing || !counts)
+			_failures.push_back("the sequencer position does not count the steps of the pattern");
+		if(!after || after->playing)
+			_failures.push_back("the sequencer position plays on after STOP");
 	}
 
 	void checkFactoryPattern(const Pattern& _pattern, const uint8_t _slot, std::vector<std::string>& _failures)
@@ -189,6 +241,7 @@ namespace
 		}
 		if(steps[12].rms < c3.rms / 2)
 			failures.push_back("the trig with lock bit 50 at 0 is not as loud as the first");
+		checkSequencerPosition(mm, failures);
 
 		for(const auto& failure : failures)
 			std::printf("  FAIL %s\n", failure.c_str());

@@ -36,8 +36,9 @@ namespace mdJucePlugin
 	// lane of one of its parameters (a canvas in mmPlayLaneArea, as on the Machinedrum: the Kit value in
 	// grey, a lock in orange with a dot, on the steps that play), chosen by page (mmPlayParamPage<page>)
 	// then index (mmPlayParam<index>), each with its count of locks. A click on a track name
-	// (mmPlayTrack<track>) makes it the edited track. Read only: the Monomachine takes a pattern dump
-	// only in GLOBAL > SYSEX RECV.
+	// (mmPlayTrack<track>) makes it the edited track. While the sequencer plays a step of the steps shown,
+	// its column is lit (mdPlayNow), as on the Machinedrum. Read only: the Monomachine takes a pattern
+	// dump only in GLOBAL > SYSEX RECV.
 	class MmPatternView
 	{
 	public:
@@ -67,8 +68,11 @@ namespace mdJucePlugin
 		int rollNote(uint8_t _step) const { return _step < VisibleSteps ? m_rollNotes[_step] : -1; }
 		int barValue(uint8_t _step) const { return _step < VisibleSteps ? m_barValues[_step] : -1; }
 		bool barLocked(uint8_t _step) const { return _step < VisibleSteps && m_barLocks[_step]; }
+		// The visible column lit as playing, -1 for none
+		int getShownPlayColumn() const { return m_shownPlayColumn; }
 
 	private:
+		bool showPlayColumn(int _column);
 		void renderGrid(const Pattern* _pattern);
 		void renderRoll(const Pattern* _pattern);
 		void renderLane(const Pattern* _pattern);
@@ -115,6 +119,7 @@ namespace mdJucePlugin
 		uint8_t m_shownStepPage = 0xff;
 		uint8_t m_shownParameter = 0xff;
 		uint8_t m_shownKit = 0xff;
+		int m_shownPlayColumn = -1;
 		std::array<std::string, VisibleSteps> m_shownHeads{};
 		std::array<std::string, TrackCount> m_shownLabels{};
 		std::array<std::array<std::string, VisibleSteps>, TrackCount> m_shownSteps{};
