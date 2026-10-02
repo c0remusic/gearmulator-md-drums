@@ -612,6 +612,12 @@ namespace mdJucePlugin
 		m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
 		m_patternRequestedSlot.store(slot, std::memory_order_release);
 		m_patternWanted.store(true, std::memory_order_release);
+		// The Machinedrum reloads the pattern's Kit as stored when it takes the pattern, stopped or playing:
+		// values changed since the Kit was saved (SON) would go back. Saving the live Kit first keeps them
+		// (mdEditorFirmwareTest, checkLiveKitAcrossPatternWrite).
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(kit < 64)
+			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
 		sendEditorSysex(dump);
 		sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
 		return true;

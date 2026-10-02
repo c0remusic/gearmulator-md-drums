@@ -376,6 +376,96 @@ namespace
 			playedBack == playing->toDump() ? "as sent" : differences(playedBack, playing->toDump()).c_str());
 	}
 
+	// Peak of the main output while the sequencer plays _windows of 256 frames from PLAY
+	float playPeak(md::Hardware& _hardware, const size_t _windows)
+	{
+		panelTap(_hardware, md::PanelControl::Play);
+		const auto peaks = renderPeaks(_hardware, _windows);
+		panelTap(_hardware, md::PanelControl::Stop);
+		advance(_hardware, md::g_samplerate / 2);
+		return *std::max_element(peaks.begin(), peaks.end());
+	}
+
+	void sendControlChange(md::Hardware& _hardware, const md::automation::ControlChange& _change)
+	{
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+		event.a = _change[0];
+		event.b = _change[1];
+		event.c = _change[2];
+		require(_hardware.sendMidi(event), "CC rejected by the MIDI input");
+	}
+
+	// What a pattern written to its slot does to the live Kit, track 1 playing alone on the beats: a VOL of 0
+	// sent by CC (as the editor's SON sends it) silences it until the pattern is written, stopped or playing;
+	// the Machinedrum then reloads the pattern's Kit as stored, as selecting the pattern does. With the Kit
+	// saved first (SAVE KIT, $59), the write keeps the change: Controller::sendPattern saves it.
+	void checkLiveKitAcrossPatternWrite(md::Hardware& _hardware)
+	{
+		constexpr auto model = md::MachineModel::Machinedrum;
+		const auto pattern = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto kit = status(_hardware, sysex::StatusParameter::Kit);
+		const auto globalSlot = status(_hardware, sysex::StatusParameter::Global);
+		const auto global = sysex::parseGlobalDump(model, exchange(_hardware, sysex::globalRequest(model, globalSlot), 0x50));
+		require(global.has_value(), "no Global dump");
+		auto editor = sysex::MdPatternEditor::fromDump(readPattern(_hardware, pattern));
+		require(editor.has_value(), "pattern not editable");
+		editor->clear();
+		for(uint8_t step = 0; step < 16; step += 4)
+			require(editor->setTrig(0, step, true), "trig refused");
+		send(_hardware, editor->toDump());
+		advance(_hardware, md::g_samplerate);
+		constexpr size_t twoSeconds = 344;
+		const auto loud = playPeak(_hardware, twoSeconds);
+
+		const auto volume = md::automation::encodeParameterChange(model,
+			{md::automation::machinedrum::Routing, 0, 1, 0}, global->baseChannel);
+		require(volume.has_value(), "no CC for track 1 VOL");
+		const auto mute = [&]
+		{
+			sendControlChange(_hardware, *volume);
+			advance(_hardware, md::g_samplerate / 4);
+		};
+		mute();
+		const auto muted = playPeak(_hardware, twoSeconds);
+
+		// A trig added and the pattern written, as JOUER writes it, stopped
+		require(editor->setTrig(0, 2, true), "trig refused");
+		send(_hardware, editor->toDump());
+		advance(_hardware, md::g_samplerate);
+		const auto writtenStopped = playPeak(_hardware, twoSeconds);
+
+		// The same while playing: the peak after the write
+		mute();
+		require(editor->setTrig(0, 6, true), "trig refused");
+		panelTap(_hardware, md::PanelControl::Play);
+		const auto beforeWrite = renderPeaks(_hardware, twoSeconds);
+		send(_hardware, editor->toDump());
+		const auto afterWrite = renderPeaks(_hardware, twoSeconds * 2);
+		panelTap(_hardware, md::PanelControl::Stop);
+		advance(_hardware, md::g_samplerate / 2);
+		const auto writtenPlaying = *std::max_element(afterWrite.begin() + twoSeconds, afterWrite.end());
+		const auto mutedPlaying = *std::max_element(beforeWrite.begin(), beforeWrite.end());
+
+		// The Kit saved first
+		mute();
+		send(_hardware, sysex::kitSave(model, kit));
+		advance(_hardware, md::g_samplerate / 2);
+		require(editor->setTrig(0, 10, true), "trig refused");
+		send(_hardware, editor->toDump());
+		advance(_hardware, md::g_samplerate);
+		const auto savedThenWritten = playPeak(_hardware, twoSeconds);
+
+		std::printf("MD live Kit across a pattern write (pattern %u, Kit %u), track 1 peak: %.3f; VOL 0 by CC: %.4f;"
+			" pattern written stopped: %.3f; VOL 0 again, playing %.4f, written while playing: %.3f;"
+			" VOL 0, Kit saved, pattern written: %.4f\n", pattern + 1, kit + 1, loud, muted, writtenStopped, mutedPlaying,
+			writtenPlaying, savedThenWritten);
+		require(loud > 0.01f && muted < loud / 20 && mutedPlaying < loud / 20, "track 1 VOL by CC does not silence it");
+		// The firmware rule the editor works around
+		require(writtenStopped > loud / 2 && writtenPlaying > loud / 2,
+			"a pattern write kept the unsaved Kit: Controller::sendPattern's SAVE KIT may no longer be needed");
+		require(savedThenWritten < loud / 20, "the saved Kit did not survive the pattern write");
+	}
+
 	std::string describeEffects(const sysex::MasterEffects& _effects)
 	{
 		static constexpr const char* names[] = {"echo", "reverb", "EQ", "dynamix"};
@@ -493,6 +583,7 @@ namespace
 		checkMasterEffects(*hardware);
 		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
+		checkLiveKitAcrossPatternWrite(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");
 		return true;
 	}
