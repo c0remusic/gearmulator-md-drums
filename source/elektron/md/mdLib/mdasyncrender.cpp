@@ -7,6 +7,8 @@
 
 #include "dsp56kBase/threadtools.h"
 
+#include "synthLib/realtimeInstrumentation.h"
+
 namespace md
 {
 	namespace
@@ -176,6 +178,7 @@ namespace md
 		if(drop)
 		{
 			m_droppedBlocks.fetch_add(1, std::memory_order_relaxed);
+			synthLib::RealtimeInstrumentation::recordCurrentDroppedBlock();
 			m_gapFrames = std::min(m_gapFrames + _frames, FifoFrames / 2);
 			for(const auto& ev : _midiIn)
 			{
@@ -202,6 +205,7 @@ namespace md
 			m_gapFrames = 0;
 			job.submittedAt = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::steady_clock::now().time_since_epoch()).count();
+			job.instrumentation = synthLib::RealtimeInstrumentation::current();
 			m_submitted.store(submitted + 1, std::memory_order_release);
 			m_jobSignal.notify();
 		}
@@ -219,8 +223,10 @@ namespace md
 			};
 			while(!ready())
 				m_doneSignal.waitFor(std::chrono::milliseconds(10), ready);
-			m_statWaitNs.fetch_add(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
-				std::chrono::steady_clock::now() - waitStart).count()), std::memory_order_relaxed);
+			const auto waitNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::steady_clock::now() - waitStart).count());
+			m_statWaitNs.fetch_add(waitNs, std::memory_order_relaxed);
+			synthLib::RealtimeInstrumentation::recordCurrentRenderWait(waitNs);
 		}
 		timeline.hostResume = nowNs();
 		const uint64_t read = m_fifoRead.load(std::memory_order_relaxed);
@@ -300,7 +306,11 @@ namespace md
 			m_statQueueNs.fetch_add(static_cast<uint64_t>(std::max<int64_t>(0,
 				std::chrono::duration_cast<std::chrono::nanoseconds>(renderStart.time_since_epoch()).count()
 				- job.submittedAt)), std::memory_order_relaxed);
-			m_render(ins, outs, job.frames, job.midiIn, job.midiOut);
+			{
+				synthLib::RealtimeInstrumentation::RenderScope instrumentation(job.instrumentation,
+					static_cast<uint32_t>(job.frames));
+				m_render(ins, outs, job.frames, job.midiIn, job.midiOut);
+			}
 			const auto renderEnd = std::chrono::steady_clock::now();
 			const auto renderNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
 				renderEnd - renderStart).count());

@@ -2,6 +2,7 @@
 
 #include "jucePluginEditorLib/pluginProcessor.h"
 #include "mdChainControl.h"
+#include "mdLiveDevice.h"
 #include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdtypes.h"
@@ -72,8 +73,11 @@ namespace mdJucePlugin
 		// The device follows the setting now, or will after a reload.
 		bool isParallelTransportActive();
 		// Default plug-in latency for a new configuration: two blocks let the
-		// Machinedrum render ahead on its own threads (see md::AsyncRender).
+		// machine render ahead on its own threads (see md::AsyncRender).
 		static constexpr int DefaultLatencyBlocks = 2;
+
+		// The device without its lock, for the editor, the controller and the timers here
+		LiveDevice& getLiveDevice() { return m_liveDevice; }
 
 		// "Follow host tempo" (off by default): the machine takes its tempo and
 		// start/stop from the host's MIDI clock (see md::HostSync). On, it is kept
@@ -131,6 +135,7 @@ namespace mdJucePlugin
 			static_cast<uint8_t>(md::RamRecordingMode::Original)};
 		bool m_ramRecordingModeChunkSeen = false;
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
+		LiveDevice m_liveDevice{*this};
 		OutputMeters m_outputMeters;
 		ChainControl m_chainControl{m_model};
 		std::optional<uint8_t> m_chainLengthAsked;	// the pattern whose dump was asked for, and when

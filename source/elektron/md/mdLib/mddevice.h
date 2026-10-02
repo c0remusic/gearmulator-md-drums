@@ -9,6 +9,7 @@
 #include "mdchainplayer.h"
 #include "mdhardware.h"
 #include "mdhostsync.h"
+#include "mdmachinestatus.h"
 #include "mdsyseximport.h"
 
 #include "synthLib/device.h"
@@ -109,6 +110,8 @@ namespace md
 		}
 		void resumeRendering() override
 		{
+			// The access that paused the rendering may have changed what the status shows
+			publishStatus();
 			if(m_async)
 				m_async->resume();
 		}
@@ -231,6 +234,11 @@ namespace md
 		{
 			return m_hardware->trySendPanelEvent(_command, _argument);
 		}
+		// The live machine's panel input queue, which any thread may push to without the device
+		// lock. A committed machine (hardwareEpoch) brings a new queue: the old one is no longer read.
+		std::shared_ptr<PanelInputQueue> getPanelInput() const { return m_hardware->getPanelInput(); }
+		// Read by any thread without the device lock; the same for the Device's lifetime.
+		std::shared_ptr<const MachineStatus> getStatus() const { return m_status; }
 		PanelInputQueueStatus getPanelInputStatus() const
 		{
 			return m_hardware->getPanelInputStatus();
@@ -300,6 +308,8 @@ namespace md
 
 		void clearProjectStateRestore();
 		void failProjectStateRestore(std::string _error);
+		// On the rendering thread, or with the rendering paused
+		void publishStatus();
 		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
@@ -308,6 +318,7 @@ namespace md
 
 		const MachineModel m_model;
 		std::shared_ptr<FrontPanelPublisher> m_frontPanelPublisher;
+		std::shared_ptr<MachineStatus> m_status = std::make_shared<MachineStatus>();
 		std::shared_ptr<const PreparationContext> m_preparationContext;
 		std::unique_ptr<Hardware> m_hardware;
 		std::unique_ptr<PreparedState> m_deferredPreparedState;

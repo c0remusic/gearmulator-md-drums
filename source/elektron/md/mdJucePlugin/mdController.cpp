@@ -1146,15 +1146,10 @@ namespace mdJucePlugin
 	{
 		if(m_syntheticFirmwareReadyForTests)
 			return true;
-		bool ready = true;
-		getProcessor().getPlugin().withDeviceLocked(
-			[&ready](synthLib::Device* const _device)
-			{
-				if(const auto* const device = dynamic_cast<md::Device*>(_device))
-					ready = !device->isProjectStateRestorePending()
-						&& device->getHardware().isFirmwareMidiReady();
-			});
-		return ready;
+		// Every request asks: through the device lock, each one paused the rendering. Another kind of
+		// device (remote) is taken as ready.
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		return !status || status->firmwareReady;
 	}
 
 	bool Controller::parseSysexMessage(const pluginLib::SysEx& _message,

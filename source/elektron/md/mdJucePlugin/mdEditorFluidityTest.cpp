@@ -274,6 +274,14 @@ namespace
 		const char* name = _model == md::MachineModel::Monomachine ? "MM" : "MD";
 		std::printf("mdEditorFluidityTest %s: software renderer, %dx%d, one frame = presentation timer + RmlUi update + rasterized frame\n",
 			name, component->getWidth(), component->getHeight());
+
+		// Frames reach the machine without the device lock, which pauses its rendering: counted from
+		// the second frame, the first takes what the device shares with the editor
+		auto& instrumentation = processor.getPlugin().getRealtimeInstrumentation();
+		instrumentation.setEnabled(true);
+		mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+		const auto accessesBefore = instrumentation.snapshot().deviceAccessCount;
+
 		bool fast = true;
 		bool accelerated = true;
 		constexpr int frames = 240;
@@ -319,10 +327,14 @@ namespace
 			accelerated &= stats(presentation).p95 + stats(update).p95 < 1000.0 / 60.0;
 		}
 		component->setLookAndFeel(nullptr);
+		const auto accesses = instrumentation.snapshot().deviceAccessCount - accessesBefore;
+		instrumentation.setEnabled(false);
 		// With OpenGL the message thread only presents and updates; the GPU rasterizes on its own thread
 		std::printf("  60 Hz with OpenGL (presentation + update under 16.7 ms on every page): %s\n"
-			"  60 Hz with the software renderer (whole frame under 16.7 ms on every page): %s\n",
-			accelerated ? "yes" : "no", fast ? "yes" : "no");
+			"  60 Hz with the software renderer (whole frame under 16.7 ms on every page): %s\n"
+			"  device lock taken while drawing: %llu times\n",
+			accelerated ? "yes" : "no", fast ? "yes" : "no", static_cast<unsigned long long>(accesses));
+		require(accesses == 0, "the editor took the device lock, pausing the rendering, while drawing");
 		return accelerated;
 	}
 

@@ -154,6 +154,7 @@ namespace mdJucePlugin
 	Editor::Editor(jucePluginEditorLib::Processor& _processor, const jucePluginEditorLib::Skin& _skin)
 		: jucePluginEditorLib::Editor(_processor, _skin)
 		, m_controller(dynamic_cast<Controller&>(_processor.getController()))
+		, m_liveDevice(dynamic_cast<AudioPluginAudioProcessor&>(_processor).getLiveDevice())
 		, m_model(dynamic_cast<const AudioPluginAudioProcessor&>(_processor).getModel())
 	{
 		juce::Desktop::getInstance().addFocusChangeListener(this);
@@ -170,29 +171,16 @@ namespace mdJucePlugin
 
 	std::shared_ptr<md::FrontPanelPublisher> Editor::getFrontPanelPublisher() const
 	{
-		return getProcessor().getPlugin().withDeviceLocked(
-			[](synthLib::Device* const _device)
-			{
-				auto* const device = dynamic_cast<md::Device*>(_device);
-				return device ? device->getFrontPanelPublisher()
-					: std::shared_ptr<md::FrontPanelPublisher>{};
-			});
+		// Every frame: never through the device lock, which pauses the rendering
+		return m_liveDevice.frontPanel();
 	}
 
 	bool Editor::sendPanelEvent(const uint8_t _command, const uint8_t _argument) const
 	{
-		auto& plugin = getProcessor().getPlugin();
-		auto& diagnostics = plugin.getRealtimeInstrumentation();
+		auto& diagnostics = getProcessor().getPlugin().getRealtimeInstrumentation();
 		const auto model = static_cast<uint32_t>(getModel());
 		const auto token = diagnostics.beginPanelInput(model, _command, _argument);
-		const auto accepted = plugin.withDeviceLocked(
-			[&](synthLib::Device* const _device)
-			{
-				auto* const device = dynamic_cast<md::Device*>(_device);
-				if(!device)
-					return false;
-				return device->sendPanelEvent(_command, _argument);
-			});
+		const auto accepted = m_liveDevice.sendPanelEvent(_command, _argument);
 		diagnostics.endPanelInput(token, model, _command, _argument, accepted);
 		return accepted;
 	}
@@ -1506,31 +1494,40 @@ namespace mdJucePlugin
 			});
 	}
 
+	std::optional<md::MidiSysexTransferState> Editor::getUserSysexState() const
+	{
+		// The SYSTÈME page asks twice a second: from the published status, not through the device lock
+		const auto status = m_liveDevice.status();
+		if(!status)
+			return std::nullopt;
+		return status->userSysexState;
+	}
+
 	bool Editor::isUserSysexTransferActive() const
 	{
-		const auto progress = getUserSysexProgress();
-		if(!progress)
+		const auto state = getUserSysexState();
+		if(!state)
 			return false;
-		return progress->state == md::MidiSysexTransferState::Queued
-			|| progress->state == md::MidiSysexTransferState::NegotiatingTurbo
-			|| progress->state == md::MidiSysexTransferState::WaitingForDevice
-			|| progress->state == md::MidiSysexTransferState::Retrying
-			|| progress->state == md::MidiSysexTransferState::WaitingForReceiveMode
-			|| progress->state == md::MidiSysexTransferState::Sending
-			|| progress->state == md::MidiSysexTransferState::Cancelling;
+		return *state == md::MidiSysexTransferState::Queued
+			|| *state == md::MidiSysexTransferState::NegotiatingTurbo
+			|| *state == md::MidiSysexTransferState::WaitingForDevice
+			|| *state == md::MidiSysexTransferState::Retrying
+			|| *state == md::MidiSysexTransferState::WaitingForReceiveMode
+			|| *state == md::MidiSysexTransferState::Sending
+			|| *state == md::MidiSysexTransferState::Cancelling;
 	}
 
 	bool Editor::canCancelUserSysexTransfer() const
 	{
-		const auto progress = getUserSysexProgress();
-		if(!progress)
+		const auto state = getUserSysexState();
+		if(!state)
 			return false;
-		return progress->state == md::MidiSysexTransferState::Queued
-			|| progress->state == md::MidiSysexTransferState::NegotiatingTurbo
-			|| progress->state == md::MidiSysexTransferState::WaitingForDevice
-			|| progress->state == md::MidiSysexTransferState::Retrying
-			|| progress->state == md::MidiSysexTransferState::WaitingForReceiveMode
-			|| progress->state == md::MidiSysexTransferState::Sending;
+		return *state == md::MidiSysexTransferState::Queued
+			|| *state == md::MidiSysexTransferState::NegotiatingTurbo
+			|| *state == md::MidiSysexTransferState::WaitingForDevice
+			|| *state == md::MidiSysexTransferState::Retrying
+			|| *state == md::MidiSysexTransferState::WaitingForReceiveMode
+			|| *state == md::MidiSysexTransferState::Sending;
 	}
 
 	std::string Editor::getUserSysexMenuText() const
@@ -1577,8 +1574,8 @@ namespace mdJucePlugin
 
 	bool Editor::canResumeUserSysexTransfer() const
 	{
-		const auto progress = getUserSysexProgress();
-		return progress && progress->state == md::MidiSysexTransferState::WaitingForReceiveMode;
+		const auto state = getUserSysexState();
+		return state && *state == md::MidiSysexTransferState::WaitingForReceiveMode;
 	}
 
 	void Editor::resumeUserSysexTransfer()

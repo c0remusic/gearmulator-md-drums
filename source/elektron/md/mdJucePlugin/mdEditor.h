@@ -45,6 +45,7 @@ namespace md
 namespace mdJucePlugin
 {
 	class Controller;
+	class LiveDevice;
 	class MachinePicker;
 	class StepGrid;
 	class ViewLayout;
@@ -171,6 +172,7 @@ namespace mdJucePlugin
 			StorageImageBookmark _bookmark);
 		void showStorageOperationResult(bool _success, const juce::String& _message);
 		std::optional<md::SysexImportProgress> getUserSysexProgress() const;
+		std::optional<md::MidiSysexTransferState> getUserSysexState() const;
 		void sendUserSysexFile(const juce::File& _file, const md::SysexImportTicket& _ticket);
 		void startUserSysexTransfer(const std::shared_ptr<md::PreparedMidiSysexTransfer>& _prepared,
 			const juce::File& _file, const md::SysexImportTicket& _ticket, bool _receiveModeConfirmed);
@@ -186,6 +188,7 @@ namespace mdJucePlugin
 		};
 
 		Controller& m_controller;
+		LiveDevice& m_liveDevice;
 		const md::MachineModel m_model;
 		juceRmlUi::ElemCanvas* m_lcdCanvas = nullptr;
 		std::unique_ptr<MachinePicker> m_machinePicker;

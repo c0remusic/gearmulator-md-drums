@@ -13,6 +13,11 @@
 #include "synthLib/audioTypes.h"
 #include "synthLib/midiTypes.h"
 
+namespace synthLib
+{
+	class RealtimeInstrumentation;
+}
+
 namespace md
 {
 	// Renders a device on its own thread, one step behind the host, the way the
@@ -106,6 +111,8 @@ namespace md
 			size_t frames = 0;
 			size_t gap = 0;				// silent frames before this block's output
 			int64_t submittedAt = 0;	// steady_clock ns (diagnostics)
+			// The performance capture recording the host callback that handed the block over, if any
+			synthLib::RealtimeInstrumentation* instrumentation = nullptr;
 		};
 
 		void threadFunc();

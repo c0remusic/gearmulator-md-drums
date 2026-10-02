@@ -818,6 +818,27 @@ namespace md
 			m_deferredPreparedState->m_hardware->advance(
 				static_cast<uint32_t>(_samples));
 		}
+		publishStatus();
+	}
+
+	void Device::publishStatus()
+	{
+		MachineStatus::Values values;
+		values.restorePending = isProjectStateRestorePending();
+		values.firmwareReady = !values.restorePending && m_hardware->isFirmwareMidiReady();
+		values.restoreFailed = m_restoreStatus == ProjectStateRestoreStatus::Failed;
+		// What takeFinishedDeferredState takes
+		values.deferredStateReady = m_deferredPreparedState && m_deferredPreparedState->m_hardware
+			&& m_restoreStatus == ProjectStateRestoreStatus::Initializing
+			&& !m_deferredPreparedState->m_hardware->isProjectStateRestorePending();
+		values.factoryInitializationExpected = m_hardware->isFactoryFlashInitializationExpected();
+		values.factoryReadyForReboot = m_hardware->isFactoryFlashReadyForReboot();
+		values.parallelTransportActive = m_hardware->isProducerThreaded();
+		values.ramRecordingModeSupported = m_hardware->supportsRamRecordingMode();
+		values.userSysexState = userSysexImportProgress().state;
+		values.hardwareEpoch = m_hardwareEpoch;
+		values.restoreGeneration = m_deferredStateGeneration;
+		m_status->publish(values);
 	}
 
 	void Device::extraLatencyChanged()

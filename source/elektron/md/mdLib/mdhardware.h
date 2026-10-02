@@ -434,6 +434,9 @@ namespace md
 		{
 			(void)trySendPanelEvent(_cmd, _arg);
 		}
+		// The queue trySendPanelEvent pushes to, for pushing to it from threads that do not hold the
+		// device lock. A packet it delivers registers external interaction as trySendPanelEvent does.
+		std::shared_ptr<PanelInputQueue> getPanelInput() const { return m_panelIn; }
 		size_t getPendingPanelInputBytes() const;
 		size_t getPanelInputOverflowCount() const;
 		PanelInputQueueStatus getPanelInputStatus() const;
@@ -818,8 +821,9 @@ namespace md
 		size_t m_midiInByteCursor = 0;
 		RealtimeMidiByteQueue<64> m_realtimeMidiIn;
 
-		// Panel input events pending delivery to UART2 RX.
-		PanelInputQueue m_panelIn;
+		// Panel input events pending delivery to UART2 RX. Shared with whoever pushes to it without the
+		// device lock (getPanelInput); this machine is its only consumer.
+		std::shared_ptr<PanelInputQueue> m_panelIn = std::make_shared<PanelInputQueue>();
 
 	};
 }

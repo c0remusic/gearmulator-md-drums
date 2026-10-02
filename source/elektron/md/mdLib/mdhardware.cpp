@@ -1331,22 +1331,22 @@ namespace md
 	bool Hardware::trySendPanelEvent(const uint8_t _cmd, const uint8_t _arg)
 	{
 		registerExternalInteraction();
-		return m_panelIn.tryPush(_cmd, _arg);
+		return m_panelIn->tryPush(_cmd, _arg);
 	}
 
 	size_t Hardware::getPendingPanelInputBytes() const
 	{
-		return m_panelIn.size();
+		return m_panelIn->size();
 	}
 
 	size_t Hardware::getPanelInputOverflowCount() const
 	{
-		return m_panelIn.overflowCount();
+		return m_panelIn->overflowCount();
 	}
 
 	PanelInputQueueStatus Hardware::getPanelInputStatus() const
 	{
-		return m_panelIn.status();
+		return m_panelIn->status();
 	}
 
 	void Hardware::processUC()
@@ -1361,11 +1361,14 @@ namespace md
 			m_pendingFlashRestoreActive.load(std::memory_order_acquire);
 		if(!projectRestorePending)
 			pumpScheduledMidi();
-		if(!projectRestorePending && m_panelIn.hasPending())
+		if(!projectRestorePending && m_panelIn->hasPending())
 		{
 			PanelInputQueue::DrainBuffer panelInput;
 			const auto availablePackets = m_uc.availablePanelRxBytes() / 2;
-			const auto panelInputCount = m_panelIn.drain(panelInput, availablePackets);
+			const auto panelInputCount = m_panelIn->drain(panelInput, availablePackets);
+			// Packets pushed to the queue directly (getPanelInput) did not go through trySendPanelEvent
+			if(panelInputCount)
+				registerExternalInteraction();
 			for(size_t i = 0; i < panelInputCount; ++i)
 			{
 				const auto& packet = panelInput[i];
@@ -1419,7 +1422,7 @@ namespace md
 		constexpr uint64_t minCycles = 16;
 		if(_maxCycles < minCycles)
 			return 0;
-		if(m_pendingFlashRestoreActive.load(std::memory_order_acquire) || m_panelIn.hasPending()
+		if(m_pendingFlashRestoreActive.load(std::memory_order_acquire) || m_panelIn->hasPending()
 			|| m_midiSysexTransfer.ownsMidiWire() || m_midiInByteCursor != 0
 			|| !m_midiIn.empty() || m_realtimeMidiIn.size() != 0)
 			return 0;
@@ -1994,7 +1997,7 @@ namespace md
 						// Keep external input polling at each omitted instruction
 						// boundary; a producer still wakes the ordinary path.
 						for(; instructions < limit; ++instructions)
-							if(m_panelIn.hasPending() || !m_midiIn.empty()
+							if(m_panelIn->hasPending() || !m_midiIn.empty()
 								|| m_realtimeMidiIn.size() != 0
 								|| m_midiSysexTransfer.ownsMidiWire())
 								break;
