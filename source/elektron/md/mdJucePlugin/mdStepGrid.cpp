@@ -184,9 +184,25 @@ namespace mdJucePlugin
 			m_dirty = true;
 		}
 		// Hidden (another page than SON): drawn once shown
-		if(!m_dirty || (m_root && !m_root->IsVisible(true)))
-			return false;
+		if(m_root && !m_root->IsVisible(true))
+			return showPlayStep(-1);
+		const auto playing = m_controller.getPlayingStep();
+		const bool playChanged = showPlayStep(playing && *playing < m_steps.size() ? *playing : -1);
+		if(!m_dirty)
+			return playChanged;
 		render();
+		return true;
+	}
+
+	bool StepGrid::showPlayStep(const int _step)
+	{
+		if(_step == m_shownPlayStep)
+			return false;
+		if(m_shownPlayStep >= 0 && m_steps[static_cast<size_t>(m_shownPlayStep)])
+			m_steps[static_cast<size_t>(m_shownPlayStep)]->SetClass("mdEdStepNow", false);
+		if(_step >= 0 && m_steps[static_cast<size_t>(_step)])
+			m_steps[static_cast<size_t>(_step)]->SetClass("mdEdStepNow", true);
+		m_shownPlayStep = _step;
 		return true;
 	}
 

@@ -31,6 +31,7 @@ set(SOURCES
 	mdStepColumns.cpp mdStepColumns.h
 	mdChainView.cpp mdChainView.h
 	mdLibraryView.cpp mdLibraryView.h
+	mdTrackActivity.cpp mdTrackActivity.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h

@@ -477,21 +477,37 @@
 			<div id="mdEdPageSound" class="mdEdPage" tabgroup="mdEdit" tabpage="0">
 				<div class="mdEdStrip">
 					<button id="editTrack0" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="0" style="left: 16dp;">01</button>
+					<div id="mdEdTrackLed0" class="jucePos mdEdTrackLed" style="left: 64dp; top: 15dp;"/>
 					<button id="editTrack1" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="1" style="left: 79dp;">02</button>
+					<div id="mdEdTrackLed1" class="jucePos mdEdTrackLed" style="left: 127dp; top: 15dp;"/>
 					<button id="editTrack2" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="2" style="left: 142dp;">03</button>
+					<div id="mdEdTrackLed2" class="jucePos mdEdTrackLed" style="left: 190dp; top: 15dp;"/>
 					<button id="editTrack3" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="3" style="left: 205dp;">04</button>
+					<div id="mdEdTrackLed3" class="jucePos mdEdTrackLed" style="left: 253dp; top: 15dp;"/>
 					<button id="editTrack4" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="4" style="left: 268dp;">05</button>
+					<div id="mdEdTrackLed4" class="jucePos mdEdTrackLed" style="left: 316dp; top: 15dp;"/>
 					<button id="editTrack5" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="5" style="left: 331dp;">06</button>
+					<div id="mdEdTrackLed5" class="jucePos mdEdTrackLed" style="left: 379dp; top: 15dp;"/>
 					<button id="editTrack6" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="6" style="left: 394dp;">07</button>
+					<div id="mdEdTrackLed6" class="jucePos mdEdTrackLed" style="left: 442dp; top: 15dp;"/>
 					<button id="editTrack7" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="7" style="left: 457dp;">08</button>
+					<div id="mdEdTrackLed7" class="jucePos mdEdTrackLed" style="left: 505dp; top: 15dp;"/>
 					<button id="editTrack8" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="8" style="left: 520dp;">09</button>
+					<div id="mdEdTrackLed8" class="jucePos mdEdTrackLed" style="left: 568dp; top: 15dp;"/>
 					<button id="editTrack9" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="9" style="left: 583dp;">10</button>
+					<div id="mdEdTrackLed9" class="jucePos mdEdTrackLed" style="left: 631dp; top: 15dp;"/>
 					<button id="editTrack10" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="10" style="left: 646dp;">11</button>
+					<div id="mdEdTrackLed10" class="jucePos mdEdTrackLed" style="left: 694dp; top: 15dp;"/>
 					<button id="editTrack11" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="11" style="left: 709dp;">12</button>
+					<div id="mdEdTrackLed11" class="jucePos mdEdTrackLed" style="left: 757dp; top: 15dp;"/>
 					<button id="editTrack12" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="12" style="left: 772dp;">13</button>
+					<div id="mdEdTrackLed12" class="jucePos mdEdTrackLed" style="left: 820dp; top: 15dp;"/>
 					<button id="editTrack13" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="13" style="left: 835dp;">14</button>
+					<div id="mdEdTrackLed13" class="jucePos mdEdTrackLed" style="left: 883dp; top: 15dp;"/>
 					<button id="editTrack14" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="14" style="left: 898dp;">15</button>
+					<div id="mdEdTrackLed14" class="jucePos mdEdTrackLed" style="left: 946dp; top: 15dp;"/>
 					<button id="editTrack15" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="15" style="left: 961dp;">16</button>
+					<div id="mdEdTrackLed15" class="jucePos mdEdTrackLed" style="left: 1009dp; top: 15dp;"/>
 					<button id="editMaster" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="16" style="left: 1024dp;">MASTER</button>
 				</div>
 				<div class="mdEdScroll">
@@ -1116,6 +1132,7 @@
 							<div id="mdPlayHead30" class="jucePos juceLabel mdPlayHead" style="left: 982dp; top: 32dp; width: 24dp;">31</div>
 							<div id="mdPlayHead31" class="jucePos juceLabel mdPlayHead" style="left: 1011dp; top: 32dp; width: 24dp;">32</div>
 							<div id="mdPlayTrack0" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 48dp; width: 90dp;">01 —</div>
+							<div id="mdPlayLed0" class="jucePos mdEdTrackLed" style="left: 102dp; top: 52dp;"/>
 							<div id="mdPlayStep0_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 48dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep0_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 48dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep0_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 48dp; width: 24dp; height: 14dp;"/>
@@ -1149,6 +1166,7 @@
 							<div id="mdPlayStep0_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 48dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep0_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 48dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack1" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 64dp; width: 90dp;">02 —</div>
+							<div id="mdPlayLed1" class="jucePos mdEdTrackLed" style="left: 102dp; top: 68dp;"/>
 							<div id="mdPlayStep1_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 64dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep1_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 64dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep1_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 64dp; width: 24dp; height: 14dp;"/>
@@ -1182,6 +1200,7 @@
 							<div id="mdPlayStep1_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 64dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep1_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 64dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack2" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 80dp; width: 90dp;">03 —</div>
+							<div id="mdPlayLed2" class="jucePos mdEdTrackLed" style="left: 102dp; top: 84dp;"/>
 							<div id="mdPlayStep2_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 80dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep2_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 80dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep2_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 80dp; width: 24dp; height: 14dp;"/>
@@ -1215,6 +1234,7 @@
 							<div id="mdPlayStep2_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 80dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep2_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 80dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack3" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 96dp; width: 90dp;">04 —</div>
+							<div id="mdPlayLed3" class="jucePos mdEdTrackLed" style="left: 102dp; top: 100dp;"/>
 							<div id="mdPlayStep3_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 96dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep3_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 96dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep3_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 96dp; width: 24dp; height: 14dp;"/>
@@ -1248,6 +1268,7 @@
 							<div id="mdPlayStep3_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 96dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep3_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 96dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack4" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 112dp; width: 90dp;">05 —</div>
+							<div id="mdPlayLed4" class="jucePos mdEdTrackLed" style="left: 102dp; top: 116dp;"/>
 							<div id="mdPlayStep4_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 112dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep4_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 112dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep4_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 112dp; width: 24dp; height: 14dp;"/>
@@ -1281,6 +1302,7 @@
 							<div id="mdPlayStep4_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 112dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep4_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 112dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack5" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 128dp; width: 90dp;">06 —</div>
+							<div id="mdPlayLed5" class="jucePos mdEdTrackLed" style="left: 102dp; top: 132dp;"/>
 							<div id="mdPlayStep5_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 128dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep5_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 128dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep5_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 128dp; width: 24dp; height: 14dp;"/>
@@ -1314,6 +1336,7 @@
 							<div id="mdPlayStep5_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 128dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep5_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 128dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack6" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 144dp; width: 90dp;">07 —</div>
+							<div id="mdPlayLed6" class="jucePos mdEdTrackLed" style="left: 102dp; top: 148dp;"/>
 							<div id="mdPlayStep6_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 144dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep6_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 144dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep6_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 144dp; width: 24dp; height: 14dp;"/>
@@ -1347,6 +1370,7 @@
 							<div id="mdPlayStep6_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 144dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep6_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 144dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack7" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 160dp; width: 90dp;">08 —</div>
+							<div id="mdPlayLed7" class="jucePos mdEdTrackLed" style="left: 102dp; top: 164dp;"/>
 							<div id="mdPlayStep7_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 160dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep7_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 160dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep7_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 160dp; width: 24dp; height: 14dp;"/>
@@ -1380,6 +1404,7 @@
 							<div id="mdPlayStep7_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 160dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep7_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 160dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack8" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 176dp; width: 90dp;">09 —</div>
+							<div id="mdPlayLed8" class="jucePos mdEdTrackLed" style="left: 102dp; top: 180dp;"/>
 							<div id="mdPlayStep8_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 176dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep8_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 176dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep8_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 176dp; width: 24dp; height: 14dp;"/>
@@ -1413,6 +1438,7 @@
 							<div id="mdPlayStep8_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 176dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep8_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 176dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack9" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 192dp; width: 90dp;">10 —</div>
+							<div id="mdPlayLed9" class="jucePos mdEdTrackLed" style="left: 102dp; top: 196dp;"/>
 							<div id="mdPlayStep9_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 192dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep9_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 192dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep9_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 192dp; width: 24dp; height: 14dp;"/>
@@ -1446,6 +1472,7 @@
 							<div id="mdPlayStep9_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 192dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep9_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 192dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack10" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 208dp; width: 90dp;">11 —</div>
+							<div id="mdPlayLed10" class="jucePos mdEdTrackLed" style="left: 102dp; top: 212dp;"/>
 							<div id="mdPlayStep10_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 208dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep10_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 208dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep10_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 208dp; width: 24dp; height: 14dp;"/>
@@ -1479,6 +1506,7 @@
 							<div id="mdPlayStep10_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 208dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep10_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 208dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack11" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 224dp; width: 90dp;">12 —</div>
+							<div id="mdPlayLed11" class="jucePos mdEdTrackLed" style="left: 102dp; top: 228dp;"/>
 							<div id="mdPlayStep11_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 224dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep11_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 224dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep11_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 224dp; width: 24dp; height: 14dp;"/>
@@ -1512,6 +1540,7 @@
 							<div id="mdPlayStep11_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 224dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep11_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 224dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack12" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 240dp; width: 90dp;">13 —</div>
+							<div id="mdPlayLed12" class="jucePos mdEdTrackLed" style="left: 102dp; top: 244dp;"/>
 							<div id="mdPlayStep12_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 240dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep12_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 240dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep12_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 240dp; width: 24dp; height: 14dp;"/>
@@ -1545,6 +1574,7 @@
 							<div id="mdPlayStep12_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 240dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep12_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 240dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack13" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 256dp; width: 90dp;">14 —</div>
+							<div id="mdPlayLed13" class="jucePos mdEdTrackLed" style="left: 102dp; top: 260dp;"/>
 							<div id="mdPlayStep13_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 256dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep13_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 256dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep13_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 256dp; width: 24dp; height: 14dp;"/>
@@ -1578,6 +1608,7 @@
 							<div id="mdPlayStep13_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 256dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep13_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 256dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack14" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 272dp; width: 90dp;">15 —</div>
+							<div id="mdPlayLed14" class="jucePos mdEdTrackLed" style="left: 102dp; top: 276dp;"/>
 							<div id="mdPlayStep14_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 272dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep14_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 272dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep14_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 272dp; width: 24dp; height: 14dp;"/>
@@ -1611,6 +1642,7 @@
 							<div id="mdPlayStep14_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 272dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep14_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 272dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayTrack15" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 288dp; width: 90dp;">16 —</div>
+							<div id="mdPlayLed15" class="jucePos mdEdTrackLed" style="left: 102dp; top: 292dp;"/>
 							<div id="mdPlayStep15_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 288dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep15_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 288dp; width: 24dp; height: 14dp;"/>
 							<div id="mdPlayStep15_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 288dp; width: 24dp; height: 14dp;"/>

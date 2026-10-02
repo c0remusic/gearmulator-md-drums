@@ -362,6 +362,8 @@ def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend):
     for t in range(rows):
         y = rows_top + t * rh
         w(f'{ind(d)}<div id="{prefix}Track{t}" class="jucePos juceLabel mdPlayTrack{track_class}" style="left: 16dp; top: {y}dp; width: {PLAY_LABEL_W - 6}dp;">{t + 1:02d} —</div>')
+        # the track's trig LED (TrackActivity, mdTrackActivity.cpp) at the end of its name's column
+        w(f'{ind(d)}<div id="{prefix}Led{t}" class="jucePos mdEdTrackLed" style="left: {16 + PLAY_LABEL_W - 10}dp; top: {y + (rh - 2 - 6) // 2}dp;"/>')
         for s in range(32):
             w(f'{ind(d)}<div id="{prefix}Step{t}_{s}" class="jucePos mdEdStep mdPlayStep{step_class}" style="left: {x0 + pitch * s}dp; top: {y}dp; width: {cw}dp; height: {rh - 2}dp;"/>')
     chips = "".join(f'<span class="mdPlayChip mdPlayChip{kind}"/>{text}' for kind, text in legend[0])
@@ -598,8 +600,12 @@ w('\t\t\t\t<div class="mdEdStrip">')
 for t in range(TRACKS):
     if MD:
         w(f'\t\t\t\t\t<button id="editTrack{t}" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="{t}" style="left: {M + t * 63}dp;">{t + 1:02d}</button>')
+        led_x = M + t * 63 + 60 - 12
     else:
         w(f'\t\t\t\t\t<button id="editTrack{t}" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="{t}" style="left: {colx(2 * t)}dp; width: {span(2)}dp;">PISTE {t + 1:02d}</button>')
+        led_x = colx(2 * t) + span(2) - 18
+    # the track's trig LED (TrackActivity, mdTrackActivity.cpp) on the right of its tab, which is 28 dp high from 4 dp
+    w(f'\t\t\t\t\t<div id="mdEdTrackLed{t}" class="jucePos mdEdTrackLed" style="left: {led_x}dp; top: {4 + (28 - 6) // 2}dp;"/>')
 if MD:
     w(f'\t\t\t\t\t<button id="editMaster" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="16" style="left: {M + 16 * 63}dp;">MASTER</button>')
 w('\t\t\t\t</div>')

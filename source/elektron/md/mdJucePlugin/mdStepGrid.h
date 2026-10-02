@@ -22,7 +22,8 @@ namespace mdJucePlugin
 	// the focus, a control writes a lock on that step instead of changing the Kit,
 	// and a double click on it clears the lock. Edits are written to the firmware
 	// with the whole pattern (Controller::sendPattern): a drag once it ends, a
-	// wheel turn once it pauses.
+	// wheel turn once it pauses. While the sequencer plays, the step it plays is
+	// lit (class mdEdStepNow).
 	class StepGrid
 	{
 	public:
@@ -39,8 +40,11 @@ namespace mdJucePlugin
 		int getFocus() const { return m_focus; }
 		// Whether controls write locks: a focused step with a trig.
 		bool isLocking() const;
+		// The step lit as the one the sequencer plays, -1 for none
+		int getShownPlayStep() const { return m_shownPlayStep; }
 
 	private:
+		bool showPlayStep(int _step);
 		void render();
 		void editLock(uint8_t _parameter, std::optional<uint8_t> _value);
 		void send();
@@ -66,6 +70,7 @@ namespace mdJucePlugin
 		std::array<Control, 24> m_controls{};  // by Machinedrum track parameter 0..23
 
 		int m_focus = -1;
+		int m_shownPlayStep = -1;
 		bool m_dirty = true;
 		bool m_reading = false;
 		bool m_dragging = false;

@@ -15,6 +15,7 @@
 #include "mdMmPatternView.h"
 #include "mdChainView.h"
 #include "mdLibraryView.h"
+#include "mdTrackActivity.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -805,6 +806,10 @@ namespace mdJucePlugin
 			m_libraryView = std::make_unique<LibraryView>(m_controller, getModel(), *document);
 			m_libraryView->update(juce::Time::getMillisecondCounterHiRes());
 		}
+
+		// The tracks' trig LEDs, lit as the sequencer plays their trigs.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdTrackLed0"))
+			m_trackActivity = std::make_unique<TrackActivity>(m_controller, getModel(), *document);
 
 		// The COURBES row under SON, when the window leaves room for it.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdCurves"))
@@ -2231,8 +2236,9 @@ namespace mdJucePlugin
 			|| (m_mmPatternView && m_mmPatternView->update(nowMilliseconds));
 		const bool chainChanged = m_chainView && m_chainView->update();
 		const bool libraryChanged = m_libraryView && m_libraryView->update(nowMilliseconds);
+		const bool activityChanged = m_trackActivity && m_trackActivity->update(nowMilliseconds);
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
-			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged)
+			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged || activityChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

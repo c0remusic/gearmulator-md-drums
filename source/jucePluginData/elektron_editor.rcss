@@ -172,6 +172,9 @@
 .mdEdStep:hover { color: #f4f1ea; }
 .mdEdStepTrig, .mdEdStepBeat.mdEdStepTrig { background-color: #f4f1ea; border-color: #f4f1ea; color: #141516; }
 .mdEdStepOut { opacity: 0.3; }
+/* the step the sequencer plays (StepGrid): lit, a trig on it orange; before the focus, whose frame stays orange */
+.mdEdStep.mdEdStepNow { background-color: #4a4d54; border-color: #4a4d54; color: #f4f1ea; }
+.mdEdStepTrig.mdEdStepNow { background-color: #ff6b1f; border-color: #ff6b1f; color: #141516; }
 .mdEdStep.mdEdStepFocus { border-color: #ff6b1f; }
 
 /* JOUER (mdPatternView.cpp, mdMmPatternView.cpp): the steps' numbers over the grid, the first of each beat
@@ -317,6 +320,12 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 /* mute LED in a MIX row: lit while the track plays */
 .mdEdLed { width: 12dp; height: 12dp; border-radius: 6dp; background-color: #3a3d42; }
 .mdEdLed:checked { background-color: #ff6b1f; }
+
+/* a track's trig LED, in the track strip and in JOUER (mdTrackActivity.cpp): lit for a moment when the
+   sequencer plays a trig on the track; the track's MIX LED brightens then */
+.mdEdTrackLed { width: 6dp; height: 6dp; border-radius: 3dp; background-color: #3a3d42; pointer-events: none; }
+.mdEdTrackLed.mdTrackHit { background-color: #ff6b1f; }
+.mdEdLed.mdTrackHit:checked { background-color: #ffd2a8; }
 
 /* LFO 1-3 tabs inside MODULATION (MM) */
 .mdEdLfoTab { width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }

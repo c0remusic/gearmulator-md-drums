@@ -25,6 +25,7 @@
 #include "mdChainView.h"
 #include "mdStepGrid.h"
 #include "mdSystemPage.h"
+#include "mdTrackActivity.h"
 #include "mdTrackRoutingView.h"
 #include "mdUnreadValues.h"
 #include "mdLib/mdmachines.h"
@@ -115,15 +116,22 @@ namespace mdJucePlugin
 			return _editor.m_systemPage && _editor.m_systemPage->update(_now);
 		}
 
+		static bool updateActivity(Editor& _editor, const double _now)
+		{
+			return _editor.m_trackActivity && _editor.m_trackActivity->update(_now);
+		}
+
 		static const OutputMetersView& meters(const Editor& _editor) { return *_editor.m_outputMetersView; }
 		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
 		static const MmPatternView& mmPattern(const Editor& _editor) { return *_editor.m_mmPatternView; }
+		static const StepGrid& steps(const Editor& _editor) { return *_editor.m_stepGrid; }
 
 		// Every editor component the presentation timer refreshes, for the snapshots
 		static void present(Editor& _editor)
 		{
 			updateMeters(_editor, juce::Time::getMillisecondCounterHiRes());
 			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
+			updateActivity(_editor, juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_patternView)
 				_editor.m_patternView->update();
 			if(_editor.m_mmPatternView)
@@ -1038,11 +1046,39 @@ int main()
 			require(cell(0, 4).IsClassSet("mdPlayNow") && cell(15, 4).IsClassSet("mdPlayNow")
 				&& element(doc, "mdPlayHead4").IsClassSet("mdPlayNow") && !cell(0, 3).IsClassSet("mdPlayNow"),
 				"the playing step's column is not lit");
+			// Its trigs light their tracks' LEDs in the track strip, in JOUER and in MIX, for a moment
+			const auto stepPattern = md.getPattern();
+			const auto led = [&](const std::string& _id) { return element(doc, _id).IsClassSet("mdTrackHit"); };
+			const auto mixLed = [&](const int _track)
+			{
+				Rml::ElementList buttons;
+				element(doc, "mdEdLevelRow" + std::to_string(_track)).GetElementsByTagName(buttons, "button");
+				return !buttons.empty() && buttons.front()->IsClassSet("mdTrackHit");
+			};
+			for(int track = 0; track < 16; ++track)
+			{
+				const auto n = std::to_string(track);
+				const bool trig = stepPattern->hasTrig(static_cast<uint8_t>(track), 4);
+				require(led("mdEdTrackLed" + n) == trig && led("mdPlayLed" + n) == trig && mixLed(track) == trig,
+					"track " + std::to_string(track + 1) + "'s LEDs do not follow its trig on the playing step");
+			}
+			require(led("mdEdTrackLed0") && !led("mdEdTrackLed3"), "the test pattern lost its trigs on step 5");
 			snap("-play");
+			mdJucePlugin::EditorIdentityTestAccess::updateActivity(*editor,
+				juce::Time::getMillisecondCounterHiRes() + mdJucePlugin::TrackActivity::LitMilliseconds + 1.0);
+			require(!led("mdEdTrackLed0") && !led("mdPlayLed0") && !mixLed(0), "a track's LED stays lit");
 			Access::setPlayingStep(md, uint8_t{5});
 			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
 			require(cell(0, 5).IsClassSet("mdPlayNow") && !cell(0, 4).IsClassSet("mdPlayNow")
 				&& !element(doc, "mdPlayHead4").IsClassSet("mdPlayNow"), "the lit column did not follow the playing step");
+			// SON's PAS lights the same step
+			tabButton(doc, "mdEdit", "0").Click();
+			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(element(doc, "mdEdStep5").IsClassSet("mdEdStepNow") && !element(doc, "mdEdStep4").IsClassSet("mdEdStepNow")
+				&& mdJucePlugin::EditorIdentityTestAccess::steps(*editor).getShownPlayStep() == 5, "PAS does not light the playing step");
+			tabButton(doc, "mdEdit", "2").Click();
+			context.Update();
 			Access::setPlayingStep(md, std::nullopt);
 			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
 			require(!cell(0, 5).IsClassSet("mdPlayNow") && lane.getShownPlayStep() == -1, "a column stays lit once stopped");
@@ -1151,6 +1187,19 @@ int main()
 				&& text("mmPlayLaneInfo").rfind("piste 01 · AMP VOL : 1 lock · kit ", 0) == 0
 				&& text("mmPlayParamPage1") == "AMP · 1" && text("mmPlayParamPage2") == "FILT · 3" && text("mmPlayParam5") == "VOL · 1"
 				&& element(doc, "mmPlayParam5").IsClassSet("mdEdSelected"), "lane does not show AMP VOL's lock: \"" + text("mmPlayLaneInfo") + "\"");
+			// The sequencer plays step 4: the tracks with a trig there light their LEDs (track 1 has one)
+			Access::setPlayingStep(mm, uint8_t{3});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			const auto stepPattern = mm.getMmPattern();
+			for(int track = 0; track < 6; ++track)
+			{
+				const auto n = std::to_string(track);
+				const bool trig = stepPattern->hasTrig(static_cast<uint8_t>(track), 3);
+				require(element(doc, "mdEdTrackLed" + n).IsClassSet("mdTrackHit") == trig
+					&& element(doc, "mmPlayLed" + n).IsClassSet("mdTrackHit") == trig,
+					"track " + std::to_string(track + 1) + "'s LEDs do not follow its trig on the playing step");
+			}
+			require(element(doc, "mmPlayLed0").IsClassSet("mdTrackHit"), "track 1's LED not lit by its trig on step 4");
 			// The sequencer plays step 5: its column is lit
 			Access::setPlayingStep(mm, uint8_t{4});
 			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
