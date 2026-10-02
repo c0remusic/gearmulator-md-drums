@@ -194,7 +194,8 @@ namespace
 	// $5B on a track, with the first of _candidates the track does not hold yet:
 	// a Kit request before and after saving the Kit shows whether the firmware
 	// took the machine and whether a request returns the live or the stored Kit;
-	// the track's values show what the assignment did to them.
+	// the track's values show what the assignment did to them. The live Kit in
+	// the machine's RAM shows the machine at once, and once saved equals the dump.
 	void checkAssignment(md::Hardware& _hardware, const uint8_t _track, const std::vector<uint16_t>& _candidates)
 	{
 		const auto model = _hardware.getModel();
@@ -214,9 +215,23 @@ namespace
 		advance(_hardware, md::g_samplerate);
 
 		const auto live = readKit(_hardware, slot);
+		// The machine's RAM shows the new machine at once (Hardware::readLiveKit)
+		const auto liveKit = _hardware.readLiveKit();
+		require(liveKit.has_value(), "no live Kit for this firmware");
+		require(liveKit->machines[_track] == machine, "the live Kit does not show the assigned machine");
 		send(_hardware, sysex::kitSave(model, slot));
 		advance(_hardware, md::g_samplerate);
 		const auto saved = readKit(_hardware, slot);
+		// Saved, the Kit is the live one: every value and machine of its dump is where readLiveKit reads it
+		const auto liveSaved = _hardware.readLiveKit();
+		for(const auto& change : saved.parameters)
+		{
+			require(liveSaved->value(change.track, change.page, change.index) == change.value,
+				"the live Kit differs from the saved Kit at track " + std::to_string(change.track + 1) + " page "
+				+ std::to_string(change.page) + " index " + std::to_string(change.index));
+		}
+		for(size_t track = 0; track < saved.machines.size(); ++track)
+			require(liveSaved->machines[track] == saved.machines[track], "the live Kit's machines differ from the saved Kit's");
 
 		const auto valuesBefore = trackValues(before, _track);
 		const auto valuesAfter = trackValues(saved, _track);

@@ -19,6 +19,15 @@ namespace mdJucePlugin
 		return m_status->read();
 	}
 
+	std::optional<md::LiveKit> LiveDevice::liveKit()
+	{
+		const std::lock_guard lock(m_mutex);
+		refresh();
+		if(!m_liveKit)
+			return std::nullopt;
+		return m_liveKit->read();
+	}
+
 	std::shared_ptr<md::FrontPanelPublisher> LiveDevice::frontPanel()
 	{
 		const std::lock_guard lock(m_mutex);
@@ -46,6 +55,7 @@ namespace mdJucePlugin
 			m_known = true;
 			const auto* const device = dynamic_cast<const md::Device*>(_device);
 			m_status = device ? device->getStatus() : nullptr;
+			m_liveKit = device ? device->getLiveKit() : nullptr;
 			m_frontPanel = device ? device->getFrontPanelPublisher() : nullptr;
 			m_panelInput = device ? device->getPanelInput() : nullptr;
 			m_hardwareEpoch = device ? device->hardwareEpoch() : 0;

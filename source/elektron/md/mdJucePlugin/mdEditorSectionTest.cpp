@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <cstdlib>
 #include <iostream>
@@ -77,6 +78,28 @@ namespace mdJucePlugin
 		static void setPlayingStep(Controller& _controller, const std::optional<uint8_t> _step)
 		{
 			_controller.m_syntheticPlayingStepForTests = _step;
+		}
+
+		// The Kit the machine's RAM holds (none: no live Kit), read as the controller timer reads it: past
+		// the grace an assignment gets, three reads a poll and a second of emulation apart, two to agree
+		// and three to see no CC sent to the track in between
+		static void readLiveKit(Controller& _controller, const std::optional<md::LiveKit>& _kit,
+			const std::function<void()>& _afterFirstRead = {})
+		{
+			const std::lock_guard lock(_controller.m_synchronizationLock);
+			_controller.m_previousLiveKit.reset();
+			_controller.m_liveKitPollMs = 0;
+			const auto now = Controller::milliseconds() + Controller::AssignmentGraceMilliseconds;
+			for(uint64_t read = 0; read < 3; ++read)
+			{
+				if(read == 1 && _afterFirstRead)
+					_afterFirstRead();
+				auto kit = _kit;
+				if(kit)
+					kit->frame = (read + 1) * md::g_samplerate;
+				_controller.m_syntheticLiveKitForTests = kit;
+				_controller.serviceLiveKit(now + read * Controller::LiveKitPollMilliseconds);
+			}
 		}
 
 		// The tracks' machines, as an applied Kit dump sets them
@@ -792,6 +815,47 @@ int main()
 			const std::string next = mm ? "SynthesisB" : "MachineParameter2";
 			require(!unread("mdEdCtl_" + synthesis) && !unread("mdEdVal_" + synthesis) && unread("mdEdCtl_" + next),
 				"a control did not make exactly its own value known");
+
+			// The live Kit (the machine's RAM): once two reads show the assigned machine, the values still
+			// unknown take the firmware's; the one a control set keeps its value
+			using Access = mdJucePlugin::ControllerAutomationTestAccess;
+			const auto value = [&](const std::string& _param, const uint8_t _part)
+			{
+				return static_cast<int>(controller.getParameter(_param, _part)->getUnnormalizedValue());
+			};
+			md::LiveKit kit;
+			kit.tracks = static_cast<uint8_t>(g_trackCount);
+			for(int track = 0; track < g_trackCount; ++track)
+			{
+				kit.machines[track] = static_cast<uint8_t>(g_pickMachine);
+				kit.values[track].fill(64);
+			}
+			kit.machines[0] = static_cast<uint8_t>(g_otherFamilyMachine);
+			kit.values[0].fill(23);
+			Access::readLiveKit(md, kit);
+			mdJucePlugin::EditorIdentityTestAccess::updateUnread(*editor);
+			context.Update();
+			require(!unread("mdEdCtl_" + next) && value(next, 0) == 23 && value(synthesis, 0) == 90,
+				"the live Kit did not give the unknown values exactly");
+			// A machine changed on the front panel: taken, with the values the firmware gave its pages
+			kit.machines[1] = static_cast<uint8_t>(g_otherFamilyMachine);
+			kit.values[1].fill(77);
+			Access::readLiveKit(md, kit);
+			require(md.getTrackMachine(1) == g_otherFamilyMachine && value(synthesis, 1) == 77
+				&& value(other, 1) == (mm ? 64 : 77), "a machine changed on the front panel was not taken with its values");
+			// A CC sent to a track between the reads: the machine waits for reads that saw none go out, the
+			// RAM may not show the CC yet
+			kit.machines[2] = static_cast<uint8_t>(g_otherFamilyMachine);
+			kit.values[2].fill(50);
+			Access::readLiveKit(md, kit, [&]
+			{
+				controller.getParameter(synthesis, 2)->setUnnormalizedValueNotifyingHost(50, pluginLib::Parameter::Origin::Ui);
+			});
+			require(md.getTrackMachine(2) == g_pickMachine, "a machine was taken while a CC to its track was on its way");
+			Access::readLiveKit(md, kit);
+			require(md.getTrackMachine(2) == g_otherFamilyMachine && value(synthesis, 2) == 50,
+				"a machine was not taken once no CC went to its track");
+			Access::readLiveKit(md, std::nullopt);
 
 			loadKit();
 			require(!unread("mdEdCtl_" + next) && !mixRowValues(0, mm ? "AmpVolume" : "Volume"), "values still greyed after the Kit was applied");

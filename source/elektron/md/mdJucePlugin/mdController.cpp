@@ -343,6 +343,8 @@ namespace mdJucePlugin
 
 		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
 			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		// Until the live Kit shows it, the machine it still shows is not taken for a front panel change
+		m_assignmentMs[_part] = std::max<uint64_t>(milliseconds(), 1);
 		return true;
 	}
 
@@ -743,6 +745,11 @@ namespace mdJucePlugin
 			m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
 			requestLibraryItem(m_libraryWaiting + 1, now);
 		}
+		// The live Kit only once synchronized; a read from before a resynchronization is forgotten
+		if(m_automationReady.load(std::memory_order_acquire))
+			serviceLiveKit(now);
+		else
+			m_previousLiveKit.reset();
 		if(m_automationReady.load(std::memory_order_acquire))
 		{
 			// Firmware Global is authoritative for the MIDI channel, and a front-panel
@@ -942,6 +949,8 @@ namespace mdJucePlugin
 			}
 			m_transmittedAutomationDigest.store(digest, std::memory_order_release);
 			m_transmittedAutomationChanges.fetch_add(1, std::memory_order_release);
+			if(_change.track < m_trackDeliveries.size())
+				m_trackDeliveries[_change.track].fetch_add(1, std::memory_order_relaxed);
 			sendMidiEvent((*message)[0], (*message)[1], (*message)[2]);
 		}
 	}
@@ -966,6 +975,8 @@ namespace mdJucePlugin
 		}
 		m_transmittedAutomationDigest.store(digest, std::memory_order_release);
 		m_transmittedAutomationChanges.fetch_add(1, std::memory_order_release);
+		if(_change.track < m_trackDeliveries.size())
+			m_trackDeliveries[_change.track].fetch_add(1, std::memory_order_relaxed);
 		return true;
 	}
 
@@ -1172,6 +1183,93 @@ namespace mdJucePlugin
 		if(!status || !status->sequencerPlaying || status->sequencerStep == md::MachineStatus::Values::NoStep)
 			return std::nullopt;
 		return status->sequencerStep;
+	}
+
+	std::optional<md::LiveKit> Controller::readLiveKit() const
+	{
+		if(m_syntheticLiveKitForTests)
+			return *m_syntheticLiveKitForTests;
+		return static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().liveKit();
+	}
+
+	void Controller::serviceLiveKit(const uint64_t _now)
+	{
+		if(_now - m_liveKitPollMs < LiveKitPollMilliseconds)
+			return;
+		m_liveKitPollMs = _now;
+
+		// The tracks no CC went to during the last two reads: one sent before may already show
+		for(size_t track = 0; track < m_trackDeliveries.size(); ++track)
+		{
+			const auto deliveries = m_trackDeliveries[track].load(std::memory_order_relaxed);
+			if(deliveries != m_seenDeliveries[track])
+			{
+				m_seenDeliveries[track] = deliveries;
+				m_quietReads[track] = 0;
+			}
+			else if(m_quietReads[track] < 2)
+				++m_quietReads[track];
+		}
+
+		auto kit = readLiveKit();
+		if(!kit || kit->tracks != getPartCount())
+		{
+			m_previousLiveKit.reset();
+			return;
+		}
+		// A read not 50 ms of emulation newer than the last (the host not calling, the machine busy) waits
+		// for one that is; one older comes from another machine
+		if(m_previousLiveKit && kit->frame >= m_previousLiveKit->frame
+			&& kit->frame - m_previousLiveKit->frame < md::g_samplerate / 20)
+			return;
+		const auto previous = std::exchange(m_previousLiveKit, kit);
+		if(!previous || kit->frame < previous->frame)
+			return;
+
+		const bool mm = m_model == md::MachineModel::Monomachine;
+		// The pages an assignment gives the machine's values (assignMachine), and the last page the live
+		// Kit holds (the level's)
+		const auto lastMachinePage = mm ? md::automation::monomachine::Synthesis : md::automation::machinedrum::Routing;
+		const auto lastLivePage = mm ? md::automation::monomachine::Level : md::automation::machinedrum::Level;
+		for(uint8_t track = 0; track < kit->tracks; ++track)
+		{
+			if(m_quietReads[track] < 2 || !kit->sameTrack(*previous, track, static_cast<uint8_t>(lastMachinePage + 1)))
+				continue;
+			const uint16_t machine = kit->machines[track];
+			const auto stored = m_trackMachines[track].load(std::memory_order_acquire);
+			// The editor's assignment: no read taken before the firmware applied it, even the same machine
+			// again, and its machine expected until it shows or the firmware gave up on it
+			if(m_assignmentMs[track])
+			{
+				const auto age = _now - m_assignmentMs[track];
+				if(age < 3 * LiveKitPollMilliseconds || (machine != stored && age < AssignmentGraceMilliseconds))
+					continue;
+				m_assignmentMs[track] = 0;
+			}
+			// A machine changed on the front panel, or by a Kit loaded there: taken with its pages' values.
+			// The first machine seen is only stored: the values the plug-in restores may still be on their way.
+			const bool changed = machine != stored;
+			if(changed)
+			{
+				m_trackMachines[track].store(machine, std::memory_order_release);
+				m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
+			const bool adopted = changed && stored != md::machines::g_unknown;
+			for(auto& slot : m_automationSlots)
+			{
+				const auto& address = slot.address;
+				if(address.track != track || address.page > lastLivePage)
+					continue;
+				if(!slot.valueUnknown.load(std::memory_order_acquire) && !(adopted && address.page <= lastMachinePage))
+					continue;
+				// An edit on its way to the firmware wins
+				if(publicationIsDirty(slot.publication.load(std::memory_order_acquire)))
+					continue;
+				const auto value = publishFirmwareValue(address, kit->value(track, address.page, address.index));
+				for(auto* const parameter : findSynthParam(track, address.page, address.index))
+					parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			}
+		}
 	}
 
 	bool Controller::firmwareReadyForAutomation() const

@@ -1363,6 +1363,42 @@ namespace md
 		return SequencerPosition{m_uc.read8(stepAddress), playing};
 	}
 
+	std::optional<LiveKit> Hardware::readLiveKit()
+	{
+		// Found with mdPlayheadProbe --livekit: bytes that follow ASSIGN MACHINE and a parameter's CC at
+		// once. The Machinedrum keeps the Kit from $100000 as its dump lays it out (name at $0a, parameters
+		// at $1a, 24 a track, levels at $19a, machines at $1aa, a 32-bit word a track whose low byte is the
+		// id); the Monomachine from $100028 as its dump's decoded payload (name, levels at $0b, parameters
+		// at $11, 72 a track with pages synthesis to LFO 3 first, then a machine id byte a track).
+		LiveKit kit;
+		kit.frame = getEmulatedFrames();
+		if(m_firmwareFingerprint == g_mdOs163Fingerprint)
+		{
+			kit.tracks = automation::machinedrum::TrackCount;
+			for(uint8_t track = 0; track < kit.tracks; ++track)
+			{
+				for(uint8_t parameter = 0; parameter < 24; ++parameter)
+					kit.values[track][parameter] = m_uc.read8(0x0010001a + track * 24u + parameter);
+				kit.values[track][automation::machinedrum::Level * 8u] = m_uc.read8(0x0010019a + track);
+				kit.machines[track] = m_uc.read8(0x001001ad + track * 4u);
+			}
+			return kit;
+		}
+		if(m_firmwareFingerprint == g_mmOs132bFingerprint)
+		{
+			kit.tracks = automation::monomachine::TrackCount;
+			for(uint8_t track = 0; track < kit.tracks; ++track)
+			{
+				for(uint8_t parameter = 0; parameter < (automation::monomachine::Lfo3 + 1) * 8; ++parameter)
+					kit.values[track][parameter] = m_uc.read8(0x00100039 + track * 72u + parameter);
+				kit.values[track][automation::monomachine::Level * 8u] = m_uc.read8(0x00100033 + track);
+				kit.machines[track] = m_uc.read8(0x001001e9 + track);
+			}
+			return kit;
+		}
+		return std::nullopt;
+	}
+
 	bool Hardware::trySendPanelEvent(const uint8_t _cmd, const uint8_t _arg)
 	{
 		registerExternalInteraction();

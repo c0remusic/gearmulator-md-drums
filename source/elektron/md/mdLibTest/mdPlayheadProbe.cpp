@@ -4,9 +4,12 @@
 // which has no playhead yet. Firmware from GEARMULATOR_MD_FIRMWARE_BIN and GEARMULATOR_MM_FIRMWARE_BIN.
 // --dump <prefix> writes the RAM of both booted machines to <prefix>-md.bin and <prefix>-mm.bin, where the
 // OS keeps what its flash holds compressed, such as the machine table (md::machines::parameterNames).
+// --livekit prints the RAM bytes that follow ASSIGN MACHINE and parameter CCs: the live Kit
+// (md::Hardware::readLiveKit).
 
 #include "mmFirmwareMachine.h"
 
+#include "mdLib/mdautomation.h"
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
@@ -509,6 +512,131 @@ namespace
 		}
 	}
 
+	// The RAM bytes that hold the live Kit, the one the machine plays: what ASSIGN MACHINE ($5B) and a
+	// parameter's CC change at once, where a Kit request answers with the stored Kit. Addresses whose byte
+	// follows two assignments (or two values) in turn are printed.
+	std::vector<uint8_t> snapshotRam(md::Hardware& _hardware)
+	{
+		auto& uc = _hardware.getUC();
+		std::vector<uint8_t> bytes(0x00300000);
+		for(uint32_t i = 0; i < bytes.size(); ++i)
+		{
+			const auto address = 0x00100000 + i;
+			if(address < 0x00300000 || address >= 0x00310000)
+				bytes[i] = uc.read8(address);
+		}
+		return bytes;
+	}
+
+	void printFollowers(const char* _what, const std::vector<uint8_t>& _before, const std::vector<uint8_t>& _first,
+		const std::vector<uint8_t>& _second, const uint8_t _a, const uint8_t _b)
+	{
+		std::string line;
+		size_t count = 0;
+		for(size_t i = 0; i < _first.size(); ++i)
+		{
+			if(_before[i] == _a || _first[i] != _a || _second[i] != _b)
+				continue;
+			if(++count <= 24)
+			{
+				char text[16];
+				std::snprintf(text, sizeof(text), " $%06x", static_cast<unsigned>(0x00100000 + i));
+				line += text;
+			}
+		}
+		std::printf("%s: %zu bytes follow %u then %u:%s\n", _what, count, _a, _b, line.c_str());
+	}
+
+	void probeLiveKit(md::Hardware& _hardware, const std::function<void(const md::automation::sysex::Message&)>& _send,
+		const md::MachineModel _model, const uint16_t _machineA, const uint16_t _machineB, const char* _name)
+	{
+		namespace sysex = md::automation::sysex;
+		const auto settle = [&] { advance(_hardware, md::g_samplerate / 2); };
+		const auto assign = [&](const uint8_t _track, const uint16_t _machine)
+		{
+			const auto message = sysex::assignMachine(_model, _track, _machine);
+			require(message.has_value(), "machine not assignable");
+			_send(*message);
+			settle();
+		};
+		const auto cc = [&](const uint8_t _page, const uint8_t _track, const uint8_t _index, const uint8_t _value)
+		{
+			const auto message = md::automation::encodeParameterChange(_model, {_page, _track, _index, _value}, 0);
+			require(message.has_value(), "parameter not encodable");
+			_send(sysex::Message(message->begin(), message->end()));
+			settle();
+		};
+
+		// Machines: track 1 takes A then B, track 2 then takes A
+		auto before = snapshotRam(_hardware);
+		assign(0, _machineA);
+		const auto first = snapshotRam(_hardware);
+		assign(0, _machineB);
+		const auto second = snapshotRam(_hardware);
+		printFollowers((std::string(_name) + " track 1 machine").c_str(), before, first, second,
+			static_cast<uint8_t>(_machineA), static_cast<uint8_t>(_machineB));
+		assign(1, _machineA);
+		const auto third = snapshotRam(_hardware);
+		printFollowers((std::string(_name) + " track 2 machine").c_str(), second, third, third,
+			static_cast<uint8_t>(_machineA), static_cast<uint8_t>(_machineA));
+
+		// Parameters: track 1's first synthesis parameter takes 11 then 99; its second 33 then 77; track 2's
+		// first 22 then 88
+		before = snapshotRam(_hardware);
+		cc(0, 0, 0, 11);
+		auto p1 = snapshotRam(_hardware);
+		cc(0, 0, 0, 99);
+		auto p2 = snapshotRam(_hardware);
+		printFollowers((std::string(_name) + " track 1 param 1").c_str(), before, p1, p2, 11, 99);
+		cc(0, 0, 1, 33);
+		p1 = snapshotRam(_hardware);
+		cc(0, 0, 1, 77);
+		p2 = snapshotRam(_hardware);
+		printFollowers((std::string(_name) + " track 1 param 2").c_str(), before, p1, p2, 33, 77);
+		cc(0, 1, 0, 22);
+		p1 = snapshotRam(_hardware);
+		cc(0, 1, 0, 88);
+		p2 = snapshotRam(_hardware);
+		printFollowers((std::string(_name) + " track 2 param 1").c_str(), before, p1, p2, 22, 88);
+	}
+
+	void liveKitMachines()
+	{
+		if(const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN"))
+		{
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			auto hardware = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Machinedrum);
+			while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+				advance(*hardware, 64);
+			advance(*hardware, md::g_samplerate * 20);
+			const auto send = [&](const md::automation::sysex::Message& _bytes)
+			{
+				synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+				if(_bytes.front() == 0xf0)
+					event.sysex.assign(_bytes.begin(), _bytes.end());
+				else
+				{
+					event.a = _bytes[0];
+					event.b = _bytes.size() > 1 ? _bytes[1] : 0;
+					event.c = _bytes.size() > 2 ? _bytes[2] : 0;
+				}
+				require(hardware->sendMidi(event), "MIDI rejected");
+			};
+			// TRX-SD then EFM-BD
+			probeLiveKit(*hardware, send, md::MachineModel::Machinedrum, 17, 32, "MD");
+		}
+		if(const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN"))
+		{
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			md::test::Monomachine machine(rom, path);
+			// SWAVE-SAW then FM+-STAT
+			probeLiveKit(machine.hardware(), [&](const md::automation::sysex::Message& _bytes) { machine.send(_bytes); },
+				md::MachineModel::Monomachine, 4, 8, "MM");
+		}
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -551,6 +679,11 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 2 && std::string(_argv[1]) == "--dump")
 		{
 			dumpMachines(_argv[2]);
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--livekit")
+		{
+			liveKitMachines();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);

@@ -9,6 +9,7 @@
 #include "mdchainplayer.h"
 #include "mdhardware.h"
 #include "mdhostsync.h"
+#include "mdlivekit.h"
 #include "mdmachinestatus.h"
 #include "mdsyseximport.h"
 
@@ -239,6 +240,9 @@ namespace md
 		std::shared_ptr<PanelInputQueue> getPanelInput() const { return m_hardware->getPanelInput(); }
 		// Read by any thread without the device lock; the same for the Device's lifetime.
 		std::shared_ptr<const MachineStatus> getStatus() const { return m_status; }
+		// The Kit the live machine plays (Hardware::readLiveKit), twenty times a second of emulated
+		// time; read by any thread without the device lock, the same for the Device's lifetime.
+		std::shared_ptr<const LiveKitSnapshot> getLiveKit() const { return m_liveKit; }
 		PanelInputQueueStatus getPanelInputStatus() const
 		{
 			return m_hardware->getPanelInputStatus();
@@ -319,6 +323,8 @@ namespace md
 		const MachineModel m_model;
 		std::shared_ptr<FrontPanelPublisher> m_frontPanelPublisher;
 		std::shared_ptr<MachineStatus> m_status = std::make_shared<MachineStatus>();
+		std::shared_ptr<LiveKitSnapshot> m_liveKit = std::make_shared<LiveKitSnapshot>();
+		uint64_t m_liveKitFrame = 0;	// the emulated frame of the last kit read
 		std::shared_ptr<const PreparationContext> m_preparationContext;
 		std::unique_ptr<Hardware> m_hardware;
 		std::unique_ptr<PreparedState> m_deferredPreparedState;

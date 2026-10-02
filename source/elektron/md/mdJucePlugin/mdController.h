@@ -3,6 +3,7 @@
 #include "jucePluginLib/controller.h"
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
+#include "mdLib/mdlivekit.h"
 #include "mdLib/mdmachines.h"
 #include "mdLib/mdsysexautomation.h"
 #include "mdLib/mdtypes.h"
@@ -297,6 +298,14 @@ namespace mdJucePlugin
 		void completeSynchronizationIfReady();
 		bool firmwareReadyForAutomation() const;
 		void applyKitParameters(const std::vector<md::automation::ParameterChange>& _changes);
+		// The machine's live Kit (md::Hardware::readLiveKit), read ten times a second under
+		// m_synchronizationLock: a machine changed on the front panel is taken, with the values the
+		// firmware gave the track's pages; a value unknown since an assignment takes the firmware's.
+		// A track counts once two reads 50 ms of emulation apart agree on it and no CC went to it for two
+		// reads, so neither a Kit load or an assignment half done, nor a CC the firmware has yet to
+		// apply, is taken.
+		void serviceLiveKit(uint64_t _now);
+		std::optional<md::LiveKit> readLiveKit() const;
 		// An applied dump replaces every track's machine; an inspection dump only
 		// fills tracks whose machine is still unknown.
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
@@ -390,9 +399,24 @@ namespace mdJucePlugin
 		std::atomic_flag m_realtimeAutomationDrain = ATOMIC_FLAG_INIT;
 		std::atomic<uint64_t> m_realtimeAutomationOverflows{0};
 		mutable std::atomic<uint64_t> m_synchronizationRequests{0};
+		// serviceLiveKit(), under m_synchronizationLock: the last read, its time, and per track the time
+		// of the editor's last assignment the live Kit does not show yet (0: none), the CCs sent to the
+		// track as last seen and how many reads have seen no new one
+		static constexpr uint64_t LiveKitPollMilliseconds = 100;
+		static constexpr uint64_t AssignmentGraceMilliseconds = 1000;
+		std::optional<md::LiveKit> m_previousLiveKit;
+		uint64_t m_liveKitPollMs = 0;
+		std::array<uint64_t, md::automation::machinedrum::TrackCount> m_assignmentMs{};
+		std::array<uint32_t, md::automation::machinedrum::TrackCount> m_seenDeliveries{};
+		std::array<uint8_t, md::automation::machinedrum::TrackCount> m_quietReads{};
+		// The CCs sent per track (transmitParameterChange, transmitRealtimeParameterChange, the latter on the
+		// audio thread): a track that got one may not show it in the machine's RAM yet
+		std::array<std::atomic<uint32_t>, md::automation::machinedrum::TrackCount> m_trackDeliveries{};
 		bool m_syntheticFirmwareReadyForTests = false;
 		// Tests without a running machine: the step getPlayingStep() answers with, set
 		std::optional<std::optional<uint8_t>> m_syntheticPlayingStepForTests;
+		// and the live Kit readLiveKit() answers with, set
+		std::optional<std::optional<md::LiveKit>> m_syntheticLiveKitForTests;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
 	};
 }

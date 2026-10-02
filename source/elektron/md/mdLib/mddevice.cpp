@@ -819,6 +819,18 @@ namespace md
 				static_cast<uint32_t>(_samples));
 		}
 		publishStatus();
+
+		// The live Kit, twenty times a second: about 450 bytes read from the machine's RAM
+		const auto frames = m_hardware->getEmulatedFrames();
+		if(frames - m_liveKitFrame >= g_samplerate / 20 || frames < m_liveKitFrame)
+		{
+			m_liveKitFrame = frames;
+			if(!isProjectStateRestorePending() && m_hardware->isFirmwareMidiReady())
+			{
+				if(const auto kit = m_hardware->readLiveKit())
+					m_liveKit->publish(*kit);
+			}
+		}
 	}
 
 	void Device::publishStatus()

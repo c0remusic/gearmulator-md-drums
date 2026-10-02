@@ -17,6 +17,7 @@
 #include "mddsp.h"
 #include "mdfrontpanel.h"
 #include "mdhostaudioqueue.h"
+#include "mdlivekit.h"
 #include "mdmc.h"
 #include "mdpanel.h"
 #include "mdrealtimemidiqueue.h"
@@ -139,6 +140,10 @@ namespace md
 			bool playing = false;
 		};
 		std::optional<SequencerPosition> readSequencerPosition();
+		// The Kit the machine plays, from its RAM (md::LiveKit); none for a firmware whose layout is not
+		// known (Machinedrum OS 1.63 and Monomachine OS 1.32b are). On the emulation thread, or with it
+		// paused.
+		std::optional<LiveKit> readLiveKit();
 		bool supportsRamRecordingMode() const
 		{
 			return m_model == MachineModel::Machinedrum
