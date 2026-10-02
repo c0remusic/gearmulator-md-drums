@@ -29,8 +29,8 @@ namespace mdJucePlugin
 		StepGrid(Controller& _controller, Rml::Element& _document);
 
 		// Asks for the pattern when none is shown yet, sends pending lock edits, and
-		// redraws when the edited track, the pattern or the focus changed. Returns
-		// true when it changed the DOM.
+		// redraws when the edited track, the pattern or the focus changed, once SON
+		// shows the grid. Returns true when it changed the DOM.
 		bool update(double _nowMilliseconds);
 
 		void refresh();
@@ -53,11 +53,16 @@ namespace mdJucePlugin
 			Rml::Element* value = nullptr;     // bound value label
 			Rml::Element* lock = nullptr;      // locked value, shown instead of the value
 			Rml::Element* lockKnob = nullptr;  // over the control while locking; writes the lock
+			// What the DOM shows: written again only when it changes, each write lays the document out
+			std::string shownLock;
+			bool lockKnobShown = false;
 		};
 
 		Controller& m_controller;
+		Rml::Element* m_root = nullptr;        // the grid's block: hidden, nothing is drawn
 		std::array<Rml::Element*, 32> m_steps{};
 		Rml::Element* m_info = nullptr;
+		std::string m_shownInfo;
 		std::array<Control, 24> m_controls{};  // by Machinedrum track parameter 0..23
 
 		int m_focus = -1;

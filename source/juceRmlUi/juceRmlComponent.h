@@ -125,6 +125,10 @@ namespace juceRmlUi
 		float getOpenGLRenderingScale() const;
 		void setUseNativePixelDensity(bool _enabled);
 
+		// False while the window shows nothing of the component: hidden or minimized. A component without a
+		// window (offscreen rendering) counts as on screen.
+		bool isOnScreen() const;
+
 		Rml::Vector2i getDocumentSize() const { return m_documentSize; }
 		// A <body> with the resizableheight attribute keeps its width and scale
 		// from the window width and takes the window height, whatever it is.

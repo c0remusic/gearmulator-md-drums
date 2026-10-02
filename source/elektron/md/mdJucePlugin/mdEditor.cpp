@@ -45,6 +45,7 @@
 #include "juceRmlUi/rmlElemKnob.h"
 #include "juceRmlUi/rmlEventListener.h"
 #include "juceRmlUi/rmlHelper.h"
+#include "juceRmlUi/rmlInterfaces.h"
 #include "juceRmlUi/juceRmlComponent.h"
 
 #include "RmlUi/Core/Element.h"
@@ -53,6 +54,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -2187,6 +2189,12 @@ namespace mdJucePlugin
 		}
 		if(_timerId != g_presentationTimerId)
 			return;
+
+		// The views write the element tree under the access lock, the one the OpenGL thread reads it
+		// under (RmlComponent::renderOpenGL)
+		std::optional<juceRmlUi::RmlInterfaces::ScopedAccess> access;
+		if(auto* rml = getRmlComponent())
+			access.emplace(*rml);
 
 		const auto nowMilliseconds = juce::Time::getMillisecondCounterHiRes();
 		const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();

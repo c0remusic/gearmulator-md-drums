@@ -33,10 +33,20 @@ namespace mdJucePlugin
 			return value ? value->Get<Rml::String>(_element.GetCoreInstance()) : std::string();
 		}
 
-		void setDisplayed(Rml::Element* _element, const bool _displayed)
+		// Text and display are written only when they change: each write lays the whole document out
+		void setText(Rml::Element* _element, std::string& _shown, const std::string& _text)
 		{
-			if(!_element)
+			if(!_element || _text == _shown)
 				return;
+			_shown = _text;
+			_element->SetInnerRML(_text);
+		}
+
+		void setDisplayed(Rml::Element* _element, bool& _shown, const bool _displayed)
+		{
+			if(!_element || _displayed == _shown)
+				return;
+			_shown = _displayed;
 			if(_displayed)
 				_element->RemoveProperty(Rml::PropertyId::Display);
 			else
@@ -62,6 +72,7 @@ namespace mdJucePlugin
 				toggleTrig(step);
 			});
 		}
+		m_root = m_steps[0] ? m_steps[0]->GetParentNode() : nullptr;
 		m_info = _document.GetElementById("mdEdStepsInfo");
 		if(auto* button = _document.GetElementById("mdEdStepsRefresh"))
 		{
@@ -172,7 +183,8 @@ namespace mdJucePlugin
 			m_shownWrite = write;
 			m_dirty = true;
 		}
-		if(!m_dirty)
+		// Hidden (another page than SON): drawn once shown
+		if(!m_dirty || (m_root && !m_root->IsVisible(true)))
 			return false;
 		render();
 		return true;
@@ -266,7 +278,7 @@ namespace mdJucePlugin
 		size_t locks = 0;
 		for(uint8_t parameter = 0; parameter < m_controls.size(); ++parameter)
 		{
-			const auto& control = m_controls[parameter];
+			auto& control = m_controls[parameter];
 			if(!control.value)
 				continue;
 			const auto lock = pattern && m_focus >= 0
@@ -275,7 +287,7 @@ namespace mdJucePlugin
 			const bool dim = m_focus >= 0 && !lock;
 			if(control.lock)
 			{
-				control.lock->SetInnerRML(lock ? std::to_string(*lock) : std::string());
+				setText(control.lock, control.shownLock, lock ? std::to_string(*lock) : std::string());
 				control.lock->SetClass("mdEdHidden", !lock);
 			}
 			control.value->SetClass("mdEdHidden", lock.has_value());
@@ -287,7 +299,7 @@ namespace mdJucePlugin
 			}
 			if(control.lockKnob)
 			{
-				setDisplayed(control.lockKnob, locking);
+				setDisplayed(control.lockKnob, control.lockKnobShown, locking);
 				// Starts from the lock, or from the Kit value for a parameter without one.
 				if(locking && !m_dragging)
 					juceRmlUi::ElemValue::setValue(control.lockKnob, static_cast<float>(lock ? *lock : kitValue(parameter)), false);
@@ -298,7 +310,7 @@ namespace mdJucePlugin
 			return;
 		if(!pattern)
 		{
-			m_info->SetInnerRML(m_reading ? "lecture du pattern…" : "pattern : en attente du firmware");
+			setText(m_info, m_shownInfo, m_reading ? "lecture du pattern…" : "pattern : en attente du firmware");
 			return;
 		}
 		// The track is the tab above; the line keeps to what the grid cannot show.
@@ -320,6 +332,6 @@ namespace mdJucePlugin
 		}
 		if(m_reading)
 			text += " · relecture…";
-		m_info->SetInnerRML(text);
+		setText(m_info, m_shownInfo, text);
 	}
 }

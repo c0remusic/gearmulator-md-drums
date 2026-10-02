@@ -151,23 +151,26 @@
 .mdEdSegChoice:hover { color: #f4f1ea; }
 .mdEdSeg.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
 
-/* steps: 24 dp high, their width set by the RML */
+/* steps: 24 dp high, their width set by the RML. The focus frame is always 2 dp wide, in the step's own colour
+   until it has the focus: changing a border's width lays the whole document out again, changing its colour
+   does not. */
 .mdEdStep
 {
 	box-sizing: border-box;
 	height: 24dp;
-	line-height: 24dp;
+	line-height: 20dp;
 	font-size: 10dp;
 	text-align: center;
 	color: #8a8d93;
 	background-color: #2a2c30;
+	border: 2dp #2a2c30;
 }
-.mdEdStepBeat { background-color: #3a3d42; }
+.mdEdStepBeat { background-color: #3a3d42; border-color: #3a3d42; }
 .mdEdStep { cursor: pointer; }
 .mdEdStep:hover { color: #f4f1ea; }
-.mdEdStepTrig, .mdEdStepBeat.mdEdStepTrig { background-color: #f4f1ea; color: #141516; }
+.mdEdStepTrig, .mdEdStepBeat.mdEdStepTrig { background-color: #f4f1ea; border-color: #f4f1ea; color: #141516; }
 .mdEdStepOut { opacity: 0.3; }
-.mdEdStepFocus { border: 2dp #ff6b1f; }
+.mdEdStep.mdEdStepFocus { border-color: #ff6b1f; }
 
 /* JOUER (mdPatternView.cpp, mdMmPatternView.cpp): the steps' numbers over the grid, the first of each beat
    brighter; a band behind every other beat and a line between the bars; a row per track, the edited
@@ -198,10 +201,10 @@
 .mdPlayChipOut { background-color: #1b1c1f; border: 1dp #3a3d42; }
 
 /* BIBLIO (mdLibraryView.cpp): a cell per stored Kit, the loaded one in amber, the chosen one framed */
-.mdLibKit { box-sizing: border-box; height: 22dp; line-height: 22dp; padding-left: 6dp; font-size: 11dp; color: #f4f1ea;
-	border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdLibKit { box-sizing: border-box; height: 22dp; line-height: 20dp; padding-left: 5dp; font-size: 11dp; color: #f4f1ea;
+	border: 1dp transparent; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
 .mdLibKit:hover { background-color: #2a2c30; }
-.mdLibKit.mdEdSelected { background-color: #2e3034; border: 1dp #8a8d93; }
+.mdLibKit.mdEdSelected { background-color: #2e3034; border-color: #8a8d93; }
 .mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
 /* a pattern read without a trig */
 .mdLibKit.mdLibEmpty { color: #6c6f75; }
@@ -209,21 +212,23 @@
 
 /* JOUER, CHAÎNE (mdChainView.cpp): a slot per entry, pattern then passes and length; the chosen one
    framed, the one playing in orange, an empty one dimmed */
-.mdChainSlot { box-sizing: border-box; height: 44dp; padding: 4dp 6dp; font-size: 11dp; line-height: 17dp; color: #f4f1ea;
-	background-color: #2a2c30; border: 1dp #3a3d42; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdChainSlot { box-sizing: border-box; height: 44dp; padding: 3dp 5dp; font-size: 11dp; line-height: 17dp; color: #f4f1ea;
+	background-color: #2a2c30; border: 2dp #33363b; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
 .mdChainSlot:hover { border-color: #8a8d93; }
 .mdChainSlot.mdEdUnread { color: #55585e; background-color: transparent; cursor: default; }
-.mdChainSlot.mdEdSelected { border: 2dp #f4f1ea; }
+.mdChainSlot.mdEdSelected { border-color: #f4f1ea; }
 .mdChainSlot.mdChainPlaying { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
 .mdChainSlot.mdChainPlaying.mdEdSelected { border-color: #f4f1ea; }
 
 /* focused step: locked values in orange over the bound value, the other controls dimmed */
 .mdEdLockValue { color: #ff6b1f; font-weight: bold; }
 /* over a control while a step with a trig has the focus: dragging it writes a lock (mdStepGrid.cpp) */
-.mdEdLockKnob, .mdEdLockFader { box-sizing: border-box; decorator: none; background-color: transparent; box-shadow: none; border-width: 0dp; cursor: pointer; }
+.mdEdLockKnob, .mdEdLockFader { box-sizing: border-box; decorator: none; background-color: transparent; box-shadow: none;
+	border: 2dp transparent; cursor: pointer; }
 .mdEdLockKnob { width: 46dp; height: 46dp; border-radius: 23dp; }
 .mdEdLockFader { width: 12dp; height: 46dp; border-radius: 2dp; }
-.mdEdLockKnob:hover, .mdEdLockFader:hover, .mdEdLockKnob:active, .mdEdLockFader:active { border: 2dp #ff6b1f; }
+/* the frame's width is always there: a hover only colours it, without laying the document out */
+.mdEdLockKnob:hover, .mdEdLockFader:hover, .mdEdLockKnob:active, .mdEdLockFader:active { border-color: #ff6b1f; }
 .mdEdHidden { visibility: hidden; }
 .mdEdDim { opacity: 0.35; }
 
@@ -340,3 +345,4 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 .mdEdPickerFamily.mdEdSelected { color: #f4f1ea; background-color: #2e3034; }
 .mdEdPickerMachine.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
 .mdEdPickerInfo { display: block; font-size: 12dp; line-height: 16dp; color: #8a8d93; }
+

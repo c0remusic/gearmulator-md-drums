@@ -109,6 +109,11 @@ namespace juceRmlUi
 		m_accessMutex.unlock();
 	}
 
+	bool RmlInterfaces::tryAttach()
+	{
+		return m_accessMutex.try_lock();
+	}
+
 	template <typename T> Rml::ElementInstancerGeneric<T>& RmlInterfaces::getInstancer()
 	{
 		return g_instancers.getInstancer<T>();
