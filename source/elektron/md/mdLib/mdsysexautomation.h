@@ -189,16 +189,83 @@ namespace md::automation::sysex
 	// Machinedrum pattern dump ($67), 32- or 64-step form; only the first 32 steps are kept.
 	std::optional<PatternDump> parseMdPatternDump(MessageView _message);
 
-	// What a pattern chain needs of a Monomachine pattern dump ($67). Its payload follows MCL's
-	// MNMPattern; the trigs, notes and locks are not read.
+	// A Monomachine pattern dump ($67), its payload as MCL's MNMPattern lays it out: per track,
+	// 64-bit masks of the steps with a trig and of what each trig starts (amp envelope, filter
+	// envelope, LFOs), the note of every step and the lock rows; then the length, double tempo and
+	// Kit. Slides, swing, the MIDI tracks and the arpeggiators are not read.
 	struct MmPatternDump
 	{
+		static constexpr uint8_t TrackCount = 6;
+		static constexpr uint8_t StepCount = 64;
+		static constexpr uint8_t LockRowCount = 62;
+		static constexpr uint8_t LockBitCount = 64;
+		// A step's note, or a lock row's value, when the step has none
+		static constexpr uint8_t None = 0xff;
+
 		uint8_t slot = 0;			// 0..127, A01..H16
 		uint8_t length = 16;		// steps, 1..64
 		bool doubleTempo = false;
 		uint8_t kit = 0;
+		// Bit n: step n + 1
+		std::array<uint64_t, TrackCount> trigs{};
+		std::array<uint64_t, TrackCount> ampTrigs{};
+		std::array<uint64_t, TrackCount> filterTrigs{};
+		std::array<uint64_t, TrackCount> lfoTrigs{};
+		// The MIDI note each step plays, None without a trig
+		std::array<std::array<uint8_t, StepCount>, TrackCount> notes{};
+		// Bit b: the parameter of lock mask bit b (mmLockBit) has a lock row
+		std::array<uint64_t, TrackCount> lockMasks{};
+		// The lock rows: row k belongs to the k-th set bit of the masks, in track then bit order
+		std::vector<std::array<uint8_t, StepCount>> lockRows;
+
+		bool hasTrig(uint8_t _track, uint8_t _step) const;
+		std::optional<uint8_t> note(uint8_t _track, uint8_t _step) const;
+		// Locked value on a step for the parameter of a lock mask bit, or nullopt
+		std::optional<uint8_t> lock(uint8_t _track, uint8_t _bit, uint8_t _step) const;
+		// Steps with a lock for the parameter of a lock mask bit, bit n for step n + 1
+		uint64_t lockedSteps(uint8_t _track, uint8_t _bit) const;
 	};
 	std::optional<MmPatternDump> parseMmPatternDump(MessageView _message);
+
+	// The lock mask bit of a Monomachine track parameter, page monomachine::Synthesis to Lfo3 and index
+	// 0..7: its place among the track's parameters in the Kit (mmPatternFirmwareTest: a lock of bit 13,
+	// AMP VOL, at 0 silences its step). Bits 56 to 63 hold parameters the editor does not name.
+	constexpr uint8_t mmLockBit(const uint8_t _page, const uint8_t _index)
+	{
+		return static_cast<uint8_t>(_page * 8 + _index);
+	}
+
+	// A Monomachine pattern dump ($67) that can be edited and sent back. Its decoded payload is kept
+	// whole; toDump() encodes it again with the edits.
+	class MmPatternEditor
+	{
+	public:
+		static std::optional<MmPatternEditor> fromDump(MessageView _message);
+
+		// Sets a trig playing _note (0..127) on a step below the length. It starts the amp and filter
+		// envelopes and the LFOs, as a trig placed on the machine does. nullopt clears the step's trig,
+		// its note and its locks.
+		bool setTrig(uint8_t _track, uint8_t _step, std::optional<uint8_t> _note);
+		// Sets a locked value (0..127) on a step that has a trig, or clears it. The parameter of a lock
+		// mask bit gets its row with its first lock and loses it with its last. False when the step has
+		// no trig or all 62 rows are taken.
+		bool setLock(uint8_t _track, uint8_t _bit, uint8_t _step, std::optional<uint8_t> _value);
+		// 1 to 64 steps; trigs and locks past the length stay in the pattern
+		bool setLength(uint8_t _length);
+
+		Message toDump() const;
+
+	private:
+		uint64_t mask(size_t _offset) const;
+		void setMask(size_t _offset, uint64_t _mask);
+		size_t rowIndex(uint8_t _track, uint8_t _bit) const;
+		size_t rowCount() const;
+		uint8_t* row(size_t _row) { return m_payload.data() + rowPosition(_row); }
+		static size_t rowPosition(size_t _row);
+
+		Message m_header;					// F0 up to the pattern position
+		std::vector<uint8_t> m_payload;		// decoded
+	};
 	// The same dump with another length (1..64), everything else kept, its payload encoded again
 	std::optional<Message> withMmPatternLength(MessageView _message, uint8_t _length);
 

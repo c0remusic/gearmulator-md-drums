@@ -216,6 +216,15 @@ set_tests_properties(mmPatternChainFirmwareTest PROPERTIES
 	TIMEOUT 600)
 set_property(TARGET mmPatternChainFirmwareTest PROPERTY FOLDER "Elektron")
 
+add_executable(mmPatternFirmwareTest mmPatternFirmwareTest.cpp)
+target_link_libraries(mmPatternFirmwareTest PRIVATE mdLib)
+add_test(NAME mmPatternFirmwareTest COMMAND mmPatternFirmwareTest)
+set_tests_properties(mmPatternFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mmPatternFirmwareTest PROPERTY FOLDER "Elektron")
+
 add_executable(mdUwFirmwareTest mdUwFirmwareTest.cpp)
 target_link_libraries(mdUwFirmwareTest PRIVATE mdLib)
 # The audio oracle must detect NaN/Inf even in builds using -Ofast or /fp:fast.

@@ -3,6 +3,7 @@
 #include "mdmachines.h"
 
 #include <algorithm>
+#include <bitset>
 #include <utility>
 
 namespace md::automation::sysex
@@ -346,51 +347,250 @@ namespace md::automation::sysex
 
 	namespace
 	{
-		// Monomachine pattern payload, decoded (MCL's MNMPattern): 78 trig, slide and swing masks of
-		// 8 bytes, the swing amount, 6 lock masks of 8 bytes and 6 × 64 notes come before the length,
-		// double tempo and Kit. Locks and MIDI notes follow: more than a Global or Kit holds.
-		constexpr size_t g_mmPatternLengthIndex = 78 * 8 + 4 + 6 * 8 + 6 * 64;
+		// Monomachine pattern payload, decoded (MCL's MNMPattern). First 13 kinds of 64-bit masks,
+		// big-endian, 6 tracks each: the amp, filter and LFO trigs; what MCL names off, MIDI note on
+		// and note off; the trigs themselves (MCL: trigless, a superset of the amp trigs on the
+		// factory patterns); chord, MIDI trigless, slide, swing, MIDI slide and MIDI swing. Then the
+		// swing amount, 6 lock masks and 6 x 64 notes before the length, double tempo and Kit; then
+		// transposition, the arpeggiators, the count of lock rows, the 62 rows of 64 steps, the MIDI
+		// and chord notes. The factory patterns decode to 6520 bytes.
+		constexpr size_t g_mmMaskSize = 6 * 8;
+		constexpr size_t g_mmAmpTrigs = 0 * g_mmMaskSize;
+		constexpr size_t g_mmFilterTrigs = 1 * g_mmMaskSize;
+		constexpr size_t g_mmLfoTrigs = 2 * g_mmMaskSize;
+		constexpr size_t g_mmTrigs = 6 * g_mmMaskSize;
+		constexpr size_t g_mmLockMasks = 13 * g_mmMaskSize + 4;
+		constexpr size_t g_mmNotes = g_mmLockMasks + g_mmMaskSize;
+		constexpr size_t g_mmPatternLengthIndex = g_mmNotes + 6 * 64;
 		static_assert(g_mmPatternLengthIndex == 1060, "MNMPattern layout");
+		constexpr size_t g_mmLocksUsed = 1366;
+		constexpr size_t g_mmLockRows = g_mmLocksUsed + 1;
+		constexpr size_t g_mmPatternSize = g_mmLockRows + MmPatternDump::LockRowCount * 64 + 400 * 2 + 192 * 2 + 1;
+		static_assert(g_mmPatternSize == 6520, "MNMPattern layout");
 		constexpr size_t g_mmPatternMaximum = 8192;
 
-		std::optional<MmPatternDump> mmPatternFrom(const MessageView _message, const std::vector<uint8_t>& _decoded)
+		uint64_t readMask(const uint8_t* _bytes)
 		{
-			if(_decoded.size() < g_mmPatternLengthIndex + 3)
-				return std::nullopt;
-			MmPatternDump result;
-			result.slot = _message[9];
-			result.length = _decoded[g_mmPatternLengthIndex];
-			result.doubleTempo = _decoded[g_mmPatternLengthIndex + 1] != 0;
-			result.kit = _decoded[g_mmPatternLengthIndex + 2];
-			if(result.slot >= 128 || result.length == 0 || result.length > 64)
-				return std::nullopt;
-			return result;
+			uint64_t mask = 0;
+			for(size_t i = 0; i < 8; ++i)
+				mask = (mask << 8) | _bytes[i];
+			return mask;
 		}
+
+		std::optional<std::vector<uint8_t>> decodeMmPattern(const MessageView _message)
+		{
+			if(!validDump(MachineModel::Monomachine, _message, g_patternDump) || _message[9] >= 128)
+				return std::nullopt;
+			auto decoded = decodeMonomachinePayload(_message, g_mmPatternMaximum);
+			if(!decoded || decoded->size() < g_mmPatternSize)
+				return std::nullopt;
+			const auto length = (*decoded)[g_mmPatternLengthIndex];
+			if(length == 0 || length > MmPatternDump::StepCount)
+				return std::nullopt;
+			return decoded;
+		}
+	}
+
+	bool MmPatternDump::hasTrig(const uint8_t _track, const uint8_t _step) const
+	{
+		return _track < TrackCount && _step < StepCount && ((trigs[_track] | ampTrigs[_track]) >> _step) & 1u;
+	}
+
+	std::optional<uint8_t> MmPatternDump::note(const uint8_t _track, const uint8_t _step) const
+	{
+		if(!hasTrig(_track, _step) || notes[_track][_step] >= 0x80)
+			return std::nullopt;
+		return notes[_track][_step];
+	}
+
+	std::optional<uint8_t> MmPatternDump::lock(const uint8_t _track, const uint8_t _bit, const uint8_t _step) const
+	{
+		if(_track >= TrackCount || _bit >= LockBitCount || _step >= StepCount || !((lockMasks[_track] >> _bit) & 1u))
+			return std::nullopt;
+		size_t row = 0;
+		for(uint8_t track = 0; track < _track; ++track)
+			row += std::bitset<64>(lockMasks[track]).count();
+		row += std::bitset<64>(lockMasks[_track] & ((uint64_t{1} << _bit) - 1)).count();
+		if(row >= lockRows.size() || lockRows[row][_step] >= 0x80)
+			return std::nullopt;
+		return lockRows[row][_step];
+	}
+
+	uint64_t MmPatternDump::lockedSteps(const uint8_t _track, const uint8_t _bit) const
+	{
+		uint64_t steps = 0;
+		for(uint8_t step = 0; step < StepCount; ++step)
+		{
+			if(lock(_track, _bit, step))
+				steps |= uint64_t{1} << step;
+		}
+		return steps;
 	}
 
 	std::optional<MmPatternDump> parseMmPatternDump(const MessageView _message)
 	{
-		if(!validDump(MachineModel::Monomachine, _message, g_patternDump))
-			return std::nullopt;
-		const auto decoded = decodeMonomachinePayload(_message, g_mmPatternMaximum);
+		const auto decoded = decodeMmPattern(_message);
 		if(!decoded)
 			return std::nullopt;
-		return mmPatternFrom(_message, *decoded);
+		const auto& data = *decoded;
+		MmPatternDump result;
+		result.slot = _message[9];
+		result.length = data[g_mmPatternLengthIndex];
+		result.doubleTempo = data[g_mmPatternLengthIndex + 1] != 0;
+		result.kit = data[g_mmPatternLengthIndex + 2];
+		size_t rows = 0;
+		for(uint8_t track = 0; track < MmPatternDump::TrackCount; ++track)
+		{
+			result.ampTrigs[track] = readMask(&data[g_mmAmpTrigs + track * 8]);
+			result.filterTrigs[track] = readMask(&data[g_mmFilterTrigs + track * 8]);
+			result.lfoTrigs[track] = readMask(&data[g_mmLfoTrigs + track * 8]);
+			result.trigs[track] = readMask(&data[g_mmTrigs + track * 8]);
+			result.lockMasks[track] = readMask(&data[g_mmLockMasks + track * 8]);
+			std::copy_n(&data[g_mmNotes + track * 64], 64, result.notes[track].begin());
+			rows += std::bitset<64>(result.lockMasks[track]).count();
+		}
+		// As MCL reads them: a row per set bit, as many as the pattern holds
+		result.lockRows.resize(std::min<size_t>(rows, MmPatternDump::LockRowCount));
+		for(size_t row = 0; row < result.lockRows.size(); ++row)
+			std::copy_n(&data[g_mmLockRows + row * 64], 64, result.lockRows[row].begin());
+		return result;
+	}
+
+	std::optional<MmPatternEditor> MmPatternEditor::fromDump(const MessageView _message)
+	{
+		auto decoded = decodeMmPattern(_message);
+		if(!decoded)
+			return std::nullopt;
+		MmPatternEditor editor;
+		editor.m_header.assign(_message.begin(), _message.begin() + 10);
+		editor.m_payload = std::move(*decoded);
+		return editor;
+	}
+
+	uint64_t MmPatternEditor::mask(const size_t _offset) const
+	{
+		return readMask(&m_payload[_offset]);
+	}
+
+	void MmPatternEditor::setMask(const size_t _offset, uint64_t _mask)
+	{
+		for(size_t i = 8; i-- > 0;)
+		{
+			m_payload[_offset + i] = static_cast<uint8_t>(_mask & 0xff);
+			_mask >>= 8;
+		}
+	}
+
+	size_t MmPatternEditor::rowPosition(const size_t _row)
+	{
+		return g_mmLockRows + _row * 64;
+	}
+
+	size_t MmPatternEditor::rowIndex(const uint8_t _track, const uint8_t _bit) const
+	{
+		size_t row = 0;
+		for(uint8_t track = 0; track < _track; ++track)
+			row += std::bitset<64>(mask(g_mmLockMasks + track * 8)).count();
+		return row + std::bitset<64>(mask(g_mmLockMasks + _track * 8) & ((uint64_t{1} << _bit) - 1)).count();
+	}
+
+	size_t MmPatternEditor::rowCount() const
+	{
+		return rowIndex(MmPatternDump::TrackCount - 1, 0) + std::bitset<64>(mask(g_mmLockMasks + 5 * 8)).count();
+	}
+
+	bool MmPatternEditor::setTrig(const uint8_t _track, const uint8_t _step, const std::optional<uint8_t> _note)
+	{
+		const auto length = m_payload[g_mmPatternLengthIndex];
+		if(_track >= MmPatternDump::TrackCount || _step >= length || (_note && *_note >= 0x80))
+			return false;
+		const auto bit = uint64_t{1} << _step;
+		for(const auto kind : {g_mmAmpTrigs, g_mmFilterTrigs, g_mmLfoTrigs, g_mmTrigs})
+		{
+			const auto offset = kind + _track * 8;
+			setMask(offset, _note ? mask(offset) | bit : mask(offset) & ~bit);
+		}
+		m_payload[g_mmNotes + _track * 64 + _step] = _note ? *_note : MmPatternDump::None;
+		if(!_note)
+		{
+			for(uint8_t lockBit = 0; lockBit < MmPatternDump::LockBitCount; ++lockBit)
+				setLock(_track, lockBit, _step, std::nullopt);
+		}
+		return true;
+	}
+
+	bool MmPatternEditor::setLock(const uint8_t _track, const uint8_t _bit, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		const auto length = m_payload[g_mmPatternLengthIndex];
+		if(_track >= MmPatternDump::TrackCount || _bit >= MmPatternDump::LockBitCount || _step >= length
+			|| (_value && *_value >= 0x80))
+			return false;
+		const auto maskOffset = g_mmLockMasks + _track * 8;
+		const auto bit = uint64_t{1} << _bit;
+		const bool hasRow = mask(maskOffset) & bit;
+		const auto index = rowIndex(_track, _bit);
+		const auto rowSize = static_cast<std::ptrdiff_t>(64);
+		auto* rows = row(0);
+		auto* end = row(MmPatternDump::LockRowCount);
+		if(!_value)
+		{
+			if(!hasRow || index >= MmPatternDump::LockRowCount)
+				return true;
+			auto* values = row(index);
+			values[_step] = MmPatternDump::None;
+			if(std::all_of(values, values + 64, [](const uint8_t _v) { return _v >= 0x80; }))
+			{
+				// The row goes, the rows after it move up
+				std::copy(values + rowSize, end, values);
+				std::fill(end - rowSize, end, MmPatternDump::None);
+				setMask(maskOffset, mask(maskOffset) & ~bit);
+			}
+		}
+		else
+		{
+			const auto trigs = mask(g_mmTrigs + _track * 8) | mask(g_mmAmpTrigs + _track * 8);
+			if(!((trigs >> _step) & 1u))
+				return false;
+			if(!hasRow)
+			{
+				if(rowCount() >= MmPatternDump::LockRowCount)
+					return false;
+				// A new row, the rows after it move down
+				auto* values = rows + index * rowSize;
+				std::copy_backward(values, end - rowSize, end);
+				std::fill(values, values + rowSize, MmPatternDump::None);
+				setMask(maskOffset, mask(maskOffset) | bit);
+			}
+			row(index)[_step] = *_value;
+		}
+		m_payload[g_mmLocksUsed] = static_cast<uint8_t>(std::min<size_t>(rowCount(), MmPatternDump::LockRowCount));
+		return true;
+	}
+
+	bool MmPatternEditor::setLength(const uint8_t _length)
+	{
+		if(_length == 0 || _length > MmPatternDump::StepCount)
+			return false;
+		m_payload[g_mmPatternLengthIndex] = _length;
+		return true;
+	}
+
+	Message MmPatternEditor::toDump() const
+	{
+		Message result(m_header);
+		const auto packed = encodeMonomachinePayload(m_payload);
+		result.insert(result.end(), packed.begin(), packed.end());
+		finishDump(result);
+		return result;
 	}
 
 	std::optional<Message> withMmPatternLength(const MessageView _message, const uint8_t _length)
 	{
-		if(_length == 0 || _length > 64 || !validDump(MachineModel::Monomachine, _message, g_patternDump))
+		auto editor = MmPatternEditor::fromDump(_message);
+		if(!editor || !editor->setLength(_length))
 			return std::nullopt;
-		auto decoded = decodeMonomachinePayload(_message, g_mmPatternMaximum);
-		if(!decoded || !mmPatternFrom(_message, *decoded))
-			return std::nullopt;
-		(*decoded)[g_mmPatternLengthIndex] = _length;
-		Message result(_message.begin(), _message.begin() + 10);
-		const auto packed = encodeMonomachinePayload(*decoded);
-		result.insert(result.end(), packed.begin(), packed.end());
-		finishDump(result);
-		return result;
+		return editor->toDump();
 	}
 
 	namespace

@@ -734,24 +734,59 @@ namespace
 		return pattern;
 	}
 
-	// The length, double tempo and Kit where MCL's MNMPattern puts them (after 1060 bytes of masks,
-	// swing and notes), in a payload longer than a Global or Kit, and the same dump with another length
+	// Decoded Monomachine pattern payload (MCL's MNMPattern): 13 kinds of masks, 6 tracks each, 8 bytes
+	// big-endian, the swing amount, the lock masks, the notes, then the length, double tempo and Kit;
+	// the count of lock rows at 1366, the 62 rows of 64 steps from 1367; 6520 bytes in all.
+	constexpr size_t g_mmTrigKinds[] = {0, 1, 2, 6};		// amp, filter, LFO, the trig itself
+	constexpr size_t g_mmLockMasks = 628;
+	constexpr size_t g_mmNotes = 676;
+	constexpr size_t g_mmRows = 1367;
+
+	void setMmBit(std::vector<uint8_t>& _decoded, const size_t _offset, const uint8_t _bit)
+	{
+		_decoded[_offset + 7 - _bit / 8] |= static_cast<uint8_t>(1u << (_bit % 8));
+	}
+
+	// The length, double tempo and Kit where MCL's MNMPattern puts them, the trigs, notes and lock rows,
+	// and the same dump edited: another length, a trig, a lock
 	void testMonomachinePattern()
 	{
 		using namespace md::automation::sysex;
-		std::vector<uint8_t> decoded(6500, 0);
-		decoded[3] = 0xff;
-		decoded[1059] = 0x40;
+		std::vector<uint8_t> decoded(6520, 0);
 		decoded[1060] = 24;
 		decoded[1061] = 1;
 		decoded[1062] = 5;
-		decoded[6000] = 0x7f;
+		std::fill(decoded.begin() + g_mmNotes, decoded.begin() + g_mmNotes + 6 * 64, 0xff);
+		std::fill(decoded.begin() + g_mmRows, decoded.begin() + g_mmRows + 62 * 64, 0xff);
+		// Track 2: a trig on step 1 that starts everything, playing A2; one on step 10 that starts nothing
+		for(const auto kind : g_mmTrigKinds)
+			setMmBit(decoded, kind * 48 + 8, 0);
+		setMmBit(decoded, 6 * 48 + 8, 9);
+		decoded[g_mmNotes + 64] = 45;
+		decoded[g_mmNotes + 64 + 9] = 50;
+		// Lock bit 3 of track 1 (row 0, a lock on step 5), lock bit 7 of track 2 (row 1, 99 on step 1)
+		setMmBit(decoded, g_mmLockMasks, 3);
+		setMmBit(decoded, g_mmLockMasks + 8, 7);
+		decoded[1366] = 2;
+		decoded[g_mmRows + 4] = 7;
+		decoded[g_mmRows + 64] = 99;
 		const auto pattern = makeMonomachinePattern(17, decoded);
 		const auto parsed = parseMmPatternDump(pattern);
 		require(parsed && parsed->slot == 17 && parsed->length == 24 && parsed->doubleTempo && parsed->kit == 5,
 			"MM pattern length, double tempo or Kit not where MNMPattern has them");
+		require(parsed->ampTrigs[1] == 1 && parsed->filterTrigs[1] == 1 && parsed->lfoTrigs[1] == 1
+			&& parsed->trigs[1] == 0x201 && parsed->trigs[0] == 0, "MM trig masks misread");
+		require(parsed->hasTrig(1, 0) && parsed->hasTrig(1, 9) && !parsed->hasTrig(1, 1) && !parsed->hasTrig(0, 0),
+			"MM trigs misread");
+		require(parsed->note(1, 0) == 45 && parsed->note(1, 9) == 50 && !parsed->note(1, 1) && !parsed->note(0, 0),
+			"MM notes misread");
+		require(parsed->lockRows.size() == 2 && parsed->lock(1, 7, 0) == 99 && parsed->lock(0, 3, 4) == 7
+			&& !parsed->lock(1, 7, 1) && !parsed->lock(1, 6, 0) && parsed->lockedSteps(1, 7) == 1,
+			"MM lock rows misread");
 		require(!parseMdPatternDump(pattern) && !parseMmPatternDump(makePattern(32, {}, {}, {})),
 			"a pattern dump of one model read as the other's");
+		require(!parseMmPatternDump(makeMonomachinePattern(17, std::vector<uint8_t>(decoded.begin(), decoded.begin() + 6500))),
+			"a cut MM pattern accepted");
 
 		const auto shorter = withMmPatternLength(pattern, 8);
 		const auto reparsed = shorter ? parseMmPatternDump(*shorter) : std::nullopt;
@@ -760,6 +795,41 @@ namespace
 		expected[1060] = 8;
 		require(*shorter == makeMonomachinePattern(17, expected), "writing the length changed something else");
 		require(!withMmPatternLength(pattern, 0) && !withMmPatternLength(pattern, 65), "MM length out of range written");
+
+		// A trig with its note on step 3 of track 1, then a lock there: its row comes after track 1's
+		// row 0, track 2's row moves down
+		auto editor = MmPatternEditor::fromDump(pattern);
+		require(editor && editor->toDump() == pattern, "an MM pattern changed without an edit");
+		require(!editor->setTrig(0, 24, 60) && !editor->setTrig(6, 0, 60) && !editor->setTrig(0, 0, 128),
+			"an MM trig out of range set");
+		require(!editor->setLock(0, 5, 2, 11), "an MM lock set on a step without a trig");
+		require(editor->setTrig(0, 2, 60) && editor->setLock(0, 5, 2, 11), "MM trig or lock refused");
+		expected = decoded;
+		for(const auto kind : g_mmTrigKinds)
+			setMmBit(expected, kind * 48, 2);
+		expected[g_mmNotes + 2] = 60;
+		setMmBit(expected, g_mmLockMasks, 5);
+		expected[1366] = 3;
+		std::copy_n(decoded.begin() + g_mmRows + 64, 64, expected.begin() + g_mmRows + 128);
+		std::fill_n(expected.begin() + g_mmRows + 64, 64, 0xff);
+		expected[g_mmRows + 64 + 2] = 11;
+		require(editor->toDump() == makeMonomachinePattern(17, expected), "MM trig or lock written wrong");
+		const auto edited = parseMmPatternDump(editor->toDump());
+		require(edited && edited->note(0, 2) == 60 && edited->lock(0, 5, 2) == 11 && edited->lock(1, 7, 0) == 99,
+			"MM edits misread");
+
+		// Clearing the trig clears its lock, and the row goes
+		require(editor->setTrig(0, 2, std::nullopt), "MM trig not cleared");
+		require(editor->toDump() == pattern, "clearing the MM trig left something behind");
+
+		// 62 rows: no 63rd
+		auto full = decoded;
+		for(uint8_t bit = 0; bit < 60; ++bit)
+			setMmBit(full, g_mmLockMasks + 16, bit);
+		full[1366] = 62;
+		auto fullEditor = MmPatternEditor::fromDump(makeMonomachinePattern(17, full));
+		require(fullEditor && fullEditor->setTrig(0, 2, 60) && !fullEditor->setLock(0, 5, 2, 11)
+			&& fullEditor->setLock(0, 3, 2, 11), "a 63rd MM lock row added, or a lock on an existing row refused");
 
 		decoded[1060] = 0;
 		require(!parseMmPatternDump(makeMonomachinePattern(17, decoded)), "MM pattern of length 0 accepted");
