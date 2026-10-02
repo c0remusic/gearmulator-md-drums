@@ -17,15 +17,30 @@ namespace mdJucePlugin
 		{
 			return (_value < 10 ? "0" : "") + std::to_string(_value);
 		}
+
+		std::string patternName(const uint8_t _slot)
+		{
+			return std::string(1, static_cast<char>('A' + _slot / 16)) + number(_slot % 16 + 1u);
+		}
+
+		void setText(Rml::Element* _element, std::string& _shown, std::string _text)
+		{
+			if(!_element || _text == _shown)
+				return;
+			_element->SetInnerRML(Rml::StringUtilities::EncodeRml(_text));
+			_shown = std::move(_text);
+		}
 	}
 
 	LibraryView::LibraryView(Controller& _controller, const md::MachineModel _model, Rml::Element& _document)
 		: m_controller(_controller)
 		, m_model(_model)
 	{
+		m_root = _document.GetElementById("mdEdPageLibrary");
 		m_info = _document.GetElementById("mdLibInfo");
 		m_read = _document.GetElementById("mdLibRead");
 		m_detail = _document.GetElementById("mdLibDetail");
+		m_patternDetail = _document.GetElementById("mdLibPatternDetail");
 		const auto kits = m_controller.getKitLibrarySize();
 		for(uint8_t slot = 0; slot < kits; ++slot)
 		{
@@ -34,6 +49,13 @@ namespace mdJucePlugin
 			if(kit)
 				juceRmlUi::EventListener::Add(kit, Rml::EventId::Click, [this, slot](Rml::Event&) { select(slot); });
 		}
+		for(uint8_t slot = 0; slot < Controller::PatternLibrarySize; ++slot)
+		{
+			auto* pattern = _document.GetElementById("mdLibPattern" + std::to_string(slot));
+			m_patterns.push_back(pattern);
+			if(pattern)
+				juceRmlUi::EventListener::Add(pattern, Rml::EventId::Click, [this, slot](Rml::Event&) { selectPattern(slot); });
+		}
 		const auto tracks = _model == md::MachineModel::Monomachine ? 6 : 16;
 		for(int track = 0; track < tracks; ++track)
 			m_machines.push_back(_document.GetElementById("mdLibMachine" + std::to_string(track)));
@@ -41,10 +63,16 @@ namespace mdJucePlugin
 		{
 			juceRmlUi::EventListener::Add(m_read, Rml::EventId::Click, [this](Rml::Event&)
 			{
-				m_controller.readKitLibrary();
-				update();
+				if(m_controller.isReadingLibrary())
+					return;
+				// Read again now, or as soon as the firmware takes requests
+				m_readingWanted = true;
+				m_lastAttempt = -1.0e9;
+				m_shownRevision = ~uint64_t{0};
 			});
 		}
+		// Read once while the plug-in is open: an editor opened again shows what was read
+		m_readingWanted = !m_controller.isLibraryRead() && !m_controller.isReadingLibrary();
 	}
 
 	std::string LibraryView::kitLabel(const uint8_t _slot, const bool _read, const std::string& _name)
@@ -52,60 +80,121 @@ namespace mdJucePlugin
 		return number(_slot + 1u) + "  " + (_read ? (_name.empty() ? std::string("(sans nom)") : _name) : std::string("—"));
 	}
 
+	std::string LibraryView::patternLabel(const uint8_t _slot, const bool _read, const uint8_t _length, const uint8_t _kit)
+	{
+		return patternName(_slot) + "  " + (_read ? std::to_string(_length) + " pas · kit " + number(_kit + 1u) : std::string("—"));
+	}
+
 	void LibraryView::select(const uint8_t _slot)
 	{
 		m_selected = _slot;
 		m_shownRevision = ~uint64_t{0};
-		update();
 	}
 
-	bool LibraryView::update()
+	void LibraryView::selectPattern(const uint8_t _slot)
 	{
+		m_selectedPattern = _slot;
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::startReading(const double _nowMilliseconds)
+	{
+		m_lastAttempt = _nowMilliseconds;
+		m_waitingForMachine = !m_controller.readLibrary();
+		if(!m_waitingForMachine)
+			m_readingWanted = false;
+	}
+
+	bool LibraryView::update(const double _nowMilliseconds)
+	{
+		// Hidden: nothing read or drawn; drawn in full when shown
+		if(m_root && !m_root->IsVisible(true))
+		{
+			m_shownRevision = ~uint64_t{0};
+			return false;
+		}
+		// The first showing reads the library, RELIRE again; while the firmware boots, a try every second
+		if(m_readingWanted && !m_controller.isReadingLibrary() && _nowMilliseconds - m_lastAttempt > 1000.0)
+			startReading(_nowMilliseconds);
+
 		// Read the revision first: a change made while reading bumps it again
-		const auto revision = m_controller.getKitLibraryRevision();
+		const auto revision = m_controller.getLibraryRevision();
 		const auto current = m_controller.getCurrentKit();
-		const auto reading = m_controller.isReadingKitLibrary();
-		if(revision == m_shownRevision && current == m_shownCurrent && reading == m_shownReading)
+		const auto currentPattern = m_controller.getCurrentPattern();
+		const auto reading = m_controller.isReadingLibrary();
+		if(revision == m_shownRevision && current == m_shownCurrent && currentPattern == m_shownCurrentPattern
+			&& reading == m_shownReading && m_waitingForMachine == m_shownWaiting)
 			return false;
 		m_shownRevision = revision;
 		m_shownCurrent = current;
+		m_shownCurrentPattern = currentPattern;
 		m_shownReading = reading;
+		m_shownWaiting = m_waitingForMachine;
 
-		size_t read = 0;
+		// Only the cells that changed: a reading brings one Kit or pattern at a time
+		size_t kitsRead = 0;
 		m_shownLabels.resize(m_kits.size());
 		for(uint8_t slot = 0; slot < m_kits.size(); ++slot)
 		{
 			const auto kit = m_controller.getLibraryKit(slot);
-			read += kit && kit->read ? 1 : 0;
+			const bool read = kit && kit->read;
+			kitsRead += read ? 1 : 0;
 			auto* element = m_kits[slot];
 			if(!element)
 				continue;
-			// Only the cells that changed: a reading brings one Kit at a time
-			auto label = kitLabel(slot, kit && kit->read, kit ? kit->name : std::string());
-			if(label != m_shownLabels[slot])
-			{
-				element->SetInnerRML(Rml::StringUtilities::EncodeRml(label));
-				m_shownLabels[slot] = std::move(label);
-			}
+			setText(element, m_shownLabels[slot], kitLabel(slot, read, read ? kit->name : std::string()));
 			element->SetClass("mdLibCurrent", slot == current);
 			element->SetClass("mdEdSelected", slot == m_selected);
-			element->SetClass("mdEdUnread", !(kit && kit->read));
+			element->SetClass("mdEdUnread", !read);
+		}
+		size_t patternsRead = 0;
+		m_shownPatternLabels.resize(m_patterns.size());
+		for(uint8_t slot = 0; slot < m_patterns.size(); ++slot)
+		{
+			const auto pattern = m_controller.getLibraryPattern(slot);
+			const bool read = pattern && pattern->read;
+			patternsRead += read ? 1 : 0;
+			auto* element = m_patterns[slot];
+			if(!element)
+				continue;
+			setText(element, m_shownPatternLabels[slot], patternLabel(slot, read, read ? pattern->length : 0, read ? pattern->kit : 0));
+			element->SetClass("mdLibCurrent", slot == currentPattern);
+			element->SetClass("mdEdSelected", slot == m_selectedPattern);
+			element->SetClass("mdEdUnread", !read);
+			element->SetClass("mdLibEmpty", read && pattern->trigs == uint16_t{0});
 		}
 		if(m_info)
 		{
-			const auto total = m_kits.size();
+			const auto kits = m_kits.size();
+			const auto patterns = m_patterns.size();
+			const auto progress = m_controller.getLibraryProgress();
 			std::string text;
 			if(reading)
-				text = "lecture des kits : " + std::to_string(m_controller.getKitLibraryProgress()) + " / " + std::to_string(total) + "…";
-			else if(read == 0)
-				text = "kits non lus : LIRE LES KITS les demande à la machine, un par un (lecture seule)";
+			{
+				text = progress < kits
+					? "lecture des kits : " + std::to_string(progress) + " / " + std::to_string(kits) + "…"
+					: "lecture des patterns : " + std::to_string(progress - kits) + " / " + std::to_string(patterns) + "…";
+			}
+			else if(m_waitingForMachine)
+				text = "la machine démarre : la bibliothèque sera lue dès qu'elle répond";
+			else if(!m_controller.isLibraryRead())
+				text = "bibliothèque non lue";
 			else
-				text = std::to_string(read) + " kits lus sur " + std::to_string(total) + " · en ambre : le kit chargé · clic : ses machines, sans le charger";
+			{
+				text = std::to_string(kitsRead) + " kits et " + std::to_string(patternsRead) + " patterns lus";
+				const auto missing = kits + patterns - kitsRead - patternsRead;
+				if(missing)
+					text += " (" + std::to_string(missing) + " sans réponse)";
+			}
 			m_info->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 		}
 		if(m_read)
-			m_read->SetInnerRML(reading ? "LECTURE…" : "LIRE LES KITS");
+		{
+			m_read->SetInnerRML(reading ? "LECTURE…" : "RELIRE");
+			m_read->SetClass("mdEdOff", reading);
+		}
 		renderDetail();
+		renderPatternDetail();
 		return true;
 	}
 
@@ -140,5 +229,28 @@ namespace mdJucePlugin
 				text += "—";
 			element->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 		}
+	}
+
+	void LibraryView::renderPatternDetail()
+	{
+		if(!m_patternDetail)
+			return;
+		std::string text = "clic : le détail d'un pattern · en ambre : celui de la machine · grisé : sans trig";
+		if(m_selectedPattern < m_patterns.size())
+		{
+			const auto pattern = m_controller.getLibraryPattern(m_selectedPattern);
+			text = patternName(m_selectedPattern);
+			if(pattern && pattern->read)
+			{
+				text += " · " + std::to_string(pattern->length) + " pas · kit " + number(pattern->kit + 1u);
+				if(pattern->trigs)
+					text += " · " + (*pattern->trigs ? std::to_string(*pattern->trigs) + " trigs" : std::string("aucun trig"));
+			}
+			else
+				text += " · pas lu";
+			if(m_selectedPattern == m_controller.getCurrentPattern())
+				text += " · celui de la machine";
+		}
+		m_patternDetail->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 	}
 }

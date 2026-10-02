@@ -54,10 +54,10 @@ namespace mdJucePlugin
 			_controller.m_syntheticFirmwareReadyForTests = true;
 		}
 
-		// The library Kit asked for is not answered within 2 s: the controller timer skips it
+		// The library Kit or pattern asked for is not answered in time: the controller timer skips it
 		static void expireLibraryRequest(Controller& _controller)
 		{
-			_controller.m_libraryRequestMs = Controller::milliseconds() - 2001;
+			_controller.m_libraryRequestMs = Controller::milliseconds() - 4001;
 			_controller.onControllerTimer();
 		}
 
@@ -114,7 +114,7 @@ namespace mdJucePlugin
 			if(_editor.m_chainView)
 				_editor.m_chainView->update();
 			if(_editor.m_libraryView)
-				_editor.m_libraryView->update();
+				_editor.m_libraryView->update(juce::Time::getMillisecondCounterHiRes());
 			if(_editor.m_machinePicker)
 				_editor.m_machinePicker->update();
 			if(_editor.m_stepGrid)
@@ -994,11 +994,25 @@ int main()
 			context.Update();
 			require(controller.getCurrentPart() == 1 && element(doc, "mdPlayTrack1").IsClassSet("mdEdSelected")
 				&& lane.barValue(0) == -1 && lane.barValue(4) == 64, "a track name did not take the lane");
-			// A double click writes a trig, as in PAS
-			cell(1, 3).DispatchEvent(Rml::EventId::Dblclick, Rml::Dictionary());
+			// A click writes a trig, a second one clears it
+			cell(1, 3).Click();
 			context.Update();
 			require(md.getPattern()->hasTrig(1, 3) && md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
-				&& cell(1, 3).IsClassSet("mdEdStepTrig"), "a double click did not write the trig");
+				&& cell(1, 3).IsClassSet("mdEdStepTrig"), "a click did not write the trig");
+			cell(1, 3).Click();
+			context.Update();
+			require(!md.getPattern()->hasTrig(1, 3) && !cell(1, 3).IsClassSet("mdEdStepTrig"), "a second click did not clear the trig");
+			// TOUT EFFACER: the first click asks to confirm, the second clears every trig and writes the pattern
+			element(doc, "mdPlayClear").Click();
+			context.Update();
+			require(lane.isClearArmed() && text("mdPlayClear") == "CONFIRMER ?" && md.getPattern()->hasTrig(0, 0),
+				"TOUT EFFACER cleared without asking");
+			element(doc, "mdPlayClear").Click();
+			context.Update();
+			const auto cleared = md.getPattern();
+			require(cleared && std::all_of(cleared->trigs.begin(), cleared->trigs.end(), [](const uint32_t _trigs) { return _trigs == 0; })
+				&& !lane.isClearArmed() && text("mdPlayClear") == "TOUT EFFACER" && !cell(0, 0).IsClassSet("mdEdStepTrig")
+				&& md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "TOUT EFFACER did not clear and write the pattern");
 			element(doc, "mdPlayParam0").Click();
 			element(doc, "mdPlayTrack0").Click();
 			// OUVRIR DANS SON shows the edited track's sound
@@ -1201,44 +1215,106 @@ int main()
 			context.Update();
 		}
 
-		// BIBLIO: LIRE LES KITS reads every stored Kit, one request at a time; a Kit
-		// shows its machines without being loaded.
+		// BIBLIO: read when it first shows, one request at a time, every Kit then every pattern; a Kit shows
+		// its machines without being loaded, a pattern its length and Kit; RELIRE reads them again.
 		{
 			auto& md = dynamic_cast<mdJucePlugin::Controller&>(controller);
+			using Access = mdJucePlugin::ControllerAutomationTestAccess;
+			const auto present = [&]
+			{
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				context.Update();
+			};
+			const auto kits = md.getKitLibrarySize();
+			const auto patterns = mdJucePlugin::Controller::PatternLibrarySize;
+			require(kits == (g_model == md::MachineModel::Monomachine ? 128u : 64u), "library size is not the machine's Kit count");
+			require(!md.isReadingLibrary() && !md.isLibraryRead(), "library read before BIBLIO showed");
 			tabButton(doc, "mdEdit", "3").Click();
 			context.Update();
-			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
-			context.Update();
-			const auto kits = md.getKitLibrarySize();
-			require(kits == (g_model == md::MachineModel::Monomachine ? 128u : 64u), "library size is not the machine's Kit count");
-			require(text("mdLibKit0") == "01  —" && element(doc, "mdLibKit0").IsClassSet("mdEdUnread"), "library shows a Kit before reading");
-			element(doc, "mdLibRead").Click();
-			require(md.isReadingKitLibrary() && md.getKitLibraryProgress() == 0, "LIRE LES KITS did not start reading");
-			// Slot 3 is not answered: the timer skips it after 2 s
+			present();
+			require(md.isReadingLibrary() && md.getLibraryProgress() == 0 && text("mdLibKit0") == "01  —"
+				&& element(doc, "mdLibKit0").IsClassSet("mdEdUnread") && text("mdLibInfo") == "lecture des kits : 0 / " + std::to_string(kits) + "…"
+				&& text("mdLibRead") == "LECTURE…", "showing BIBLIO did not start reading: \"" + text("mdLibInfo") + "\"");
+			// Kit 4 is not answered: the timer skips it
 			for(uint8_t slot = 0; slot < kits; ++slot)
 			{
 				if(slot == 3)
 				{
-					mdJucePlugin::ControllerAutomationTestAccess::expireLibraryRequest(md);
+					Access::expireLibraryRequest(md);
 					continue;
 				}
 				std::vector<uint16_t> machines(g_trackCount, slot % 2 ? g_pickMachine : g_otherFamilyMachine);
 				md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, slot, 64, machines, "KIT " + std::to_string(slot + 1)),
 					synthLib::MidiEventSource::Device);
 			}
-			require(!md.isReadingKitLibrary() && md.getKitLibraryProgress() == kits, "reading did not end after the last Kit");
+			present();
+			require(md.isReadingLibrary() && md.getLibraryProgress() == kits
+				&& text("mdLibInfo") == "lecture des patterns : 0 / " + std::to_string(patterns) + "…", "patterns not read after the Kits");
+			// A01, 16 steps with trigs; A02, empty; B06, 32 steps; the others not answered
+			const auto patternDump = [&](const uint8_t _slot, const uint8_t _length, const bool _trigs)
+			{
+#if defined(MD_EDITOR_SECTION_TEST_MM)
+				auto edited = md::automation::sysex::MmPatternEditor::fromDump(mdAutomationTest::makeMmPatternDump(_slot, _length));
+				require(edited.has_value(), "MM test pattern not built");
+				for(uint8_t step = 0; _trigs && step < _length; step += 4)
+					require(edited->setTrig(0, step, 48), "MM test pattern not built");
+				const auto dump = edited->toDump();
+				return pluginLib::SysEx(dump.begin(), dump.end());
+#else
+				std::array<uint32_t, 16> trigs{};
+				trigs[0] = _trigs ? 0x1111u : 0u;
+				return mdAutomationTest::makeMdPatternDump(_slot, _length, trigs);
+#endif
+			};
+			for(uint8_t slot = 0; slot < patterns; ++slot)
+			{
+				if(slot == 0 || slot == 1 || slot == 21)
+					md.parseSysexMessage(patternDump(slot, slot == 21 ? 32 : 16, slot != 1), synthLib::MidiEventSource::Device);
+				else
+					Access::expireLibraryRequest(md);
+			}
+			require(!md.isReadingLibrary() && md.isLibraryRead() && md.getLibraryProgress() == kits + patterns,
+				"reading did not end after the last pattern");
 			require(md.getLibraryKit(11) && md.getLibraryKit(11)->read && md.getLibraryKit(11)->name == "KIT 12"
 				&& !md.getLibraryKit(3)->read, "library did not keep the Kits read and skip the one not answered");
-			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
-			context.Update();
+			const auto first = md.getLibraryPattern(0);
+			const auto empty = md.getLibraryPattern(1);
+			require(first && first->read && first->length == 16 && first->kit == 0 && first->trigs == uint16_t{4}
+				&& empty && empty->read && empty->trigs == uint16_t{0} && !md.getLibraryPattern(2)->read
+				&& md.getLibraryPattern(21)->length == 32, "library did not keep the patterns read");
+			present();
+			require(text("mdLibInfo") == std::to_string(kits - 1) + " kits et 3 patterns lus (126 sans réponse)" && text("mdLibRead") == "RELIRE",
+				"the library's line does not count what was read: \"" + text("mdLibInfo") + "\"");
 			require(text("mdLibKit11") == "12  KIT 12" && text("mdLibKit3") == "04  —" && !element(doc, "mdLibKit11").IsClassSet("mdEdUnread"),
 				"library cells do not show the Kits read");
 			require(element(doc, "mdLibKit" + std::to_string(md.getCurrentKit())).IsClassSet("mdLibCurrent"), "the loaded Kit is not marked");
 			element(doc, "mdLibKit11").Click();
-			context.Update();
+			present();
 			require(text("mdLibDetail").rfind("KIT 12 · KIT 12", 0) == 0 && text("mdLibMachine0") == std::string("01  ") + g_pickName
 				&& element(doc, "mdLibKit11").IsClassSet("mdEdSelected"), "a Kit does not show its machines: \"" + text("mdLibDetail") + "\"");
 			snap("-library");
+			// PATTERNS: length and Kit, an empty one greyed, the machine's marked; a click shows one
+			tabButton(doc, "mdLib", "1").Click();
+			context.Update();
+			present();
+			require(visible(element(doc, "mdLibPatternsPage")) && !visible(element(doc, "mdLibKitsPage")), "PATTERNS not shown");
+			require(text("mdLibPattern0") == "A01  16 pas · kit 01" && text("mdLibPattern2") == "A03  —" && text("mdLibPattern21") == "B06  32 pas · kit 01"
+				&& element(doc, "mdLibPattern1").IsClassSet("mdLibEmpty") && element(doc, "mdLibPattern2").IsClassSet("mdEdUnread")
+				&& element(doc, "mdLibPattern" + std::to_string(md.getCurrentPattern())).IsClassSet("mdLibCurrent"),
+				"pattern cells do not show the patterns read");
+			element(doc, "mdLibPattern0").Click();
+			present();
+			require(text("mdLibPatternDetail") == "A01 · 16 pas · kit 01 · 4 trigs" && element(doc, "mdLibPattern0").IsClassSet("mdEdSelected"),
+				"a pattern does not show its detail: \"" + text("mdLibPatternDetail") + "\"");
+			snap("-library-patterns");
+			// RELIRE reads everything again
+			element(doc, "mdLibRead").Click();
+			present();
+			require(md.isReadingLibrary() && md.getLibraryProgress() == 0 && text("mdLibPattern0") == "A01  —", "RELIRE did not read again");
+			for(size_t item = 0; item < kits + patterns; ++item)
+				Access::expireLibraryRequest(md);
+			require(!md.isReadingLibrary() && md.isLibraryRead(), "the second reading did not end");
+			tabButton(doc, "mdLib", "0").Click();
 			tabButton(doc, "mdEdit", "0").Click();
 			context.Update();
 		}

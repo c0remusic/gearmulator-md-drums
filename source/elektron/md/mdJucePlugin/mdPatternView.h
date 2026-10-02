@@ -34,8 +34,9 @@ namespace mdJucePlugin
 	// parameter, a canvas in mdPlayLaneArea: the Kit value in grey, a lock in orange
 	// with a dot, for the steps that play; mdPlayParam<parameter> chooses the
 	// parameter and counts its locks. A click on a track name (mdPlayTrack<track>) makes it the edited track;
-	// a double click on a step sets or clears its trig, written to the firmware as
-	// the PAS block does. OUVRIR DANS SON (mdPlayOpen) shows the track in SON.
+	// a click on a step sets or clears its trig, written to the firmware as the PAS
+	// block does; TOUT EFFACER (mdPlayClear), clicked twice, clears every trig and lock.
+	// OUVRIR DANS SON (mdPlayOpen) shows the track in SON.
 	class PatternView
 	{
 	public:
@@ -61,7 +62,12 @@ namespace mdJucePlugin
 		int barValue(uint8_t _step) const { return _step < StepCount ? m_barValues[_step] : -1; }
 		bool barLocked(uint8_t _step) const { return _step < StepCount && m_barLocks[_step]; }
 
+		// TOUT EFFACER's second click must come within this
+		static constexpr double ClearConfirmMilliseconds = 3000.0;
+		bool isClearArmed() const { return m_clearArmedAt >= 0.0; }
+
 	private:
+		void disarmClear();
 		void renderGrid(const md::automation::sysex::PatternDump* _pattern);
 		void renderLane(const md::automation::sysex::PatternDump* _pattern);
 		uint8_t kitValue(uint8_t _track, uint8_t _parameter) const;
@@ -77,6 +83,8 @@ namespace mdJucePlugin
 		std::array<std::array<Rml::Element*, StepCount>, TrackCount> m_steps{};
 		std::array<Rml::Element*, ParameterCount> m_parameters{};
 		juceRmlUi::ElemCanvas* m_lane = nullptr;
+		Rml::Element* m_clear = nullptr;
+		double m_clearArmedAt = -1.0;
 		std::array<int, StepCount> m_barValues{};
 		std::array<bool, StepCount> m_barLocks{};
 		std::array<std::string, ParameterCount> m_names{};

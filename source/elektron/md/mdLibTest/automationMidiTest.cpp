@@ -561,7 +561,7 @@ namespace
 		require(pattern.size() == 0xacb, "test pattern has the wrong size");
 
 		const auto parsed = parseMdPatternDump(pattern);
-		require(parsed && parsed->slot == 18 && parsed->length == 24, "wrong MD pattern slot or length");
+		require(parsed && parsed->slot == 18 && parsed->length == 24 && parsed->kit == 5, "wrong MD pattern slot, length or Kit");
 		require(parsed->hasTrig(0, 0) && parsed->hasTrig(0, 4) && parsed->hasTrig(0, 31) && !parsed->hasTrig(0, 1)
 			&& parsed->hasTrig(2, 1) && !parsed->hasTrig(1, 0), "wrong MD pattern trigs");
 		require(parsed->lock(0, 0, 4) == uint8_t{100} && parsed->lock(0, 9, 31) == uint8_t{7}
@@ -707,6 +707,19 @@ namespace
 		require(longEditor->setTrig(2, 33, true) && longEditor->setLock(2, 23, 33, 77) && longEditor->setLock(2, 23, 1, 64),
 			"could not restore the second half");
 		require(longEditor->toDump() == longPattern, "64-step edits did not restore the pattern");
+
+		// Clearing everything: no trig and no lock in either half, the row count 0, the rest kept
+		longEditor->clear();
+		dump = longEditor->toDump();
+		parsed = parseMdPatternDump(dump);
+		require(parsed && parsed->length == 48 && dump[rowCountPosition] == 0
+			&& std::all_of(parsed->trigs.begin(), parsed->trigs.end(), [](const uint32_t _trigs) { return _trigs == 0; })
+			&& std::all_of(parsed->lockMasks.begin(), parsed->lockMasks.end(), [](const uint32_t _mask) { return _mask == 0; }),
+			"clearing the pattern left a trig or a lock");
+		auto emptyExtension = extension;
+		emptyExtension[2 * 4 + 3] = 0;
+		emptyExtension[76 + 2 * 32 + 1] = 0xff;
+		require(dump == makePattern(48, {}, {}, {}, emptyExtension), "clearing the pattern changed something else");
 		require(longEditor->setLength(64) && !longEditor->setLength(65), "64-step form length range wrong");
 
 		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");

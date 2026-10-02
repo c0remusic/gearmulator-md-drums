@@ -813,7 +813,7 @@ namespace mdJucePlugin
 		if(auto* const document = getDocument(); document && document->GetElementById("mdLibKit0"))
 		{
 			m_libraryView = std::make_unique<LibraryView>(m_controller, getModel(), *document);
-			m_libraryView->update();
+			m_libraryView->update(juce::Time::getMillisecondCounterHiRes());
 		}
 
 		// The COURBES row under SON, when the window leaves room for it.
@@ -2225,7 +2225,7 @@ namespace mdJucePlugin
 		const bool patternChanged = (m_patternView && m_patternView->update())
 			|| (m_mmPatternView && m_mmPatternView->update(nowMilliseconds));
 		const bool chainChanged = m_chainView && m_chainView->update();
-		const bool libraryChanged = m_libraryView && m_libraryView->update();
+		const bool libraryChanged = m_libraryView && m_libraryView->update(nowMilliseconds);
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
 			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged)
 			if(auto* rml = getRmlComponent())

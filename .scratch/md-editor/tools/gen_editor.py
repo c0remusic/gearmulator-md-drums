@@ -431,11 +431,14 @@ def play_page_md(d):
     w(f'{ind(d)}<div class="mdEdContent" style="height: {{PLAY_H}}dp;">')
     marker = len(out)
     block_open(d + 1, "mdPlayGrid", "PATTERN", "", 0, 12, 12, "{GRID_H}")
-    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: {gw - 110 - 16 - 70}dp;">pattern : en attente du firmware</div>')
+    # TOUT EFFACER asks for a second click (CONFIRMER), then clears every trig and lock of the pattern
+    clear_x = gw - 16 - 62 - 8 - 120
+    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: {clear_x - 12 - 110}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {clear_x}dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>')
     w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     gh = play_grid(d + 2, "mdPlay", 16, 16, gw, "", "",
                    ([("Trig", "trig"), ("Lock", "trig avec locks"), ("Out", "au-delà de la longueur")],
-                    "clic sur un nom : sa piste dans la lane · double-clic sur un pas : poser ou retirer un trig"))
+                    "clic sur un pas : poser ou retirer un trig · clic sur un nom : sa piste dans la lane"))
     for i in range(marker, len(out)):
         out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)
@@ -472,37 +475,59 @@ def play_page_md(d):
 # ---------- BIBLIO (board 8) ----------
 
 def library_page(d):
-    # Every stored Kit, number and name, read on request; a click shows its machines without loading it.
-    # LibraryView (mdLibraryView.cpp) fills it.
+    # Two tabs, KITS and PATTERNS, with the reading's state and RELIRE beside them. KITS: every stored Kit,
+    # number and name; a click shows its machines without loading it. PATTERNS: every stored pattern, its
+    # length and Kit, A to H in columns. LibraryView (mdLibraryView.cpp) reads both when BIBLIO first shows,
+    # and fills them.
     kits, cols, kb = (64, 4, 8) if MD else (128, 8, 12)
-    rows, rh = 16, 24
+    rows, rh = 16, 22
+    ty = 12
+    by = ty + 24 + 8
     kh = TOP + 28 + rows * rh + 8
+    gw = span(12)
     w(f'{ind(d)}<div class="mdEdContent" style="height: {{LIB_H}}dp;">')
-    block_open(d + 1, "mdLibKits", "KITS", "", 0, kb, 12, kh)
-    w(f'{ind(d + 2)}<div id="mdLibInfo" class="jucePos juceLabel mdEdSub" style="left: 80dp; top: 4dp; width: {span(kb) - 80 - 16 - 150}dp;">kits non lus</div>')
-    w(f'{ind(d + 2)}<button id="mdLibRead" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {span(kb) - 16 - 140}dp; top: 4dp; width: 140dp;">LIRE LES KITS</button>')
+    for n, name in enumerate(["KITS", "PATTERNS"]):
+        w(f'{ind(d + 1)}<button id="mdLibTab{n}" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdLib" tabbutton="{n}" style="left: {colx(0) + n * 96}dp; top: {ty}dp; width: 90dp;">{name}</button>')
+    info_x = colx(0) + 2 * 96 + 12
+    w(f'{ind(d + 1)}<div id="mdLibInfo" class="jucePos juceLabel mdEdSub mdLibInfo" style="left: {info_x}dp; top: {ty}dp; width: {colx(0) + gw - 140 - 12 - info_x}dp;">bibliothèque non lue</div>')
+    w(f'{ind(d + 1)}<button id="mdLibRead" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {colx(0) + gw - 140}dp; top: {ty}dp; width: 140dp;">RELIRE</button>')
+    page_w = M + gw + M
+    # KITS
+    w(f'{ind(d + 1)}<div id="mdLibKitsPage" class="jucePos" tabgroup="mdLib" tabpage="0" style="left: 0dp; top: 0dp; width: {page_w}dp; height: {{LIB_H}}dp;">')
+    block_open(d + 2, "mdLibKits", "KITS", "clic : ses machines, sans le charger · en ambre : le kit chargé", 0, kb, by, kh)
     cw = (span(kb) - 32) // cols
     for slot in range(kits):
         c, r = slot // rows, slot % rows
-        w(f'{ind(d + 2)}<div id="mdLibKit{slot}" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: {16 + c * cw}dp; top: {TOP + 28 + r * rh}dp; width: {cw - 6}dp;">{slot + 1:02d}  —</div>')
-    block_close(d + 1)
+        w(f'{ind(d + 3)}<div id="mdLibKit{slot}" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: {16 + c * cw}dp; top: {TOP + 4 + r * rh}dp; width: {cw - 6}dp;">{slot + 1:02d}  —</div>')
+    block_close(d + 2)
     tracks = 16 if MD else 6
     if MD:
-        block_open(d + 1, "mdLibMachines", "MACHINES", "sans charger le kit", 8, 4, 12, kh)
-        w(f'{ind(d + 2)}<div id="mdLibDetail" class="jucePos juceLabel mdEdRowName" style="left: 16dp; top: {TOP - 4}dp; width: {span(4) - 32}dp;">KIT —</div>')
+        block_open(d + 2, "mdLibMachines", "MACHINES", "sans charger le kit", 8, 4, by, kh)
+        w(f'{ind(d + 3)}<div id="mdLibDetail" class="jucePos juceLabel mdEdRowName" style="left: 16dp; top: {TOP - 4}dp; width: {span(4) - 32}dp;">KIT —</div>')
         for t in range(tracks):
-            w(f'{ind(d + 2)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {TOP + 28 + t * rh}dp; width: {span(4) - 32}dp;">{t + 1:02d}  —</div>')
-        block_close(d + 1)
-        total = 12 + kh + 12
+            w(f'{ind(d + 3)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {TOP + 28 + t * rh}dp; width: {span(4) - 32}dp;">{t + 1:02d}  —</div>')
+        block_close(d + 2)
+        total = by + kh + 12
     else:
-        my = 12 + kh + GUT
+        my = by + kh + GUT
         mh = PAGE_H - my - 12
-        block_open(d + 1, "mdLibMachines", "MACHINES", "", 0, 12, my, mh)
-        w(f'{ind(d + 2)}<div id="mdLibDetail" class="jucePos juceLabel mdEdSub" style="left: 120dp; top: 4dp; width: 600dp;">KIT —</div>')
+        block_open(d + 2, "mdLibMachines", "MACHINES", "", 0, 12, my, mh)
+        w(f'{ind(d + 3)}<div id="mdLibDetail" class="jucePos juceLabel mdEdSub" style="left: 120dp; top: 4dp; width: 600dp;">KIT —</div>')
         for t in range(tracks):
-            w(f'{ind(d + 2)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: {16 + t * 170}dp; top: 28dp; width: 164dp;">{t + 1:02d}  —</div>')
-        block_close(d + 1)
+            w(f'{ind(d + 3)}<div id="mdLibMachine{t}" class="jucePos juceLabel mdEdNote" style="left: {16 + t * 170}dp; top: 28dp; width: 164dp;">{t + 1:02d}  —</div>')
+        block_close(d + 2)
         total = my + mh + 12
+    w(f'{ind(d + 1)}</div>')
+    # PATTERNS: banks A to H in columns, 01 to 16 in rows
+    w(f'{ind(d + 1)}<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: {page_w}dp; height: {{LIB_H}}dp;">')
+    block_open(d + 2, "mdLibPatterns", "PATTERNS", "", 0, 12, by, kh)
+    w(f'{ind(d + 3)}<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 140dp; top: 4dp; width: {gw - 140 - 16}dp;">—</div>')
+    pw = (gw - 32) // 8
+    for slot in range(128):
+        c, r = slot // 16, slot % 16
+        w(f'{ind(d + 3)}<div id="mdLibPattern{slot}" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: {16 + c * pw}dp; top: {TOP + 4 + r * rh}dp; width: {pw - 6}dp;">{chr(ord("A") + c)}{r + 1:02d}  —</div>')
+    block_close(d + 2)
+    w(f'{ind(d + 1)}</div>')
     w(f'{ind(d)}</div>')
     return total
 

@@ -72,8 +72,8 @@ namespace mdJucePlugin
 				m_steps[track][step] = cell;
 				if(!cell)
 					continue;
-				// A double click, as in PAS: each write costs the playing machine a short silence
-				juceRmlUi::EventListener::Add(cell, Rml::EventId::Dblclick, [this, track, step](Rml::Event&)
+				// A click sets or clears the trig; each write costs the playing machine a short silence
+				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, track, step](Rml::Event&)
 				{
 					const auto pattern = m_controller.getPattern();
 					if(pattern && m_controller.setPatternTrig(track, step, !pattern->hasTrig(track, step)))
@@ -104,6 +104,26 @@ namespace mdJucePlugin
 			juceRmlUi::EventListener::Add(refresh, Rml::EventId::Click, [this](Rml::Event&)
 			{
 				m_controller.requestPattern();
+			});
+		}
+		// TOUT EFFACER: a first click arms it (CONFIRMER, 3 s), a second one clears the pattern and writes it
+		m_clear = _document.GetElementById("mdPlayClear");
+		if(m_clear)
+		{
+			juceRmlUi::EventListener::Add(m_clear, Rml::EventId::Click, [this](Rml::Event&)
+			{
+				const auto now = juce::Time::getMillisecondCounterHiRes();
+				if(m_clearArmedAt < 0.0 || now - m_clearArmedAt > ClearConfirmMilliseconds)
+				{
+					m_clearArmedAt = now;
+					m_clear->SetInnerRML("CONFIRMER ?");
+					m_clear->SetClass("mdPlayArmed", true);
+					return;
+				}
+				disarmClear();
+				if(m_controller.clearPattern())
+					m_controller.sendPattern();
+				update();
 			});
 		}
 		if(auto* open = _document.GetElementById("mdPlayOpen"))
@@ -158,13 +178,30 @@ namespace mdJucePlugin
 		return parameter ? static_cast<uint8_t>(std::clamp(static_cast<int>(parameter->getUnnormalizedValue()), 0, 127)) : 0;
 	}
 
+	void PatternView::disarmClear()
+	{
+		m_clearArmedAt = -1.0;
+		if(m_clear)
+		{
+			m_clear->SetInnerRML("TOUT EFFACER");
+			m_clear->SetClass("mdPlayArmed", false);
+		}
+	}
+
 	bool PatternView::update()
 	{
+		// TOUT EFFACER not confirmed in time
+		bool disarmed = false;
+		if(m_clearArmedAt >= 0.0 && juce::Time::getMillisecondCounterHiRes() - m_clearArmedAt > ClearConfirmMilliseconds)
+		{
+			disarmClear();
+			disarmed = true;
+		}
 		// Hidden: drawn in full when shown
 		if(m_root && !m_root->IsVisible(true))
 		{
 			m_shownPattern = ~uint64_t{0};
-			return false;
+			return disarmed;
 		}
 		const auto revision = m_controller.getPatternRevision();
 		const auto machines = m_controller.getMachineRevision();
@@ -173,7 +210,7 @@ namespace mdJucePlugin
 		const auto kit = kitValue(track, m_laneParameter);
 		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack;
 		if(!grid && m_laneParameter == m_shownParameter && kit == m_shownKit)
-			return false;
+			return disarmed;
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;

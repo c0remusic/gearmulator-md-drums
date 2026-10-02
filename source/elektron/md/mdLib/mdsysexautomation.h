@@ -90,6 +90,7 @@ namespace md::automation::sysex
 	{
 		uint8_t slot = 0;      // 0..127, A01..H16
 		uint8_t length = 16;   // steps, 1..64
+		uint8_t kit = 0;       // 0..63, the Kit the pattern loads
 		std::array<uint32_t, 16> trigs{};      // bit n: a trig on step n + 1
 		std::array<uint32_t, 16> lockMasks{};  // bit p: parameter p (0..23) has a lock row
 		// The 64 lock rows: row k belongs to the k-th set bit of the masks, in
@@ -119,6 +120,8 @@ namespace md::automation::sysex
 		// Sets the length, 1 to the steps the dump holds (32, or 64 in the long form).
 		// Trigs and locks past the length stay in the dump.
 		bool setLength(uint8_t _length);
+		// Clears every trig and every lock of every step the dump holds, past the length too.
+		void clear();
 
 		Message toDump() const;
 

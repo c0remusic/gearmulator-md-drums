@@ -188,6 +188,8 @@
 .mmPlayStep.mmPlaySilent { background-color: #8a8d93; color: #141516; }
 .mdPlayStep.mdPlayLocked { background-color: #ff6b1f; color: #141516; }
 .mdPlayLegend { height: 16dp; line-height: 16dp; }
+/* TOUT EFFACER waiting for its second click */
+.mdEdButton.mdPlayArmed { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
 .mdPlayChip { display: inline-block; width: 10dp; height: 10dp; margin-left: 14dp; margin-right: 5dp; border-radius: 2dp; vertical-align: middle; }
 .mdPlayChip:first-child { margin-left: 0dp; }
 .mdPlayChipTrig { background-color: #f4f1ea; }
@@ -201,6 +203,9 @@
 .mdLibKit:hover { background-color: #2a2c30; }
 .mdLibKit.mdEdSelected { background-color: #2e3034; border: 1dp #8a8d93; }
 .mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
+/* a pattern read without a trig */
+.mdLibKit.mdLibEmpty { color: #6c6f75; }
+.mdLibInfo { height: 24dp; line-height: 24dp; }
 
 /* JOUER, CHAÎNE (mdChainView.cpp): a slot per entry, pattern then passes and length; the chosen one
    framed, the one playing in orange, an empty one dimmed */

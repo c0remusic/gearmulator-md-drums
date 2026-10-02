@@ -326,6 +326,7 @@ namespace md::automation::sysex
 			return std::nullopt;
 		// The row count byte is not needed: rows follow the masks, as on the machine.
 		result.length = _message[position + 1];
+		result.kit = _message[position + 4];
 		position += 6;
 		if(result.length == 0 || result.length > 64)
 			return std::nullopt;
@@ -769,6 +770,22 @@ namespace md::automation::sysex
 			return false;
 		m_plain[1] = _length;
 		return true;
+	}
+
+	void MdPatternEditor::clear()
+	{
+		for(uint8_t track = 0; track < 16; ++track)
+		{
+			for(uint8_t step = 0; step < stepCount(); ++step)
+				trigByte(track, step) = 0;
+		}
+		m_masks.fill(0);
+		for(size_t row = 0; row < g_patternRows; ++row)
+		{
+			for(uint8_t step = 0; step < stepCount(); ++step)
+				lockValue(row, step) = g_noLock;
+		}
+		m_plain[5] = 0;
 	}
 
 	Message MdPatternEditor::toDump() const

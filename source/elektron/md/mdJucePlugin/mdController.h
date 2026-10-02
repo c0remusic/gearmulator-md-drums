@@ -134,24 +134,40 @@ namespace mdJucePlugin
 		// Increments whenever a track output changes or becomes known.
 		uint64_t getRoutingRevision() const { return m_routingRevision.load(std::memory_order_acquire); }
 
-		// BIBLIO: the stored Kits, name and machines, read one by one with Kit requests
-		// ($53) once readKitLibrary is called; a slot not answered within 2 s is
-		// skipped. Read only: nothing is loaded.
+		// BIBLIO: the stored Kits, name and machines (Kit requests, $53), then the
+		// stored patterns, length and Kit (pattern requests, $68), read one by one
+		// once readLibrary is called; a Kit not answered within 2 s, or a pattern
+		// within 4 s, is skipped. What was read stays until the next reading. Read
+		// only: nothing is loaded.
 		struct LibraryKit
 		{
 			bool read = false;
 			std::string name;
 			std::vector<uint16_t> machines;
 		};
-		// Starts, or starts again, reading every Kit. False while the firmware is not ready.
-		bool readKitLibrary();
-		bool isReadingKitLibrary() const { return m_libraryReading.load(std::memory_order_acquire); }
+		struct LibraryPattern
+		{
+			bool read = false;
+			uint8_t length = 0;
+			uint8_t kit = 0;
+			// Trigs in the pattern's steps; nullopt when the dump read does not tell
+			// (a Machinedrum pattern longer than 32 steps: only 32 are read)
+			std::optional<uint16_t> trigs;
+		};
+		static constexpr size_t PatternLibrarySize = 128;
+		// Starts, or starts again, reading every Kit, then every pattern. False while
+		// the firmware is not ready: it boots, or a project state is being restored.
+		bool readLibrary();
+		bool isReadingLibrary() const { return m_libraryReading.load(std::memory_order_acquire); }
+		// A reading went to its end since the plug-in opened
+		bool isLibraryRead() const { return m_libraryDone.load(std::memory_order_acquire); }
 		size_t getKitLibrarySize() const { return m_model == md::MachineModel::Monomachine ? 128 : 64; }
-		// Slots answered or skipped since the reading started
-		size_t getKitLibraryProgress() const { return m_libraryProgress.load(std::memory_order_acquire); }
+		// Kits, then patterns, answered or skipped since the reading started
+		size_t getLibraryProgress() const { return m_libraryProgress.load(std::memory_order_acquire); }
 		std::optional<LibraryKit> getLibraryKit(uint8_t _slot) const;
-		// Increments whenever a library Kit is read or the reading starts or ends
-		uint64_t getKitLibraryRevision() const { return m_libraryRevision.load(std::memory_order_acquire); }
+		std::optional<LibraryPattern> getLibraryPattern(uint8_t _slot) const;
+		// Increments whenever a library Kit or pattern is read or the reading starts or ends
+		uint64_t getLibraryRevision() const { return m_libraryRevision.load(std::memory_order_acquire); }
 
 		// Asks the firmware for the current pattern number, then for that pattern's
 		// dump. False while the firmware is not ready. A pattern selected through SET
@@ -172,6 +188,8 @@ namespace mdJucePlugin
 		// pattern, or when md::automation::sysex::MdPatternEditor refuses the edit.
 		bool setPatternTrig(uint8_t _track, uint8_t _step, bool _on);
 		bool setPatternLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
+		// Every trig and lock of the pattern, past its length too
+		bool clearPattern();
 		// Writes the edited pattern back to its slot ($67), then reads it again: the
 		// reply tells whether the firmware kept it. False when there is nothing to send.
 		bool sendPattern();
@@ -272,8 +290,10 @@ namespace mdJucePlugin
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
 		// Same policy for the master effects
 		void storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, bool _authoritative);
-		// Asks for one library Kit, or ends the reading past the last slot
-		void requestLibraryKit(size_t _slot, uint64_t _now);
+		// Asks for one library item, the Kits then the patterns, or ends the reading past the last
+		void requestLibraryItem(size_t _item, uint64_t _now);
+		// A pattern dump the library waits for: stores it and asks for the next item
+		void storeLibraryPattern(uint8_t _slot, const LibraryPattern& _pattern);
 		void sendEditorSysex(const md::automation::sysex::Message& _message) const;
 		void onControllerTimer() override;
 		void sendMissingSynchronizationRequests();
@@ -327,9 +347,11 @@ namespace mdJucePlugin
 		uint64_t m_routingWritesAtGlobalRequest = 0;
 		mutable std::mutex m_libraryMutex;
 		std::vector<LibraryKit> m_library;          // under m_libraryMutex
-		size_t m_libraryWaiting = 0;                // slot asked for, under m_synchronizationLock
+		std::vector<LibraryPattern> m_libraryPatterns;	// under m_libraryMutex
+		size_t m_libraryWaiting = 0;                // item asked for (Kits, then patterns), under m_synchronizationLock
 		uint64_t m_libraryRequestMs = 0;
 		std::atomic<bool> m_libraryReading{false};
+		std::atomic<bool> m_libraryDone{false};
 		std::atomic<size_t> m_libraryProgress{0};
 		std::atomic<uint64_t> m_libraryRevision{0};
 		mutable std::mutex m_patternMutex;

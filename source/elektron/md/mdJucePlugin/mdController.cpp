@@ -6,6 +6,7 @@
 #include "mdLib/mdsysexautomation.h"
 
 #include <algorithm>
+#include <bitset>
 #include <chrono>
 #include <set>
 
@@ -391,7 +392,7 @@ namespace mdJucePlugin
 		return true;
 	}
 
-	bool Controller::readKitLibrary()
+	bool Controller::readLibrary()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
 		if(!firmwareReadyForAutomation())
@@ -399,26 +400,47 @@ namespace mdJucePlugin
 		{
 			const std::lock_guard lock(m_libraryMutex);
 			m_library.assign(getKitLibrarySize(), LibraryKit{});
+			m_libraryPatterns.assign(PatternLibrarySize, LibraryPattern{});
 		}
 		m_libraryProgress.store(0, std::memory_order_release);
 		m_libraryReading.store(true, std::memory_order_release);
 		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
-		requestLibraryKit(0, milliseconds());
+		requestLibraryItem(0, milliseconds());
 		return true;
 	}
 
-	void Controller::requestLibraryKit(const size_t _slot, const uint64_t _now)
+	void Controller::requestLibraryItem(const size_t _item, const uint64_t _now)
 	{
-		// One request at a time: each dump takes the MIDI line about 0.4 s
-		if(_slot >= getKitLibrarySize())
+		// One request at a time: a Kit dump takes the MIDI line about 0.4 s, a pattern dump up to 1.8 s
+		const auto kits = getKitLibrarySize();
+		if(_item >= kits + PatternLibrarySize)
 		{
 			m_libraryReading.store(false, std::memory_order_release);
+			m_libraryDone.store(true, std::memory_order_release);
 			m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
 			return;
 		}
-		m_libraryWaiting = _slot;
+		m_libraryWaiting = _item;
 		m_libraryRequestMs = _now;
-		sendEditorSysex(md::automation::sysex::kitRequest(m_model, static_cast<uint8_t>(_slot)));
+		if(_item < kits)
+			sendEditorSysex(md::automation::sysex::kitRequest(m_model, static_cast<uint8_t>(_item)));
+		else
+			sendEditorSysex(md::automation::sysex::patternRequest(m_model, static_cast<uint8_t>(_item - kits)));
+	}
+
+	void Controller::storeLibraryPattern(const uint8_t _slot, const LibraryPattern& _pattern)
+	{
+		const auto kits = getKitLibrarySize();
+		if(!m_libraryReading.load(std::memory_order_acquire) || m_libraryWaiting < kits || _slot != m_libraryWaiting - kits)
+			return;
+		{
+			const std::lock_guard lock(m_libraryMutex);
+			if(_slot < m_libraryPatterns.size())
+				m_libraryPatterns[_slot] = _pattern;
+		}
+		m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+		requestLibraryItem(m_libraryWaiting + 1, milliseconds());
 	}
 
 	std::optional<Controller::LibraryKit> Controller::getLibraryKit(const uint8_t _slot) const
@@ -427,6 +449,14 @@ namespace mdJucePlugin
 		if(_slot >= m_library.size())
 			return std::nullopt;
 		return m_library[_slot];
+	}
+
+	std::optional<Controller::LibraryPattern> Controller::getLibraryPattern(const uint8_t _slot) const
+	{
+		const std::lock_guard lock(m_libraryMutex);
+		if(_slot >= m_libraryPatterns.size())
+			return std::nullopt;
+		return m_libraryPatterns[_slot];
 	}
 
 	std::optional<md::automation::sysex::TrackOutput> Controller::getTrackOutput(const uint8_t _track) const
@@ -553,6 +583,15 @@ namespace mdJucePlugin
 		});
 	}
 
+	bool Controller::clearPattern()
+	{
+		return editPattern([](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			_editor.clear();
+			return true;
+		});
+	}
+
 	bool Controller::sendPattern()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
@@ -669,10 +708,12 @@ namespace mdJucePlugin
 		completeSynchronizationIfReady();
 		const auto now = milliseconds();
 		// A library Kit not answered: skip it (the firmware may drop a request while busy)
-		if(m_libraryReading.load(std::memory_order_acquire) && now - m_libraryRequestMs > g_dumpRequestRetryMs)
+		// A Kit not answered within 2 s, a pattern (a longer dump) within 4 s, is skipped
+		if(m_libraryReading.load(std::memory_order_acquire)
+			&& now - m_libraryRequestMs > (m_libraryWaiting < getKitLibrarySize() ? g_dumpRequestRetryMs : 2 * g_dumpRequestRetryMs))
 		{
 			m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
-			requestLibraryKit(m_libraryWaiting + 1, now);
+			requestLibraryItem(m_libraryWaiting + 1, now);
 		}
 		if(m_automationReady.load(std::memory_order_acquire))
 		{
@@ -1242,7 +1283,8 @@ namespace mdJucePlugin
 			m_model, _message))
 		{
 			// The library's Kit, read whatever the synchronization makes of the same dump
-			if(m_libraryReading.load(std::memory_order_acquire) && kit->slot == m_libraryWaiting)
+			if(m_libraryReading.load(std::memory_order_acquire) && m_libraryWaiting < getKitLibrarySize()
+				&& kit->slot == m_libraryWaiting)
 			{
 				{
 					const std::lock_guard lock(m_libraryMutex);
@@ -1251,7 +1293,7 @@ namespace mdJucePlugin
 				}
 				m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
 				m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
-				requestLibraryKit(m_libraryWaiting + 1, milliseconds());
+				requestLibraryItem(m_libraryWaiting + 1, milliseconds());
 			}
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
@@ -1298,6 +1340,16 @@ namespace mdJucePlugin
 			{
 				// Any pattern's length, for the chain
 				static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+				// The library's pattern; its trigs counted when the dump holds them all
+				LibraryPattern stored{true, pattern->length, pattern->kit, std::nullopt};
+				if(pattern->length <= 32)
+				{
+					uint16_t trigs = 0;
+					for(const auto mask : pattern->trigs)
+						trigs += static_cast<uint16_t>(std::bitset<32>(pattern->length < 32 ? mask & ((1u << pattern->length) - 1u) : mask).count());
+					stored.trigs = trigs;
+				}
+				storeLibraryPattern(pattern->slot, stored);
 				if(m_patternWanted.load(std::memory_order_acquire)
 					&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
 				{
@@ -1330,6 +1382,14 @@ namespace mdJucePlugin
 		{
 			// Any pattern's length, for the chain
 			static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+			// The library's pattern
+			uint16_t trigs = 0;
+			for(uint8_t track = 0; track < md::automation::sysex::MmPatternDump::TrackCount; ++track)
+			{
+				for(uint8_t step = 0; step < pattern->length; ++step)
+					trigs += pattern->hasTrig(track, step) ? 1 : 0;
+			}
+			storeLibraryPattern(pattern->slot, LibraryPattern{true, pattern->length, pattern->kit, trigs});
 			if(m_patternWanted.load(std::memory_order_acquire)
 				&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
 			{
