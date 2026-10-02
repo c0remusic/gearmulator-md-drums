@@ -1069,7 +1069,7 @@
 					</div>
 				</div>
 			</div>
-			<!-- JOUER: the current pattern and a lane (MD); the MM pattern format is not decoded yet. -->
+			<!-- JOUER: the current pattern, a lane and the chain (MD); the chain (MM, its pattern's trigs not decoded yet). -->
 			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
 				<div class="mdEdScroll">
 					<div class="mdEdContent" style="height: 538dp;">

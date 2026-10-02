@@ -101,8 +101,9 @@ namespace md::automation::sysex
 				: std::nullopt;
 		}
 
+		// _maximum: the most decoded bytes the dump may hold (a pattern holds more than a Global or a Kit)
 		std::optional<std::vector<uint8_t>> decodeMonomachinePayload(
-			const MessageView _message)
+			const MessageView _message, const size_t _maximum = 4096)
 		{
 			const auto end = _message.size() - 5;
 			std::vector<uint8_t> rle;
@@ -132,7 +133,7 @@ namespace md::automation::sysex
 				const auto count = static_cast<size_t>(value & 0x7f);
 				if(count == 0 || ++position >= rle.size())
 					return std::nullopt;
-				if(decoded.size() + count > 4096)
+				if(decoded.size() + count > _maximum)
 					return std::nullopt;
 				decoded.insert(decoded.end(), count, rle[position]);
 			}
@@ -340,6 +341,55 @@ namespace md::automation::sysex
 		// Parameters 24 and up belong to lock rows the classic format does not have.
 		for(auto& mask : result.lockMasks)
 			mask &= 0x00ffffffu;
+		return result;
+	}
+
+	namespace
+	{
+		// Monomachine pattern payload, decoded (MCL's MNMPattern): 78 trig, slide and swing masks of
+		// 8 bytes, the swing amount, 6 lock masks of 8 bytes and 6 × 64 notes come before the length,
+		// double tempo and Kit. Locks and MIDI notes follow: more than a Global or Kit holds.
+		constexpr size_t g_mmPatternLengthIndex = 78 * 8 + 4 + 6 * 8 + 6 * 64;
+		static_assert(g_mmPatternLengthIndex == 1060, "MNMPattern layout");
+		constexpr size_t g_mmPatternMaximum = 8192;
+
+		std::optional<MmPatternDump> mmPatternFrom(const MessageView _message, const std::vector<uint8_t>& _decoded)
+		{
+			if(_decoded.size() < g_mmPatternLengthIndex + 3)
+				return std::nullopt;
+			MmPatternDump result;
+			result.slot = _message[9];
+			result.length = _decoded[g_mmPatternLengthIndex];
+			result.doubleTempo = _decoded[g_mmPatternLengthIndex + 1] != 0;
+			result.kit = _decoded[g_mmPatternLengthIndex + 2];
+			if(result.slot >= 128 || result.length == 0 || result.length > 64)
+				return std::nullopt;
+			return result;
+		}
+	}
+
+	std::optional<MmPatternDump> parseMmPatternDump(const MessageView _message)
+	{
+		if(!validDump(MachineModel::Monomachine, _message, g_patternDump))
+			return std::nullopt;
+		const auto decoded = decodeMonomachinePayload(_message, g_mmPatternMaximum);
+		if(!decoded)
+			return std::nullopt;
+		return mmPatternFrom(_message, *decoded);
+	}
+
+	std::optional<Message> withMmPatternLength(const MessageView _message, const uint8_t _length)
+	{
+		if(_length == 0 || _length > 64 || !validDump(MachineModel::Monomachine, _message, g_patternDump))
+			return std::nullopt;
+		auto decoded = decodeMonomachinePayload(_message, g_mmPatternMaximum);
+		if(!decoded || !mmPatternFrom(_message, *decoded))
+			return std::nullopt;
+		(*decoded)[g_mmPatternLengthIndex] = _length;
+		Message result(_message.begin(), _message.begin() + 10);
+		const auto packed = encodeMonomachinePayload(*decoded);
+		result.insert(result.end(), packed.begin(), packed.end());
+		finishDump(result);
 		return result;
 	}
 

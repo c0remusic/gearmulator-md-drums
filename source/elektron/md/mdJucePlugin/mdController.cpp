@@ -489,7 +489,7 @@ namespace mdJucePlugin
 	bool Controller::requestPatternDump(const uint8_t _slot)
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
-		if(m_model != md::MachineModel::Machinedrum || _slot >= 128 || !firmwareReadyForAutomation())
+		if(_slot >= 128 || !firmwareReadyForAutomation())
 			return false;
 		sendEditorSysex(md::automation::sysex::patternRequest(m_model, _slot));
 		return true;
@@ -1319,6 +1319,12 @@ namespace mdJucePlugin
 				}
 				return true;
 			}
+		}
+		else if(const auto pattern = md::automation::sysex::parseMmPatternDump(_message))
+		{
+			// Any pattern's length, for the chain
+			static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+			return true;
 		}
 
 		// External SET STATUS messages can change the active Global, selected Kit,

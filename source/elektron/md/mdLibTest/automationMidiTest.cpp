@@ -712,6 +712,59 @@ namespace
 		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");
 	}
 
+	// A Monomachine pattern dump ($67) holding _decoded: run-length pass, then 7-bit groups, as the
+	// firmware sends it (bit 7 of a run byte: the count of the byte after it)
+	md::automation::sysex::Message makeMonomachinePattern(const uint8_t _slot, const std::vector<uint8_t>& _decoded)
+	{
+		std::vector<uint8_t> rle;
+		for(size_t position = 0; position < _decoded.size();)
+		{
+			size_t count = 1;
+			while(count < 0x7f && position + count < _decoded.size() && _decoded[position + count] == _decoded[position])
+				++count;
+			if(count == 1 && _decoded[position] < 0x80)
+				rle.push_back(_decoded[position]);
+			else
+				rle.insert(rle.end(), {static_cast<uint8_t>(0x80 | count), _decoded[position]});
+			position += count;
+		}
+		md::automation::sysex::Message pattern{0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x67, 0x05, 0x01, _slot};
+		append7Bit(pattern, rle);
+		finishDump(pattern);
+		return pattern;
+	}
+
+	// The length, double tempo and Kit where MCL's MNMPattern puts them (after 1060 bytes of masks,
+	// swing and notes), in a payload longer than a Global or Kit, and the same dump with another length
+	void testMonomachinePattern()
+	{
+		using namespace md::automation::sysex;
+		std::vector<uint8_t> decoded(6500, 0);
+		decoded[3] = 0xff;
+		decoded[1059] = 0x40;
+		decoded[1060] = 24;
+		decoded[1061] = 1;
+		decoded[1062] = 5;
+		decoded[6000] = 0x7f;
+		const auto pattern = makeMonomachinePattern(17, decoded);
+		const auto parsed = parseMmPatternDump(pattern);
+		require(parsed && parsed->slot == 17 && parsed->length == 24 && parsed->doubleTempo && parsed->kit == 5,
+			"MM pattern length, double tempo or Kit not where MNMPattern has them");
+		require(!parseMdPatternDump(pattern) && !parseMmPatternDump(makePattern(32, {}, {}, {})),
+			"a pattern dump of one model read as the other's");
+
+		const auto shorter = withMmPatternLength(pattern, 8);
+		const auto reparsed = shorter ? parseMmPatternDump(*shorter) : std::nullopt;
+		require(reparsed && reparsed->length == 8 && reparsed->kit == 5 && reparsed->slot == 17, "MM length not written");
+		auto expected = decoded;
+		expected[1060] = 8;
+		require(*shorter == makeMonomachinePattern(17, expected), "writing the length changed something else");
+		require(!withMmPatternLength(pattern, 0) && !withMmPatternLength(pattern, 65), "MM length out of range written");
+
+		decoded[1060] = 0;
+		require(!parseMmPatternDump(makeMonomachinePattern(17, decoded)), "MM pattern of length 0 accepted");
+	}
+
 	void testMachineAssignment()
 	{
 		using md::automation::sysex::Message;
@@ -1052,6 +1105,7 @@ int main(const int _argc, const char* const* _argv)
 	testMachineAssignment();
 	testMachinedrumPattern();
 	testMachinedrumPatternEditing();
+	testMonomachinePattern();
 	testDumpRequestOrdering();
 	testGlobalSync();
 	testHostSync();

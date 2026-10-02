@@ -206,6 +206,16 @@ set_tests_properties(patternChainFirmwareTest PROPERTIES
 	TIMEOUT 600)
 set_property(TARGET patternChainFirmwareTest PROPERTY FOLDER "Elektron")
 
+# The Monomachine side: pattern lengths from the dump, and when the machine takes the next pattern
+add_executable(mmPatternChainFirmwareTest mmPatternChainFirmwareTest.cpp)
+target_link_libraries(mmPatternChainFirmwareTest PRIVATE mdLib)
+add_test(NAME mmPatternChainFirmwareTest COMMAND mmPatternChainFirmwareTest)
+set_tests_properties(mmPatternChainFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mmPatternChainFirmwareTest PROPERTY FOLDER "Elektron")
+
 add_executable(mdUwFirmwareTest mdUwFirmwareTest.cpp)
 target_link_libraries(mdUwFirmwareTest PRIVATE mdLib)
 # The audio oracle must detect NaN/Inf even in builds using -Ofast or /fp:fast.

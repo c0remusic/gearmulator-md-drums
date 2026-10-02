@@ -58,7 +58,9 @@ namespace
 		require(samePass(chain.passAt(3 * 384 + 100), 0, 1, 3 * 384 + 96, 96, 0), "a later round wrong");
 
 		const auto first = *chain.passAt(0);
-		require(first.lastRequestTick() == 88, "last request tick not 8 ticks before the end");
+		require(chain.lastRequestTick(first) == 88, "Machinedrum's last request tick not 8 ticks before the end");
+		Chain monomachine(md::MachineModel::Monomachine);
+		require(monomachine.lastRequestTick(first) == 94 && monomachine != Chain(), "Monomachine's last request tick not 2 ticks before the end");
 		const auto second = chain.next(first);
 		const auto third = chain.next(second);
 		const auto fourth = chain.next(third);

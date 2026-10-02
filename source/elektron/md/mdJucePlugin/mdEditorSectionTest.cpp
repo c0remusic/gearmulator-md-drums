@@ -977,9 +977,12 @@ int main()
 			context.Update();
 			require(visible(element(doc, "mdEdPageSound")) && controller.getCurrentPart() == 0, "OUVRIR DANS SON did not open SON");
 		}
+#endif
 
-		// JOUER, CHAÎNE: the project's chain, built from the machine's pattern, and what it does
+		// JOUER, CHAÎNE: the project's chain, built from the machine's pattern, and what it does. The
+		// Machinedrum shows it under a tab of the bottom block, the Monomachine in a block of its own.
 		{
+			constexpr bool tabs = g_model == md::MachineModel::Machinedrum;
 			using Entries = std::vector<mdJucePlugin::ChainControl::Entry>;
 			using View = mdJucePlugin::ChainView;
 			using State = mdJucePlugin::ChainControl::State;
@@ -992,15 +995,17 @@ int main()
 			};
 			const auto has = [&](const std::string& _id, const char* _part) { return text(_id).find(_part) != std::string::npos; };
 			tabButton(doc, "mdEdit", "2").Click();
-			tabButton(doc, "mdPlayBottom", "1").Click();
+			if(tabs)
+				tabButton(doc, "mdPlayBottom", "1").Click();
 			context.Update();
 			present();
-			require(visible(element(doc, "mdPlayChainPage")) && !visible(element(doc, "mdPlayLanePage")), "CHAÎNE tab not shown");
+			require(visible(element(doc, "mdPlayChainPage")) && (!tabs || !visible(element(doc, "mdPlayLanePage"))), "CHAÎNE not shown");
 			require(text("mdChainState") == "chaîne inactive" && text("mdChainSlot0") == "—"
 				&& element(doc, "mdChainSlot0").IsClassSet("mdEdUnread"), "an empty chain not shown so");
 
 			// The machine on A04: AJOUTER adds it, twice, then the second becomes A05 and the first plays twice
-			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 3, 0xf7}, synthLib::MidiEventSource::Device);
+			const uint8_t product = g_model == md::MachineModel::Monomachine ? 0x03 : 0x02;
+			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, product, 0x00, 0x72, 0x04, 3, 0xf7}, synthLib::MidiEventSource::Device);
 			present();
 			require(text("mdChainAdd") == "AJOUTER A04", "AJOUTER does not name the machine's pattern: \"" + text("mdChainAdd") + "\"");
 			require(element(doc, "mdChainBank0").IsClassSet("mdEdUnread"), "the pattern selector active without an entry");
@@ -1058,10 +1063,10 @@ int main()
 			present();
 			require(chain.getEntries().empty() && !chain.isEnabled() && text("mdChainState") == "chaîne inactive",
 				"VIDER and CHAÎNE ACTIVE did not empty and stop the chain");
-			tabButton(doc, "mdPlayBottom", "0").Click();
+			if(tabs)
+				tabButton(doc, "mdPlayBottom", "0").Click();
 			context.Update();
 		}
-#endif
 
 		// BIBLIO: LIRE LES KITS reads every stored Kit, one request at a time; a Kit
 		// shows its machines without being loaded.

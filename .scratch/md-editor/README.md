@@ -198,7 +198,15 @@ Interface (faite, `mdChainView.*`, capture `md-chain.png`) : le bloc du bas de J
 
 `mdEditorSectionTest` construit A04 ×2, A05 par les boutons et le sélecteur, déplace, retire, active, et vérifie chaque ligne d'état.
 
-Reste : la chaîne sur le MM (règle du firmware à mesurer, longueurs sans décodage du pattern) et le bandeau ARRANGEMENT des sources DAW et SONG MACHINE de la maquette.
+Monomachine (fait) :
+
+- Longueur : `parseMmPatternDump` lit le dump de pattern MM (`$67`) selon `MNMPattern` de MCL : après 78 masques de trigs, slides et swings de 8 octets, le swing, 6 masques de locks et 6 × 64 notes, l'octet 1060 de la charge utile décodée est la longueur, puis le double tempo et le kit. Patterns d'usine A01 à A04 : 64 pas, kits 1 à 4. `withMmPatternLength` réécrit la longueur (le MM ne prend un dump qu'en GLOBAL > SYSEX RECV).
+- `mmPatternChainFirmwareTest` (SFX-60 OS 1.32b, ~4 min) : le MM s'engage sur le pattern suivant au **dernier tick** du pattern qui joue (1 tick avant la fin, contre 7 sur le MD) : demandé jusqu'à 2 ticks avant la fin, il bascule à la fin ; au dernier tick ou après, un tour de plus. Même résultat avec A01 réécrit à 32 pas : la longueur lue est bien celle que joue le séquenceur. Une demande en attente au STOP joue au START suivant, statut inchangé, comme sur le MD.
+- `md::PatternChain::commitTicks(modèle)` : 7 (MD), 1 (MM). La chaîne, son état (chunk `CHAN`), ses longueurs et le minuteur du processeur valent pour les deux modèles ; le contrôleur lit la longueur de tout dump de pattern MM.
+- Interface : sur le MM, JOUER montre le bloc CHAÎNE seul (le pattern et le piano roll attendent le décodage des trigs MM).
+- `mdChainPluginFirmwareTest` tourne sur les deux modèles : sur le MM (patterns de 64 pas), le statut suit la chaîne A01, A02, A01 à ppq 16, 32, 48, 64.
+
+Reste : le bandeau ARRANGEMENT des sources DAW et SONG MACHINE de la maquette.
 
 Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), l'échelle et le double tempo, les patterns de plus de 32 pas, une vraie machine (tout ce qui précède vient de l'émulation du firmware).
 

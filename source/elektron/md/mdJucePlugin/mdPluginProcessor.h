@@ -87,7 +87,7 @@ namespace mdJucePlugin
 		// Levels of the three output buses after each block, for the editor's meters
 		OutputMeters& getOutputMeters() { return m_outputMeters; }
 
-		// The project's pattern chain (Machinedrum), played while the machine follows the host
+		// The project's pattern chain, played while the machine follows the host
 		ChainControl& getChainControl() { return m_chainControl; }
 		using jucePluginEditorLib::Processor::processBlock;
 		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;

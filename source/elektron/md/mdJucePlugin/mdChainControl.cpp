@@ -5,7 +5,8 @@
 namespace mdJucePlugin
 {
 	ChainControl::ChainControl(const md::MachineModel _model)
-		: m_player(std::make_shared<md::ChainPlayer>(_model))
+		: m_model(_model)
+		, m_player(std::make_shared<md::ChainPlayer>(_model))
 	{
 	}
 
@@ -88,7 +89,7 @@ namespace mdJucePlugin
 
 	md::PatternChain ChainControl::makeChain() const
 	{
-		md::PatternChain chain;
+		md::PatternChain chain(m_model);
 		(void)chain.setEntries(m_entries);
 		for(const auto& entry : m_entries)
 			chain.setLength(entry.pattern, m_lengths[entry.pattern].load(std::memory_order_acquire));

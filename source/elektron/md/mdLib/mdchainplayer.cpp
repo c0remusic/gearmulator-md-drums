@@ -156,7 +156,7 @@ namespace md
 		// What the machine plays after this pass unless asked for another
 		const auto next = _chain->next(*pass);
 		const auto after = m_queued ? m_queued : m_current;
-		if(after == next.pattern || tick > pass->lastRequestTick())
+		if(after == next.pattern || tick > _chain->lastRequestTick(*pass))
 			return;
 		select(next.pattern, _event, _out);
 		m_queued = next.pattern;

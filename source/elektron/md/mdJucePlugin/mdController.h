@@ -161,9 +161,8 @@ namespace mdJucePlugin
 		std::optional<md::automation::sysex::PatternDump> getPattern() const;
 		// Increments whenever a new pattern dump is stored or the pattern is edited.
 		uint64_t getPatternRevision() const { return m_patternRevision.load(std::memory_order_acquire); }
-		// Machinedrum only: asks for a pattern's dump, for its length (the processor's ChainControl
-		// takes the length of every pattern dump). False on the Monomachine or while the firmware
-		// is not ready.
+		// Asks for a pattern's dump, for its length (the processor's ChainControl takes the length of
+		// every pattern dump). False while the firmware is not ready.
 		bool requestPatternDump(uint8_t _slot);
 
 		// Machinedrum only: edit the pattern as last read. The edit shows at once in

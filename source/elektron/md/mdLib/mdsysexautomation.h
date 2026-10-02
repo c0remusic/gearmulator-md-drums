@@ -189,6 +189,19 @@ namespace md::automation::sysex
 	// Machinedrum pattern dump ($67), 32- or 64-step form; only the first 32 steps are kept.
 	std::optional<PatternDump> parseMdPatternDump(MessageView _message);
 
+	// What a pattern chain needs of a Monomachine pattern dump ($67). Its payload follows MCL's
+	// MNMPattern; the trigs, notes and locks are not read.
+	struct MmPatternDump
+	{
+		uint8_t slot = 0;			// 0..127, A01..H16
+		uint8_t length = 16;		// steps, 1..64
+		bool doubleTempo = false;
+		uint8_t kit = 0;
+	};
+	std::optional<MmPatternDump> parseMmPatternDump(MessageView _message);
+	// The same dump with another length (1..64), everything else kept, its payload encoded again
+	std::optional<Message> withMmPatternLength(MessageView _message, uint8_t _length);
+
 	// SET STATUS for the Global slot: the firmware reloads that slot, which is how
 	// a Global dump written to the active slot takes effect.
 	Message globalReload(MachineModel _model, uint8_t _slot);

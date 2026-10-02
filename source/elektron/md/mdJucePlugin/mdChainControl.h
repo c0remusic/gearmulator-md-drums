@@ -18,7 +18,7 @@ namespace baseLib
 
 namespace mdJucePlugin
 {
-	// The project's pattern chain (Machinedrum): what the editor edits and the project saves, handed to
+	// The project's pattern chain: what the editor edits and the project saves, handed to
 	// the md::ChainPlayer the device runs. It plays when it is on, the length of every pattern in it is
 	// known, and the machine follows the host's transport (HostSync): the chain counts the host's clock.
 	// Any thread: the host may save or load the project from its own.
@@ -70,6 +70,7 @@ namespace mdJucePlugin
 		md::PatternChain makeChain() const;
 		State updateLocked(bool _following);
 
+		const md::MachineModel m_model;
 		const std::shared_ptr<md::ChainPlayer> m_player;
 		std::array<std::atomic<uint8_t>, 128> m_lengths{};
 		std::atomic<uint32_t> m_lengthsChanged{0};

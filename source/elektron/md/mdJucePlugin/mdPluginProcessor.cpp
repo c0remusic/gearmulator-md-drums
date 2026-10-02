@@ -122,7 +122,6 @@ namespace mdJucePlugin
 			baseLib::ChunkWriter chunk(_stream, "AUTO", 1);
 			_stream.write(snapshot);
 		}
-		if(m_model == md::MachineModel::Machinedrum)
 		{
 			baseLib::ChunkWriter chunk(_stream, "CHAN", 1);
 			m_chainControl.save(_stream);
@@ -141,8 +140,7 @@ namespace mdJucePlugin
 		});
 		_reader.add("CHAN", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
-			if(m_model == md::MachineModel::Machinedrum)
-				(void)m_chainControl.load(_stream);
+			(void)m_chainControl.load(_stream);
 		});
 		_reader.add("RAMF", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
@@ -434,8 +432,9 @@ namespace mdJucePlugin
 			else
 				m_startupDiagnosticsEnabled = false;
 		}
-		if(m_model == md::MachineModel::Machinedrum || m_startupDiagnosticsEnabled)
-			startTimer(250);
+		// The factory initialisation and state restore (Machinedrum), the startup diagnostics and
+		// the pattern chain (both machines)
+		startTimer(250);
 		m_performanceReport = std::make_unique<synthLib::PerformanceReport>(
 			getPlugin().getRealtimeInstrumentation(), panelEventDetails);
 		// The environment switch is also useful in hosts without an open editor.
@@ -852,8 +851,6 @@ namespace mdJucePlugin
 
 	void AudioPluginAudioProcessor::serviceChain()
 	{
-		if(m_model != md::MachineModel::Machinedrum)
-			return;
 		m_chainControl.update(getHostSyncState() == md::HostSync::State::Following);
 		// A pattern of the chain whose length is not known: its dump, one pattern at a time,
 		// asked for again after three seconds without an answer
@@ -898,8 +895,7 @@ namespace mdJucePlugin
 		d->setRamRecordingMode(getRamRecordingMode());
 		d->setParallelTransport(getParallelTransportSetting());
 		d->setHostSyncControl(m_hostSyncControl);
-		if(m_model == md::MachineModel::Machinedrum)
-			d->setChainPlayer(m_chainControl.getPlayer());
+		d->setChainPlayer(m_chainControl.getPlayer());
 		return d.release();
 	}
 
