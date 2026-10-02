@@ -61,6 +61,17 @@ namespace mdJucePlugin
 			_controller.onControllerTimer();
 		}
 
+		// The edits pause: the controller timer writes the pattern sendPatternSoon() waits with
+		static void pauseEdits(Controller& _controller)
+		{
+			const std::lock_guard lock(_controller.m_synchronizationLock);
+			_controller.servicePatternWrite(Controller::milliseconds() + Controller::PatternWritePauseMilliseconds);
+		}
+		static bool patternWriteWaiting(const Controller& _controller)
+		{
+			return _controller.m_patternWriteFirstMs != 0;
+		}
+
 		// The tracks' machines, as an applied Kit dump sets them
 		static std::vector<uint16_t> machines(const Controller& _controller)
 		{
@@ -559,7 +570,12 @@ int main()
 			doubleClick(step(1));
 			require(step(1).IsClassSet("mdEdStepTrig") && step(1).IsClassSet("mdEdStepFocus"), "double click did not set a trig and focus it");
 			require(md.getPattern()->hasTrig(0, 1), "trig not in the controller's pattern");
-			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "trig not written to the firmware");
+			// Written once the edits pause, not at the click
+			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::None
+				&& mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md), "trig written before the edits paused");
+			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
+				&& !mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md), "trig not written to the firmware");
 			require(visible(lockKnob) && visible(element(doc, "mdEdLockKnob_Volume")), "lock knobs not over the controls of a step with a trig");
 			const auto filterBase = md.getParameter("FilterBase", 0);
 			const auto kitBefore = filterBase->getUnnormalizedValue();
@@ -994,14 +1010,17 @@ int main()
 			context.Update();
 			require(controller.getCurrentPart() == 1 && element(doc, "mdPlayTrack1").IsClassSet("mdEdSelected")
 				&& lane.barValue(0) == -1 && lane.barValue(4) == 64, "a track name did not take the lane");
-			// A click writes a trig, a second one clears it
+			// A click sets a trig, a second one clears it; the pattern is written once the clicks pause
 			cell(1, 3).Click();
 			context.Update();
-			require(md.getPattern()->hasTrig(1, 3) && md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
-				&& cell(1, 3).IsClassSet("mdEdStepTrig"), "a click did not write the trig");
+			require(md.getPattern()->hasTrig(1, 3) && cell(1, 3).IsClassSet("mdEdStepTrig")
+				&& mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md), "a click did not set the trig");
 			cell(1, 3).Click();
 			context.Update();
 			require(!md.getPattern()->hasTrig(1, 3) && !cell(1, 3).IsClassSet("mdEdStepTrig"), "a second click did not clear the trig");
+			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
+				&& !mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md), "the clicks were not written once they paused");
 			// TOUT EFFACER: the first click asks to confirm, the second clears every trig and writes the pattern
 			element(doc, "mdPlayClear").Click();
 			context.Update();

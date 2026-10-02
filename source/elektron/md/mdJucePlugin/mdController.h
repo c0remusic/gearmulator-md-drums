@@ -193,6 +193,13 @@ namespace mdJucePlugin
 		// Writes the edited pattern back to its slot ($67), then reads it again: the
 		// reply tells whether the firmware kept it. False when there is nothing to send.
 		bool sendPattern();
+		// sendPattern() once the edits pause, PatternWritePauseMilliseconds after the last one, and at
+		// the latest PatternWriteMaxDelayMilliseconds after the first one not written (the controller
+		// timer sends it). A write costs the playing machine a short silence, a SAVE KIT and a dump to
+		// read back: a click per step wrote it every time.
+		void sendPatternSoon();
+		static constexpr uint64_t PatternWritePauseMilliseconds = 250;
+		static constexpr uint64_t PatternWriteMaxDelayMilliseconds = 1000;
 		enum class PatternWrite : uint8_t
 		{
 			None,       // nothing written yet
@@ -208,6 +215,8 @@ namespace mdJucePlugin
 	private:
 		friend struct ControllerAutomationTestAccess;
 		bool editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit);
+		// The write sendPatternSoon() asked for, once due; under m_synchronizationLock
+		void servicePatternWrite(uint64_t _now);
 		struct Address
 		{
 			uint8_t page = 0;
@@ -361,6 +370,9 @@ namespace mdJucePlugin
 		md::automation::sysex::Message m_patternDump;
 		bool m_patternEdited = false;               // edits not sent yet
 		uint32_t m_patternWritesInFlight = 0;       // sent, not read back yet
+		// sendPatternSoon(), under m_synchronizationLock: the first and last edit waiting, 0 for none
+		uint64_t m_patternWriteFirstMs = 0;
+		uint64_t m_patternWriteLastMs = 0;
 		std::optional<md::automation::sysex::PatternDump> m_patternSent;
 		std::atomic<PatternWrite> m_patternWrite{PatternWrite::None};
 		std::atomic<uint64_t> m_patternRevision{0};

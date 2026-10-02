@@ -72,12 +72,13 @@ namespace mdJucePlugin
 				m_steps[track][step] = cell;
 				if(!cell)
 					continue;
-				// A click sets or clears the trig; each write costs the playing machine a short silence
+				// A click sets or clears the trig, shown at once; the pattern is written once the clicks
+				// pause, as each write costs the playing machine a short silence
 				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, track, step](Rml::Event&)
 				{
 					const auto pattern = m_controller.getPattern();
 					if(pattern && m_controller.setPatternTrig(track, step, !pattern->hasTrig(track, step)))
-						m_controller.sendPattern();
+						m_controller.sendPatternSoon();
 					update();
 				});
 			}

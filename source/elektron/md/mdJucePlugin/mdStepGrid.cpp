@@ -211,7 +211,7 @@ namespace mdJucePlugin
 		const auto pattern = m_controller.getPattern();
 		const auto part = static_cast<uint8_t>(m_controller.getCurrentPart());
 		if(pattern && m_controller.setPatternTrig(part, _step, !pattern->hasTrig(part, _step)))
-			m_controller.sendPattern();
+			m_controller.sendPatternSoon();
 		m_focus = _step;
 		m_dirty = true;
 		render();

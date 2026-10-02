@@ -592,11 +592,32 @@ namespace mdJucePlugin
 		});
 	}
 
+	void Controller::sendPatternSoon()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto now = milliseconds();
+		if(!m_patternWriteFirstMs)
+			m_patternWriteFirstMs = now;
+		m_patternWriteLastMs = now;
+	}
+
+	void Controller::servicePatternWrite(const uint64_t _now)
+	{
+		if(!m_patternWriteFirstMs)
+			return;
+		if(_now - m_patternWriteLastMs < PatternWritePauseMilliseconds
+			&& _now - m_patternWriteFirstMs < PatternWriteMaxDelayMilliseconds)
+			return;
+		(void)sendPattern();
+	}
+
 	bool Controller::sendPattern()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
 		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
 			return false;
+		// This write carries the edits a sendPatternSoon() waits with
+		m_patternWriteFirstMs = 0;
 		md::automation::sysex::Message dump;
 		uint8_t slot = 0;
 		{
@@ -713,6 +734,7 @@ namespace mdJucePlugin
 		drainRealtimeParameterChanges(RealtimeAutomationCapacity, false);
 		completeSynchronizationIfReady();
 		const auto now = milliseconds();
+		servicePatternWrite(now);
 		// A library Kit not answered: skip it (the firmware may drop a request while busy)
 		// A Kit not answered within 2 s, a pattern (a longer dump) within 4 s, is skipped
 		if(m_libraryReading.load(std::memory_order_acquire)
@@ -1232,6 +1254,17 @@ namespace mdJucePlugin
 				return true;
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
+				// Edits waiting to be written belong to the pattern shown: written before another one replaces it
+				if(m_patternWriteFirstMs)
+				{
+					bool otherSlot = false;
+					{
+						const std::lock_guard lock(m_patternMutex);
+						otherSlot = m_pattern && m_pattern->slot != status->value;
+					}
+					if(otherSlot)
+						(void)sendPattern();
+				}
 				if(m_currentPattern.exchange(status->value, std::memory_order_acq_rel) != status->value)
 					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
 				// A status reply leads to a dump when requestPattern asked for one, or
@@ -1357,7 +1390,13 @@ namespace mdJucePlugin
 					{
 						const std::lock_guard lock(m_patternMutex);
 						// Each write is read back; only the reply to the last one tells
-						// what the firmware kept.
+						// what the firmware kept. Another pattern's dump ends the wait:
+						// what was written is no longer the pattern shown.
+						if(m_patternWritesInFlight > 0 && m_patternSent && m_patternSent->slot != pattern->slot)
+						{
+							m_patternWritesInFlight = 0;
+							m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+						}
 						if(m_patternWritesInFlight > 0)
 						{
 							if(--m_patternWritesInFlight > 0)
