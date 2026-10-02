@@ -1003,12 +1003,20 @@ int main()
 			md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x72, 0x04, 3, 0xf7}, synthLib::MidiEventSource::Device);
 			present();
 			require(text("mdChainAdd") == "AJOUTER A04", "AJOUTER does not name the machine's pattern: \"" + text("mdChainAdd") + "\"");
+			require(element(doc, "mdChainBank0").IsClassSet("mdEdUnread"), "the pattern selector active without an entry");
 			element(doc, "mdChainAdd").Click();
 			element(doc, "mdChainPassesUp").Click();
 			element(doc, "mdChainAdd").Click();
-			element(doc, "mdChainPatternUp").Click();
+			// The selector: bank B keeps the number (B04), number 05 keeps the bank (B05), bank A again (A05)
+			element(doc, "mdChainBank1").Click();
+			require(chain.getEntries() == Entries{{3, 2}, {19, 1}}, "bank B did not make the chosen entry B04");
+			element(doc, "mdChainNumber4").Click();
+			element(doc, "mdChainBank0").Click();
 			present();
 			require(chain.getEntries() == Entries{{3, 2}, {4, 1}}, "the chain is not A04 x2, A05");
+			require(element(doc, "mdChainBank0").IsClassSet("mdEdSelected") && element(doc, "mdChainNumber4").IsClassSet("mdEdSelected")
+				&& !element(doc, "mdChainNumber3").IsClassSet("mdEdSelected") && !element(doc, "mdChainBank1").IsClassSet("mdEdSelected"),
+				"the selector does not show the chosen entry's A05");
 			require(has("mdChainSlot0", "A04") && has("mdChainSlot0", "×2") && has("mdChainSlot0", "…")
 				&& has("mdChainSlot1", "A05") && element(doc, "mdChainSlot1").IsClassSet("mdEdSelected")
 				&& !element(doc, "mdChainSlot0").IsClassSet("mdEdSelected"), "slots do not show A04 x2 and A05 chosen");

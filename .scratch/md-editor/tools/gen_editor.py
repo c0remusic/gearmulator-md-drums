@@ -352,23 +352,28 @@ def play_page_md(d):
     # The 32 bars, drawn in a canvas under the steps
     w(f'{ind(d + 2)}<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {area_top}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
     w(f'{ind(d + 1)}</div>')
-    # CHAÎNE: what it does on the title row, the entries in slots, the actions under them
+    # CHAÎNE: what it does on the title row, the entries in slots, the chosen slot's pattern as a bank and a
+    # number, the actions under them
     w(f'{ind(d + 1)}<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
     w(f'{ind(d + 2)}<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16 - 150}dp;">chaîne inactive</div>')
     w(f'{ind(d + 2)}<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 140}dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>')
     sw = (gw - 32) // CHAIN_SLOTS
     for s in range(CHAIN_SLOTS):
         w(f'{ind(d + 2)}<div id="mdChainSlot{s}" class="jucePos mdChainSlot mdEdUnread" style="left: {16 + sw * s}dp; top: {TOP}dp; width: {sw - 4}dp;">—</div>')
-    ay = TOP + 44 + 12
-    actions = [("mdChainAdd", "AJOUTER"), ("mdChainPatternDown", "PATTERN −"), ("mdChainPatternUp", "PATTERN +"),
-               ("mdChainPassesDown", "PASSAGES −"), ("mdChainPassesUp", "PASSAGES +"), ("mdChainMoveLeft", "‹ DÉPLACER"),
-               ("mdChainMoveRight", "DÉPLACER ›"), ("mdChainRemove", "RETIRER"), ("mdChainClear", "VIDER")]
+    py = TOP + 44 + 10
+    pw, gap = 42, (gw - 32) - 24 * 42
+    selector(d + 2, 16, py, [chr(ord("A") + b) for b in range(8)], [pw] * 8, [f"mdChainBank{b}" for b in range(8)])
+    selector(d + 2, 16 + 8 * pw + gap, py, [f"{n + 1:02d}" for n in range(16)], [pw] * 16, [f"mdChainNumber{n}" for n in range(16)])
+    ay = py + 24 + 8
+    actions = [("mdChainAdd", "AJOUTER"), ("mdChainPassesDown", "PASSAGES −"), ("mdChainPassesUp", "PASSAGES +"),
+               ("mdChainMoveLeft", "‹ DÉPLACER"), ("mdChainMoveRight", "DÉPLACER ›"), ("mdChainRemove", "RETIRER"),
+               ("mdChainClear", "VIDER")]
     step = (gw - 32) // len(actions)
     for i, (bid, label) in enumerate(actions):
         w(f'{ind(d + 2)}<button id="{bid}" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {16 + step * i}dp; top: {ay}dp; width: {step - 6}dp;">{label}</button>')
-    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {ay + 24 + 10}dp; width: {gw - 32}dp;">'
-      'Joue avec le transport de l\'hôte, la machine le suivant (SYSTÈME). AJOUTER prend le pattern de la machine ; '
-      'changé dans le dernier pas, le suivant attend un tour.</div>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {ay + 24 + 8}dp; width: {gw - 32}dp;">'
+      'Joue avec le transport de l\'hôte (SYSTÈME, SUIVRE L\'HÔTE). AJOUTER prend le pattern de la machine ; '
+      'A–H et 01–16 changent celui de la case choisie.</div>')
     w(f'{ind(d + 1)}</div>')
     d -= 1
     block_close(d + 1)

@@ -193,12 +193,12 @@ Plug-in (fait) :
 Interface (faite, `mdChainView.*`, capture `md-chain.png`) : le bloc du bas de JOUER a deux onglets, LANE et CHAÎNE (la maquette met l'arrangement au-dessus du pattern, mais la fenêtre de 606 dp n'a pas la place ; les onglets gardent la grille entière). CHAÎNE :
 
 - seize cases, une par entrée : « A04 ×2 » puis « 32 pas » (« … » tant que la longueur n'est pas lue) ; la case choisie encadrée, celle qui joue en orange ;
-- AJOUTER A04 ajoute le pattern de la machine (statut CURRENT PATTERN) après la case choisie ; PATTERN − / +, PASSAGES − / +, ‹ DÉPLACER / DÉPLACER › agissent sur la case choisie (la dernière si aucune) ; RETIRER, VIDER ; CHAÎNE ACTIVE (orange quand activée) ;
+- AJOUTER A04 ajoute le pattern de la machine (statut CURRENT PATTERN) après la case choisie ; le sélecteur A–H et 01–16 montre et change le pattern de la case choisie (la banque garde le numéro, le numéro garde la banque), sans toucher à celui de la machine ; PASSAGES − / +, ‹ DÉPLACER / DÉPLACER › agissent sur la case choisie (la dernière si aucune) ; RETIRER, VIDER ; CHAÎNE ACTIVE (orange quand activée) ;
 - la ligne d'état dit ce que fait la chaîne : « chaîne inactive », « chaîne vide : … », « lecture de la longueur des patterns… », « en attente : la machine ne suit pas l'hôte (SYSTÈME, SUIVRE L'HÔTE) », « prête : joue avec le transport de l'hôte », et en lecture « joue A04 (passage 2/2) · ensuite A05 ».
 
-`mdEditorSectionTest` construit A04 ×2, A05 par les boutons, déplace, retire, active, et vérifie chaque ligne d'état.
+`mdEditorSectionTest` construit A04 ×2, A05 par les boutons et le sélecteur, déplace, retire, active, et vérifie chaque ligne d'état.
 
-Reste : la chaîne sur le MM (règle du firmware à mesurer, longueurs sans décodage du pattern), un choix de pattern sans passer par la machine (sélecteur A–H × 16), et le bandeau ARRANGEMENT des sources DAW et SONG MACHINE de la maquette.
+Reste : la chaîne sur le MM (règle du firmware à mesurer, longueurs sans décodage du pattern) et le bandeau ARRANGEMENT des sources DAW et SONG MACHINE de la maquette.
 
 Pas encore vérifié : le MM (format de pattern non décodé ; à faire par le statut et le program change OUT), l'échelle et le double tempo, les patterns de plus de 32 pas, une vraie machine (tout ce qui précède vient de l'émulation du firmware).
 

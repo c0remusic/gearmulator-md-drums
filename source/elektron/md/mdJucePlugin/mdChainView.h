@@ -21,14 +21,17 @@ namespace mdJucePlugin
 	// JOUER (Machinedrum), CHAÎNE tab: the project's pattern chain (ChainControl). The slots
 	// mdChainSlot<0..15> show the entries, pattern then passes and length, the chosen one framed and the
 	// one playing in orange. mdChainAdd adds the machine's current pattern after the chosen entry; the
-	// chosen entry's pattern (mdChainPatternDown/Up), passes (mdChainPassesDown/Up) and place
-	// (mdChainMoveLeft/Right) change, mdChainRemove removes it, mdChainClear empties the chain, and
-	// mdChainEnable turns it on or off. mdChainState says what the chain does.
+	// chosen entry's pattern (its bank mdChainBank<0..7>, A to H, and number mdChainNumber<0..15>),
+	// passes (mdChainPassesDown/Up) and place (mdChainMoveLeft/Right) change, mdChainRemove removes it,
+	// mdChainClear empties the chain, and mdChainEnable turns it on or off. Without a chosen entry,
+	// these act on the last one. mdChainState says what the chain does.
 	class ChainView
 	{
 	public:
 		using Entry = ChainControl::Entry;
 		static constexpr size_t SlotCount = 16;
+		static constexpr uint8_t BankCount = 8;
+		static constexpr uint8_t NumberCount = 16;
 
 		ChainView(ChainControl& _chain, Controller& _controller, Rml::Element& _document);
 
@@ -60,6 +63,8 @@ namespace mdJucePlugin
 		Rml::Element* m_enable = nullptr;
 		Rml::Element* m_add = nullptr;
 		std::array<Rml::Element*, SlotCount> m_slots{};
+		std::array<Rml::Element*, BankCount> m_banks{};
+		std::array<Rml::Element*, NumberCount> m_numbers{};
 		std::array<std::string, SlotCount> m_shownSlots{};
 		std::string m_shownState;
 		std::string m_shownAdd;

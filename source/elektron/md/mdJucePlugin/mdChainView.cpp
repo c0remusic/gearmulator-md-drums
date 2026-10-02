@@ -73,20 +73,31 @@ namespace mdJucePlugin
 				});
 			});
 		};
-		change("mdChainPatternDown", [](Entry& _entry)
+		// The chosen entry's pattern: its bank (A to H) keeping its number, or its number keeping its bank
+		for(uint8_t bank = 0; bank < BankCount; ++bank)
 		{
-			if(_entry.pattern == 0)
-				return false;
-			--_entry.pattern;
-			return true;
-		});
-		change("mdChainPatternUp", [](Entry& _entry)
+			m_banks[bank] = _document.GetElementById("mdChainBank" + std::to_string(bank));
+			change(("mdChainBank" + std::to_string(bank)).c_str(), [bank](Entry& _entry)
+			{
+				const auto pattern = static_cast<uint8_t>(bank * NumberCount + _entry.pattern % NumberCount);
+				if(pattern == _entry.pattern)
+					return false;
+				_entry.pattern = pattern;
+				return true;
+			});
+		}
+		for(uint8_t number = 0; number < NumberCount; ++number)
 		{
-			if(_entry.pattern >= 127)
-				return false;
-			++_entry.pattern;
-			return true;
-		});
+			m_numbers[number] = _document.GetElementById("mdChainNumber" + std::to_string(number));
+			change(("mdChainNumber" + std::to_string(number)).c_str(), [number](Entry& _entry)
+			{
+				const auto pattern = static_cast<uint8_t>(_entry.pattern / NumberCount * NumberCount + number);
+				if(pattern == _entry.pattern)
+					return false;
+				_entry.pattern = pattern;
+				return true;
+			});
+		}
 		change("mdChainPassesDown", [](Entry& _entry)
 		{
 			if(_entry.passes <= 1)
@@ -263,6 +274,23 @@ namespace mdJucePlugin
 			element->SetClass("mdEdUnread", !used);
 			element->SetClass("mdEdSelected", used && m_chosen == slot);
 			element->SetClass("mdChainPlaying", used && playing && playing->entry == slot);
+		}
+		// The pattern of the entry the selector changes: the chosen one, or the last
+		const auto target = m_chosen ? m_chosen : (entries.empty() ? std::nullopt : std::optional<size_t>(entries.size() - 1));
+		const auto pattern = target ? std::optional<uint8_t>(entries[*target].pattern) : std::nullopt;
+		for(uint8_t bank = 0; bank < BankCount; ++bank)
+		{
+			if(!m_banks[bank])
+				continue;
+			m_banks[bank]->SetClass("mdEdSelected", pattern && *pattern / NumberCount == bank);
+			m_banks[bank]->SetClass("mdEdUnread", !pattern);
+		}
+		for(uint8_t number = 0; number < NumberCount; ++number)
+		{
+			if(!m_numbers[number])
+				continue;
+			m_numbers[number]->SetClass("mdEdSelected", pattern && *pattern % NumberCount == number);
+			m_numbers[number]->SetClass("mdEdUnread", !pattern);
 		}
 		if(m_enable)
 			juceRmlUi::ElemButton::setChecked(m_enable, enabled);

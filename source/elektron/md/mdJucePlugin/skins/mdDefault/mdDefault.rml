@@ -1659,16 +1659,38 @@
 								<div id="mdChainSlot13" class="jucePos mdChainSlot mdEdUnread" style="left: 848dp; top: 32dp; width: 60dp;">—</div>
 								<div id="mdChainSlot14" class="jucePos mdChainSlot mdEdUnread" style="left: 912dp; top: 32dp; width: 60dp;">—</div>
 								<div id="mdChainSlot15" class="jucePos mdChainSlot mdEdUnread" style="left: 976dp; top: 32dp; width: 60dp;">—</div>
-								<button id="mdChainAdd" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 16dp; top: 88dp; width: 109dp;">AJOUTER</button>
-								<button id="mdChainPatternDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 131dp; top: 88dp; width: 109dp;">PATTERN −</button>
-								<button id="mdChainPatternUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 246dp; top: 88dp; width: 109dp;">PATTERN +</button>
-								<button id="mdChainPassesDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 361dp; top: 88dp; width: 109dp;">PASSAGES −</button>
-								<button id="mdChainPassesUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 476dp; top: 88dp; width: 109dp;">PASSAGES +</button>
-								<button id="mdChainMoveLeft" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 591dp; top: 88dp; width: 109dp;">‹ DÉPLACER</button>
-								<button id="mdChainMoveRight" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 706dp; top: 88dp; width: 109dp;">DÉPLACER ›</button>
-								<button id="mdChainRemove" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 821dp; top: 88dp; width: 109dp;">RETIRER</button>
-								<button id="mdChainClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 936dp; top: 88dp; width: 109dp;">VIDER</button>
-								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 122dp; width: 1036dp;">Joue avec le transport de l'hôte, la machine le suivant (SYSTÈME). AJOUTER prend le pattern de la machine ; changé dans le dernier pas, le suivant attend un tour.</div>
+								<div id="mdChainBank0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 86dp; width: 42dp;">A</div>
+								<div id="mdChainBank1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 58dp; top: 86dp; width: 42dp;">B</div>
+								<div id="mdChainBank2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 100dp; top: 86dp; width: 42dp;">C</div>
+								<div id="mdChainBank3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 142dp; top: 86dp; width: 42dp;">D</div>
+								<div id="mdChainBank4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 184dp; top: 86dp; width: 42dp;">E</div>
+								<div id="mdChainBank5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 226dp; top: 86dp; width: 42dp;">F</div>
+								<div id="mdChainBank6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 268dp; top: 86dp; width: 42dp;">G</div>
+								<div id="mdChainBank7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 310dp; top: 86dp; width: 42dp;">H</div>
+								<div id="mdChainNumber0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 380dp; top: 86dp; width: 42dp;">01</div>
+								<div id="mdChainNumber1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 422dp; top: 86dp; width: 42dp;">02</div>
+								<div id="mdChainNumber2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 464dp; top: 86dp; width: 42dp;">03</div>
+								<div id="mdChainNumber3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 506dp; top: 86dp; width: 42dp;">04</div>
+								<div id="mdChainNumber4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 548dp; top: 86dp; width: 42dp;">05</div>
+								<div id="mdChainNumber5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 590dp; top: 86dp; width: 42dp;">06</div>
+								<div id="mdChainNumber6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 632dp; top: 86dp; width: 42dp;">07</div>
+								<div id="mdChainNumber7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 674dp; top: 86dp; width: 42dp;">08</div>
+								<div id="mdChainNumber8" class="jucePos mdEdSeg mdEdSegChoice" style="left: 716dp; top: 86dp; width: 42dp;">09</div>
+								<div id="mdChainNumber9" class="jucePos mdEdSeg mdEdSegChoice" style="left: 758dp; top: 86dp; width: 42dp;">10</div>
+								<div id="mdChainNumber10" class="jucePos mdEdSeg mdEdSegChoice" style="left: 800dp; top: 86dp; width: 42dp;">11</div>
+								<div id="mdChainNumber11" class="jucePos mdEdSeg mdEdSegChoice" style="left: 842dp; top: 86dp; width: 42dp;">12</div>
+								<div id="mdChainNumber12" class="jucePos mdEdSeg mdEdSegChoice" style="left: 884dp; top: 86dp; width: 42dp;">13</div>
+								<div id="mdChainNumber13" class="jucePos mdEdSeg mdEdSegChoice" style="left: 926dp; top: 86dp; width: 42dp;">14</div>
+								<div id="mdChainNumber14" class="jucePos mdEdSeg mdEdSegChoice" style="left: 968dp; top: 86dp; width: 42dp;">15</div>
+								<div id="mdChainNumber15" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1010dp; top: 86dp; width: 42dp;">16</div>
+								<button id="mdChainAdd" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 16dp; top: 118dp; width: 142dp;">AJOUTER</button>
+								<button id="mdChainPassesDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 164dp; top: 118dp; width: 142dp;">PASSAGES −</button>
+								<button id="mdChainPassesUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 312dp; top: 118dp; width: 142dp;">PASSAGES +</button>
+								<button id="mdChainMoveLeft" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 460dp; top: 118dp; width: 142dp;">‹ DÉPLACER</button>
+								<button id="mdChainMoveRight" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 608dp; top: 118dp; width: 142dp;">DÉPLACER ›</button>
+								<button id="mdChainRemove" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 756dp; top: 118dp; width: 142dp;">RETIRER</button>
+								<button id="mdChainClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 904dp; top: 118dp; width: 142dp;">VIDER</button>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 150dp; width: 1036dp;">Joue avec le transport de l'hôte (SYSTÈME, SUIVRE L'HÔTE). AJOUTER prend le pattern de la machine ; A–H et 01–16 changent celui de la case choisie.</div>
 							</div>
 						</div>
 					</div>
