@@ -1108,7 +1108,10 @@
 					<div class="mdEdContent" style="height: 538dp;">
 						<div id="mdPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 330dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERN</div>
-							<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: 740dp;">pattern : en attente du firmware</div>
+							<div id="mdPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
+							<div id="mdPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
+							<button id="mdPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 286dp; top: 4dp; width: 110dp;">LONGUEUR —</button>
+							<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 408dp; top: 4dp; width: 442dp;">pattern : en attente du firmware</div>
 							<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
 							<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
 							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 274dp;"/>

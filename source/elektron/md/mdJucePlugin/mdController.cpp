@@ -652,6 +652,14 @@ namespace mdJucePlugin
 		});
 	}
 
+	bool Controller::setPatternLength(const uint8_t _length)
+	{
+		return editPattern([_length](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setLength(_length);
+		});
+	}
+
 	void Controller::sendPatternSoon()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
@@ -1563,15 +1571,14 @@ namespace mdJucePlugin
 			{
 				// Any pattern's length, for the chain
 				static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
-				// The library's pattern; its trigs counted when the dump holds them all
+				// The library's pattern and its trigs within its length: the dump holds them all, 64 steps
+				// in its long form
 				LibraryPattern stored{true, pattern->length, pattern->kit, std::nullopt};
-				if(pattern->length <= 32)
-				{
-					uint16_t trigs = 0;
-					for(const auto mask : pattern->trigs)
-						trigs += static_cast<uint16_t>(std::bitset<32>(pattern->length < 32 ? mask & ((1u << pattern->length) - 1u) : mask).count());
-					stored.trigs = trigs;
-				}
+				const auto inLength = pattern->length >= 64 ? ~uint64_t{0} : (uint64_t{1} << pattern->length) - 1;
+				uint16_t trigs = 0;
+				for(const auto mask : pattern->trigs)
+					trigs += static_cast<uint16_t>(std::bitset<64>(mask & inLength).count());
+				stored.trigs = trigs;
 				storeLibraryPattern(pattern->slot, stored);
 				if(m_patternWanted.load(std::memory_order_acquire)
 					&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))

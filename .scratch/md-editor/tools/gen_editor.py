@@ -442,18 +442,23 @@ def play_page_mm(d):
     return ly + lh + 12
 
 def play_page_md(d):
-    # The current pattern, every track on its 32 first steps, then under it, as tabs, the lane of the
-    # edited track and one parameter, or the project's chain. PatternView (mdPatternView.cpp) fills the
-    # grid and the lane from the pattern dump, ChainView (mdChainView.cpp) the chain.
+    # The current pattern, every track on 32 steps at a time (1-32 or 33-64 of a pattern over 32 steps),
+    # then under it, as tabs, the lane of the edited track and one parameter, or the project's chain.
+    # PatternView (mdPatternView.cpp) fills the grid and the lane from the pattern dump, ChainView
+    # (mdChainView.cpp) the chain.
     label_w = PLAY_LABEL_W
     gw = span(12)
     pitch = (gw - 32 - label_w) // 32
     w(f'{ind(d)}<div class="mdEdContent" style="height: {{PLAY_H}}dp;">')
     marker = len(out)
     block_open(d + 1, "mdPlayGrid", "PATTERN", "", 0, 12, 12, "{GRID_H}")
+    selector(d + 2, 110, 4, ["PAS 1–32", "PAS 33–64"], [84, 84], ["mdPlayPage0", "mdPlayPage1"])
+    # LONGUEUR opens a menu of the lengths, 1 to 64
+    w(f'{ind(d + 2)}<button id="mdPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {110 + 2 * 84 + 8}dp; top: 4dp; width: 110dp;">LONGUEUR —</button>')
+    info_x = 110 + 2 * 84 + 8 + 110 + 12
     # TOUT EFFACER asks for a second click (CONFIRMER), then clears every trig and lock of the pattern
     clear_x = gw - 16 - 62 - 8 - 120
-    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 110dp; top: 4dp; width: {clear_x - 12 - 110}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {clear_x - 12 - info_x}dp;">pattern : en attente du firmware</div>')
     w(f'{ind(d + 2)}<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {clear_x}dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>')
     w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     gh = play_grid(d + 2, "mdPlay", 16, 16, gw, "", "",

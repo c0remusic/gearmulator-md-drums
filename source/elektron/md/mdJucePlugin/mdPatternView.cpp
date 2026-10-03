@@ -7,6 +7,7 @@
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlEventListener.h"
+#include "juceRmlUi/rmlMenu.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -54,6 +55,25 @@ namespace mdJucePlugin
 		m_root = _document.GetElementById("mdEdPagePlay");
 		m_info = _document.GetElementById("mdPlayInfo");
 		m_laneInfo = _document.GetElementById("mdPlayLaneInfo");
+		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
+		{
+			m_stepPages[page] = _document.GetElementById("mdPlayPage" + std::to_string(page));
+			if(!m_stepPages[page])
+				continue;
+			juceRmlUi::EventListener::Add(m_stepPages[page], Rml::EventId::Click, [this, page](Rml::Event&)
+			{
+				m_stepPage = page;
+				update();
+			});
+		}
+		m_length = _document.GetElementById("mdPlayLength");
+		if(m_length)
+		{
+			juceRmlUi::EventListener::Add(m_length, Rml::EventId::Click, [this](const Rml::Event& _event)
+			{
+				openLengthMenu(_event);
+			});
+		}
 		for(uint8_t step = 0; step < StepCount; ++step)
 			m_heads[step] = _document.GetElementById("mdPlayHead" + std::to_string(step));
 		for(uint8_t track = 0; track < TrackCount; ++track)
@@ -73,12 +93,13 @@ namespace mdJucePlugin
 				m_steps[track][step] = cell;
 				if(!cell)
 					continue;
-				// A click sets or clears the trig, shown at once; the pattern is written once the clicks
-				// pause, as each write costs the playing machine a short silence
+				// A click sets or clears the trig of the step shown, at once; the pattern is written once the
+				// clicks pause, as each write costs the playing machine a short silence
 				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, track, step](Rml::Event&)
 				{
 					const auto pattern = m_controller.getPattern();
-					if(pattern && m_controller.setPatternTrig(track, step, !pattern->hasTrig(track, step)))
+					const auto shown = static_cast<uint8_t>(m_shownStepPage * StepCount + step);
+					if(pattern && m_controller.setPatternTrig(track, shown, !pattern->hasTrig(track, shown)))
 						m_controller.sendPatternSoon();
 					update();
 				});
@@ -145,7 +166,7 @@ namespace mdJucePlugin
 		}
 	}
 
-	uint32_t PatternView::parameterLocks(const md::automation::sysex::PatternDump& _pattern, const uint8_t _track,
+	uint64_t PatternView::parameterLocks(const md::automation::sysex::PatternDump& _pattern, const uint8_t _track,
 		const uint8_t _parameter)
 	{
 		if(_track >= TrackCount || _parameter >= ParameterCount || !((_pattern.lockMasks[_track] >> _parameter) & 1u))
@@ -157,18 +178,18 @@ namespace mdJucePlugin
 		row += std::bitset<32>(_pattern.lockMasks[_track] & ((1u << _parameter) - 1u)).count();
 		if(row >= _pattern.lockRows.size())
 			return 0;
-		uint32_t steps = 0;
-		for(uint8_t step = 0; step < StepCount; ++step)
+		uint64_t steps = 0;
+		for(uint8_t step = 0; step < _pattern.steps; ++step)
 		{
 			if(_pattern.lockRows[row][step] < 0x80)
-				steps |= 1u << step;
+				steps |= uint64_t{1} << step;
 		}
 		return steps;
 	}
 
-	uint32_t PatternView::lockedSteps(const md::automation::sysex::PatternDump& _pattern, const uint8_t _track)
+	uint64_t PatternView::lockedSteps(const md::automation::sysex::PatternDump& _pattern, const uint8_t _track)
 	{
-		uint32_t steps = 0;
+		uint64_t steps = 0;
 		for(uint8_t parameter = 0; parameter < ParameterCount; ++parameter)
 			steps |= parameterLocks(_pattern, _track, parameter);
 		return steps;
@@ -178,6 +199,25 @@ namespace mdJucePlugin
 	{
 		const auto* parameter = m_names[_parameter].empty() ? nullptr : m_controller.getParameter(m_names[_parameter], _track);
 		return parameter ? static_cast<uint8_t>(std::clamp(static_cast<int>(parameter->getUnnormalizedValue()), 0, 127)) : 0;
+	}
+
+	void PatternView::openLengthMenu(const Rml::Event& _event)
+	{
+		const auto pattern = m_controller.getPattern();
+		if(!pattern)
+			return;
+		// Two columns of 32; the pattern is written once the choice is made, as a click on a step does
+		juceRmlUi::Menu menu;
+		for(uint8_t length = 1; length <= MaxSteps; ++length)
+		{
+			menu.addEntry(std::to_string(length) + " pas", length == pattern->length, [this, length]
+			{
+				if(m_controller.setPatternLength(length))
+					m_controller.sendPatternSoon();
+				update();
+			});
+		}
+		menu.runModal(_event, StepCount);
 	}
 
 	void PatternView::disarmClear()
@@ -205,14 +245,25 @@ namespace mdJucePlugin
 			m_shownPattern = ~uint64_t{0};
 			return showPlayStep(-1) || disarmed;
 		}
-		const auto playing = m_controller.getPlayingStep();
-		const bool playStepChanged = showPlayStep(playing && *playing < StepCount ? *playing : -1);
 		const auto revision = m_controller.getPatternRevision();
 		const auto machines = m_controller.getMachineRevision();
 		const auto track = static_cast<uint8_t>(m_controller.getCurrentPart());
+		// Steps 33 to 64 only for a pattern over 32 steps: settled when the pattern or the page asked for
+		// changes
+		std::optional<md::automation::sysex::PatternDump> pattern;
+		auto page = m_shownStepPage;
+		if(revision != m_shownPattern || m_stepPage != m_shownStepPage)
+		{
+			pattern = m_controller.getPattern();
+			page = pattern && pattern->length > StepCount ? m_stepPage : 0;
+			m_stepPage = page;
+		}
+		const auto playing = m_controller.getPlayingStep();
+		const bool playStepChanged = showPlayStep(playing && *playing / StepCount == page ? *playing % StepCount : -1);
 		// The lane shows the Kit value where a step has no lock: follow it
 		const auto kit = kitValue(track, m_laneParameter);
-		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack;
+		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack
+			|| page != m_shownStepPage;
 		if(!grid && m_laneParameter == m_shownParameter && kit == m_shownKit)
 			return disarmed || playStepChanged;
 		m_shownPattern = revision;
@@ -220,7 +271,9 @@ namespace mdJucePlugin
 		m_shownTrack = track;
 		m_shownParameter = m_laneParameter;
 		m_shownKit = kit;
-		const auto pattern = m_controller.getPattern();
+		m_shownStepPage = page;
+		if(!pattern)
+			pattern = m_controller.getPattern();
 		if(grid)
 			renderGrid(pattern ? &*pattern : nullptr);
 		renderLane(pattern ? &*pattern : nullptr);
@@ -263,6 +316,7 @@ namespace mdJucePlugin
 	void PatternView::renderGrid(const md::automation::sysex::PatternDump* _pattern)
 	{
 		const uint8_t length = _pattern ? _pattern->length : 0;
+		const auto first = static_cast<uint8_t>(m_shownStepPage * StepCount);
 		size_t trigs = 0;
 		for(uint8_t track = 0; track < TrackCount; ++track)
 		{
@@ -272,12 +326,15 @@ namespace mdJucePlugin
 				setText(label, m_shownLabels[track], number(track + 1u) + " " + (machine ? std::string(machine->name) : std::string("—")));
 				label->SetClass("mdEdSelected", track == m_shownTrack);
 			}
+			// The trigs within the length, on every step
+			for(uint8_t step = 0; step < length; ++step)
+				trigs += _pattern && _pattern->hasTrig(track, step) ? 1 : 0;
 			const auto locked = _pattern ? lockedSteps(*_pattern, track) : 0u;
-			for(uint8_t step = 0; step < StepCount; ++step)
+			for(uint8_t column = 0; column < StepCount; ++column)
 			{
+				const auto step = static_cast<uint8_t>(first + column);
 				const bool trig = _pattern && step < length && _pattern->hasTrig(track, step);
-				trigs += trig ? 1 : 0;
-				auto* cell = m_steps[track][step];
+				auto* cell = m_steps[track][column];
 				if(!cell)
 					continue;
 				cell->SetClass("mdEdStepTrig", trig);
@@ -285,28 +342,43 @@ namespace mdJucePlugin
 				cell->SetClass("mdPlayLocked", trig && ((locked >> step) & 1u));
 			}
 		}
-		for(uint8_t step = 0; step < StepCount; ++step)
+		for(uint8_t column = 0; column < StepCount; ++column)
 		{
-			if(m_heads[step])
-				m_heads[step]->SetClass("mdEdStepOut", _pattern && step >= length);
+			auto* head = m_heads[column];
+			if(!head)
+				continue;
+			if(m_shownHeadPage != m_shownStepPage)
+				head->SetInnerRML(std::to_string(first + column + 1));
+			head->SetClass("mdEdStepOut", _pattern && first + column >= length);
 		}
+		m_shownHeadPage = m_shownStepPage;
+		// PAS 33-64 only for a pattern over 32 steps
+		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
+		{
+			if(!m_stepPages[page])
+				continue;
+			m_stepPages[page]->SetClass("mdEdSelected", page == m_shownStepPage);
+			m_stepPages[page]->SetClass("mdEdOff", page > 0 && (!_pattern || _pattern->length <= StepCount));
+		}
+		setText(m_length, m_shownLength, _pattern ? "LONGUEUR " + std::to_string(length) : std::string("LONGUEUR —"));
 		setText(m_info, m_shownInfo, _pattern ? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
-			+ (length > StepCount ? " (32 affichés)" : "") + " · " + std::to_string(trigs) + " trigs"
-			: std::string("pattern : en attente du firmware"));
+			+ " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs") : std::string("pattern : en attente du firmware"));
 	}
 
 	void PatternView::renderLane(const md::automation::sysex::PatternDump* _pattern)
 	{
-		// The steps that play: the Kit value in grey, a lock in orange
+		// The steps shown that play: the Kit value in grey, a lock in orange
 		const auto part = m_shownTrack;
 		const uint8_t length = _pattern ? _pattern->length : 0;
+		const auto first = static_cast<uint8_t>(m_shownStepPage * StepCount);
 		const auto locks = _pattern ? parameterLocks(*_pattern, part, m_laneParameter) : 0u;
-		for(uint8_t step = 0; step < StepCount; ++step)
+		for(uint8_t column = 0; column < StepCount; ++column)
 		{
+			const auto step = static_cast<uint8_t>(first + column);
 			const bool trig = _pattern && step < length && _pattern->hasTrig(part, step);
 			const bool lock = (locks >> step) & 1u;
-			m_barLocks[step] = trig && lock;
-			m_barValues[step] = !trig ? -1 : lock ? _pattern->lock(part, m_laneParameter, step).value_or(m_shownKit) : m_shownKit;
+			m_barLocks[column] = trig && lock;
+			m_barValues[column] = !trig ? -1 : lock ? _pattern->lock(part, m_laneParameter, step).value_or(m_shownKit) : m_shownKit;
 		}
 		if(m_lane)
 			m_lane->repaint();
@@ -320,7 +392,7 @@ namespace mdJucePlugin
 		size_t laneLocks = 0;
 		for(uint8_t parameter = 0; parameter < ParameterCount; ++parameter)
 		{
-			const auto count = _pattern ? std::bitset<32>(parameterLocks(*_pattern, part, parameter)).count() : size_t{0};
+			const auto count = _pattern ? std::bitset<64>(parameterLocks(*_pattern, part, parameter)).count() : size_t{0};
 			if(parameter == m_laneParameter)
 				laneLocks = count;
 			if(auto* button = m_parameters[parameter])

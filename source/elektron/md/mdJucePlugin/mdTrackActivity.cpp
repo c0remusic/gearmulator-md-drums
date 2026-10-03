@@ -66,9 +66,9 @@ namespace mdJucePlugin
 			if(const auto pattern = m_controller.getMmPattern())
 				add(*pattern, 64);
 		}
-		// The Machinedrum's dump holds the first 32 steps
+		// The Machinedrum's dump holds 32 steps, or 64 in its long form
 		else if(const auto pattern = m_controller.getPattern())
-			add(*pattern, 32);
+			add(*pattern, pattern->steps);
 		return tracks;
 	}
 

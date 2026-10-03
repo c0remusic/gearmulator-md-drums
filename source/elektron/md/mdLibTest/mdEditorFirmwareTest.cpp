@@ -411,6 +411,49 @@ namespace
 		return *std::max_element(peaks.begin(), peaks.end());
 	}
 
+	// A pattern over 32 steps (48, a trig and a lock on step 40 of track 1), written and read back as sent,
+	// its steps 33 to 64 read; then 24 steps, step 40 kept past the length. The firmware sends every
+	// pattern in the long form (A01 of 32 steps too); sent in the short form, a pattern loses its steps 33
+	// to 64.
+	void checkLongPattern(md::Hardware& _hardware)
+	{
+		constexpr auto model = md::MachineModel::Machinedrum;
+		const auto slot = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto original = exchange(_hardware, sysex::patternRequest(model, slot), 0x67);
+		require(original.size() == 0x1522 && sysex::parseMdPatternDump(original)->steps == 64,
+			"the firmware sent a pattern in the short form");
+		auto editor = sysex::MdPatternEditor::fromDump(original);
+		require(editor && editor->setLength(48), "the codec did not make the pattern long");
+		require(editor->setTrig(0, 39, true) && editor->setLock(0, 2, 39, 99), "the codec did not set step 40");
+		const auto sent = editor->toDump();
+		require(sent.size() == 0x1522, "the long form is not 0x1522 bytes");
+		send(_hardware, sent);
+		advance(_hardware, md::g_samplerate);
+		const auto back = exchange(_hardware, sysex::patternRequest(model, slot), 0x67);
+		const auto parsed = sysex::parseMdPatternDump(back);
+		std::printf("MD pattern %u made 48 steps: read back %zu bytes, %s\n", slot + 1, back.size(),
+			back == sent ? "as sent" : differences(back, sent).c_str());
+		require(parsed && parsed->steps == 64 && parsed->length == 48 && parsed->hasTrig(0, 39) && parsed->lock(0, 2, 39) == uint8_t{99},
+			"the long pattern did not come back with its step 40");
+		require(back == sent, "the long pattern came back changed");
+
+		auto shorter = sysex::MdPatternEditor::fromDump(back);
+		require(shorter && shorter->setLength(24), "the codec did not shorten the pattern");
+		const auto shortSent = shorter->toDump();
+		send(_hardware, shortSent);
+		advance(_hardware, md::g_samplerate);
+		const auto shortDump = exchange(_hardware, sysex::patternRequest(model, slot), 0x67);
+		const auto shortBack = sysex::parseMdPatternDump(shortDump);
+		std::printf("MD pattern %u made 24 steps: sent %zu bytes, read back %zu bytes, length %d, step 40 %s\n", slot + 1,
+			shortSent.size(), shortDump.size(), shortBack ? int(shortBack->length) : -1,
+			shortBack && shortBack->hasTrig(0, 39) ? "kept" : "gone");
+		require(shortBack && shortBack->length == 24 && shortBack->hasTrig(0, 39) && shortDump == shortSent,
+			"24 steps did not come back as sent, step 40 kept past the length");
+		// The pattern as it was, for the checks after this one
+		send(_hardware, original);
+		advance(_hardware, md::g_samplerate);
+	}
+
 	void sendControlChange(md::Hardware& _hardware, const md::automation::ControlChange& _change)
 	{
 		synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
@@ -692,6 +735,7 @@ namespace
 		checkLfo(*hardware);
 		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
+		checkLongPattern(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);
 		checkSequencerPosition(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");

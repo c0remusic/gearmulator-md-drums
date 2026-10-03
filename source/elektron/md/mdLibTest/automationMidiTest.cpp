@@ -666,8 +666,18 @@ namespace
 		require(parsed && parsed->length == 16 && parsed->hasTrig(0, 31) && parsed->lock(0, 9, 31) == uint8_t{7},
 			"length not written, or a trig past it lost");
 		require(!editor->setTrig(0, 20, true), "trig accepted past the length");
-		require(!editor->setLength(0) && !editor->setLength(33), "length out of range accepted");
+		require(!editor->setLength(0) && !editor->setLength(65), "length out of range accepted");
 		require(editor->setLength(32) && editor->toDump() == pattern, "length 32 did not restore the pattern");
+		// Over 32 steps the long form, its steps 33 to 64 empty; it stays long back at 32
+		auto longer = MdPatternEditor::fromDump(pattern);
+		require(longer && longer->setLength(40), "length 40 refused");
+		dump = longer->toDump();
+		parsed = parseMdPatternDump(dump);
+		require(dump.size() == 0x1522 && parsed && parsed->steps == 64 && parsed->length == 40 && parsed->hasTrig(0, 31)
+			&& !parsed->hasTrig(0, 32) && !parsed->lock(0, 0, 33) && longer->setTrig(0, 39, true) && !longer->setTrig(0, 40, true),
+			"length 40 did not give the long form, empty past step 32");
+		require(longer->setLength(32) && longer->toDump().size() == 0x1522 && parseMdPatternDump(longer->toDump())->hasTrig(0, 39),
+			"back at 32 steps, the long form or step 40 was lost");
 
 		// Clearing a trig clears its locks; an emptied row goes away.
 		require(editor->setTrig(0, 4, false), "could not clear a trig");
@@ -695,6 +705,11 @@ namespace
 		extension[76 + 2 * 32 + 1] = 77;              // row 2 (track 3, parameter 23): step 34
 		const auto longPattern = makePattern(48, trigs, masks, locks, extension);
 		require(longPattern.size() == 0x1522, "64-step test pattern has the wrong size");
+		// Read in full: steps 33 to 64 of the trigs and of the lock rows
+		parsed = parseMdPatternDump(longPattern);
+		require(parsed && parsed->steps == 64 && parsed->hasTrig(2, 33) && !parsed->hasTrig(2, 34)
+			&& parsed->lock(2, 23, 33) == uint8_t{77} && parsed->lock(2, 23, 1) == uint8_t{64} && !parsed->lock(2, 23, 34),
+			"steps 33 to 64 of the long form misread");
 		auto longEditor = MdPatternEditor::fromDump(longPattern);
 		require(longEditor && longEditor->toDump() == longPattern, "64-step pattern does not survive a read and write");
 		require(longEditor->setLock(0, 5, 4, 42), "could not add a row to the 64-step pattern");
@@ -713,7 +728,7 @@ namespace
 		dump = longEditor->toDump();
 		parsed = parseMdPatternDump(dump);
 		require(parsed && parsed->length == 48 && dump[rowCountPosition] == 0
-			&& std::all_of(parsed->trigs.begin(), parsed->trigs.end(), [](const uint32_t _trigs) { return _trigs == 0; })
+			&& std::all_of(parsed->trigs.begin(), parsed->trigs.end(), [](const auto _trigs) { return _trigs == 0; })
 			&& std::all_of(parsed->lockMasks.begin(), parsed->lockMasks.end(), [](const uint32_t _mask) { return _mask == 0; }),
 			"clearing the pattern left a trig or a lock");
 		auto emptyExtension = extension;

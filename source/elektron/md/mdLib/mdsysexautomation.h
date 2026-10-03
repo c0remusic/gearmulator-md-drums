@@ -92,17 +92,20 @@ namespace md::automation::sysex
 	// (reverb, echo, EQ, dynamix): the dump at $487, the live Kit (LiveKit::masterEffects).
 	MasterEffects masterEffectsFromKit(const uint8_t* _bytes);
 
-	// The first 32 steps of a Machinedrum pattern, as far as the editor shows them.
+	// A Machinedrum pattern's trigs and locks, as far as the editor shows them. The
+	// dump holds 32 steps, or 64 in its long form (a length over 32).
 	struct PatternDump
 	{
 		uint8_t slot = 0;      // 0..127, A01..H16
 		uint8_t length = 16;   // steps, 1..64
 		uint8_t kit = 0;       // 0..63, the Kit the pattern loads
-		std::array<uint32_t, 16> trigs{};      // bit n: a trig on step n + 1
+		uint8_t steps = 32;    // steps the dump holds: 32, or 64 in the long form
+		std::array<uint64_t, 16> trigs{};      // bit n: a trig on step n + 1
 		std::array<uint32_t, 16> lockMasks{};  // bit p: parameter p (0..23) has a lock row
 		// The 64 lock rows: row k belongs to the k-th set bit of the masks, in
-		// track then parameter order; 128 and above means no lock on that step.
-		std::vector<std::array<uint8_t, 32>> lockRows;
+		// track then parameter order; 128 and above means no lock on that step
+		// (always past the steps the dump holds).
+		std::vector<std::array<uint8_t, 64>> lockRows;
 
 		bool hasTrig(uint8_t _track, uint8_t _step) const;
 		// Locked value of parameter _parameter (0..23: synthesis, effects, routing)
@@ -124,8 +127,9 @@ namespace md::automation::sysex
 		// A parameter (0..23) gets its lock row with its first lock and loses it
 		// with its last. False when the step has no trig or all 64 rows are taken.
 		bool setLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
-		// Sets the length, 1 to the steps the dump holds (32, or 64 in the long form).
-		// Trigs and locks past the length stay in the dump.
+		// Sets the length, 1 to 64. Over 32, a dump of 32 steps takes the long form,
+		// its steps 33 to 64 empty; a long dump stays long. Trigs and locks past the
+		// length stay in the dump.
 		bool setLength(uint8_t _length);
 		// Clears every trig and every lock of every step the dump holds, past the length too.
 		void clear();

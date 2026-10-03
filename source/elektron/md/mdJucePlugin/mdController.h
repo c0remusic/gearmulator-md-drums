@@ -205,6 +205,8 @@ namespace mdJucePlugin
 		bool setPatternLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
 		// Every trig and lock of the pattern, past its length too
 		bool clearPattern();
+		// The pattern's length, 1 to 64 (MdPatternEditor::setLength)
+		bool setPatternLength(uint8_t _length);
 		// Writes the edited pattern back to its slot ($67), then reads it again: the
 		// reply tells whether the firmware kept it. False when there is nothing to send.
 		bool sendPattern();

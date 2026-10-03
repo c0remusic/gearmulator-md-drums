@@ -1212,9 +1212,60 @@ int main()
 			element(doc, "mdPlayClear").Click();
 			context.Update();
 			const auto cleared = md.getPattern();
-			require(cleared && std::all_of(cleared->trigs.begin(), cleared->trigs.end(), [](const uint32_t _trigs) { return _trigs == 0; })
+			require(cleared && std::all_of(cleared->trigs.begin(), cleared->trigs.end(), [](const auto _trigs) { return _trigs == 0; })
 				&& !lane.isClearArmed() && text("mdPlayClear") == "TOUT EFFACER" && !cell(0, 0).IsClassSet("mdEdStepTrig")
 				&& md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "TOUT EFFACER did not clear and write the pattern");
+
+			// A pattern over 32 steps: PAS 33–64 shows steps 33 to 64, numbered from 33, past the length greyed;
+			// the playing step and a click there are steps 33 to 64 too
+			std::array<uint64_t, 16> longTrigs{};
+			longTrigs[0] = 1u | uint64_t{1} << 40;	// track 1: steps 1 and 41
+			const auto readPattern = [&](const pluginLib::SysEx& _dump, const uint8_t _steps)
+			{
+				require(md.requestPattern(), "pattern read refused");
+				// Writes waiting for their read-back: each dump answers one
+				for(int reply = 0; reply < 8 && (!md.getPattern() || md.getPattern()->steps != _steps); ++reply)
+					md.parseSysexMessage(_dump, synthLib::MidiEventSource::Device);
+				require(md.getPattern() && md.getPattern()->steps == _steps, "pattern of " + std::to_string(_steps) + " steps not read");
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				context.Update();
+			};
+			readPattern(mdAutomationTest::makeMdPatternDump(20, 48, longTrigs), 64);
+			require(lane.getStepPage() == 0 && !element(doc, "mdPlayPage1").IsClassSet("mdEdOff")
+				&& text("mdPlayInfo") == "pattern B05 · 48 pas · 2 trigs", "a long pattern does not offer its steps 33 to 64: \""
+				+ text("mdPlayInfo") + "\"");
+			element(doc, "mdPlayPage1").Click();
+			context.Update();
+			require(lane.getStepPage() == 1 && text("mdPlayHead0") == "33" && text("mdPlayHead31") == "64"
+				&& cell(0, 8).IsClassSet("mdEdStepTrig") && !cell(0, 0).IsClassSet("mdEdStepTrig")
+				&& cell(0, 16).IsClassSet("mdEdStepOut") && !cell(0, 15).IsClassSet("mdEdStepOut")
+				&& element(doc, "mdPlayPage1").IsClassSet("mdEdSelected"), "PAS 33–64 does not show steps 33 to 64");
+			Access::setPlayingStep(md, uint8_t{40});
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			require(cell(0, 8).IsClassSet("mdPlayNow") && lane.getShownPlayStep() == 8, "step 41 playing does not light its column");
+			snap("-play64");
+			Access::setPlayingStep(md, std::nullopt);
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			cell(0, 9).Click();
+			context.Update();
+			require(md.getPattern()->hasTrig(0, 41) && cell(0, 9).IsClassSet("mdEdStepTrig"), "a click on PAS 33–64 did not set step 42");
+			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			// LONGUEUR shows the length; 40 steps grey steps 41 and up, their trigs kept
+			require(text("mdPlayLength") == "LONGUEUR 48", "LONGUEUR does not show the pattern's length");
+			// As the menu does: the length, then the write once the edits pause
+			require(md.setPatternLength(40), "length 40 refused");
+			md.sendPatternSoon();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(text("mdPlayLength") == "LONGUEUR 40" && cell(0, 8).IsClassSet("mdEdStepOut") && !cell(0, 7).IsClassSet("mdEdStepOut")
+				&& md.getPattern()->hasTrig(0, 41) && text("mdPlayInfo") == "pattern B05 · 40 pas · 1 trig",
+				"a length of 40 not shown: \"" + text("mdPlayInfo") + "\"");
+			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			// A pattern of 32 steps again: steps 1 to 32, PAS 33–64 off
+			readPattern(mdAutomationTest::makeMdPatternDump(20, 32, trigs, 77), 32);
+			require(lane.getStepPage() == 0 && text("mdPlayHead0") == "1" && element(doc, "mdPlayPage1").IsClassSet("mdEdOff")
+				&& cell(0, 0).IsClassSet("mdEdStepTrig") && text("mdPlayLength") == "LONGUEUR 32", "a short pattern still shows steps 33 to 64");
+
 			element(doc, "mdPlayParam0").Click();
 			element(doc, "mdPlayTrack0").Click();
 			// OUVRIR DANS SON shows the edited track's sound

@@ -328,8 +328,21 @@ namespace mdAutomationTest
 
 	// A 32-step Machinedrum pattern dump: _trigs[track] as bits, one lock value
 	// _lock for track 1 parameter 0 on step 1 when given, everything else empty.
+	// The same over 64 steps: a length over 32 gives the long form, steps 33 to 64 after the 32-step
+	// sections (MCL's MDPattern), their trigs from the high halves of _trigs, without locks
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint64_t, 16>& _trigs, const int _lock = -1);
+
 	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
 		const std::array<uint32_t, 16>& _trigs, const int _lock = -1)
+	{
+		std::array<uint64_t, 16> trigs{};
+		std::copy(_trigs.begin(), _trigs.end(), trigs.begin());
+		return makeMdPatternDump(_slot, _length, trigs, _lock);
+	}
+
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint64_t, 16>& _trigs, const int _lock)
 	{
 		const auto pack = [](md::automation::sysex::Message& _out, const std::vector<uint8_t>& _data)
 		{
@@ -345,12 +358,13 @@ namespace mdAutomationTest
 					_out.push_back(_data[group + bit] & 0x7f);
 			}
 		};
-		std::vector<uint8_t> trigs, masks;
+		std::vector<uint8_t> trigs, masks, highTrigs;
 		for(size_t track = 0; track < 16; ++track)
 		{
 			for(const auto shift : {24, 16, 8, 0})
 			{
 				trigs.push_back(static_cast<uint8_t>(_trigs[track] >> shift));
+				highTrigs.push_back(static_cast<uint8_t>(_trigs[track] >> (32 + shift)));
 				masks.push_back(static_cast<uint8_t>(track == 0 && _lock >= 0 && shift == 0 ? 1 : 0));
 			}
 		}
@@ -364,6 +378,15 @@ namespace mdAutomationTest
 		result.insert(result.end(), {0, _length, 0, 0, 0, static_cast<uint8_t>(_lock >= 0 ? 1 : 0)});
 		pack(result, locks);
 		pack(result, std::vector<uint8_t>(204, 0));
+		if(_length > 32)
+		{
+			// Trigs, accent, slide and swing, lock rows and per-track patterns of steps 33 to 64
+			auto extension = highTrigs;
+			extension.resize(extension.size() + 12, 0);
+			extension.resize(extension.size() + 64 * 32, 0xff);
+			extension.resize(extension.size() + 192, 0);
+			pack(result, extension);
+		}
 		finishDump(result);
 		return {result.begin(), result.end()};
 	}

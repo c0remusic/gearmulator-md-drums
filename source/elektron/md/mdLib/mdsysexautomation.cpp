@@ -278,14 +278,37 @@ namespace md::automation::sysex
 		return request(_model, g_patternRequest, _slot);
 	}
 
+	namespace
+	{
+		// Pattern dump sections after the 6 plain bytes: the lock rows, then accent,
+		// slide and swing edit flags and per-track patterns. The 64-step form adds
+		// one 7-bit run: trigs, accent/slide/swing, lock rows and per-track patterns
+		// of steps 33 to 64 (MCL's MDPattern).
+		constexpr size_t g_patternShortSize = 0xacb;
+		constexpr size_t g_patternLongSize = 0x1522;
+		constexpr size_t g_patternTailSize = 204;
+		constexpr size_t g_patternExtensionSize = 64 + 12 + 64 * 32 + 192;
+		constexpr size_t g_patternExtensionLocks = 64 + 12;
+		constexpr size_t g_patternRows = 64;
+		constexpr uint8_t g_patternParameters = 24;
+		constexpr uint8_t g_noLock = 0xff;
+
+		// 16 big-endian 32-bit masks
+		uint32_t readMask32(const uint8_t* _bytes)
+		{
+			return static_cast<uint32_t>(_bytes[0]) << 24 | static_cast<uint32_t>(_bytes[1]) << 16
+				| static_cast<uint32_t>(_bytes[2]) << 8 | _bytes[3];
+		}
+	}
+
 	bool PatternDump::hasTrig(const uint8_t _track, const uint8_t _step) const
 	{
-		return _track < 16 && _step < 32 && (trigs[_track] >> _step) & 1u;
+		return _track < 16 && _step < steps && (trigs[_track] >> _step) & 1u;
 	}
 
 	std::optional<uint8_t> PatternDump::lock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step) const
 	{
-		if(_track >= 16 || _parameter >= 24 || _step >= 32 || !((lockMasks[_track] >> _parameter) & 1u))
+		if(_track >= 16 || _parameter >= 24 || _step >= steps || !((lockMasks[_track] >> _parameter) & 1u))
 			return std::nullopt;
 		size_t row = 0;
 		for(uint8_t t = 0; t < _track; ++t)
@@ -302,24 +325,25 @@ namespace md::automation::sysex
 	{
 		// 32-step form 0xacb bytes; the 64-step form appends the second half.
 		if(!validDump(MachineModel::Machinedrum, _message, g_patternDump)
-			|| (_message.size() != 0xacb && _message.size() != 0x1522))
+			|| (_message.size() != g_patternShortSize && _message.size() != g_patternLongSize))
 			return std::nullopt;
 		PatternDump result;
 		result.slot = _message[9];
 		if(result.slot >= 128)
 			return std::nullopt;
+		result.steps = _message.size() == g_patternLongSize ? 64 : 32;
 
 		// Trig and lock-row masks: 16 big-endian 32-bit values each, in their own 7-bit runs.
 		size_t position = 0x0a;
 		std::array<uint8_t, 64> raw{};
-		for(auto* target : {&result.trigs, &result.lockMasks})
-		{
-			if(!read7Bit(_message, position, raw.size(), raw.data()))
-				return std::nullopt;
-			for(size_t track = 0; track < 16; ++track)
-				(*target)[track] = static_cast<uint32_t>(raw[track * 4]) << 24 | static_cast<uint32_t>(raw[track * 4 + 1]) << 16
-					| static_cast<uint32_t>(raw[track * 4 + 2]) << 8 | raw[track * 4 + 3];
-		}
+		if(!read7Bit(_message, position, raw.size(), raw.data()))
+			return std::nullopt;
+		for(size_t track = 0; track < 16; ++track)
+			result.trigs[track] = readMask32(&raw[track * 4]);
+		if(!read7Bit(_message, position, raw.size(), raw.data()))
+			return std::nullopt;
+		for(size_t track = 0; track < 16; ++track)
+			result.lockMasks[track] = readMask32(&raw[track * 4]);
 		// Accent, slide and swing patterns and the swing amount, then six plain bytes:
 		// accent amount, length, double tempo, scale, kit, locked rows.
 		std::array<uint8_t, 16> skipped{};
@@ -332,14 +356,27 @@ namespace md::automation::sysex
 		if(result.length == 0 || result.length > 64)
 			return std::nullopt;
 
-		std::vector<uint8_t> locks(64 * 32);
+		std::vector<uint8_t> locks(g_patternRows * 32);
 		if(!read7Bit(_message, position, locks.size(), locks.data()))
 			return std::nullopt;
-		for(size_t row = 0; row < 64; ++row)
+		result.lockRows.resize(g_patternRows);
+		for(size_t row = 0; row < g_patternRows; ++row)
 		{
-			std::array<uint8_t, 32> values{};
-			std::copy_n(locks.begin() + row * 32, 32, values.begin());
-			result.lockRows.push_back(values);
+			result.lockRows[row].fill(g_noLock);
+			std::copy_n(locks.begin() + row * 32, 32, result.lockRows[row].begin());
+		}
+		// The 64-step form: steps 33 to 64 of the trigs and of each lock row, after the tail
+		if(result.steps == 64)
+		{
+			std::vector<uint8_t> tail(g_patternTailSize);
+			std::vector<uint8_t> extension(g_patternExtensionSize);
+			if(!read7Bit(_message, position, tail.size(), tail.data())
+				|| !read7Bit(_message, position, extension.size(), extension.data()))
+				return std::nullopt;
+			for(size_t track = 0; track < 16; ++track)
+				result.trigs[track] |= static_cast<uint64_t>(readMask32(&extension[track * 4])) << 32;
+			for(size_t row = 0; row < g_patternRows; ++row)
+				std::copy_n(&extension[g_patternExtensionLocks + row * 32], 32, result.lockRows[row].begin() + 32);
 		}
 		// Parameters 24 and up belong to lock rows the classic format does not have.
 		for(auto& mask : result.lockMasks)
@@ -595,20 +632,6 @@ namespace md::automation::sysex
 		return editor->toDump();
 	}
 
-	namespace
-	{
-		// Pattern dump sections after the 6 plain bytes: the lock rows, then accent,
-		// slide and swing edit flags and per-track patterns. The 64-step form adds
-		// one 7-bit run: trigs, accent/slide/swing, lock rows and per-track patterns
-		// of steps 33 to 64.
-		constexpr size_t g_patternTailSize = 204;
-		constexpr size_t g_patternExtensionSize = 64 + 12 + 64 * 32 + 192;
-		constexpr size_t g_patternExtensionLocks = 64 + 12;
-		constexpr size_t g_patternRows = 64;
-		constexpr uint8_t g_patternParameters = 24;
-		constexpr uint8_t g_noLock = 0xff;
-	}
-
 	std::optional<MdPatternEditor> MdPatternEditor::fromDump(const MessageView _message)
 	{
 		if(!parseMdPatternDump(_message))
@@ -627,7 +650,7 @@ namespace md::automation::sysex
 		if(!read7Bit(_message, position, editor.m_locks.size(), editor.m_locks.data())
 			|| !read7Bit(_message, position, editor.m_tail.size(), editor.m_tail.data()))
 			return std::nullopt;
-		if(_message.size() == 0x1522)
+		if(_message.size() == g_patternLongSize)
 		{
 			editor.m_extension.resize(g_patternExtensionSize);
 			if(!read7Bit(_message, position, editor.m_extension.size(), editor.m_extension.data()))
@@ -767,8 +790,17 @@ namespace md::automation::sysex
 
 	bool MdPatternEditor::setLength(const uint8_t _length)
 	{
-		if(_length == 0 || _length > stepCount())
+		if(_length == 0 || _length > 64)
 			return false;
+		// Over 32 steps, a dump of 32 steps takes the long form, its steps 33 to 64 without trigs, accents,
+		// slides, swings or locks. A long dump stays long: the Machinedrum OS 1.63 sends every pattern in
+		// the long form, takes both, and clears steps 33 to 64 of a pattern sent in the short form
+		// (mdEditorFirmwareTest)
+		if(_length > 32 && m_extension.empty())
+		{
+			m_extension.assign(g_patternExtensionSize, 0);
+			std::fill_n(m_extension.begin() + g_patternExtensionLocks, g_patternRows * 32, g_noLock);
+		}
 		m_plain[1] = _length;
 		return true;
 	}
