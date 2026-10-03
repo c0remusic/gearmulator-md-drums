@@ -62,7 +62,7 @@ namespace mdJucePlugin
 			if(pattern)
 				juceRmlUi::EventListener::Add(pattern, Rml::EventId::Click, [this, slot](Rml::Event&) { selectPattern(slot); });
 		}
-		// COPIER takes the pattern clicked, COLLER copies it onto the one clicked then (Machinedrum)
+		// COPIER takes the pattern clicked, COLLER copies it onto the one clicked then
 		m_copy = _document.GetElementById("mdLibCopy");
 		if(m_copy)
 		{

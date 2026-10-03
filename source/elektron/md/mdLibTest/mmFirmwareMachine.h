@@ -52,6 +52,8 @@ namespace md::test
 		}
 
 		Hardware& hardware() { return m_device->getHardware(); }
+		// The Device around it, for what it does on its rendering (Device::process)
+		Device& device() { return *m_device; }
 
 		void send(const Message& _bytes)
 		{

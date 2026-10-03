@@ -7,7 +7,6 @@
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlEventListener.h"
-#include "juceRmlUi/rmlMenu.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -46,20 +45,14 @@ namespace mdJucePlugin
 			_shown = _text;
 			_element->SetInnerRML(_text);
 		}
-
-		uint64_t copyKey(const Controller::PatternCopyState& _copy)
-		{
-			return uint64_t{static_cast<uint8_t>(_copy.state)} | uint64_t{_copy.from} << 8 | uint64_t{_copy.to} << 16
-				| uint64_t{_copy.serial} << 24;
-		}
 	}
 
 	PatternView::PatternView(Controller& _controller, Rml::Element& _document, SelectTrack _selectTrack)
 		: m_controller(_controller)
 		, m_selectTrack(std::move(_selectTrack))
+		, m_commands(_controller, _document, "mdPlay", [this] { update(); })
 	{
 		m_root = _document.GetElementById("mdEdPagePlay");
-		m_info = _document.GetElementById("mdPlayInfo");
 		m_laneInfo = _document.GetElementById("mdPlayLaneInfo");
 		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
 		{
@@ -70,14 +63,6 @@ namespace mdJucePlugin
 			{
 				m_stepPage = page;
 				update();
-			});
-		}
-		m_length = _document.GetElementById("mdPlayLength");
-		if(m_length)
-		{
-			juceRmlUi::EventListener::Add(m_length, Rml::EventId::Click, [this](const Rml::Event& _event)
-			{
-				openLengthMenu(_event);
 			});
 		}
 		for(uint8_t step = 0; step < StepCount; ++step)
@@ -135,45 +120,6 @@ namespace mdJucePlugin
 				m_controller.requestPattern();
 			});
 		}
-		// COPIER VERS: the menu of the slots, or the copy REMPLACER asked to confirm
-		m_copy = _document.GetElementById("mdPlayCopy");
-		if(m_copy)
-		{
-			juceRmlUi::EventListener::Add(m_copy, Rml::EventId::Click, [this](const Rml::Event& _event)
-			{
-				if(m_copyArmedTo < 128 && juce::Time::getMillisecondCounterHiRes() - m_copyArmedAt <= ConfirmMilliseconds)
-				{
-					const auto from = m_copyArmedFrom;
-					const auto to = m_copyArmedTo;
-					disarmCopy();
-					m_controller.copyPattern(from, to);
-					update();
-					return;
-				}
-				disarmCopy();
-				openCopyMenu(_event);
-			});
-		}
-		// TOUT EFFACER: a first click arms it (CONFIRMER, 3 s), a second one clears the pattern and writes it
-		m_clear = _document.GetElementById("mdPlayClear");
-		if(m_clear)
-		{
-			juceRmlUi::EventListener::Add(m_clear, Rml::EventId::Click, [this](Rml::Event&)
-			{
-				const auto now = juce::Time::getMillisecondCounterHiRes();
-				if(m_clearArmedAt < 0.0 || now - m_clearArmedAt > ConfirmMilliseconds)
-				{
-					m_clearArmedAt = now;
-					m_clear->SetInnerRML("CONFIRMER ?");
-					m_clear->SetClass("mdPlayArmed", true);
-					return;
-				}
-				disarmClear();
-				if(m_controller.clearPattern())
-					m_controller.sendPattern();
-				update();
-			});
-		}
 		if(auto* open = _document.GetElementById("mdPlayOpen"))
 		{
 			auto* document = &_document;
@@ -226,136 +172,15 @@ namespace mdJucePlugin
 		return parameter ? static_cast<uint8_t>(std::clamp(static_cast<int>(parameter->getUnnormalizedValue()), 0, 127)) : 0;
 	}
 
-	void PatternView::openLengthMenu(const Rml::Event& _event)
-	{
-		const auto pattern = m_controller.getPattern();
-		if(!pattern)
-			return;
-		// Two columns of 32; the pattern is written once the choice is made, as a click on a step does
-		juceRmlUi::Menu menu;
-		for(uint8_t length = 1; length <= MaxSteps; ++length)
-		{
-			menu.addEntry(std::to_string(length) + " pas", length == pattern->length, [this, length]
-			{
-				if(m_controller.setPatternLength(length))
-					m_controller.sendPatternSoon();
-				update();
-			});
-		}
-		menu.runModal(_event, StepCount);
-	}
-
-	void PatternView::openCopyMenu(const Rml::Event& _event)
-	{
-		const auto pattern = m_controller.getPattern();
-		if(!pattern)
-			return;
-		// A column per bank, A to H, what the library knows of each slot; the pattern's own off
-		juceRmlUi::Menu menu;
-		for(uint8_t slot = 0; slot < Controller::PatternLibrarySize; ++slot)
-		{
-			auto label = patternName(slot);
-			const auto stored = m_controller.getLibraryPattern(slot);
-			if(stored && stored->read && stored->trigs)
-				label += *stored->trigs ? " · " + std::to_string(*stored->trigs) + (*stored->trigs == 1 ? " trig" : " trigs") : " · vide";
-			menu.addEntry(label, slot != pattern->slot, slot == pattern->slot, [this, slot] { copyTo(slot); });
-		}
-		menu.runModal(_event, 16);
-	}
-
-	void PatternView::copyTo(const uint8_t _slot)
-	{
-		const auto pattern = m_controller.getPattern();
-		if(!pattern || _slot >= Controller::PatternLibrarySize || _slot == pattern->slot)
-			return;
-		const auto stored = m_controller.getLibraryPattern(_slot);
-		if(stored && stored->read && stored->trigs == uint16_t{0})
-		{
-			disarmCopy();
-			m_controller.copyPattern(pattern->slot, _slot);
-			update();
-			return;
-		}
-		m_copyArmedFrom = pattern->slot;
-		m_copyArmedTo = _slot;
-		m_copyArmedAt = juce::Time::getMillisecondCounterHiRes();
-		renderCopy();
-	}
-
-	void PatternView::disarmClear()
-	{
-		m_clearArmedAt = -1.0;
-		if(m_clear)
-		{
-			m_clear->SetInnerRML("TOUT EFFACER");
-			m_clear->SetClass("mdPlayArmed", false);
-		}
-	}
-
-	void PatternView::disarmCopy()
-	{
-		if(m_copyArmedTo >= 128)
-			return;
-		m_copyArmedTo = 0xff;
-		renderCopy();
-	}
-
-	void PatternView::renderCopy()
-	{
-		const auto copy = m_controller.getPatternCopy();
-		const bool copying = copy.state == Controller::PatternCopy::Reading || copy.state == Controller::PatternCopy::Writing;
-		if(m_copy)
-		{
-			setText(m_copy, m_shownCopyLabel, m_copyArmedTo < 128 ? "REMPLACER " + patternName(m_copyArmedTo) + " ?"
-				: copying ? std::string("COPIE…") : std::string("COPIER VERS…"));
-			m_copy->SetClass("mdPlayArmed", m_copyArmedTo < 128);
-			m_copy->SetClass("mdEdOff", m_shownSlot >= 128 || copying);
-		}
-		// The line tells how the copy of the pattern shown goes
-		auto text = m_patternLine;
-		if(copy.state != Controller::PatternCopy::None && copy.from == m_shownSlot)
-		{
-			const auto to = patternName(copy.to);
-			switch(copy.state)
-			{
-			case Controller::PatternCopy::Reading:
-			case Controller::PatternCopy::Writing: text += " · copie vers " + to + "…"; break;
-			case Controller::PatternCopy::Copied: text += " · copié sur " + to; break;
-			case Controller::PatternCopy::Refused: text += " · copie sur " + to + " refusée"; break;
-			case Controller::PatternCopy::Failed: text += " · copie sur " + to + " sans réponse"; break;
-			default: break;
-			}
-		}
-		setText(m_info, m_shownInfo, text);
-	}
-
 	bool PatternView::update()
 	{
-		// TOUT EFFACER or REMPLACER not confirmed in time
-		bool disarmed = false;
-		const auto now = juce::Time::getMillisecondCounterHiRes();
-		if(m_clearArmedAt >= 0.0 && now - m_clearArmedAt > ConfirmMilliseconds)
-		{
-			disarmClear();
-			disarmed = true;
-		}
-		if(m_copyArmedTo < 128 && now - m_copyArmedAt > ConfirmMilliseconds)
-		{
-			disarmCopy();
-			disarmed = true;
-		}
+		// TOUT EFFACER or REMPLACER not confirmed in time, the copy as it goes
+		const bool commands = m_commands.update(juce::Time::getMillisecondCounterHiRes());
 		// Hidden: drawn in full when shown
 		if(m_root && !m_root->IsVisible(true))
 		{
 			m_shownPattern = ~uint64_t{0};
-			return showPlayStep(-1) || disarmed;
-		}
-		const auto copy = copyKey(m_controller.getPatternCopy());
-		const bool copyChanged = copy != m_shownCopy;
-		if(copyChanged)
-		{
-			m_shownCopy = copy;
-			renderCopy();
+			return showPlayStep(-1) || commands;
 		}
 		const auto revision = m_controller.getPatternRevision();
 		const auto machines = m_controller.getMachineRevision();
@@ -377,7 +202,7 @@ namespace mdJucePlugin
 		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack
 			|| page != m_shownStepPage;
 		if(!grid && m_laneParameter == m_shownParameter && kit == m_shownKit)
-			return disarmed || playStepChanged || copyChanged;
+			return commands || playStepChanged;
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;
@@ -472,11 +297,10 @@ namespace mdJucePlugin
 			m_stepPages[page]->SetClass("mdEdSelected", page == m_shownStepPage);
 			m_stepPages[page]->SetClass("mdEdOff", page > 0 && (!_pattern || _pattern->length <= StepCount));
 		}
-		setText(m_length, m_shownLength, _pattern ? "LONGUEUR " + std::to_string(length) : std::string("LONGUEUR —"));
-		m_shownSlot = _pattern ? _pattern->slot : 0xff;
-		m_patternLine = _pattern ? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
-			+ " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs") : std::string("pattern : en attente du firmware");
-		renderCopy();
+		m_commands.show(_pattern ? std::optional<uint8_t>(_pattern->slot) : std::nullopt, length, _pattern
+			? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas" + " · " + std::to_string(trigs)
+				+ (trigs == 1 ? " trig" : " trigs")
+			: std::string("pattern : en attente du firmware"));
 	}
 
 	void PatternView::renderLane(const md::automation::sysex::PatternDump* _pattern)

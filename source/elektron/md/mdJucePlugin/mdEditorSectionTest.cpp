@@ -64,10 +64,10 @@ namespace mdJucePlugin
 			_controller.onControllerTimer();
 		}
 
-		// A copy's source or read back is not answered in time: the controller timer fails it
+		// A copy's source or read back is not answered in time, on either model: the controller timer fails it
 		static void expirePatternCopy(Controller& _controller)
 		{
-			_controller.m_patternCopyMs = Controller::milliseconds() - Controller::PatternCopyTimeoutMilliseconds - 1;
+			_controller.m_patternCopyMs = Controller::milliseconds() - Controller::MmWriteTimeoutMilliseconds - 1;
 			_controller.onControllerTimer();
 		}
 
@@ -155,6 +155,8 @@ namespace mdJucePlugin
 		static const OutputMetersView& meters(const Editor& _editor) { return *_editor.m_outputMetersView; }
 		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
 		static const MmPatternView& mmPattern(const Editor& _editor) { return *_editor.m_mmPatternView; }
+		// What clicks in the Monomachine's grid and roll, and its COPIER VERS menu, do
+		static MmPatternView& editMmPattern(Editor& _editor) { return *_editor.m_mmPatternView; }
 		static const StepGrid& steps(const Editor& _editor) { return *_editor.m_stepGrid; }
 		// A slot chosen in COPIER VERS's menu
 		static void copyPatternTo(Editor& _editor, const uint8_t _slot) { _editor.m_patternView->copyTo(_slot); }
@@ -1489,6 +1491,70 @@ int main()
 			element(doc, "mmPlayParam5").Click();
 			element(doc, "mmPlayTrack0").Click();
 			context.Update();
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+
+			// Editing: a click on step 2 of track 1 (no trig) puts the note of the trig before it (C2); a click in
+			// the roll moves it to D#2, a second one there clears it, a third puts F2. Written once the clicks
+			// pause, through the Device's SYSEX RECV write; the pattern read back as sent, the write is told.
+			{
+				using PatternWrite = mdJucePlugin::Controller::PatternWrite;
+				using PatternCopy = mdJucePlugin::Controller::PatternCopy;
+				auto& edit = mdJucePlugin::EditorIdentityTestAccess::editMmPattern(*editor);
+				const auto readBack = [&](md::automation::sysex::MmPatternEditor& _sent)
+				{
+					const auto sent = _sent.toDump();
+					mm.parseSysexMessage(pluginLib::SysEx(sent.begin(), sent.end()), synthLib::MidiEventSource::Device);
+					mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+					context.Update();
+				};
+				cell(0, 1).Click();
+				context.Update();
+				require(mm.getMmPattern()->note(0, 1) == uint8_t{36} && Access::patternWriteWaiting(mm),
+					"a click on a step did not set a trig playing the note before it");
+				// The roll of track 1: F1 (29) to F3 (53), a row a semitone; on a roll of 320 by 250, step 2's
+				// column and F2's row
+				require(edit.rollCell(15.0f, 125.0f, 320.0f, 250.0f) == std::make_pair(uint8_t{1}, uint8_t{41})
+					&& !edit.rollCell(-1.0f, 125.0f, 320.0f, 250.0f), "a click in the roll does not land on its step and note");
+				edit.placeNote(1, 39);
+				require(mm.getMmPattern()->note(0, 1) == uint8_t{39}, "a click in the roll did not move the note");
+				edit.placeNote(1, 39);
+				require(!mm.getMmPattern()->hasTrig(0, 1), "a click on the note there did not clear it");
+				edit.placeNote(1, 41);
+				Access::pauseEdits(mm);
+				require(mm.getMmPattern()->note(0, 1) == uint8_t{41} && mm.getPatternWrite() == PatternWrite::Pending
+					&& !Access::patternWriteWaiting(mm), "the edits were not written once they paused");
+				require(pattern->setTrig(0, 1, 41), "MM test pattern not edited");
+				readBack(*pattern);
+				require(mm.getPatternWrite() == PatternWrite::Written && text("mmPlayStep0_1") == "F2",
+					"the write read back as sent not told");
+
+				// TOUT EFFACER, clicked twice: every trig goes, and the pattern is written
+				element(doc, "mmPlayClear").Click();
+				element(doc, "mmPlayClear").Click();
+				context.Update();
+				const auto cleared = mm.getMmPattern();
+				require(cleared && std::all_of(cleared->trigs.begin(), cleared->trigs.end(), [](const uint64_t _t) { return _t == 0; })
+					&& mm.getPatternWrite() == PatternWrite::Pending, "TOUT EFFACER did not clear and write the pattern");
+				pattern->clear();
+				readBack(*pattern);
+				require(mm.getPatternWrite() == PatternWrite::Written && text("mmPlayInfo").rfind("pattern B05 · 48 pas · 0 trigs", 0) == 0,
+					"the cleared pattern not read back: \"" + text("mmPlayInfo") + "\"");
+
+				// COPIER VERS B06: confirmed, sent with B06's number through the Device's write, read back as sent
+				edit.copyTo(21);
+				context.Update();
+				require(edit.isCopyArmed() && text("mmPlayCopy") == "REMPLACER B06 ?", "COPIER VERS did not ask to confirm");
+				element(doc, "mmPlayCopy").Click();
+				context.Update();
+				const auto copy = mm.getPatternCopy();
+				require(copy.state == PatternCopy::Writing && copy.from == 20 && copy.to == 21, "REMPLACER did not copy B05 to B06");
+				require(pattern->setSlot(21), "MM test pattern not numbered B06");
+				readBack(*pattern);
+				require(mm.getPatternCopy().state == PatternCopy::Copied && text("mmPlayInfo").find("copié sur B06") != std::string::npos,
+					"the copy read back not told: \"" + text("mmPlayInfo") + "\"");
+				snap("-play-edit");
+			}
 			Access::setMachines(mm, kitMachines);
 		}
 #endif
@@ -1674,7 +1740,6 @@ int main()
 			require(text("mdLibPatternDetail") == "A01 · 16 pas · kit 01 · 4 trigs" && element(doc, "mdLibPattern0").IsClassSet("mdEdSelected"),
 				"a pattern does not show its detail: \"" + text("mdLibPatternDetail") + "\"");
 			snap("-library-patterns");
-#if !defined(MD_EDITOR_SECTION_TEST_MM)
 			// COPIER takes A01; COLLER onto B06, which has trigs, asks to confirm (REMPLACER), then copies: A01 read,
 			// sent as B06 and read back, B06's cell showing the copy. Onto A02, known empty, at once; not answered,
 			// the copy fails.
@@ -1682,12 +1747,15 @@ int main()
 				using PatternCopy = mdJucePlugin::Controller::PatternCopy;
 				const auto line = [&] { return text("mdLibPatternDetail"); };
 				const auto serial = md.getPatternCopy().serial;
+				// B06's trigs: one every 4 steps of its 32 on the Monomachine, the first 16's on the Machinedrum
+				const std::string b06 = std::string("B06 · 32 pas · kit 01 · ") + (g_model == md::MachineModel::Monomachine ? "8" : "4")
+					+ " trigs · à coller : A01";
 				require(element(doc, "mdLibPaste").IsClassSet("mdEdOff") && !element(doc, "mdLibCopy").IsClassSet("mdEdOff"),
 					"COLLER offered before COPIER, or COPIER not offered");
 				element(doc, "mdLibCopy").Click();
 				element(doc, "mdLibPattern21").Click();
 				present();
-				require(!element(doc, "mdLibPaste").IsClassSet("mdEdOff") && line() == "B06 · 32 pas · kit 01 · 4 trigs · à coller : A01"
+				require(!element(doc, "mdLibPaste").IsClassSet("mdEdOff") && line() == b06
 					&& element(doc, "mdLibPattern0").IsClassSet("mdLibSource"), "COPIER did not take A01: \"" + line() + "\"");
 				element(doc, "mdLibPaste").Click();
 				present();
@@ -1697,8 +1765,7 @@ int main()
 				present();
 				auto copy = md.getPatternCopy();
 				require(copy.state == PatternCopy::Reading && copy.from == 0 && copy.to == 21 && text("mdLibPaste") == "COPIE…"
-					&& line() == "B06 · 32 pas · kit 01 · 4 trigs · à coller : A01 · copie de A01 vers B06…",
-					"REMPLACER did not start the copy: \"" + line() + "\"");
+					&& line() == b06 + " · copie de A01 vers B06…", "REMPLACER did not start the copy: \"" + line() + "\"");
 				md.parseSysexMessage(patternDump(0, 16, true), synthLib::MidiEventSource::Device);
 				require(md.getPatternCopy().state == PatternCopy::Writing, "A01 read, the copy not sent");
 				md.parseSysexMessage(patternDump(21, 16, true), synthLib::MidiEventSource::Device);
@@ -1718,7 +1785,6 @@ int main()
 				require(md.getPatternCopy().state == PatternCopy::Failed && line().find("copie de A01 vers A02 sans réponse") != std::string::npos,
 					"a copy not answered did not fail: \"" + line() + "\"");
 			}
-#endif
 			// RELIRE reads everything again
 			element(doc, "mdLibRead").Click();
 			present();

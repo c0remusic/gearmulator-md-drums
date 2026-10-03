@@ -20,6 +20,13 @@ namespace mdJucePlugin
 			return _a.length == _b.length && _a.trigs == _b.trigs && _a.lockMasks == _b.lockMasks && _a.lockRows == _b.lockRows;
 		}
 
+		// The Monomachine encodes a dump its own way (a byte more or less): the pattern, not the bytes
+		bool sameMmPattern(const md::automation::sysex::MmPatternDump& _a, const md::automation::sysex::MmPatternDump& _b)
+		{
+			return _a.length == _b.length && _a.kit == _b.kit && _a.trigs == _b.trigs && _a.ampTrigs == _b.ampTrigs
+				&& _a.notes == _b.notes && _a.lockMasks == _b.lockMasks && _a.lockRows == _b.lockRows;
+		}
+
 		constexpr uint64_t g_dumpRequestRetryMs = 2000;
 		constexpr uint8_t g_snapshotVersion = 2;
 		constexpr uint8_t g_snapshotComplete = 1u << 0;
@@ -628,6 +635,37 @@ namespace mdJucePlugin
 		return true;
 	}
 
+	bool Controller::editMmPattern(const std::function<bool(md::automation::sysex::MmPatternEditor&)>& _edit)
+	{
+		if(m_model != md::MachineModel::Monomachine)
+			return false;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternDump.empty() || !m_mmPattern)
+				return false;
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(m_patternDump);
+			if(!editor || !_edit(*editor))
+				return false;
+			auto dump = editor->toDump();
+			auto pattern = md::automation::sysex::parseMmPatternDump(dump);
+			if(!pattern)
+				return false;
+			m_patternDump = std::move(dump);
+			m_mmPattern = std::move(*pattern);
+			m_patternEdited = true;
+		}
+		m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	bool Controller::setMmPatternTrig(const uint8_t _track, const uint8_t _step, const std::optional<uint8_t> _note)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setTrig(_track, _step, _note);
+		});
+	}
+
 	bool Controller::setPatternTrig(const uint8_t _track, const uint8_t _step, const bool _on)
 	{
 		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
@@ -647,6 +685,14 @@ namespace mdJucePlugin
 
 	bool Controller::clearPattern()
 	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				_editor.clear();
+				return true;
+			});
+		}
 		return editPattern([](md::automation::sysex::MdPatternEditor& _editor)
 		{
 			_editor.clear();
@@ -656,6 +702,13 @@ namespace mdJucePlugin
 
 	bool Controller::setPatternLength(const uint8_t _length)
 	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([_length](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				return _editor.setLength(_length);
+			});
+		}
 		return editPattern([_length](md::automation::sysex::MdPatternEditor& _editor)
 		{
 			return _editor.setLength(_length);
@@ -673,6 +726,16 @@ namespace mdJucePlugin
 
 	void Controller::servicePatternWrite(const uint64_t _now)
 	{
+		// A Monomachine write not read back in time (its machine replaced, say): the next one may go
+		if(m_model == md::MachineModel::Monomachine && _now - m_mmWriteMs > MmWriteTimeoutMilliseconds)
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternWritesInFlight > 0)
+			{
+				m_patternWritesInFlight = 0;
+				m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+			}
+		}
 		if(!m_patternWriteFirstMs)
 			return;
 		if(_now - m_patternWriteLastMs < PatternWritePauseMilliseconds
@@ -681,11 +744,51 @@ namespace mdJucePlugin
 		(void)sendPattern();
 	}
 
+	void Controller::writeMmDump(const md::automation::sysex::Message& _dump, const uint8_t _slot)
+	{
+		// The Monomachine reloads the Kit of the selected pattern when it takes it, as the Machinedrum does:
+		// the live Kit is saved first (mmPatternWriteFirmwareTest)
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(_slot == m_currentPattern.load(std::memory_order_acquire) && kit < getKitLibrarySize())
+			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		static_cast<AudioPluginAudioProcessor&>(getProcessor()).getMmPatternWriteControl().request({_dump},
+			{md::automation::sysex::patternRequest(m_model, _slot)});
+		m_mmWriteMs = milliseconds();
+	}
+
 	bool Controller::sendPattern()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
-		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+		if(!firmwareReadyForAutomation())
 			return false;
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			// A write at a time: the edits wait for the one under way, the controller timer sends them after it
+			md::automation::sysex::Message dump;
+			uint8_t slot = 0;
+			{
+				const std::lock_guard lock(m_patternMutex);
+				if(!m_patternEdited || !m_mmPattern)
+					return false;
+				if(m_patternWritesInFlight > 0)
+				{
+					if(!m_patternWriteFirstMs)
+						m_patternWriteFirstMs = m_patternWriteLastMs = milliseconds();
+					return false;
+				}
+				dump = m_patternDump;
+				slot = m_mmPattern->slot;
+				m_patternEdited = false;
+				m_mmPatternSent = m_mmPattern;
+				++m_patternWritesInFlight;
+			}
+			m_patternWriteFirstMs = 0;
+			m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
+			m_patternRequestedSlot.store(slot, std::memory_order_release);
+			m_patternWanted.store(true, std::memory_order_release);
+			writeMmDump(dump, slot);
+			return true;
+		}
 		// This write carries the edits a sendPatternSoon() waits with
 		m_patternWriteFirstMs = 0;
 		md::automation::sysex::Message dump;
@@ -718,7 +821,7 @@ namespace mdJucePlugin
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
 		const auto copy = getPatternCopy();
-		if(m_model != md::MachineModel::Machinedrum || _from >= PatternLibrarySize || _to >= PatternLibrarySize || _from == _to
+		if(_from >= PatternLibrarySize || _to >= PatternLibrarySize || _from == _to
 			|| copy.state == PatternCopy::Reading || copy.state == PatternCopy::Writing || !firmwareReadyForAutomation())
 			return false;
 		m_patternCopy.store(uint64_t{static_cast<uint8_t>(PatternCopy::Reading)} | uint64_t{_from} << 8 | uint64_t{_to} << 16
@@ -728,7 +831,7 @@ namespace mdJucePlugin
 		md::automation::sysex::Message shown;
 		{
 			const std::lock_guard lock(m_patternMutex);
-			if(m_pattern && m_pattern->slot == _from)
+			if((m_pattern && m_pattern->slot == _from) || (m_mmPattern && m_mmPattern->slot == _from))
 				shown = m_patternDump;
 		}
 		if(shown.empty())
@@ -754,6 +857,38 @@ namespace mdJucePlugin
 	void Controller::writePatternCopy(const md::automation::sysex::Message& _source)
 	{
 		const auto to = getPatternCopy().to;
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(_source);
+			md::automation::sysex::Message dump;
+			std::optional<md::automation::sysex::MmPatternDump> copy;
+			if(editor && editor->setSlot(to))
+			{
+				dump = editor->toDump();
+				copy = md::automation::sysex::parseMmPatternDump(dump);
+			}
+			if(!copy)
+			{
+				setPatternCopyState(PatternCopy::Failed);
+				return;
+			}
+			setPatternCopyState(PatternCopy::Writing);
+			m_patternCopyMs = milliseconds();
+			m_patternCopyShown = false;
+			{
+				const std::lock_guard lock(m_patternMutex);
+				m_mmPatternCopySent = std::move(copy);
+				// Onto the pattern shown: the copy replaces it, its edits not written yet dropped; the copy
+				// read back shows
+				if(m_mmPattern && m_mmPattern->slot == to)
+				{
+					m_patternEdited = false;
+					m_patternWriteFirstMs = 0;
+				}
+			}
+			writeMmDump(dump, to);
+			return;
+		}
 		auto editor = md::automation::sysex::MdPatternEditor::fromDump(_source);
 		md::automation::sysex::Message dump;
 		std::optional<md::automation::sysex::PatternDump> copy;
@@ -799,7 +934,8 @@ namespace mdJucePlugin
 	void Controller::servicePatternCopy(const uint64_t _now)
 	{
 		const auto state = getPatternCopy().state;
-		if((state == PatternCopy::Reading || state == PatternCopy::Writing) && _now - m_patternCopyMs > PatternCopyTimeoutMilliseconds)
+		const auto timeout = m_model == md::MachineModel::Monomachine ? MmWriteTimeoutMilliseconds : PatternCopyTimeoutMilliseconds;
+		if((state == PatternCopy::Reading || state == PatternCopy::Writing) && _now - m_patternCopyMs > timeout)
 			setPatternCopyState(PatternCopy::Failed);
 	}
 
@@ -1732,12 +1868,51 @@ namespace mdJucePlugin
 					trigs += pattern->hasTrig(track, step) ? 1 : 0;
 			}
 			storeLibraryPattern(pattern->slot, LibraryPattern{true, pattern->length, pattern->kit, trigs});
+			// A copy's source, or the copy read back from its slot; onto the pattern shown, the copy shows
+			const auto copy = getPatternCopy();
+			if(copy.state == PatternCopy::Reading && pattern->slot == copy.from)
+				writePatternCopy(md::automation::sysex::Message(_message.begin(), _message.end()));
+			else if(copy.state == PatternCopy::Writing && pattern->slot == copy.to)
+			{
+				bool shown = false;
+				{
+					const std::lock_guard lock(m_patternMutex);
+					setPatternCopyState(m_mmPatternCopySent && sameMmPattern(*pattern, *m_mmPatternCopySent)
+						? PatternCopy::Copied : PatternCopy::Refused);
+					if(m_mmPattern && m_mmPattern->slot == pattern->slot && !m_patternEdited)
+					{
+						m_mmPattern = *pattern;
+						m_patternDump.assign(_message.begin(), _message.end());
+						shown = true;
+					}
+				}
+				if(shown)
+					m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
 			if(m_patternWanted.load(std::memory_order_acquire)
 				&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
 			{
 				{
 					const std::lock_guard lock(m_patternMutex);
-					m_mmPattern = std::move(*pattern);
+					// A write read back, as on the Machinedrum: another pattern's dump ends the wait
+					if(m_patternWritesInFlight > 0 && m_mmPatternSent && m_mmPatternSent->slot != pattern->slot)
+					{
+						m_patternWritesInFlight = 0;
+						m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+					}
+					if(m_patternWritesInFlight > 0)
+					{
+						--m_patternWritesInFlight;
+						m_patternWrite.store(m_mmPatternSent && sameMmPattern(*pattern, *m_mmPatternSent)
+							? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
+					}
+					// Edits not sent yet stay on top of the same pattern
+					if(!m_patternEdited || !m_mmPattern || m_mmPattern->slot != pattern->slot)
+					{
+						m_mmPattern = std::move(*pattern);
+						m_patternDump.assign(_message.begin(), _message.end());
+						m_patternEdited = false;
+					}
 				}
 				m_patternWanted.store(false, std::memory_order_release);
 				m_patternRevision.fetch_add(1, std::memory_order_acq_rel);

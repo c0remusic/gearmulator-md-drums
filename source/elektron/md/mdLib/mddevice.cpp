@@ -156,6 +156,8 @@ namespace md
 			if(m_hostSyncSlot < 8)
 				sendSysex(automation::sysex::globalRequest(m_model, m_hostSyncSlot));
 		};
+		m_mmPatternWriterActions.sendSysex = sendSysex;
+		m_mmPatternWriterActions.sendPanel = m_hostSyncActions.sendPanel;
 	}
 
 	bool Device::captureFactoryFlashCachePersistence(std::string& _filename,
@@ -701,6 +703,26 @@ namespace md
 				m_chainPlayer->observe(_midiOut[index]);
 		}
 		serviceHostSync(_midiOut, first);
+		serviceMmPatternWriter();
+	}
+
+	void Device::serviceMmPatternWriter()
+	{
+		if(!m_mmPatternWriteControl || m_model != MachineModel::Monomachine)
+			return;
+		// Hands off as the host sync: a user SysEx import owns the MIDI input, a project state is
+		// restored, or the factory image is still being learned; and while the host sync's macro
+		// drives the panel
+		if(m_hardware->isMidiSysexTransferActive() || isProjectStateRestorePending()
+			|| !m_hardware->isFirmwareMidiReady() || m_hardware->isFactoryFlashInitializationExpected())
+			return;
+		if(!m_mmPatternWriter.isBusy() && !m_hostSync.isDrivingPanel())
+		{
+			if(auto write = m_mmPatternWriteControl->take())
+				m_mmPatternWriter.start(std::move(*write));
+		}
+		m_mmPatternWriter.service(m_hardware->getEmulatedFrames(), m_hardwareEpoch, m_mmPatternWriterActions);
+		m_mmPatternWriteControl->publishDone(m_mmPatternWriter.getDone());
 	}
 
 	void Device::serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, const size_t _first)
@@ -740,6 +762,9 @@ namespace md
 			|| !m_hardware->isFirmwareMidiReady() || m_hardware->isFactoryFlashInitializationExpected())
 			return;
 
+		// The panel is the editor's pattern write's until it is done
+		if(m_mmPatternWriter.isBusy())
+			return;
 		// Another machine or another active Global slot starts over from a fresh read.
 		const auto epoch = (m_hardwareEpoch << 8) | m_hostSyncSlot;
 		m_hostSync.service(m_hardware->getEmulatedFrames(), epoch, m_hostSyncActions);

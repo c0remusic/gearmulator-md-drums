@@ -94,9 +94,9 @@ namespace mdJucePlugin
 	MmPatternView::MmPatternView(Controller& _controller, Rml::Element& _document, SelectTrack _selectTrack)
 		: m_controller(_controller)
 		, m_selectTrack(std::move(_selectTrack))
+		, m_commands(_controller, _document, "mmPlay", [this] { forceRedraw(); })
 	{
 		m_root = _document.GetElementById("mdEdPagePlay");
-		m_info = _document.GetElementById("mmPlayInfo");
 		m_rollInfo = _document.GetElementById("mmPlayRollInfo");
 		for(uint8_t step = 0; step < VisibleSteps; ++step)
 			m_heads[step] = _document.GetElementById("mmPlayHead" + std::to_string(step));
@@ -113,7 +113,18 @@ namespace mdJucePlugin
 				});
 			}
 			for(uint8_t step = 0; step < VisibleSteps; ++step)
-				m_steps[track][step] = _document.GetElementById("mmPlayStep" + std::to_string(track) + "_" + std::to_string(step));
+			{
+				auto* cell = _document.GetElementById("mmPlayStep" + std::to_string(track) + "_" + std::to_string(step));
+				m_steps[track][step] = cell;
+				if(!cell)
+					continue;
+				// The step of the page shown
+				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, track, step](Rml::Event&)
+				{
+					const auto page = m_shownStepPage < 2 ? m_shownStepPage : uint8_t{0};
+					toggleStep(track, static_cast<uint8_t>(page * VisibleSteps + step));
+				});
+			}
 		}
 		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
 		{
@@ -159,6 +170,16 @@ namespace mdJucePlugin
 		{
 			m_roll = juceRmlUi::ElemCanvas::create(area);
 			m_roll->setRepaintGraphicsCallback([this](juce::Image& _image, juce::Graphics& _g) { paintRoll(_image, _g); });
+			// A click puts a note where it lands, in the area's own coordinates
+			juceRmlUi::EventListener::Add(area, Rml::EventId::Click, [this, area](Rml::Event& _event)
+			{
+				const auto offset = area->GetAbsoluteOffset(Rml::BoxArea::Content);
+				const auto size = area->GetBox().GetSize(Rml::BoxArea::Content);
+				const auto x = _event.GetParameter<float>("mouse_x", 0.0f) - offset.x;
+				const auto y = _event.GetParameter<float>("mouse_y", 0.0f) - offset.y;
+				if(const auto cell = rollCell(x, y, size.x, size.y))
+					placeNote(cell->first, cell->second);
+			});
 		}
 		if(auto* area = _document.GetElementById("mmPlayLaneArea"))
 		{
@@ -219,6 +240,61 @@ namespace mdJucePlugin
 		return {static_cast<uint8_t>(lowest), static_cast<uint8_t>(highest)};
 	}
 
+	uint8_t MmPatternView::defaultNote(const Pattern& _pattern, const uint8_t _track, const uint8_t _step)
+	{
+		for(int step = _step - 1; step >= 0; --step)
+		{
+			if(const auto note = _pattern.note(_track, static_cast<uint8_t>(step)))
+				return *note;
+		}
+		for(int step = _step + 1; step < Pattern::StepCount; ++step)
+		{
+			if(const auto note = _pattern.note(_track, static_cast<uint8_t>(step)))
+				return *note;
+		}
+		return DefaultNote;
+	}
+
+	void MmPatternView::toggleStep(const uint8_t _track, const uint8_t _step)
+	{
+		const auto pattern = m_controller.getMmPattern();
+		if(!pattern || _track >= TrackCount)
+			return;
+		const auto note = pattern->hasTrig(_track, _step) ? std::nullopt : std::optional<uint8_t>(defaultNote(*pattern, _track, _step));
+		if(m_controller.setMmPatternTrig(_track, _step, note))
+			m_controller.sendPatternSoon();
+		forceRedraw();
+	}
+
+	void MmPatternView::placeNote(const uint8_t _column, const uint8_t _note)
+	{
+		const auto pattern = m_controller.getMmPattern();
+		const auto track = m_shownTrack;
+		if(!pattern || track >= TrackCount || _column >= VisibleSteps || _note >= 0x80)
+			return;
+		const auto page = m_shownStepPage < 2 ? m_shownStepPage : uint8_t{0};
+		const auto step = static_cast<uint8_t>(page * VisibleSteps + _column);
+		// The note already there goes; another takes its place, the trig's locks kept
+		const auto note = pattern->note(track, step) == _note ? std::nullopt : std::optional<uint8_t>(_note);
+		if(m_controller.setMmPatternTrig(track, step, note))
+			m_controller.sendPatternSoon();
+		forceRedraw();
+	}
+
+	std::optional<std::pair<uint8_t, uint8_t>> MmPatternView::rollCell(const float _x, const float _y, const float _width,
+		const float _height) const
+	{
+		if(_x < 0.0f || _y < 0.0f || _x >= _width || _y >= _height || _width < VisibleSteps || _height < 8.0f)
+			return std::nullopt;
+		// As paintRoll lays them: a column per step, a row per semitone, the highest note on top
+		const int lowest = m_rollRange.first;
+		const int highest = m_rollRange.second;
+		const auto rowHeight = _height / static_cast<float>(highest - lowest + 1);
+		const auto column = std::min(static_cast<int>(_x / (_width / VisibleSteps)), VisibleSteps - 1);
+		const auto note = std::clamp(highest - static_cast<int>(_y / rowHeight), lowest, highest);
+		return std::make_pair(static_cast<uint8_t>(column), static_cast<uint8_t>(note));
+	}
+
 	uint8_t MmPatternView::kitValue(const uint8_t _track, const uint8_t _parameter) const
 	{
 		const auto* parameter = m_names[_parameter].empty() ? nullptr : m_controller.getParameter(m_names[_parameter], _track);
@@ -227,11 +303,13 @@ namespace mdJucePlugin
 
 	bool MmPatternView::update(const double _nowMilliseconds)
 	{
+		// TOUT EFFACER or REMPLACER not confirmed in time, the copy as it goes
+		const bool commands = m_commands.update(_nowMilliseconds);
 		// Hidden: drawn in full when shown
 		if(m_root && !m_root->IsVisible(true))
 		{
 			forceRedraw();
-			return showPlayColumn(-1);
+			return showPlayColumn(-1) || commands;
 		}
 		const auto playing = m_controller.getPlayingStep();
 		const bool playChanged = showPlayColumn(playing && *playing / VisibleSteps == m_stepPage
@@ -251,7 +329,7 @@ namespace mdJucePlugin
 		const bool grid = revision != m_shownPattern || machines != m_shownMachines || track != m_shownTrack
 			|| m_stepPage != m_shownStepPage;
 		if(!grid && parameter == m_shownParameter && kit == m_shownKit)
-			return playChanged;
+			return playChanged || commands;
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;
@@ -341,8 +419,9 @@ namespace mdJucePlugin
 				button->SetClass("mdEdOff", _pattern && page * VisibleSteps >= length);
 			}
 		}
-		setText(m_info, m_shownInfo, _pattern ? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
-			+ (_pattern->doubleTempo ? " · tempo double" : "") + " · " + std::to_string(trigs) + " trigs"
+		m_commands.show(_pattern ? std::optional<uint8_t>(_pattern->slot) : std::nullopt, length, _pattern
+			? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
+				+ (_pattern->doubleTempo ? " · tempo double" : "") + " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs")
 			: std::string("pattern : en attente du firmware"));
 	}
 

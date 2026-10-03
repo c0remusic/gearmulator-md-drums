@@ -21,6 +21,7 @@ set(SOURCES
 	mdhostclock.h
 	mdhostsync.cpp mdhostsync.h
 	mdmachines.cpp mdmachines.h
+	mdmmpatternwriter.cpp mdmmpatternwriter.h
 	mdmachinestatus.h
 	mdmc.cpp mdmc.h
 	mdmemorymap.h

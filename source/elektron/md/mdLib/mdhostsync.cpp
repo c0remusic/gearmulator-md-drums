@@ -82,6 +82,30 @@ namespace md
 		return macro.take();
 	}
 
+	std::vector<PanelMacroStep> monomachineReceiveMacro()
+	{
+		using C = PanelControl;
+		MacroBuilder macro(MachineModel::Monomachine);
+		macro.tap(C::Exit, 4)							// out of any menu
+			.chord(C::Function, C::Kit)					// GLOBAL, on the active slot
+			.tap(C::Enter)								// GLOBAL n EDIT
+			.tap(C::Left).tap(C::Up, 4)					// first category: AUDIO
+			.tap(C::Down, 2)							// FILE
+			.tap(C::Right).tap(C::Up, 3)				// its first item: SYSEX SEND
+			.tap(C::Down)								// SYSEX RECV
+			.tap(C::Enter)								// the SYSEX RECEIVE page
+			.tap(C::Up, 3)								// MODE: ORIG, the first of ORIG, SPEC, VERF
+			.tap(C::Right).tap(C::Enter);				// WAITING...
+		return macro.take();
+	}
+
+	std::vector<PanelMacroStep> monomachineLeaveMenusMacro()
+	{
+		MacroBuilder macro(MachineModel::Monomachine);
+		macro.tap(PanelControl::Exit, 4);
+		return macro.take();
+	}
+
 	HostSync::HostSync(const MachineModel _model) : m_model(_model)
 	{
 		// A Machinedrum Global is 197 bytes, a Monomachine one about 110.

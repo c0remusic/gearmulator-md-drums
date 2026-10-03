@@ -818,7 +818,10 @@
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERN</div>
 							<div id="mmPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
 							<div id="mmPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
-							<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 290dp; top: 4dp; width: 692dp;">pattern : en attente du firmware</div>
+							<button id="mmPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 286dp; top: 4dp; width: 110dp;">LONGUEUR —</button>
+							<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 408dp; top: 4dp; width: 304dp;">pattern : en attente du firmware</div>
+							<button id="mmPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 724dp; top: 4dp; width: 130dp;">COPIER VERS…</button>
+							<button id="mmPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
 							<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
 							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 174dp;"/>
 							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 174dp;"/>
@@ -1061,7 +1064,7 @@
 							<div id="mmPlayStep5_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 178dp; width: 24dp; height: 24dp;"/>
 							<div id="mmPlayStep5_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 178dp; width: 24dp; height: 24dp;"/>
 							<div id="mmPlayStep5_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 178dp; width: 24dp; height: 24dp;"/>
-							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 208dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig et sa note<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipSilent"/>trig sans enveloppe d'ampli<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un nom : sa piste dans le piano roll · lecture seule</div>
+							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 208dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig et sa note<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipSilent"/>trig sans enveloppe d'ampli<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : trig · clic dans le piano roll : la note · clic sur un nom : sa piste</div>
 						</div>
 						<div id="mmPlayBottom" class="jucePos mdEdBlock" style="left: 16dp; top: 254dp; width: 1068dp; height: 272dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;"></div>
@@ -1304,7 +1307,9 @@
 						<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: 1100dp; height: 538dp;">
 							<div id="mdLibPatterns" class="jucePos mdEdBlock" style="left: 16dp; top: 44dp; width: 1068dp; height: 420dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERNS</div>
-								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 140dp; top: 4dp; width: 912dp;">—</div>
+								<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>
+								<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>
+								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 350dp; top: 4dp; width: 702dp;">—</div>
 								<div id="mdLibPattern0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 123dp;">A01  —</div>
 								<div id="mdLibPattern1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 123dp;">A02  —</div>
 								<div id="mdLibPattern2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 123dp;">A03  —</div>

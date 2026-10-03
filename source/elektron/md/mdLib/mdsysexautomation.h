@@ -274,6 +274,11 @@ namespace md::automation::sysex
 		bool setLock(uint8_t _track, uint8_t _bit, uint8_t _step, std::optional<uint8_t> _value);
 		// 1 to 64 steps; trigs and locks past the length stay in the pattern
 		bool setLength(uint8_t _length);
+		// Clears every step's trigs of every kind, notes and locks, past the length too
+		void clear();
+		// The pattern's number, 0 to 127 (A01 to H16): received in SYSEX RECV's ORIG mode, a dump goes to the
+		// slot it names, so a dump given another slot's number is a copy.
+		bool setSlot(uint8_t _slot);
 
 		Message toDump() const;
 
@@ -285,7 +290,7 @@ namespace md::automation::sysex
 		uint8_t* row(size_t _row) { return m_payload.data() + rowPosition(_row); }
 		static size_t rowPosition(size_t _row);
 
-		Message m_header;					// F0 up to the pattern position
+		Message m_header;					// F0 up to the pattern position, included
 		std::vector<uint8_t> m_payload;		// decoded
 	};
 	// The same dump with another length (1..64), everything else kept, its payload encoded again

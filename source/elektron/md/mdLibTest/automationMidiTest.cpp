@@ -869,6 +869,21 @@ namespace
 		require(fullEditor && fullEditor->setTrig(0, 2, 60) && !fullEditor->setLock(0, 5, 2, 11)
 			&& fullEditor->setLock(0, 3, 2, 11), "a 63rd MM lock row added, or a lock on an existing row refused");
 
+		// Cleared: no step mask of any kind, note, lock mask, row or row count left; the length, Kit and the rest
+		// kept. Then a copy: another slot's number, nothing else.
+		auto clearing = MmPatternEditor::fromDump(pattern);
+		require(clearing.has_value(), "MM pattern not editable");
+		clearing->clear();
+		expected = decoded;
+		std::fill_n(expected.begin(), 13 * 48, uint8_t{0});
+		std::fill_n(expected.begin() + g_mmLockMasks, 48, uint8_t{0});
+		std::fill_n(expected.begin() + g_mmNotes, 6 * 64, uint8_t{0xff});
+		std::fill_n(expected.begin() + g_mmRows, 62 * 64, uint8_t{0xff});
+		expected[1366] = 0;
+		require(clearing->toDump() == makeMonomachinePattern(17, expected), "clearing the MM pattern left a trig or a lock, or changed the rest");
+		require(clearing->setSlot(40) && !clearing->setSlot(128), "MM slot 40 refused, or 128 accepted");
+		require(clearing->toDump() == makeMonomachinePattern(40, expected), "the MM copy is not the pattern under another number");
+
 		decoded[1060] = 0;
 		require(!parseMmPatternDump(makeMonomachinePattern(17, decoded)), "MM pattern of length 0 accepted");
 	}

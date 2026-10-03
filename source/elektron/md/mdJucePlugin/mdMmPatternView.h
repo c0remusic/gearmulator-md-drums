@@ -1,10 +1,13 @@
 #pragma once
 
+#include "mdPatternCommands.h"
+
 #include "mdLib/mdsysexautomation.h"
 
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -37,8 +40,12 @@ namespace mdJucePlugin
 	// grey, a lock in orange with a dot, on the steps that play), chosen by page (mmPlayParamPage<page>)
 	// then index (mmPlayParam<index>), each with its count of locks. A click on a track name
 	// (mmPlayTrack<track>) makes it the edited track. While the sequencer plays a step of the steps shown,
-	// its column is lit (mdPlayNow), as on the Machinedrum. Read only: the Monomachine takes a pattern
-	// dump only in GLOBAL > SYSEX RECV.
+	// its column is lit (mdPlayNow), as on the Machinedrum.
+	// Editing: a click on a step sets a trig, playing the note of the track's nearest trig (C4 without
+	// one), or clears the trig there; a click in the roll puts the edited track's note at that height on
+	// that step, or clears it when it is the note already there. LONGUEUR, COPIER VERS and TOUT EFFACER:
+	// PatternCommands. Written as on the Machinedrum once the clicks pause (Controller::sendPatternSoon),
+	// through the Monomachine's SYSEX RECV menu, which the Device drives: about 2.7 s a write.
 	class MmPatternView
 	{
 	public:
@@ -49,6 +56,7 @@ namespace mdJucePlugin
 		static constexpr uint8_t VisibleSteps = 32;
 		static constexpr uint8_t PageCount = 7;			// SYN, AMP, FILT, EFX, LFO 1 to 3
 		static constexpr uint8_t ParameterCount = PageCount * 8;
+		static constexpr uint8_t DefaultNote = 60;		// C4
 
 		MmPatternView(Controller& _controller, Rml::Element& _document, SelectTrack _selectTrack);
 
@@ -56,6 +64,22 @@ namespace mdJucePlugin
 		// machines, the edited track, the steps shown (grid, roll and lane), the lane parameter or its
 		// Kit value (lane). Returns true when it changed the DOM.
 		bool update(double _nowMilliseconds);
+
+		// What a click on a step does (_step: 0 to 63)
+		void toggleStep(uint8_t _track, uint8_t _step);
+		// What a click in the roll does, on a visible column and a note
+		void placeNote(uint8_t _column, uint8_t _note);
+		// The visible column and the note a click in the roll at (_x, _y) of a _width by _height roll
+		// lands on, nullopt outside
+		std::optional<std::pair<uint8_t, uint8_t>> rollCell(float _x, float _y, float _width, float _height) const;
+		// The note a new trig on a step plays: the note of the track's nearest trig before it, or after
+		// it, DefaultNote without one
+		static uint8_t defaultNote(const Pattern& _pattern, uint8_t _track, uint8_t _step);
+
+		// What a slot chosen in COPIER VERS's menu does
+		void copyTo(const uint8_t _slot) { m_commands.copyTo(_slot); }
+		bool isCopyArmed() const { return m_commands.isCopyArmed(); }
+		bool isClearArmed() const { return m_commands.isClearArmed(); }
 
 		// A MIDI note as the roll and the grid write it, C4 for 60
 		static std::string noteName(uint8_t _note);
@@ -84,8 +108,8 @@ namespace mdJucePlugin
 
 		Controller& m_controller;
 		SelectTrack m_selectTrack;
+		PatternCommands m_commands;
 		Rml::Element* m_root = nullptr;
-		Rml::Element* m_info = nullptr;
 		Rml::Element* m_rollInfo = nullptr;
 		Rml::Element* m_laneInfo = nullptr;
 		std::array<Rml::Element*, VisibleSteps> m_heads{};
@@ -125,7 +149,6 @@ namespace mdJucePlugin
 		std::array<std::array<std::string, VisibleSteps>, TrackCount> m_shownSteps{};
 		std::array<std::string, PageCount> m_shownPageLabels{};
 		std::array<std::string, 8> m_shownParameterLabels{};
-		std::string m_shownInfo;
 		std::string m_shownRollInfo;
 		std::string m_shownLaneInfo;
 	};

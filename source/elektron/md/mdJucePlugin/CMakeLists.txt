@@ -26,6 +26,7 @@ set(SOURCES
 	mdOutputMeters.h
 	mdOutputMetersView.cpp mdOutputMetersView.h
 	mdSystemPage.cpp mdSystemPage.h
+	mdPatternCommands.cpp mdPatternCommands.h
 	mdPatternView.cpp mdPatternView.h
 	mdMmPatternView.cpp mdMmPatternView.h
 	mdStepColumns.cpp mdStepColumns.h

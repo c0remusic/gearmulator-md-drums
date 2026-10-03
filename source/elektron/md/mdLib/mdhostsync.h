@@ -28,6 +28,13 @@ namespace md
 	// depend on where the menus were left.
 	std::vector<PanelMacroStep> monomachineSyncMacro(automation::sysex::GlobalSync _sync);
 
+	// Front-panel input from any screen to the Monomachine's GLOBAL > FILE > SYSEX RECV page, its MODE
+	// on ORIG (a dump goes to the slot it names), waiting for dumps: the only way it takes a pattern dump.
+	// The page shows RECV n MSG. n ERR. as they come; the sequencer plays on (mmPatternWriteFirmwareTest).
+	std::vector<PanelMacroStep> monomachineReceiveMacro();
+	// Out of the menus, back to the screen the machine plays on
+	std::vector<PanelMacroStep> monomachineLeaveMenusMacro();
+
 	// Keeps a machine's MIDI sync receive settings on what the plug-in's "Follow
 	// host tempo" option asks for. The owner feeds it every Global dump of the
 	// active slot, services it regularly with the emulated frame count, and
@@ -70,6 +77,8 @@ namespace md
 		void setTarget(Target _target);
 		Target getTarget() const { return m_target; }
 		State getState() const { return m_state; }
+		// Its macro plays into the front panel: nothing else may drive the panel meanwhile
+		bool isDrivingPanel() const { return m_phase == Phase::RunningMacro; }
 
 		// A Global dump of the active slot, as the firmware sent it. Copied into
 		// storage reserved up front: no allocation on a rendering thread.

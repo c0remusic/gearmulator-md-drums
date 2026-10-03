@@ -394,6 +394,7 @@ namespace md::automation::sysex
 		// transposition, the arpeggiators, the count of lock rows, the 62 rows of 64 steps, the MIDI
 		// and chord notes. The factory patterns decode to 6520 bytes.
 		constexpr size_t g_mmMaskSize = 6 * 8;
+		constexpr size_t g_mmTrigKinds = 13;
 		constexpr size_t g_mmAmpTrigs = 0 * g_mmMaskSize;
 		constexpr size_t g_mmFilterTrigs = 1 * g_mmMaskSize;
 		constexpr size_t g_mmLfoTrigs = 2 * g_mmMaskSize;
@@ -612,6 +613,25 @@ namespace md::automation::sysex
 		if(_length == 0 || _length > MmPatternDump::StepCount)
 			return false;
 		m_payload[g_mmPatternLengthIndex] = _length;
+		return true;
+	}
+
+	void MmPatternEditor::clear()
+	{
+		// The 13 kinds of step masks, the lock masks and rows, the notes
+		std::fill_n(m_payload.begin(), g_mmTrigKinds * g_mmMaskSize, uint8_t{0});
+		std::fill_n(m_payload.begin() + g_mmLockMasks, g_mmMaskSize, uint8_t{0});
+		std::fill_n(m_payload.begin() + g_mmNotes, MmPatternDump::TrackCount * 64, MmPatternDump::None);
+		std::fill_n(m_payload.begin() + g_mmLockRows, MmPatternDump::LockRowCount * 64, MmPatternDump::None);
+		m_payload[g_mmLocksUsed] = 0;
+	}
+
+	bool MmPatternEditor::setSlot(const uint8_t _slot)
+	{
+		if(_slot >= 128)
+			return false;
+		// The last byte of the header; the checksum, which counts it, is made again by toDump
+		m_header.back() = _slot;
 		return true;
 	}
 

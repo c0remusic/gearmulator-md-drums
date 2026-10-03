@@ -401,13 +401,19 @@ def play_page_mm(d):
     marker = len(out)
     block_open(d + 1, "mmPlayGrid", "PATTERN", "", 0, 12, 12, "{GRID_H}")
     selector(d + 2, 110, 4, ["PAS 1–32", "PAS 33–64"], [84, 84], ["mmPlayPage0", "mmPlayPage1"])
-    info_x = 110 + 2 * 84 + 12
-    w(f'{ind(d + 2)}<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {gw - info_x - 16 - 70}dp;">pattern : en attente du firmware</div>')
+    # LONGUEUR, COPIER VERS and TOUT EFFACER as on the Machinedrum (PatternCommands)
+    w(f'{ind(d + 2)}<button id="mmPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {110 + 2 * 84 + 8}dp; top: 4dp; width: 110dp;">LONGUEUR —</button>')
+    info_x = 110 + 2 * 84 + 8 + 110 + 12
+    clear_x = gw - 16 - 62 - 8 - 120
+    copy_x = clear_x - 8 - 130
+    w(f'{ind(d + 2)}<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {copy_x - 12 - info_x}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<button id="mmPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: {copy_x}dp; top: 4dp; width: 130dp;">COPIER VERS…</button>')
+    w(f'{ind(d + 2)}<button id="mmPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {clear_x}dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>')
     w(f'{ind(d + 2)}<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     gh = play_grid(d + 2, "mmPlay", 6, 26, gw, " mmPlayTrack", " mmPlayStep",
                    ([("Trig", "trig et sa note"), ("Lock", "trig avec locks"), ("Silent", "trig sans enveloppe d'ampli"),
                      ("Out", "au-delà de la longueur")],
-                    "clic sur un nom : sa piste dans le piano roll · lecture seule"))
+                    "clic sur un pas : trig · clic dans le piano roll : la note · clic sur un nom : sa piste"))
     for i in range(marker, len(out)):
         out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)
@@ -552,13 +558,11 @@ def library_page(d):
     # PATTERNS: banks A to H in columns, 01 to 16 in rows
     w(f'{ind(d + 1)}<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: {page_w}dp; height: {{LIB_H}}dp;">')
     block_open(d + 2, "mdLibPatterns", "PATTERNS", "", 0, 12, by, kh)
-    detail_x = 140
-    if MD:
-        # COPIER takes the pattern clicked, COLLER copies it onto the one clicked then; REMPLACER asks for a
-        # second click for one not known empty (LibraryView)
-        w(f'{ind(d + 3)}<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>')
-        w(f'{ind(d + 3)}<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>')
-        detail_x = 350
+    # COPIER takes the pattern clicked, COLLER copies it onto the one clicked then; REMPLACER asks for a
+    # second click for one not known empty (LibraryView)
+    w(f'{ind(d + 3)}<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>')
+    w(f'{ind(d + 3)}<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>')
+    detail_x = 350
     w(f'{ind(d + 3)}<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {detail_x}dp; top: 4dp; width: {gw - detail_x - 16}dp;">—</div>')
     pw = (gw - 32) // 8
     for slot in range(128):

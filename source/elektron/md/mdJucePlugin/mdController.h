@@ -198,17 +198,24 @@ namespace mdJucePlugin
 		// every pattern dump). False while the firmware is not ready.
 		bool requestPatternDump(uint8_t _slot);
 
-		// Machinedrum only: edit the pattern as last read. The edit shows at once in
-		// getPattern(); sendPattern() writes it to the firmware. False without a
-		// pattern, or when md::automation::sysex::MdPatternEditor refuses the edit.
+		// Edit the pattern as last read. The edit shows at once in getPattern() or
+		// getMmPattern(); sendPattern() writes it to the firmware. False without a
+		// pattern, or when the model's editor (md::automation::sysex::MdPatternEditor,
+		// MmPatternEditor) refuses the edit.
+		// Machinedrum: a step's trig, and a lock on a step with a trig
 		bool setPatternTrig(uint8_t _track, uint8_t _step, bool _on);
 		bool setPatternLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
+		// Monomachine: a trig playing _note on a step, or none (its note and locks go with it)
+		bool setMmPatternTrig(uint8_t _track, uint8_t _step, std::optional<uint8_t> _note);
 		// Every trig and lock of the pattern, past its length too
 		bool clearPattern();
-		// The pattern's length, 1 to 64 (MdPatternEditor::setLength)
+		// The pattern's length, 1 to 64
 		bool setPatternLength(uint8_t _length);
-		// Writes the edited pattern back to its slot ($67), then reads it again: the
-		// reply tells whether the firmware kept it. False when there is nothing to send.
+		// Writes the edited pattern back to its slot ($67), its Kit saved first, then
+		// reads it again: the reply tells whether the firmware kept it. The Monomachine
+		// takes it on its SYSEX RECV menu, which the Device drives (md::MmPatternWriter),
+		// a write at a time: edits made meanwhile wait for the next. False when there is
+		// nothing to send, or while a Monomachine write is under way.
 		bool sendPattern();
 		// sendPattern() once the edits pause, PatternWritePauseMilliseconds after the last one, and at
 		// the latest PatternWriteMaxDelayMilliseconds after the first one not written (the controller
@@ -226,14 +233,16 @@ namespace mdJucePlugin
 		};
 		PatternWrite getPatternWrite() const { return m_patternWrite.load(std::memory_order_acquire); }
 
-		// Machinedrum only: copies a stored pattern into another slot, the source's dump with the
-		// destination's number ($67), then reads the destination back. The source is the pattern shown
-		// (getPattern()), its edits not written yet included, or else is read first. A copy onto the pattern
-		// shown replaces it as an edit does, written by sendPattern(); onto the selected pattern, the live
-		// Kit is saved first, as the firmware then reloads the pattern's Kit. A copy to another slot leaves
-		// the selected pattern and the live Kit as they are (mdEditorFirmwareTest, checkPatternCopy). False
-		// on the Monomachine, for the same slot or one out of range, while the firmware is not ready, or
-		// while another copy runs.
+		// Copies a stored pattern into another slot, the source's dump with the destination's number ($67),
+		// then reads the destination back. The source is the pattern shown (getPattern(), getMmPattern()),
+		// its edits not written yet included, or else is read first. Onto the selected pattern, the live Kit
+		// is saved first, as the firmware then reloads the pattern's Kit; a copy to another slot leaves the
+		// selected pattern and the live Kit as they are (mdEditorFirmwareTest, mmPatternWriteFirmwareTest).
+		// On the Machinedrum a copy onto the pattern shown replaces it as an edit does, written by
+		// sendPattern(); on the Monomachine it goes through the Device's SYSEX RECV write
+		// (md::MmPatternWriter), the pattern shown's edits not written yet dropped, and the copy read back
+		// is shown. False for the same slot or one out of range, while the firmware is not ready, or while
+		// another copy runs.
 		bool copyPattern(uint8_t _from, uint8_t _to);
 		enum class PatternCopy : uint8_t
 		{
@@ -258,8 +267,11 @@ namespace mdJucePlugin
 			bool operator!=(const PatternCopyState& _other) const { return !(*this == _other); }
 		};
 		PatternCopyState getPatternCopy() const;
-		// A pattern dump takes 1.7 s on the MIDI line: the copy and its read back, twice that
+		// A Machinedrum pattern dump takes 1.7 s on the MIDI line: the copy and its read back, twice that
 		static constexpr uint64_t PatternCopyTimeoutMilliseconds = 8000;
+		// A Monomachine write takes its menu about 2.7 s, and may wait for the one under way: the longest
+		// a write, or a copy, waits for its read back before it counts as not answered
+		static constexpr uint64_t MmWriteTimeoutMilliseconds = 20000;
 
 		void requestAutomationState();
 		std::vector<uint8_t> createAutomationSnapshot() const;
@@ -268,6 +280,9 @@ namespace mdJucePlugin
 	private:
 		friend struct ControllerAutomationTestAccess;
 		bool editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit);
+		bool editMmPattern(const std::function<bool(md::automation::sysex::MmPatternEditor&)>& _edit);
+		// Hands a Monomachine dump to the Device's SYSEX RECV write, the request for its slot after it
+		void writeMmDump(const md::automation::sysex::Message& _dump, uint8_t _slot);
 		// The write sendPatternSoon() asked for, once due; under m_synchronizationLock
 		void servicePatternWrite(uint64_t _now);
 		// The copy copyPattern() started, once its source is there: sent with the destination's number, or
@@ -441,8 +456,12 @@ namespace mdJucePlugin
 		mutable std::mutex m_patternMutex;
 		std::optional<md::automation::sysex::PatternDump> m_pattern;
 		std::optional<md::automation::sysex::MmPatternDump> m_mmPattern;	// under m_patternMutex
-		// The dump behind m_pattern, edits included; both under m_patternMutex.
+		// The dump behind m_pattern or m_mmPattern, edits included; under m_patternMutex.
 		md::automation::sysex::Message m_patternDump;
+		// The Monomachine pattern written last, and the copy sent; under m_patternMutex
+		std::optional<md::automation::sysex::MmPatternDump> m_mmPatternSent;
+		std::optional<md::automation::sysex::MmPatternDump> m_mmPatternCopySent;
+		uint64_t m_mmWriteMs = 0;					// the write under way handed to the Device, under m_synchronizationLock
 		bool m_patternEdited = false;               // edits not sent yet
 		uint32_t m_patternWritesInFlight = 0;       // sent, not read back yet
 		// sendPatternSoon(), under m_synchronizationLock: the first and last edit waiting, 0 for none

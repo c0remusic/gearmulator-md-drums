@@ -18,8 +18,8 @@ namespace mdJucePlugin
 	// BIBLIO (board 8), two tabs. KITS: every stored Kit of the machine, number and name (mdLibKit<slot>),
 	// the current Kit marked; a click on a Kit shows its machines (mdLibDetail, mdLibMachine<track>) without
 	// loading it. PATTERNS: every stored pattern, its length and Kit (mdLibPattern<slot>), the current
-	// pattern marked; a click shows it in mdLibPatternDetail. On the Machinedrum, COPIER (mdLibCopy) takes
-	// the pattern clicked as the one to copy, COLLER (mdLibPaste) copies it onto the pattern clicked then
+	// pattern marked; a click shows it in mdLibPatternDetail. COPIER (mdLibCopy) takes the pattern clicked
+	// as the one to copy, COLLER (mdLibPaste) copies it onto the pattern clicked then
 	// (Controller::copyPattern): at once onto one the library knows empty, otherwise once COLLER, then
 	// REMPLACER B05 ?, is clicked again within ConfirmMilliseconds. The library is read
 	// (Controller::readLibrary) when BIBLIO first shows, as soon as the firmware takes requests, and again

@@ -11,6 +11,7 @@
 #include "mdhostsync.h"
 #include "mdlivekit.h"
 #include "mdmachinestatus.h"
+#include "mdmmpatternwriter.h"
 #include "mdsyseximport.h"
 
 #include "synthLib/device.h"
@@ -222,6 +223,13 @@ namespace md
 		// The pattern chain the plug-in plays (Machinedrum): the Device runs it on its MIDI
 		// on the rendering thread. Set before the Device renders.
 		void setChainPlayer(std::shared_ptr<ChainPlayer> _player) { m_chainPlayer = std::move(_player); }
+		// The editor's Monomachine pattern writes: the Device drives the SYSEX RECV menu for them on
+		// its rendering thread (MmPatternWriter), one write at a time, never while the host sync's
+		// macro drives the panel. Set before the Device renders.
+		void setMmPatternWriteControl(std::shared_ptr<MmPatternWriteControl> _control)
+		{
+			m_mmPatternWriteControl = std::move(_control);
+		}
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -315,6 +323,7 @@ namespace md
 		// On the rendering thread, or with the rendering paused
 		void publishStatus();
 		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
+		void serviceMmPatternWriter();
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
 		uint32_t hardwareLatency() const { return isRenderingAsync() ? 0 : getExtraLatencySamples(); }
@@ -349,6 +358,9 @@ namespace md
 		std::shared_ptr<HostSyncControl> m_hostSyncControl;
 		uint32_t m_hostSyncRequest = 0;		// the last request handed to m_hostSync
 		uint8_t m_hostSyncSlot = 0xff;		// active Global slot, from status answers
+		MmPatternWriter m_mmPatternWriter;
+		MmPatternWriter::Actions m_mmPatternWriterActions;
+		std::shared_ptr<MmPatternWriteControl> m_mmPatternWriteControl;
 		std::shared_ptr<ChainPlayer> m_chainPlayer;
 		std::vector<synthLib::SMidiEvent> m_chainEvents;	// what the chain forwards for one event
 		// Last member: destroyed (render thread stopped) before everything it renders.
