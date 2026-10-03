@@ -8,8 +8,6 @@ namespace md
 	{
 		// As HostSync: the Monomachine shows its boot logo, ignoring the panel, for about nine seconds
 		constexpr uint64_t g_bootSettleFrames = g_samplerate * 10;
-		// After the dumps' own time on the line, for the firmware to store them
-		constexpr uint64_t g_storeFrames = g_samplerate / 2;
 	}
 
 	bool MmPatternWriter::start(Write _write)
@@ -17,7 +15,7 @@ namespace md
 		if(isBusy())
 			return false;
 		m_write = std::move(_write);
-		m_macro = monomachineReceiveMacro();
+		m_macro = monomachineReceiveMacro(m_timing.panel);
 		m_macroStep = 0;
 		m_nextFrames = 0;
 		m_phase = Phase::Entering;
@@ -43,6 +41,20 @@ namespace md
 		return m_macroStep >= m_macro.size() && _frames >= m_nextFrames;
 	}
 
+	void MmPatternWriter::sendDumps(const uint64_t _frames, const Actions& _actions)
+	{
+		size_t bytes = 0;
+		for(const auto& dump : m_write.dumps)
+		{
+			if(_actions.sendSysex)
+				_actions.sendSysex(dump);
+			bytes += dump.size();
+		}
+		++m_sends;
+		m_lineEnd = _frames + lineFrames(bytes);
+		m_nextFrames = m_lineEnd + m_timing.resendFrames;
+	}
+
 	void MmPatternWriter::service(const uint64_t _frames, const uint64_t _epoch, const Actions& _actions)
 	{
 		// Another machine: a write half done goes with the old one
@@ -63,24 +75,47 @@ namespace md
 		case Phase::Idle:
 			return;
 		case Phase::Entering:
-		{
 			if(!playMacro(_frames, _actions))
 				return;
-			size_t bytes = 0;
-			for(const auto& dump : m_write.dumps)
-			{
-				if(_actions.sendSysex)
-					_actions.sendSysex(dump);
-				bytes += dump.size();
-			}
-			m_nextFrames = _frames + lineFrames(bytes) + g_storeFrames;
-			m_phase = Phase::Receiving;
-			return;
-		}
-		case Phase::Receiving:
+			m_nextFrames = _frames + m_timing.readyFrames;
+			m_phase = Phase::Readying;
+			[[fallthrough]];
+		case Phase::Readying:
 			if(_frames < m_nextFrames)
 				return;
-			m_macro = monomachineLeaveMenusMacro();
+			// WAITING... on the screen: what changes it now is RECV n MSG.
+			m_screen = _actions.screenDigest ? _actions.screenDigest() : 0;
+			m_sends = 0;
+			sendDumps(_frames, _actions);
+			m_phase = Phase::Sending;
+			return;
+		case Phase::Sending:
+			if(_frames < m_lineEnd)
+				return;
+			if(!_actions.screenDigest)
+			{
+				m_nextFrames = m_lineEnd + m_timing.storeFrames;
+				m_phase = Phase::Storing;
+				return;
+			}
+			if(_actions.screenDigest() == m_screen)
+			{
+				// Not taken yet: given resendFrames, then sent again, or the menus left all the same
+				if(_frames < m_nextFrames)
+					return;
+				if(m_sends < m_timing.sends)
+				{
+					sendDumps(_frames, _actions);
+					return;
+				}
+			}
+			m_nextFrames = _frames + m_timing.storeFrames;
+			m_phase = Phase::Storing;
+			return;
+		case Phase::Storing:
+			if(_frames < m_nextFrames)
+				return;
+			m_macro = monomachineLeaveMenusMacro(m_timing.panel);
 			m_macroStep = 0;
 			m_phase = Phase::Leaving;
 			[[fallthrough]];

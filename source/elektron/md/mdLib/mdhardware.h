@@ -466,6 +466,23 @@ namespace md
 		const auto& getAudioOutputs() const { return m_audioOutputs; }
 		const std::string& getRomFilename() const { return m_rom.getFilename(); }
 
+		// A digest of LCD pages _firstPage to _lastPage (8 rows each, 0 on top) as the
+		// emulation has drawn them: it changes when what they show does. The emulation's
+		// thread only (a Device's rendering), as it reads the live decoder.
+		uint64_t lcdPagesDigest(uint32_t _firstPage, uint32_t _lastPage) const
+		{
+			uint64_t digest = 14695981039346656037ull;
+			for(uint32_t page = _firstPage; page <= _lastPage && page < 8; ++page)
+			{
+				for(uint32_t half = 0; half < 2; ++half)
+				{
+					for(uint32_t column = 0; column < 64; ++column)
+						digest = (digest ^ m_frontPanel.getLcdVram(half, page, column)) * 1099511628211ull;
+				}
+			}
+			return digest;
+		}
+
 		// Last complete front-panel value published by the emulation thread. Returning
 		// by value prevents consumers from retaining a reference to live decoder state.
 		FrontPanel getFrontPanelSnapshot() const { return m_frontPanelPublisher->read(); }

@@ -158,6 +158,8 @@ namespace md
 		};
 		m_mmPatternWriterActions.sendSysex = sendSysex;
 		m_mmPatternWriterActions.sendPanel = m_hostSyncActions.sendPanel;
+		// The SYSEX RECEIVE page's last line, LCD pages 6 and 7: WAITING..., then RECV n MSG.
+		m_mmPatternWriterActions.screenDigest = [this] { return m_hardware->lcdPagesDigest(6, 7); };
 	}
 
 	bool Device::captureFactoryFlashCachePersistence(std::string& _filename,

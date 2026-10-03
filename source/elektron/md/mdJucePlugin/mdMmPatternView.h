@@ -50,7 +50,7 @@ namespace mdJucePlugin
 	// plays. In the lane, a press or a drag locks the parameter on a step with a trig at the pointer's
 	// height (LaneInput), a double click clears the lock. LONGUEUR, COPIER VERS and TOUT EFFACER:
 	// PatternCommands. Written as on the Machinedrum once the clicks pause (Controller::sendPatternSoon),
-	// through the Monomachine's SYSEX RECV menu, which the Device drives: about 2.7 s a write.
+	// through the Monomachine's SYSEX RECV menu, which the Device drives: about half a second a write.
 	class MmPatternView
 	{
 	public:

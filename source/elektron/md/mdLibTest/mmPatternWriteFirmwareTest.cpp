@@ -5,14 +5,19 @@
 // sends the dumps, leaves the menus and sends what comes after: here a request for the pattern written,
 // whose answer comes back as written.
 // - A02 rewritten (16 steps, three trigs) with the MODE left on SPEC: read back as written.
-// - A01 playing on the internal clock, copied to A05 (its dump with A05's number): A05 comes back as A01,
-//   the selected pattern stays A01, the sequencer plays on and sounds through the write, and the Kit
-//   stays as it is (track 1's machine assigned and not saved).
+// - A01 playing on the internal clock, copied to A05 (its dump with A05's number) just after PLAY, when the
+//   firmware drops a dump sent the moment WAITING... shows: A05 comes back as A01, the selected pattern
+//   stays A01, the sequencer plays on and sounds through the write, and the Kit stays as it is (track 1's
+//   machine assigned and not saved).
 // - The selected pattern written reloads its Kit as stored (the assigned machine goes); with SAVE KIT
 //   ($59) sent first, the machine stays.
+// - A write as the controller asks, through the Device, comes back as written.
+// A write with the writer's taps takes under a second and a half.
 //
 // Firmware from GEARMULATOR_MM_FIRMWARE_BIN; 77 without it. MM_WRITE_PANEL_PREFIX writes the LCD at the
-// stages of the first write.
+// stages of the first write, and every 8 blocks of the copy. MM_WRITE_TIMING_SWEEP instead writes with
+// shorter and shorter taps, stopped and playing, then copies just after PLAY, and tells what comes back and
+// how often the dump was sent: how the writer's timing was chosen.
 
 #include "mmFirmwareMachine.h"
 
@@ -58,8 +63,9 @@ namespace
 	};
 
 	// Services the writer as the Device does, every 256 frames, until the write is done and one more second
-	// for the answers to what it sent after
-	WriteRun runWrite(Monomachine& _mm, md::MmPatternWriter& _writer, md::MmPatternWriter::Write _write)
+	// for the answers to what it sent after. _probe: the LCD every 8 blocks under MM_WRITE_PANEL_PREFIX.
+	WriteRun runWrite(Monomachine& _mm, md::MmPatternWriter& _writer, md::MmPatternWriter::Write _write,
+		const std::string& _probe = {})
 	{
 		auto& hw = _mm.hardware();
 		const auto id = _write.id;
@@ -67,6 +73,7 @@ namespace
 		md::MmPatternWriter::Actions actions;
 		actions.sendSysex = [&](const Message& _message) { _mm.send(_message); };
 		actions.sendPanel = [&](const md::PanelPacket& _packet) { return hw.trySendPanelEvent(_packet.row, _packet.mask); };
+		actions.screenDigest = [&] { return hw.lcdPagesDigest(6, 7); };
 		std::array<std::vector<float>, 2> audio;
 		synthLib::TAudioOutputs outputs{};
 		for(size_t channel = 0; channel < audio.size(); ++channel)
@@ -105,6 +112,8 @@ namespace
 					run.answers.emplace_back(event.sysex.begin(), event.sysex.end());
 			}
 			_writer.service(hw.getEmulatedFrames(), 1, actions);
+			if(!_probe.empty() && !doneAt && (frames / 256) % 8 == 0)
+				probe(hw, _probe + "-" + std::to_string(frames / 256));
 			if(!doneAt && _writer.getDone() == id)
 			{
 				doneAt = frames;
@@ -127,6 +136,64 @@ namespace
 		return std::nullopt;
 	}
 
+	// MM_WRITE_TIMING_SWEEP: A02 written with shorter and shorter taps, each time from the GLOBAL menu with the
+	// MODE left on SPEC, stopped then with A01 playing: what comes back, how long it took, how often the dump
+	// was sent. Then A01 copied to A05 just after PLAY, as the test below does: when the firmware drops the dump.
+	void sweepTimings(Monomachine& _mm)
+	{
+		auto& hw = _mm.hardware();
+		const std::pair<uint32_t, uint32_t> taps[] = {{1024, 2048}, {512, 1024}, {256, 512}, {128, 256}, {64, 128}, {32, 64}, {16, 32}};
+		uint8_t variant = 0;
+		uint32_t id = 1000;
+		for(const bool playing : {false, true})
+		{
+			if(playing)
+			{
+				_mm.selectPattern(0);
+				panelTap(hw, md::PanelControl::Play);
+			}
+			for(const auto& [hold, settle] : taps)
+			{
+				enterMmReceive(hw, false);
+				panelTap(hw, md::PanelControl::Down);
+				panelTap(hw, md::PanelControl::Exit);
+				md::MmPatternWriter::Timing timing;
+				timing.panel = {hold, settle};
+				md::MmPatternWriter writer(timing);
+				auto a02 = sysex::MmPatternEditor::fromDump(_mm.readPattern(1));
+				requireThat(a02.has_value(), "A02 not editable");
+				a02->clear();
+				requireThat(a02->setLength(16) && a02->setTrig(0, variant % 16, static_cast<uint8_t>(40 + variant)), "A02 edits refused");
+				++variant;
+				const auto sent = sysex::parseMmPatternDump(a02->toDump());
+				const auto run = runWrite(_mm, writer, {++id, {a02->toDump()}, {sysex::patternRequest(Model, 1)}});
+				const auto back = answeredPattern(run, 1);
+				std::printf("sweep hold %4u settle %4u %s: %s in %.2f s, sent %u times\n", hold, settle,
+					playing ? "playing" : "stopped", !back ? "no answer" : samePattern(*back, *sent) ? "OK" : "DIFFERENT",
+					run.seconds, writer.getSends());
+			}
+			if(playing)
+				panelTap(hw, md::PanelControl::Stop);
+		}
+		auto copy = sysex::MmPatternEditor::fromDump(_mm.readPattern(0));
+		requireThat(copy && copy->setSlot(4), "A01 not numbered A05");
+		const auto sent = sysex::parseMmPatternDump(copy->toDump());
+		for(int attempt = 0; attempt < 3; ++attempt)
+		{
+			auto blank = sysex::MmPatternEditor::fromDump(copy->toDump());
+			blank->clear();
+			md::MmPatternWriter clearing;
+			runWrite(_mm, clearing, {++id, {blank->toDump()}, {}});
+			panelTap(hw, md::PanelControl::Play);
+			md::MmPatternWriter writer;
+			const auto run = runWrite(_mm, writer, {++id, {copy->toDump()}, {sysex::patternRequest(Model, 4)}});
+			const auto back = answeredPattern(run, 4);
+			std::printf("A01 copied to A05 just after PLAY: %s in %.2f s, sent %u times\n",
+				!back ? "no answer" : samePattern(*back, *sent) ? "OK" : "DIFFERENT", run.seconds, writer.getSends());
+			panelTap(hw, md::PanelControl::Stop);
+		}
+	}
+
 	uint16_t trackMachine(md::Hardware& _hardware)
 	{
 		const auto kit = _hardware.readLiveKit();
@@ -147,6 +214,11 @@ namespace
 		requireThat(md::RomLoader::isRomForModel(rom, Model), std::string(path) + " is not the Monomachine firmware");
 		Monomachine mm(rom, path);
 		auto& hw = mm.hardware();
+		if(std::getenv("MM_WRITE_TIMING_SWEEP"))
+		{
+			sweepTimings(mm);
+			return true;
+		}
 		md::MmPatternWriter writer;
 		std::vector<std::string> failures;
 		uint32_t id = 0;
@@ -172,6 +244,8 @@ namespace
 			!a02Back ? "no answer to the request after" : samePattern(*a02Back, *a02Sent) ? "read back as written" : "read back different");
 		if(!a02Back || !samePattern(*a02Back, *a02Sent))
 			failures.push_back("A02 not read back as written");
+		if(first.seconds > 1.5)
+			failures.push_back("a write took more than 1.5 s");
 
 		// A01 playing, copied to A05; track 1's machine assigned, not saved
 		mm.selectPattern(0);
@@ -185,7 +259,7 @@ namespace
 		auto copy = sysex::MmPatternEditor::fromDump(a01);
 		requireThat(copy && copy->setSlot(4), "A01 not numbered A05");
 		const auto copySent = sysex::parseMmPatternDump(copy->toDump());
-		const auto copied = runWrite(mm, writer, {++id, {copy->toDump()}, {sysex::patternRequest(Model, 4)}});
+		const auto copied = runWrite(mm, writer, {++id, {copy->toDump()}, {sysex::patternRequest(Model, 4)}}, "copy");
 		panelTap(hw, md::PanelControl::Stop);
 		const auto a05 = answeredPattern(copied, 4);
 		std::string steps;
@@ -203,12 +277,28 @@ namespace
 		}
 		const auto selected = mm.status(Monomachine::Status::Pattern);
 		const auto machine = trackMachine(hw);
-		std::printf("MM A01 copied to A05 while playing, in %.1f s: %s; selected after: A0%u; track 1 machine %u (assigned %u)\n"
-			"  steps every 0.5 s:%s\n  rms every 0.5 s:%s\n", copied.seconds,
+		std::printf("MM A01 copied to A05 just after PLAY, in %.1f s, the dump sent %u times: %s; selected after: A0%u;"
+			" track 1 machine %u (assigned %u)\n  steps every 0.5 s:%s\n  rms every 0.5 s:%s\n", copied.seconds, writer.getSends(),
 			!a05 ? "no answer" : samePattern(*a05, *copySent) ? "A05 read back as A01" : "A05 read back different",
 			selected + 1, machine, GndSin, steps.c_str(), levels.c_str());
 		if(!a05 || !samePattern(*a05, *copySent))
+		{
+			if(a05)
+			{
+				std::printf("  A05 back: length %u/%u kit %u/%u trigs %d ampTrigs %d notes %d lockMasks %d rows %zu/%zu\n",
+					a05->length, copySent->length, a05->kit, copySent->kit, a05->trigs == copySent->trigs,
+					a05->ampTrigs == copySent->ampTrigs, a05->notes == copySent->notes, a05->lockMasks == copySent->lockMasks,
+					a05->lockRows.size(), copySent->lockRows.size());
+				size_t answers = 0;
+				for(const auto& answer : copied.answers)
+				{
+					if(const auto pattern = sysex::parseMmPatternDump(answer))
+						std::printf("  answer %zu: pattern slot %u length %u\n", answers, pattern->slot, pattern->length);
+					++answers;
+				}
+			}
 			failures.push_back("A05 not read back as the copy of A01");
+		}
 		if(selected != 0)
 			failures.push_back("the copy changed the selected pattern");
 		if(!moving || quietest < 0.01f)

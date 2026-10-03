@@ -2,6 +2,7 @@
 #include "mdLib/mdautomationsync.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdmachines.h"
+#include "mdLib/mdmmpatternwriter.h"
 #include "mdLib/mdsysexautomation.h"
 #include "synthLib/midiBufferParser.h"
 
@@ -1234,6 +1235,64 @@ namespace
 	}
 }
 
+// The Monomachine pattern writer against a stand-in machine: its keys, its dumps and its screen. A screen
+// that changes once a dump is off the MIDI line (RECV n MSG.) has it sent once, the request after it
+// last; a screen that never changes (a dropped dump) has it sent three times, then the menus are left all
+// the same; nothing is done in the machine's first ten seconds; another machine abandons a write.
+void testMonomachinePatternWriter()
+{
+	using Message = md::automation::sysex::Message;
+	md::MmPatternWriter writer;
+	std::vector<Message> sent;
+	size_t keys = 0;
+	uint64_t screen = 1;
+	uint64_t frames = 0;
+	uint64_t dumpSentAt = 0;
+	const Message dump(100, 0x10);
+	const Message request{0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x68, 0x01, 0xf7};
+	md::MmPatternWriter::Actions actions;
+	actions.sendSysex = [&](const Message& _message)
+	{
+		if(_message == dump)
+			dumpSentAt = frames;
+		sent.push_back(_message);
+	};
+	actions.sendPanel = [&](const md::PanelPacket&) { ++keys; return true; };
+	actions.screenDigest = [&] { return screen; };
+	// The emulated frames go on from one write to the next, a block at a time
+	const auto run = [&](const uint32_t _id, const bool _taken)
+	{
+		for(const auto end = frames + md::g_samplerate * 10; frames < end && writer.getDone() != _id; frames += 256)
+		{
+			writer.service(frames, 1, actions);
+			if(_taken && dumpSentAt && frames >= dumpSentAt + md::MmPatternWriter::lineFrames(dump.size()))
+				screen = 2;
+		}
+		return writer.getDone() == _id;
+	};
+
+	require(writer.start({1, {dump}, {request}}) && writer.isBusy() && !writer.start({9, {dump}, {}}), "the writer took a write while busy");
+	writer.service(md::g_samplerate * 5, 1, actions);
+	require(keys == 0 && sent.empty(), "the writer drove the panel behind the boot logo");
+	frames = md::g_samplerate * 10;
+	require(run(1, true) && writer.getSends() == 1 && sent.size() == 2 && sent.front() == dump && sent.back() == request
+		&& keys > 40 && !writer.isBusy(), "a dump taken was not sent once, the request after it");
+
+	sent.clear();
+	dumpSentAt = 0;
+	screen = 3;
+	require(writer.start({2, {dump}, {request}}) && run(2, false) && writer.getSends() == 3
+		&& std::count(sent.begin(), sent.end(), dump) == 3 && sent.back() == request, "a dropped dump was not sent three times");
+
+	// Another machine (a state restore) halfway: the write goes with the old one
+	sent.clear();
+	require(writer.start({3, {dump}, {request}}), "the writer refused a write");
+	writer.service(frames, 1, actions);
+	require(writer.isBusy() && writer.getDone() == 2, "a write did not start");
+	writer.service(frames + 256, 2, actions);
+	require(writer.getDone() == 3 && !writer.isBusy() && sent.empty(), "a write was not abandoned with its machine");
+}
+
 int main(const int _argc, const char* const* _argv)
 {
 	testMachinedrum();
@@ -1246,6 +1305,7 @@ int main(const int _argc, const char* const* _argv)
 	testMachinedrumPattern();
 	testMachinedrumPatternEditing();
 	testMonomachinePattern();
+	testMonomachinePatternWriter();
 	testDumpRequestOrdering();
 	testGlobalSync();
 	testHostSync();

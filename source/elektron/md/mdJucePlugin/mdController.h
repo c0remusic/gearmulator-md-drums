@@ -271,7 +271,7 @@ namespace mdJucePlugin
 		PatternCopyState getPatternCopy() const;
 		// A Machinedrum pattern dump takes 1.7 s on the MIDI line: the copy and its read back, twice that
 		static constexpr uint64_t PatternCopyTimeoutMilliseconds = 8000;
-		// A Monomachine write takes its menu about 2.7 s, and may wait for the one under way: the longest
+		// A Monomachine write takes its menu about half a second, and may wait for the one under way: the longest
 		// a write, or a copy, waits for its read back before it counts as not answered
 		static constexpr uint64_t MmWriteTimeoutMilliseconds = 20000;
 
