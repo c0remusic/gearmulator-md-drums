@@ -666,6 +666,15 @@ namespace mdJucePlugin
 		});
 	}
 
+	bool Controller::setMmPatternLock(const uint8_t _track, const uint8_t _bit, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setLock(_track, _bit, _step, _value);
+		});
+	}
+
 	bool Controller::setPatternTrig(const uint8_t _track, const uint8_t _step, const bool _on)
 	{
 		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)

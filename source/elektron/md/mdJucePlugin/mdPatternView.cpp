@@ -112,6 +112,10 @@ namespace mdJucePlugin
 		{
 			m_lane = juceRmlUi::ElemCanvas::create(area);
 			m_lane->setRepaintGraphicsCallback([this](juce::Image& _image, juce::Graphics& _g) { paintLane(_image, _g); });
+			m_laneInput = std::make_unique<LaneInput>(*area, [this](const uint8_t _column, const std::optional<uint8_t> _value)
+			{
+				editLock(_column, _value);
+			});
 		}
 		if(auto* refresh = _document.GetElementById("mdPlayRefresh"))
 		{
@@ -164,6 +168,21 @@ namespace mdJucePlugin
 		for(uint8_t parameter = 0; parameter < ParameterCount; ++parameter)
 			steps |= parameterLocks(_pattern, _track, parameter);
 		return steps;
+	}
+
+	void PatternView::editLock(const uint8_t _column, const std::optional<uint8_t> _value)
+	{
+		const auto track = m_shownTrack;
+		if(track >= TrackCount || _column >= StepCount)
+			return;
+		const auto step = static_cast<uint8_t>(m_shownStepPage * StepCount + _column);
+		// The same value again (a drag passes over it many times): nothing to write
+		const auto pattern = m_controller.getPattern();
+		if(!pattern || pattern->lock(track, m_laneParameter, step) == _value)
+			return;
+		if(m_controller.setPatternLock(track, m_laneParameter, step, _value))
+			m_controller.sendPatternSoon();
+		update();
 	}
 
 	uint8_t PatternView::kitValue(const uint8_t _track, const uint8_t _parameter) const

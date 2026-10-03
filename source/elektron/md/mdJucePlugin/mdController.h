@@ -205,8 +205,10 @@ namespace mdJucePlugin
 		// Machinedrum: a step's trig, and a lock on a step with a trig
 		bool setPatternTrig(uint8_t _track, uint8_t _step, bool _on);
 		bool setPatternLock(uint8_t _track, uint8_t _parameter, uint8_t _step, std::optional<uint8_t> _value);
-		// Monomachine: a trig playing _note on a step, or none (its note and locks go with it)
+		// Monomachine: a trig playing _note on a step, or none (its note and locks go with it); a lock of
+		// the parameter at lock mask bit _bit (md::automation::sysex::mmLockBit) on a step with a trig
 		bool setMmPatternTrig(uint8_t _track, uint8_t _step, std::optional<uint8_t> _note);
+		bool setMmPatternLock(uint8_t _track, uint8_t _bit, uint8_t _step, std::optional<uint8_t> _value);
 		// Every trig and lock of the pattern, past its length too
 		bool clearPattern();
 		// The pattern's length, 1 to 64

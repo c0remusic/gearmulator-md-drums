@@ -23,4 +23,9 @@ namespace mdJucePlugin::stepColumns
 	// for the Kit's value, orange with a dot above for a lock
 	void paintLane(juce::Graphics& _g, float _width, float _height, const std::array<int, Count>& _values,
 		const std::array<bool, Count>& _locks);
+
+	// The column under _x on a canvas _width wide, -1 outside
+	int columnAt(float _x, float _width);
+	// The value a bar reaching _y has, as paintLane draws it: 127 under the dot's room at the top
+	uint8_t laneValueAt(float _y, float _width, float _height);
 }

@@ -1072,7 +1072,9 @@
 							<button id="mmPlayTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="1" style="left: 112dp; top: 4dp; width: 90dp;">LANE</button>
 							<button id="mmPlayTab2" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="2" style="left: 208dp; top: 4dp; width: 90dp;">CHAÎNE</button>
 							<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 272dp;">
-								<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 736dp;">—</div>
+								<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 560dp;">—</div>
+								<button id="mmPlayRollDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 888dp; top: 4dp; width: 80dp;">OCTAVE –</button>
+								<button id="mmPlayRollUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 972dp; top: 4dp; width: 80dp;">OCTAVE +</button>
 								<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 90dp; height: 232dp;"/>
 								<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 32dp; width: 928dp; height: 232dp;"/>
 							</div>
@@ -1093,7 +1095,7 @@
 								<div id="mmPlayParam5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 877dp; top: 32dp; width: 57dp;">VOL</div>
 								<div id="mmPlayParam6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 934dp; top: 32dp; width: 57dp;">PAN</div>
 								<div id="mmPlayParam7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 991dp; top: 32dp; width: 57dp;">PORT</div>
-								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock</div>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer</div>
 								<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 200dp;"/>
 							</div>
 							<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: 1068dp; height: 272dp;">

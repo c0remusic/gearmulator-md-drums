@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mdLaneInput.h"
 #include "mdPatternCommands.h"
 
 #include "mdLib/mdsysexautomation.h"
@@ -7,6 +8,8 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 
 namespace juce
@@ -39,7 +42,9 @@ namespace mdJucePlugin
 	// that play; mdPlayParam<parameter> chooses the parameter and counts its locks.
 	// A click on a track name (mdPlayTrack<track>) makes it the edited track;
 	// a click on a step sets or clears its trig, written to the firmware as the PAS
-	// block does. LONGUEUR, COPIER VERS and TOUT EFFACER: PatternCommands. OUVRIR DANS
+	// block does. In the lane, a press or a drag locks the parameter on a step with a
+	// trig at the pointer's height (LaneInput), a double click clears the lock.
+	// LONGUEUR, COPIER VERS and TOUT EFFACER: PatternCommands. OUVRIR DANS
 	// SON (mdPlayOpen) shows the track in SON. While the sequencer plays, the column of
 	// its step is lit when its steps are shown (mdPlayNow on the step number and the
 	// cells), as the machine's position in its RAM gives it (Controller::getPlayingStep).
@@ -60,6 +65,9 @@ namespace mdJucePlugin
 		// playing step, the copy. Returns true when it changed the DOM.
 		bool update();
 
+		// What the lane does under the mouse (LaneInput): the lane's parameter locked on the step
+		// of a visible column, or its lock cleared (nullopt)
+		void editLock(uint8_t _column, std::optional<uint8_t> _value);
 		// What a slot chosen in COPIER VERS's menu does
 		void copyTo(const uint8_t _slot) { m_commands.copyTo(_slot); }
 		bool isCopyArmed() const { return m_commands.isCopyArmed(); }
@@ -98,6 +106,7 @@ namespace mdJucePlugin
 		std::array<std::array<Rml::Element*, StepCount>, TrackCount> m_steps{};
 		std::array<Rml::Element*, ParameterCount> m_parameters{};
 		juceRmlUi::ElemCanvas* m_lane = nullptr;
+		std::unique_ptr<LaneInput> m_laneInput;
 		std::array<int, StepCount> m_barValues{};
 		std::array<bool, StepCount> m_barLocks{};
 		std::array<std::string, ParameterCount> m_names{};

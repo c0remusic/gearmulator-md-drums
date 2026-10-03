@@ -3,6 +3,7 @@
 #include <juce_graphics/juce_graphics.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace mdJucePlugin::stepColumns
 {
@@ -25,13 +26,37 @@ namespace mdJucePlugin::stepColumns
 		_g.fillRect(pitch * 16.0f - gap / 2.0f - 1.0f, 0.0f, 2.0f, _height);
 	}
 
+	namespace
+	{
+		// A lock's dot above its bar: the room a bar of 127 leaves at the top
+		float dotSize(const float _width)
+		{
+			return std::max(3.0f, _width / Count * CellFraction / 5.0f);
+		}
+	}
+
+	int columnAt(const float _x, const float _width)
+	{
+		if(_x < 0.0f || _x >= _width || _width <= 0.0f)
+			return -1;
+		return std::min(static_cast<int>(_x / (_width / Count)), Count - 1);
+	}
+
+	uint8_t laneValueAt(const float _y, const float _width, const float _height)
+	{
+		const auto range = _height - dotSize(_width) - 3.0f;
+		if(range <= 0.0f)
+			return 0;
+		return static_cast<uint8_t>(std::clamp(static_cast<int>(std::lround((_height - _y) * 127.0f / range)), 0, 127));
+	}
+
 	void paintLane(juce::Graphics& _g, const float _width, const float _height, const std::array<int, Count>& _values,
 		const std::array<bool, Count>& _locks)
 	{
 		paintBeats(_g, _width, _height);
 		const auto pitch = _width / Count;
 		const auto cell = pitch * CellFraction;
-		const auto dot = std::max(3.0f, cell / 5.0f);
+		const auto dot = dotSize(_width);
 		for(uint8_t step = 0; step < Count; ++step)
 		{
 			if(_values[step] < 0)

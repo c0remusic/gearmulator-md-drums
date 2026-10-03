@@ -24,6 +24,7 @@
 #include "mdPatternView.h"
 #include "mdMmPatternView.h"
 #include "mdChainView.h"
+#include "mdStepColumns.h"
 #include "mdStepGrid.h"
 #include "mdSystemPage.h"
 #include "mdTrackActivity.h"
@@ -154,6 +155,8 @@ namespace mdJucePlugin
 
 		static const OutputMetersView& meters(const Editor& _editor) { return *_editor.m_outputMetersView; }
 		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
+		// What the mouse does in the Machinedrum's lane
+		static PatternView& editPattern(Editor& _editor) { return *_editor.m_patternView; }
 		static const MmPatternView& mmPattern(const Editor& _editor) { return *_editor.m_mmPatternView; }
 		// What clicks in the Monomachine's grid and roll, and its COPIER VERS menu, do
 		static MmPatternView& editMmPattern(Editor& _editor) { return *_editor.m_mmPatternView; }
@@ -1201,6 +1204,26 @@ int main()
 			context.Update();
 			require(text("mdPlayLaneInfo") == "piste 01 · VOL : 0 locks · kit 64" && !lane.barLocked(0) && lane.barValue(0) == 64,
 				"choosing VOL did not change the lane");
+			// The lane under the mouse: a press locks VOL on step 1 (a trig) at the height pressed, a double click
+			// clears the lock; written once the edits pause. The top of a lane is 127, its foot 0.
+			{
+				auto& edit = mdJucePlugin::EditorIdentityTestAccess::editPattern(*editor);
+				namespace columns = mdJucePlugin::stepColumns;
+				require(columns::laneValueAt(0.0f, 928.0f, 200.0f) == 127 && columns::laneValueAt(200.0f, 928.0f, 200.0f) == 0
+					&& columns::columnAt(30.0f, 928.0f) == 1 && columns::columnAt(-1.0f, 928.0f) == -1,
+					"a lane does not map the mouse to its steps and values");
+				edit.editLock(0, uint8_t{100});
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(md.getPattern()->lock(0, 17, 0) == uint8_t{100} && lane.barLocked(0) && lane.barValue(0) == 100
+					&& mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md)
+					&& text("mdPlayLaneInfo").rfind("piste 01 · VOL : 1 lock", 0) == 0, "a press in the lane did not lock VOL on step 1");
+				edit.editLock(1, uint8_t{100});
+				require(!md.getPattern()->lock(0, 17, 1), "a lock set on a step without a trig");
+				edit.editLock(0, std::nullopt);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(!md.getPattern()->lock(0, 17, 0) && !lane.barLocked(0) && lane.barValue(0) == 64, "a double click did not clear the lock");
+				mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			}
 			// A track name makes it the edited track; its lane follows
 			element(doc, "mdPlayTrack1").Click();
 			context.Update();
@@ -1528,6 +1551,50 @@ int main()
 				readBack(*pattern);
 				require(mm.getPatternWrite() == PatternWrite::Written && text("mmPlayStep0_1") == "F2",
 					"the write read back as sent not told");
+
+				// LANE (AMP VOL): a press locks it on step 2 at the height pressed, a double click clears the lock, a
+				// step without a trig takes none; the lock is written as the notes are
+				const auto volume = md::automation::sysex::mmLockBit(md::automation::monomachine::Amplification, 5);
+				tabButton(doc, "mmPlayBottom", "1").Click();
+				context.Update();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				edit.editLock(1, uint8_t{64});
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(mm.getMmPattern()->lock(0, volume, 1) == uint8_t{64} && view.barLocked(1) && view.barValue(1) == 64
+					&& Access::patternWriteWaiting(mm), "a press in the lane did not lock AMP VOL on step 2");
+				edit.editLock(1, std::nullopt);
+				edit.editLock(2, uint8_t{64});
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(!mm.getMmPattern()->lock(0, volume, 1) && !view.barLocked(1) && !mm.getMmPattern()->lock(0, volume, 2),
+					"a double click did not clear the lock, or a step without a trig took one");
+				edit.editLock(1, uint8_t{100});
+				Access::pauseEdits(mm);
+				require(mm.getPatternWrite() == PatternWrite::Pending && pattern->setLock(0, volume, 1, 100), "the lock not written");
+				readBack(*pattern);
+				require(mm.getPatternWrite() == PatternWrite::Written && view.barValue(1) == 100, "the lock not read back as written");
+
+				// The roll moved: OCTAVE + shows an octave higher, a click there puts C4 on step 3, and the roll stays
+				// where it was moved; OCTAVE – back down; another track shows the notes it plays
+				tabButton(doc, "mmPlayBottom", "0").Click();
+				context.Update();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				const auto fitted = view.getRollRange();
+				element(doc, "mmPlayRollUp").Click();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(view.getRollRange() == std::make_pair(static_cast<uint8_t>(fitted.first + 12), static_cast<uint8_t>(fitted.second + 12)),
+					"OCTAVE + did not show an octave higher");
+				edit.placeNote(2, 60);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(mm.getMmPattern()->note(0, 2) == uint8_t{60} && view.getRollRange().first == fitted.first + 12,
+					"a note put in the moved roll did not stay, or the roll moved back");
+				element(doc, "mmPlayRollDown").Click();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(view.getRollRange().first == fitted.first, "OCTAVE – did not show an octave lower");
+				element(doc, "mmPlayTrack1").Click();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				element(doc, "mmPlayTrack0").Click();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(view.getRollRange() == View::rollRange(*mm.getMmPattern(), 0), "another track did not bring the roll back to its notes");
 
 				// TOUT EFFACER, clicked twice: every trig goes, and the pattern is written
 				element(doc, "mmPlayClear").Click();

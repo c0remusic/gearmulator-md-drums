@@ -180,11 +180,28 @@ namespace mdJucePlugin
 				if(const auto cell = rollCell(x, y, size.x, size.y))
 					placeNote(cell->first, cell->second);
 			});
+			// The wheel moves the notes shown, two semitones a notch, down for the lower ones
+			juceRmlUi::EventListener::Add(area, Rml::EventId::Mousescroll, [this](Rml::Event& _event)
+			{
+				const auto delta = _event.GetParameter<float>("wheel_delta_y", 0.0f);
+				if(delta == 0.0f)
+					return;
+				scrollRoll(delta > 0.0f ? -2 : 2);
+				_event.StopPropagation();
+			});
 		}
+		if(auto* down = _document.GetElementById("mmPlayRollDown"))
+			juceRmlUi::EventListener::Add(down, Rml::EventId::Click, [this](Rml::Event&) { scrollRoll(-12); });
+		if(auto* up = _document.GetElementById("mmPlayRollUp"))
+			juceRmlUi::EventListener::Add(up, Rml::EventId::Click, [this](Rml::Event&) { scrollRoll(12); });
 		if(auto* area = _document.GetElementById("mmPlayLaneArea"))
 		{
 			m_lane = juceRmlUi::ElemCanvas::create(area);
 			m_lane->setRepaintGraphicsCallback([this](juce::Image& _image, juce::Graphics& _g) { paintLane(_image, _g); });
+			m_laneInput = std::make_unique<LaneInput>(*area, [this](const uint8_t _column, const std::optional<uint8_t> _value)
+			{
+				editLock(_column, _value);
+			});
 		}
 		if(auto* refresh = _document.GetElementById("mmPlayRefresh"))
 		{
@@ -281,6 +298,31 @@ namespace mdJucePlugin
 		forceRedraw();
 	}
 
+	void MmPatternView::scrollRoll(const int _semitones)
+	{
+		// Drawn again by the next update, keys and line with it
+		const int span = m_rollRange.second - m_rollRange.first;
+		m_rollLow = std::clamp(static_cast<int>(m_rollRange.first) + _semitones, 0, 127 - span);
+		forceRedraw();
+	}
+
+	void MmPatternView::editLock(const uint8_t _column, const std::optional<uint8_t> _value)
+	{
+		const auto track = m_shownTrack;
+		const auto bit = m_shownParameter;
+		if(track >= TrackCount || bit >= Pattern::LockBitCount || _column >= VisibleSteps)
+			return;
+		const auto page = m_shownStepPage < 2 ? m_shownStepPage : uint8_t{0};
+		const auto step = static_cast<uint8_t>(page * VisibleSteps + _column);
+		// The same value again (a drag passes over it many times): nothing to write
+		const auto pattern = m_controller.getMmPattern();
+		if(!pattern || pattern->lock(track, bit, step) == _value)
+			return;
+		if(m_controller.setMmPatternLock(track, bit, step, _value))
+			m_controller.sendPatternSoon();
+		forceRedraw();
+	}
+
 	std::optional<std::pair<uint8_t, uint8_t>> MmPatternView::rollCell(const float _x, const float _y, const float _width,
 		const float _height) const
 	{
@@ -330,6 +372,9 @@ namespace mdJucePlugin
 			|| m_stepPage != m_shownStepPage;
 		if(!grid && parameter == m_shownParameter && kit == m_shownKit)
 			return playChanged || commands;
+		// Another track: the roll shows the notes it plays
+		if(track != m_shownTrack)
+			m_rollLow.reset();
 		m_shownPattern = revision;
 		m_shownMachines = machines;
 		m_shownTrack = track;
@@ -431,7 +476,16 @@ namespace mdJucePlugin
 		const uint8_t length = _pattern ? _pattern->length : 0;
 		const auto first = static_cast<uint8_t>(m_shownStepPage * VisibleSteps);
 		const auto locked = _pattern ? lockedSteps(*_pattern, track) : 0u;
-		m_rollRange = _pattern ? rollRange(*_pattern, track) : std::pair<uint8_t, uint8_t>{48, 72};
+		const auto fitted = _pattern ? rollRange(*_pattern, track) : std::pair<uint8_t, uint8_t>{48, 72};
+		// Moved (OCTAVE, wheel): as many notes from the lowest chosen; another pattern brings back the fitted ones
+		if(_pattern && _pattern->slot != m_rollSlot)
+		{
+			m_rollLow.reset();
+			m_rollSlot = _pattern->slot;
+		}
+		const int span = fitted.second - fitted.first;
+		const int low = m_rollLow ? std::clamp(*m_rollLow, 0, 127 - span) : fitted.first;
+		m_rollRange = {static_cast<uint8_t>(low), static_cast<uint8_t>(low + span)};
 		m_rollLength = static_cast<uint8_t>(std::clamp(length - first, 0, static_cast<int>(VisibleSteps)));
 		size_t notes = 0;
 		for(uint8_t cell = 0; cell < VisibleSteps; ++cell)

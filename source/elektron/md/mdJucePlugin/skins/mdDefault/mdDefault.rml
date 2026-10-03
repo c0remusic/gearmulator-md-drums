@@ -1731,7 +1731,7 @@
 								<div id="mdPlayParam21" class="jucePos mdEdSeg mdEdSegChoice" style="left: 919dp; top: 32dp; width: 41dp;">LFOS</div>
 								<div id="mdPlayParam22" class="jucePos mdEdSeg mdEdSegChoice" style="left: 962dp; top: 32dp; width: 41dp;">LFOD</div>
 								<div id="mdPlayParam23" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1005dp; top: 32dp; width: 41dp;">LFOM</div>
-								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock</div>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer</div>
 								<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 100dp;"/>
 							</div>
 							<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 172dp;">

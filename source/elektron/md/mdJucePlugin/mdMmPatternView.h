@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mdLaneInput.h"
 #include "mdPatternCommands.h"
 
 #include "mdLib/mdsysexautomation.h"
@@ -7,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -43,7 +45,10 @@ namespace mdJucePlugin
 	// its column is lit (mdPlayNow), as on the Machinedrum.
 	// Editing: a click on a step sets a trig, playing the note of the track's nearest trig (C4 without
 	// one), or clears the trig there; a click in the roll puts the edited track's note at that height on
-	// that step, or clears it when it is the note already there. LONGUEUR, COPIER VERS and TOUT EFFACER:
+	// that step, or clears it when it is the note already there. OCTAVE – and + (mmPlayRollDown, Up) and
+	// the wheel over the roll move the notes it shows; another track or pattern brings back the notes it
+	// plays. In the lane, a press or a drag locks the parameter on a step with a trig at the pointer's
+	// height (LaneInput), a double click clears the lock. LONGUEUR, COPIER VERS and TOUT EFFACER:
 	// PatternCommands. Written as on the Machinedrum once the clicks pause (Controller::sendPatternSoon),
 	// through the Monomachine's SYSEX RECV menu, which the Device drives: about 2.7 s a write.
 	class MmPatternView
@@ -75,6 +80,13 @@ namespace mdJucePlugin
 		// The note a new trig on a step plays: the note of the track's nearest trig before it, or after
 		// it, DefaultNote without one
 		static uint8_t defaultNote(const Pattern& _pattern, uint8_t _track, uint8_t _step);
+		// What OCTAVE – and + (12 semitones) and the wheel do: the roll's notes moved, within 0 to 127
+		void scrollRoll(int _semitones);
+		// The notes the roll shows, lowest and highest
+		std::pair<uint8_t, uint8_t> getRollRange() const { return m_rollRange; }
+		// What the lane does under the mouse (LaneInput): the parameter shown locked on the step of a
+		// visible column, or its lock cleared (nullopt)
+		void editLock(uint8_t _column, std::optional<uint8_t> _value);
 
 		// What a slot chosen in COPIER VERS's menu does
 		void copyTo(const uint8_t _slot) { m_commands.copyTo(_slot); }
@@ -121,6 +133,10 @@ namespace mdJucePlugin
 		juceRmlUi::ElemCanvas* m_keys = nullptr;
 		juceRmlUi::ElemCanvas* m_roll = nullptr;
 		juceRmlUi::ElemCanvas* m_lane = nullptr;
+		std::unique_ptr<LaneInput> m_laneInput;
+		// The roll's lowest note once moved (OCTAVE, wheel); none: around the notes the track plays
+		std::optional<int> m_rollLow;
+		uint8_t m_rollSlot = 0xff;			// the pattern the roll was moved on
 		std::array<std::string, ParameterCount> m_names{};
 
 		uint8_t m_stepPage = 0;

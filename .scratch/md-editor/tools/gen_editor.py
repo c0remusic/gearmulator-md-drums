@@ -365,6 +365,8 @@ MM_AMP = ["ATK", "HOLD", "DEC", "REL", "DIST", "VOL", "PAN", "PORT"]
 # mdStepColumns.h paints the canvases under it on the same columns); the legend under the rows.
 # Returns the block's height.
 PLAY_LABEL_W = 96
+# Beside a lane (LaneInput): what its bars are, and what the mouse does on them
+LANE_NOTE = "gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer"
 
 def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend):
     pitch = (gw - 32 - PLAY_LABEL_W) // 32
@@ -428,7 +430,12 @@ def play_page_mm(d):
     area_h = lh - TOP - 8
     # The roll: a keyboard in the names' column, the notes on the steps' columns
     w(f'{ind(d + 1)}<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
-    w(f'{ind(d + 2)}<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {gw - tabs_w - 16}dp;">—</div>')
+    # OCTAVE – and + move the notes the roll shows, as the wheel over it does
+    up_x = gw - 16 - 80
+    down_x = up_x - 4 - 80
+    w(f'{ind(d + 2)}<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: {tabs_w}dp; top: 4dp; width: {down_x - 12 - tabs_w}dp;">—</div>')
+    w(f'{ind(d + 2)}<button id="mmPlayRollDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {down_x}dp; top: 4dp; width: 80dp;">OCTAVE –</button>')
+    w(f'{ind(d + 2)}<button id="mmPlayRollUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {up_x}dp; top: 4dp; width: 80dp;">OCTAVE +</button>')
     w(f'{ind(d + 2)}<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: {TOP}dp; width: {label_w - 6}dp; height: {area_h}dp;"/>')
     w(f'{ind(d + 2)}<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {TOP}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
     w(f'{ind(d + 1)}</div>')
@@ -439,7 +446,7 @@ def play_page_mm(d):
     selector(d + 2, 16, TOP, MM_PAGES, [pw] * len(MM_PAGES), [f"mmPlayParamPage{p}" for p in range(len(MM_PAGES))])
     selector(d + 2, 16 + pw * len(MM_PAGES) + 16, TOP, MM_AMP, [iw] * 8, [f"mmPlayParam{i}" for i in range(8)])
     lane_top = TOP + 32
-    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lane_top}dp; width: {label_w - 6}dp;">gris : kit<br/>orange : lock</div>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {lane_top}dp; width: {label_w - 6}dp;">{LANE_NOTE}</div>')
     w(f'{ind(d + 2)}<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {lane_top}dp; width: {pitch * 32}dp; height: {lh - lane_top - 8}dp;"/>')
     w(f'{ind(d + 1)}</div>')
     w(f'{ind(d + 1)}<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: {gw}dp; height: {lh}dp;">')
@@ -497,7 +504,7 @@ def play_page_md(d):
         w(f'{ind(d + 2)}<div id="mdPlayParam{p}" class="jucePos mdEdSeg mdEdSegChoice" style="left: {16 + pb * p}dp; top: {TOP}dp; width: {pb - 2}dp;">{name}</div>')
     area_top = TOP + 32
     area_h = lh - area_top - 8
-    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {area_top}dp; width: {label_w - 6}dp;">gris : kit<br/>orange : lock</div>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: {area_top}dp; width: {label_w - 6}dp;">{LANE_NOTE}</div>')
     # The 32 bars, drawn in a canvas under the steps
     w(f'{ind(d + 2)}<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: {16 + label_w}dp; top: {area_top}dp; width: {pitch * 32}dp; height: {area_h}dp;"/>')
     w(f'{ind(d + 1)}</div>')
