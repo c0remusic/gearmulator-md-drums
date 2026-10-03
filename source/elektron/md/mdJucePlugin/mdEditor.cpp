@@ -827,12 +827,20 @@ namespace mdJucePlugin
 			m_machinePicker->update();
 		}
 
-		// The PAS block (Machinedrum) shows the edited track in the current pattern.
+		// The PAS block (Machinedrum) shows the edited track in the current pattern; OUVRIR DANS SON
+		// (JOUER) shows it on the steps JOUER shows.
 		if(auto* const document = getDocument(); document && getModel() == md::MachineModel::Machinedrum
 			&& document->GetElementById("mdEdStep0"))
 		{
 			m_stepGrid = std::make_unique<StepGrid>(m_controller, *document);
 			m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
+			if(auto* open = document->GetElementById("mdPlayOpen"); open && m_patternView)
+			{
+				juceRmlUi::EventListener::Add(open, Rml::EventId::Click, [this](Rml::Event&)
+				{
+					m_stepGrid->setStepPage(m_patternView->getStepPage());
+				});
+			}
 		}
 
 		if(getModel() == md::MachineModel::Machinedrum)

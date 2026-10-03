@@ -83,11 +83,14 @@ def controls_block(d, bid, title, sub, c0, ncols, y, items, model="partCurrent",
 ROW_A = TOP + 24 + 8
 
 def steps_block(d, y, ncols):
-    # StepGrid (mdStepGrid.cpp) fills the steps and the line on the right from the current pattern.
+    # StepGrid (mdStepGrid.cpp) fills the steps, 32 at a time (33 to 64 for a pattern over 32 steps),
+    # and the line on the right from the current pattern.
     width = span(ncols)
     pitch = (width - 32 + 2) // 32
     block_open(d, "mdEdSteps", "PAS", "", 0, ncols, y, ROW_A)
-    w(f'{ind(d + 1)}<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 60dp; top: 4dp; width: {width - 60 - 16 - 70}dp;">pattern : en attente</div>')
+    selector(d + 1, 52, 4, ["1–32", "33–64"], [48, 48], ["mdEdStepPage0", "mdEdStepPage1"])
+    info_x = 52 + 2 * 48 + 12
+    w(f'{ind(d + 1)}<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {width - info_x - 16 - 70}dp;">pattern : en attente</div>')
     w(f'{ind(d + 1)}<button id="mdEdStepsRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {width - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     for s in range(32):
         beat = " mdEdStepBeat" if s % 4 == 0 else ""

@@ -57,19 +57,30 @@ namespace mdJucePlugin
 	StepGrid::StepGrid(Controller& _controller, Rml::Element& _document)
 		: m_controller(_controller)
 	{
-		for(uint8_t step = 0; step < m_steps.size(); ++step)
+		// A column is the step of the page shown
+		for(uint8_t column = 0; column < m_steps.size(); ++column)
 		{
-			m_steps[step] = _document.GetElementById("mdEdStep" + std::to_string(step));
-			if(!m_steps[step])
+			m_steps[column] = _document.GetElementById("mdEdStep" + std::to_string(column));
+			if(!m_steps[column])
 				continue;
-			juceRmlUi::EventListener::Add(m_steps[step], Rml::EventId::Click, [this, step](Rml::Event&)
+			juceRmlUi::EventListener::Add(m_steps[column], Rml::EventId::Click, [this, column](Rml::Event&)
 			{
-				toggleFocus(step);
+				toggleFocus(static_cast<uint8_t>(m_stepPage * StepCount + column));
 			});
 			// The two clicks before it have toggled the focus off and on again.
-			juceRmlUi::EventListener::Add(m_steps[step], Rml::EventId::Dblclick, [this, step](Rml::Event&)
+			juceRmlUi::EventListener::Add(m_steps[column], Rml::EventId::Dblclick, [this, column](Rml::Event&)
 			{
-				toggleTrig(step);
+				toggleTrig(static_cast<uint8_t>(m_stepPage * StepCount + column));
+			});
+		}
+		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
+		{
+			m_stepPages[page] = _document.GetElementById("mdEdStepPage" + std::to_string(page));
+			if(!m_stepPages[page])
+				continue;
+			juceRmlUi::EventListener::Add(m_stepPages[page], Rml::EventId::Click, [this, page](Rml::Event&)
+			{
+				setStepPage(page);
 			});
 		}
 		m_root = m_steps[0] ? m_steps[0]->GetParentNode() : nullptr;
@@ -186,24 +197,37 @@ namespace mdJucePlugin
 		// Hidden (another page than SON): drawn once shown
 		if(m_root && !m_root->IsVisible(true))
 			return showPlayStep(-1);
+		// Drawn first: the page shown is settled there
+		const bool rendered = m_dirty;
+		if(m_dirty)
+			render();
 		const auto playing = m_controller.getPlayingStep();
-		const bool playChanged = showPlayStep(playing && *playing < m_steps.size() ? *playing : -1);
-		if(!m_dirty)
-			return playChanged;
-		render();
-		return true;
+		const bool playChanged = showPlayStep(playing && *playing / StepCount == m_stepPage ? *playing % StepCount : -1);
+		return rendered || playChanged;
 	}
 
-	bool StepGrid::showPlayStep(const int _step)
+	bool StepGrid::showPlayStep(const int _column)
 	{
-		if(_step == m_shownPlayStep)
+		if(_column == m_shownPlayStep)
 			return false;
 		if(m_shownPlayStep >= 0 && m_steps[static_cast<size_t>(m_shownPlayStep)])
 			m_steps[static_cast<size_t>(m_shownPlayStep)]->SetClass("mdEdStepNow", false);
-		if(_step >= 0 && m_steps[static_cast<size_t>(_step)])
-			m_steps[static_cast<size_t>(_step)]->SetClass("mdEdStepNow", true);
-		m_shownPlayStep = _step;
+		if(_column >= 0 && m_steps[static_cast<size_t>(_column)])
+			m_steps[static_cast<size_t>(_column)]->SetClass("mdEdStepNow", true);
+		m_shownPlayStep = _column;
 		return true;
+	}
+
+	void StepGrid::setStepPage(const uint8_t _page)
+	{
+		if(_page >= m_stepPages.size() || _page == m_stepPage)
+			return;
+		// The focus is a step shown
+		send();
+		m_stepPage = _page;
+		m_focus = -1;
+		m_dirty = true;
+		render();
 	}
 
 	void StepGrid::refresh()
@@ -277,18 +301,37 @@ namespace mdJucePlugin
 		const auto pattern = m_controller.getPattern();
 		const auto part = static_cast<uint8_t>(m_controller.getCurrentPart());
 		const auto length = pattern ? pattern->length : uint8_t{0};
+		// Steps 33 to 64 only for a pattern over 32 steps; the focus only on a step shown
+		m_stepPage = pattern && length > StepCount ? m_stepPage : 0;
+		if(m_focus >= 0 && m_focus / StepCount != m_stepPage)
+			m_focus = -1;
+		const auto first = static_cast<uint8_t>(m_stepPage * StepCount);
 		const bool locking = isLocking();
 
+		// The trigs within the length, on every step
 		size_t trigs = 0;
-		for(uint8_t step = 0; step < m_steps.size(); ++step)
+		for(uint8_t step = 0; pattern && step < length; ++step)
+			trigs += pattern->hasTrig(part, step) ? 1 : 0;
+		for(uint8_t column = 0; column < m_steps.size(); ++column)
 		{
-			const bool trig = pattern && pattern->hasTrig(part, step) && step < length;
-			trigs += trig ? 1 : 0;
-			if(!m_steps[step])
+			auto* cell = m_steps[column];
+			if(!cell)
 				continue;
-			m_steps[step]->SetClass("mdEdStepTrig", trig);
-			m_steps[step]->SetClass("mdEdStepOut", pattern && step >= length);
-			m_steps[step]->SetClass("mdEdStepFocus", step == m_focus);
+			const auto step = static_cast<uint8_t>(first + column);
+			// A text written lays the document out: only when the page changes
+			if(m_shownNumbers != m_stepPage)
+				cell->SetInnerRML(std::to_string(step + 1));
+			cell->SetClass("mdEdStepTrig", pattern && step < length && pattern->hasTrig(part, step));
+			cell->SetClass("mdEdStepOut", pattern && step >= length);
+			cell->SetClass("mdEdStepFocus", step == m_focus);
+		}
+		m_shownNumbers = m_stepPage;
+		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
+		{
+			if(!m_stepPages[page])
+				continue;
+			m_stepPages[page]->SetClass("mdEdSelected", page == m_stepPage);
+			m_stepPages[page]->SetClass("mdEdOff", page > 0 && length <= StepCount);
 		}
 
 		size_t locks = 0;
@@ -331,7 +374,7 @@ namespace mdJucePlugin
 		}
 		// The track is the tab above; the line keeps to what the grid cannot show.
 		auto text = "pattern " + patternName(pattern->slot) + " · " + std::to_string(length) + " pas"
-			+ (length > 32 ? " (32 affichés)" : "") + " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs");
+			+ " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs");
 		if(m_focus >= 0)
 		{
 			text += " · pas " + std::to_string(m_focus + 1);

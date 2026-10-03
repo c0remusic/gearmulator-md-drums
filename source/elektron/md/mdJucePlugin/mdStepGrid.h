@@ -14,8 +14,9 @@ namespace mdJucePlugin
 {
 	class Controller;
 
-	// The PAS block of the Machinedrum editor: the 32 steps of the edited track in
-	// the current pattern, read from the firmware (Controller::requestPattern).
+	// The PAS block of the Machinedrum editor: the edited track in the current
+	// pattern, read from the firmware (Controller::requestPattern), 32 steps at a
+	// time: 1 to 32 or, for a pattern over 32 steps, 33 to 64 (mdEdStepPage0 and 1).
 	// A click on a step focuses it: the parameters locked on that step show their
 	// locked value in orange, the others are dimmed. A second click clears the focus.
 	// A double click sets or clears the step's trig. While a step with a trig has
@@ -23,10 +24,12 @@ namespace mdJucePlugin
 	// and a double click on it clears the lock. Edits are written to the firmware
 	// with the whole pattern (Controller::sendPattern): a drag once it ends, a
 	// wheel turn once it pauses. While the sequencer plays, the step it plays is
-	// lit (class mdEdStepNow).
+	// lit (class mdEdStepNow) when its page is shown.
 	class StepGrid
 	{
 	public:
+		static constexpr uint8_t StepCount = 32;	// the steps shown
+
 		StepGrid(Controller& _controller, Rml::Element& _document);
 
 		// Asks for the pattern when none is shown yet, sends pending lock edits, and
@@ -35,16 +38,21 @@ namespace mdJucePlugin
 		bool update(double _nowMilliseconds);
 
 		void refresh();
+		// _step: 0 to 63, a step shown
 		void toggleFocus(uint8_t _step);
 		void toggleTrig(uint8_t _step);
 		int getFocus() const { return m_focus; }
 		// Whether controls write locks: a focused step with a trig.
 		bool isLocking() const;
-		// The step lit as the one the sequencer plays, -1 for none
+		// The steps shown: 0 for 1 to 32, 1 for 33 to 64, only for a pattern over 32
+		// steps. Another page writes the pending edits and clears the focus.
+		void setStepPage(uint8_t _page);
+		uint8_t getStepPage() const { return m_stepPage; }
+		// The column lit as the step the sequencer plays, -1 for none
 		int getShownPlayStep() const { return m_shownPlayStep; }
 
 	private:
-		bool showPlayStep(int _step);
+		bool showPlayStep(int _column);
 		void render();
 		void editLock(uint8_t _parameter, std::optional<uint8_t> _value);
 		void send();
@@ -64,7 +72,10 @@ namespace mdJucePlugin
 
 		Controller& m_controller;
 		Rml::Element* m_root = nullptr;        // the grid's block: hidden, nothing is drawn
-		std::array<Rml::Element*, 32> m_steps{};
+		std::array<Rml::Element*, StepCount> m_steps{};
+		std::array<Rml::Element*, 2> m_stepPages{};
+		uint8_t m_stepPage = 0;
+		uint8_t m_shownNumbers = 0;            // the page the steps' numbers show: the skin's are 1 to 32
 		Rml::Element* m_info = nullptr;
 		std::string m_shownInfo;
 		std::array<Control, 24> m_controls{};  // by Machinedrum track parameter 0..23

@@ -594,6 +594,8 @@ int main()
 			require(step(24).IsClassSet("mdEdStepOut") && !step(23).IsClassSet("mdEdStepOut"), "PAS grid ignores the pattern length");
 			require(text("mdEdStepsInfo").find("B03") != std::string::npos && text("mdEdStepsInfo").find("24 pas") != std::string::npos,
 				"PAS line does not name pattern B03 and its length");
+			require(element(doc, "mdEdStepPage0").IsClassSet("mdEdSelected") && element(doc, "mdEdStepPage1").IsClassSet("mdEdOff"),
+				"PAS offers steps 33 to 64 for a pattern of 24 steps");
 
 			step(0).Click();
 			context.Update();
@@ -1250,6 +1252,45 @@ int main()
 			context.Update();
 			require(md.getPattern()->hasTrig(0, 41) && cell(0, 9).IsClassSet("mdEdStepTrig"), "a click on PAS 33–64 did not set step 42");
 			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
+			// SON's PAS on the same steps: OUVRIR DANS SON keeps the page JOUER shows; there a focused step past
+			// 32 takes a lock, and the other page clears the focus
+			{
+				const auto& grid = mdJucePlugin::EditorIdentityTestAccess::steps(*editor);
+				const auto step = [&](const int _column) -> Rml::Element& { return element(doc, "mdEdStep" + std::to_string(_column)); };
+				element(doc, "mdPlayTrack0").Click();
+				element(doc, "mdPlayOpen").Click();
+				context.Update();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(visible(element(doc, "mdEdPageSound")) && grid.getStepPage() == 1
+					&& element(doc, "mdEdStepPage1").IsClassSet("mdEdSelected") && text("mdEdStep0") == "33" && text("mdEdStep31") == "64"
+					&& step(8).IsClassSet("mdEdStepTrig") && step(9).IsClassSet("mdEdStepTrig") && !step(0).IsClassSet("mdEdStepTrig")
+					&& step(16).IsClassSet("mdEdStepOut") && !step(15).IsClassSet("mdEdStepOut")
+					&& text("mdEdStepsInfo").rfind("pattern B05 · 48 pas · 3 trigs · envoi", 0) == 0,
+					"SON's PAS does not show steps 33 to 64: \"" + text("mdEdStepsInfo") + "\"");
+				Access::setPlayingStep(md, uint8_t{40});
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(step(8).IsClassSet("mdEdStepNow") && grid.getShownPlayStep() == 8, "SON's PAS does not light step 41 playing");
+				Access::setPlayingStep(md, std::nullopt);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				step(8).Click();
+				context.Update();
+				auto& lockKnob = element(doc, "mdEdLockKnob_FilterBase");
+				require(grid.getFocus() == 40 && step(8).IsClassSet("mdEdStepFocus") && visible(lockKnob), "step 41 not focused for its locks");
+				juceRmlUi::ElemValue::setValue(&lockKnob, 55.0f);
+				context.Update();
+				// FilterBase: lock row parameter 12
+				require(md.getPattern()->lock(0, 12, 40) == 55 && text("mdEdLock_FilterBase") == "55"
+					&& text("mdEdStepsInfo").rfind("pattern B05 · 48 pas · 3 trigs · pas 41 : 1 lock", 0) == 0,
+					"a lock on step 41 not written: \"" + text("mdEdStepsInfo") + "\"");
+				snap("-steps64");
+				element(doc, "mdEdStepPage0").Click();
+				context.Update();
+				require(grid.getStepPage() == 0 && grid.getFocus() == -1 && text("mdEdStep0") == "1" && step(0).IsClassSet("mdEdStepTrig")
+					&& !step(8).IsClassSet("mdEdStepFocus") && !visible(lockKnob), "PAS 1–32 kept the focus on step 41");
+				tabButton(doc, "mdEdit", "2").Click();
+				context.Update();
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			}
 			// LONGUEUR shows the length; 40 steps grey steps 41 and up, their trigs kept
 			require(text("mdPlayLength") == "LONGUEUR 48", "LONGUEUR does not show the pattern's length");
 			// As the menu does: the length, then the write once the edits pause

@@ -515,7 +515,9 @@
 						<div id="mdEdTrackView" class="mdEdView" data-if="page != 16" roomyheight="584" style="height: 444dp;">
 							<div id="mdEdSteps" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 708dp; height: 64dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 676dp;">PAS</div>
-								<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 60dp; top: 4dp; width: 562dp;">pattern : en attente</div>
+								<div id="mdEdStepPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 52dp; top: 4dp; width: 48dp;">1–32</div>
+								<div id="mdEdStepPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 100dp; top: 4dp; width: 48dp;">33–64</div>
+								<div id="mdEdStepsInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 160dp; top: 4dp; width: 462dp;">pattern : en attente</div>
 								<button id="mdEdStepsRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 630dp; top: 4dp; width: 62dp;">RELIRE</button>
 								<div id="mdEdStep0" class="jucePos mdEdStep mdEdStepBeat" style="left: 16dp; top: 32dp; width: 19dp;">1</div>
 								<div id="mdEdStep1" class="jucePos mdEdStep" style="left: 37dp; top: 32dp; width: 19dp;">2</div>
