@@ -257,6 +257,22 @@ namespace md::machines
 		return machine ? &families(_model)[machine->family] : nullptr;
 	}
 
+	std::string_view machinedrumParameterName(const uint16_t _machine, const uint8_t _index)
+	{
+		constexpr std::string_view names[24] = {
+			"P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8",
+			"AMD", "AMF", "EQF", "EQG", "BASE", "WDTH", "Q", "SRR",
+			"DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"};
+		if(_index >= 24)
+			return {};
+		if(_index < 8)
+		{
+			if(const auto* machine = parameterNames(MachineModel::Machinedrum, _machine))
+				return (*machine)[_index];
+		}
+		return names[_index];
+	}
+
 	const ParameterNames* parameterNames(const MachineModel _model, const uint16_t _id)
 	{
 		const bool mm = _model == MachineModel::Monomachine;

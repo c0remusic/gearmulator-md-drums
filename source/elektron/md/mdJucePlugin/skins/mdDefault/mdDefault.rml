@@ -637,16 +637,33 @@
 							<div id="mdEdLfo" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 308dp; width: 1068dp; height: 124dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">MODULATION</div>
 								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 1036dp;">LFO de la piste</div>
-								<knob id="mdEdCtl_LFOShape" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOShape" style="left: 16dp; top: 32dp;"/>
-								<div id="mdEdVal_LFOShape" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{LFOShape_text}}</div>
-								<div id="mdEdName_LFOShape" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">FORME</div>
-								<knob id="mdEdCtl_LFOSpeed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOSpeed" style="left: 106dp; top: 32dp;"/>
-								<div id="mdEdVal_LFOSpeed" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{LFOSpeed_text}}</div>
-								<div id="mdEdName_LFOSpeed" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">SPEED</div>
-								<knob id="mdEdCtl_LFOAmount" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOAmount" style="left: 196dp; top: 32dp;"/>
-								<div id="mdEdVal_LFOAmount" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{LFOAmount_text}}</div>
-								<div id="mdEdName_LFOAmount" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">DEPTH</div>
-								<div class="jucePos juceLabel mdEdNote" data-unread="LFOShape LFOSpeed LFOAmount" style="left: 286dp; top: 44dp; width: 766dp;">LFO forme {{LFOShape_text}} · vitesse {{LFOSpeed_text}} · profondeur {{LFOAmount_text}} · destination : à venir</div>
+								<knob id="mdEdCtl_LFOSpeed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOSpeed" style="left: 16dp; top: 32dp;"/>
+								<div id="mdEdVal_LFOSpeed" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{LFOSpeed_text}}</div>
+								<div id="mdEdName_LFOSpeed" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">SPEED</div>
+								<knob id="mdEdCtl_LFOAmount" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOAmount" style="left: 106dp; top: 32dp;"/>
+								<div id="mdEdVal_LFOAmount" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{LFOAmount_text}}</div>
+								<div id="mdEdName_LFOAmount" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">DEPTH</div>
+								<knob id="mdEdCtl_LFOShape" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="LFOShape" style="left: 196dp; top: 32dp;"/>
+								<div id="mdEdVal_LFOShape" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{LFOShape_text}}</div>
+								<div id="mdEdName_LFOShape" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">SHMIX</div>
+								<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 286dp; top: 36dp; width: 90dp;">DESTINATION</div>
+								<button id="mdEdLfoDest" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 380dp; top: 32dp; width: 220dp;">—</button>
+								<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 616dp; top: 36dp; width: 90dp;">MISE À JOUR</div>
+								<div id="mdEdLfoUpdate0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 710dp; top: 32dp; width: 56dp;">FREE</div>
+								<div id="mdEdLfoUpdate1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 766dp; top: 32dp; width: 56dp;">TRIG</div>
+								<div id="mdEdLfoUpdate2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 822dp; top: 32dp; width: 56dp;">HOLD</div>
+								<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 286dp; top: 68dp; width: 90dp;">FORME 1</div>
+								<div id="mdEdLfoShape1" class="jucePos mdEdLfoShape" style="left: 380dp; top: 64dp;">
+									<div id="mdEdLfoShape1Icon" class="jucePos mdEdLfoIcon" style="left: 6dp; top: 4dp;"/>
+									<div id="mdEdLfoShape1Name" class="jucePos juceLabel mdEdLfoShapeName" style="left: 40dp; top: 0dp;">—</div>
+								</div>
+								<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 500dp; top: 68dp; width: 90dp;">FORME 2</div>
+								<div id="mdEdLfoShape2" class="jucePos mdEdLfoShape" style="left: 594dp; top: 64dp;">
+									<div id="mdEdLfoShape2Icon" class="jucePos mdEdLfoIcon" style="left: 6dp; top: 4dp;"/>
+									<div id="mdEdLfoShape2Name" class="jucePos juceLabel mdEdLfoShapeName" style="left: 40dp; top: 0dp;">—</div>
+								</div>
+								<div id="mdEdLfoWave" class="jucePos mdEdCurveArea" style="left: 896dp; top: 32dp; width: 156dp; height: 56dp;"/>
+								<div id="mdEdLfoInfo" class="jucePos juceLabel mdEdNote" style="left: 286dp; top: 98dp; width: 766dp;">LFO inconnu : en attente du kit</div>
 							</div>
 							<div id="mdEdCurves" class="mdEdCurves" style="display: none;">
 								<div id="mdEdCurvesFilter" class="jucePos mdEdBlock" style="left: 16dp; top: 444dp; width: 528dp; height: 128dp;">

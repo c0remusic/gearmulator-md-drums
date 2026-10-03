@@ -16,6 +16,7 @@
 #include "mdController.h"
 #include "mdCurveView.h"
 #include "mdKitPatternScreen.h"
+#include "mdLfoView.h"
 #include "mdLibraryView.h"
 #include "mdMachinePicker.h"
 #include "mdMasterEffectsView.h"
@@ -155,6 +156,8 @@ namespace mdJucePlugin
 			updateMeters(_editor, juce::Time::getMillisecondCounterHiRes());
 			updateSystem(_editor, juce::Time::getMillisecondCounterHiRes());
 			updateActivity(_editor, juce::Time::getMillisecondCounterHiRes());
+			if(_editor.m_lfoView)
+				_editor.m_lfoView->update();
 			if(_editor.m_patternView)
 				_editor.m_patternView->update();
 			if(_editor.m_mmPatternView)
@@ -881,6 +884,41 @@ int main()
 			require(text("mdEdFxVal2_4") == "20", "MASTER value line changed back after the turn");
 			element(doc, "editTrack0").Click();
 			context.Update();
+
+			// MODULATION: track 1's LFO from the Kit dump (zeros in the test's: track 1's PTCH, triangles, FREE),
+			// then from the live Kit, with the master effects; an update segment sets the LFO ($62)
+			mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+			context.Update();
+			require(text("mdEdLfoDest") == "PISTE 01 · PTCH" && element(doc, "mdEdLfoUpdate0").IsClassSet("mdEdSelected")
+				&& text("mdEdLfoShape1Name") == "TRIANGLE", "MODULATION does not show the Kit's LFO: \"" + text("mdEdLfoDest") + "\"");
+			{
+				md::LiveKit live;
+				live.tracks = static_cast<uint8_t>(g_trackCount);
+				live.machinedrum = true;
+				for(int track = 0; track < g_trackCount; ++track)
+				{
+					live.machines[track] = static_cast<uint8_t>(g_pickMachine);
+					live.values[track].fill(64);
+				}
+				live.lfos[0] = {4, 17, md::LfoSettings::Ramp, md::LfoSettings::Exponential, md::LfoSettings::Hold};
+				for(uint8_t index = 0; index < live.masterEffects.size(); ++index)
+					live.masterEffects[index] = static_cast<uint8_t>(10 + index);
+				Access::readLiveKit(md, live);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				context.Update();
+				require(text("mdEdLfoDest") == "PISTE 05 · VOL" && element(doc, "mdEdLfoUpdate2").IsClassSet("mdEdSelected")
+					&& !element(doc, "mdEdLfoUpdate0").IsClassSet("mdEdSelected") && text("mdEdLfoShape1Name") == "RAMPE"
+					&& text("mdEdLfoShape2Name") == "EXPO", "MODULATION does not show the live Kit's LFO: \"" + text("mdEdLfoDest") + "\"");
+				snap("-lfo");
+				// The live Kit's master effects, in the dump's order: reverb first
+				require(md.getMasterEffect(Effect::Reverb, 0) == uint8_t{10} && md.getMasterEffect(Effect::Echo, 0) == uint8_t{18}
+					&& md.getMasterEffect(Effect::Dynamix, 7) == uint8_t{41}, "the controller did not take the live Kit's master effects");
+				Access::readLiveKit(md, std::nullopt);
+				element(doc, "mdEdLfoUpdate1").Click();
+				context.Update();
+				require(md.getTrackLfo(0) && md.getTrackLfo(0)->update == md::LfoSettings::Trig
+					&& element(doc, "mdEdLfoUpdate1").IsClassSet("mdEdSelected"), "TRIG did not set the LFO's update");
+			}
 
 			// MIX, SORTIE: each track's output from the Global (MAIN for all in the test's
 			// Global), and a click routes the track.

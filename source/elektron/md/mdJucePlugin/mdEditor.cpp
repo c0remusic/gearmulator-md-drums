@@ -16,6 +16,7 @@
 #include "mdChainView.h"
 #include "mdLibraryView.h"
 #include "mdTrackActivity.h"
+#include "mdLfoView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -810,6 +811,10 @@ namespace mdJucePlugin
 		// The tracks' trig LEDs, lit as the sequencer plays their trigs.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdTrackLed0"))
 			m_trackActivity = std::make_unique<TrackActivity>(m_controller, getModel(), *document);
+
+		// MODULATION (Machinedrum): the edited track's LFO.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdLfoDest"))
+			m_lfoView = std::make_unique<LfoView>(m_controller, *document);
 
 		// The COURBES row under SON, when the window leaves room for it.
 		if(auto* const document = getDocument(); document && document->GetElementById("mdEdCurves"))
@@ -2237,8 +2242,9 @@ namespace mdJucePlugin
 		const bool chainChanged = m_chainView && m_chainView->update();
 		const bool libraryChanged = m_libraryView && m_libraryView->update(nowMilliseconds);
 		const bool activityChanged = m_trackActivity && m_trackActivity->update(nowMilliseconds);
+		const bool lfoChanged = m_lfoView && m_lfoView->update();
 		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
-			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged || activityChanged)
+			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged || activityChanged || lfoChanged)
 			if(auto* rml = getRmlComponent())
 				rml->enqueueUpdateOnce();
 

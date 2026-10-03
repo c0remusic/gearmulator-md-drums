@@ -232,6 +232,14 @@ namespace
 		}
 		for(size_t track = 0; track < saved.machines.size(); ++track)
 			require(liveSaved->machines[track] == saved.machines[track], "the live Kit's machines differ from the saved Kit's");
+		if(model == md::MachineModel::Machinedrum)
+		{
+			require(saved.lfos.has_value() && saved.masterEffects.has_value(), "the Kit dump holds no LFOs or master effects");
+			for(size_t track = 0; track < saved.lfos->size(); ++track)
+				require(liveSaved->lfos[track] == (*saved.lfos)[track], "the live Kit's LFO of track " + std::to_string(track + 1) + " differs from the saved Kit's");
+			require(sysex::masterEffectsFromKit(liveSaved->masterEffects.data()) == *saved.masterEffects,
+				"the live Kit's master effects differ from the saved Kit's");
+		}
 
 		const auto valuesBefore = trackValues(before, _track);
 		const auto valuesAfter = trackValues(saved, _track);
@@ -483,6 +491,32 @@ namespace
 		require(savedThenWritten < loud / 20, "the saved Kit did not survive the pattern write");
 	}
 
+	// SET LFO PARAM ($62): each field of track 3's LFO shows in the live Kit at once, and the saved Kit holds it
+	void checkLfo(md::Hardware& _hardware)
+	{
+		constexpr uint8_t track = 2;
+		const md::LfoSettings wanted{5, 17, md::LfoSettings::Ramp, md::LfoSettings::Exponential, md::LfoSettings::Hold};
+		const uint8_t fields[] = {wanted.track, wanted.parameter, wanted.shape1, wanted.shape2, wanted.update};
+		for(uint8_t field = 0; field < 5; ++field)
+		{
+			const auto message = sysex::lfoChange(track, field, fields[field]);
+			require(message.has_value(), "codec refused an LFO change");
+			send(_hardware, *message);
+		}
+		require(!sysex::lfoChange(track, 2, md::LfoSettings::ShapeCount) && !sysex::lfoChange(track, 5, 0),
+			"codec took a shape or a field out of range");
+		advance(_hardware, md::g_samplerate / 2);
+		const auto live = _hardware.readLiveKit();
+		require(live && live->lfos[track] == wanted, "the live Kit does not show the LFO changed by $62");
+		const auto slot = status(_hardware, sysex::StatusParameter::Kit);
+		send(_hardware, sysex::kitSave(md::MachineModel::Machinedrum, slot));
+		advance(_hardware, md::g_samplerate);
+		const auto saved = readKit(_hardware, slot);
+		require(saved.lfos && (*saved.lfos)[track] == wanted, "the saved Kit does not hold the LFO changed by $62");
+		std::printf("MD $62: track %u LFO -> track %u parameter %u, shapes %u and %u, update %u, live and saved\n",
+			track + 1, wanted.track + 1, wanted.parameter, wanted.shape1, wanted.shape2, wanted.update);
+	}
+
 	std::string describeEffects(const sysex::MasterEffects& _effects)
 	{
 		static constexpr const char* names[] = {"echo", "reverb", "EQ", "dynamix"};
@@ -518,6 +552,10 @@ namespace
 			advance(_hardware, md::g_samplerate / 10);
 		}
 		advance(_hardware, md::g_samplerate / 2);
+		// The live Kit shows them before any save
+		const auto live = _hardware.readLiveKit();
+		require(live && sysex::masterEffectsFromKit(live->masterEffects.data()) == expected,
+			"the live Kit does not show the master effects $5D-$60 set");
 		send(_hardware, sysex::kitSave(model, slot));
 		advance(_hardware, md::g_samplerate);
 		const auto afterDump = exchange(_hardware, sysex::kitRequest(model, slot), 0x52);
@@ -651,6 +689,7 @@ namespace
 		checkAssignment(*hardware, 2, {17, 33});     // TRX-SD or EFM-SD: the plain machine table
 		checkAssignment(*hardware, 3, {128, 129});   // ROM-01 or ROM-02: sent with the UW flag
 		checkMasterEffects(*hardware);
+		checkLfo(*hardware);
 		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);

@@ -32,6 +32,7 @@ set(SOURCES
 	mdChainView.cpp mdChainView.h
 	mdLibraryView.cpp mdLibraryView.h
 	mdTrackActivity.cpp mdTrackActivity.h
+	mdLfoView.cpp mdLfoView.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mdautomation.h"
+#include "mdlivekit.h"
 
 #include <array>
 #include <cstdint>
@@ -83,7 +84,13 @@ namespace md::automation::sysex
 		std::string name;
 		// Machinedrum only, indexed by MasterEffect.
 		std::optional<MasterEffects> masterEffects;
+		// Machinedrum only: each track's LFO.
+		std::optional<std::array<LfoSettings, machinedrum::TrackCount>> lfos;
 	};
+
+	// The Machinedrum's master effects from the 32 bytes of a Kit that hold them, in the dump's order
+	// (reverb, echo, EQ, dynamix): the dump at $487, the live Kit (LiveKit::masterEffects).
+	MasterEffects masterEffectsFromKit(const uint8_t* _bytes);
 
 	// The first 32 steps of a Machinedrum pattern, as far as the editor shows them.
 	struct PatternDump
@@ -177,6 +184,11 @@ namespace md::automation::sysex
 	// Machinedrum: one parameter (0..7) of a master effect of the live Kit, $5D to $60.
 	// Empty for a parameter or value out of range.
 	std::optional<Message> masterEffectChange(MasterEffect _effect, uint8_t _parameter, uint8_t _value);
+	// Machinedrum: one field of a track's LFO (SET LFO PARAM, $62, after MCL's MD::setLFOParam), 0 the
+	// destination track, 1 its parameter, 2 and 3 the shapes, 4 the update (LfoSettings). The firmware
+	// clamps a value out of range (mdPlayheadProbe --lfo); empty for one here, or a track or field out of
+	// range.
+	std::optional<Message> lfoChange(uint8_t _track, uint8_t _field, uint8_t _value);
 	// Machinedrum: the output of a track (SET TRACK ROUTING, $5C), kept in the Global.
 	// Empty for a track or output out of range.
 	std::optional<Message> trackRouting(uint8_t _track, TrackOutput _output);

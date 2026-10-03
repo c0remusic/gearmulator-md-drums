@@ -637,6 +637,141 @@ namespace
 		}
 	}
 
+	// SET LFO PARAM ($62, MCL's MD::setLFOParam): what the Machinedrum keeps of each value, read back from
+	// the live Kit's LFO block of track 1 ($1001ea: destination track, parameter, shape 1, shape 2, update)
+	void probeLfo()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
+		if(!path)
+			return;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		auto hardware = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Machinedrum);
+		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			advance(*hardware, 64);
+		advance(*hardware, md::g_samplerate * 20);
+		auto& uc = hardware->getUC();
+		const auto block = [&]
+		{
+			std::string text;
+			for(uint32_t i = 0; i < 5; ++i)
+				text += " " + std::to_string(uc.read8(0x001001ea + i));
+			return text;
+		};
+		std::printf("MD LFO 1 block at boot:%s\n", block().c_str());
+		for(const uint8_t field : {0, 1, 2, 3, 4})
+		{
+			std::string line;
+			for(const uint8_t value : {0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 15, 16, 23, 24, 31, 127})
+			{
+				synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+				event.sysex = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x62, field, value, 0xf7};
+				require(hardware->sendMidi(event), "SysEx rejected");
+				advance(*hardware, md::g_samplerate / 5);
+				line += " " + std::to_string(value) + ">" + std::to_string(uc.read8(0x001001ea + field));
+			}
+			std::printf("MD LFO 1 field %u (sent>kept):%s\n", field, line.c_str());
+		}
+		std::printf("MD LFO 1 block at end:%s\n", block().c_str());
+
+		// Each shape running (free, fast, full depth, shape 1 only): the state byte that moves most, traced
+		const auto lfoParam = [&](const uint8_t _field, const uint8_t _value)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.sysex = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x62, _field, _value, 0xf7};
+			require(hardware->sendMidi(event), "SysEx rejected");
+		};
+		const auto cc = [&](const uint8_t _index, const uint8_t _value)
+		{
+			const auto message = md::automation::encodeParameterChange(md::MachineModel::Machinedrum,
+				{md::automation::machinedrum::Routing, 0, _index, _value}, 0);
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.a = (*message)[0];
+			event.b = (*message)[1];
+			event.c = (*message)[2];
+			require(hardware->sendMidi(event), "CC rejected");
+		};
+		lfoParam(0, 0);		// track 1
+		lfoParam(1, 17);	// VOL
+		lfoParam(4, 0);		// FREE
+		lfoParam(2, 0);
+		lfoParam(3, 0);
+		cc(5, 96);			// LFOS
+		cc(7, 0);			// LFOM: shape 1
+
+		// Per RAM byte ($200000-$2fffff, then the SRAM), how many values it takes over 128 samples
+		const auto distinct = [&]
+		{
+			constexpr uint32_t ramSize = 0x00100000, sramSize = 0x2000;
+			std::vector<std::array<uint8_t, 128>> samples(ramSize + sramSize);
+			for(size_t s = 0; s < 128; ++s)
+			{
+				advance(*hardware, 256);
+				for(uint32_t i = 0; i < ramSize; ++i)
+					samples[i][s] = uc.read8(0x00200000 + i);
+				for(uint32_t i = 0; i < sramSize; ++i)
+					samples[ramSize + i][s] = uc.read8(0x01000000 + i);
+			}
+			std::vector<uint16_t> counts(samples.size());
+			for(size_t i = 0; i < samples.size(); ++i)
+			{
+				std::array<bool, 256> seen{};
+				for(const auto value : samples[i])
+					counts[i] += seen[value] ? 0 : (seen[value] = true, 1);
+			}
+			return counts;
+		};
+		const auto addressOf = [](const size_t _index)
+		{
+			return _index < 0x00100000 ? 0x00200000 + static_cast<uint32_t>(_index) : 0x01000000 + static_cast<uint32_t>(_index - 0x00100000);
+		};
+		cc(6, 0);			// LFOD 0: what moves anyway
+		advance(*hardware, md::g_samplerate / 2);
+		const auto still = distinct();
+		cc(6, 127);			// LFOD 127
+		advance(*hardware, md::g_samplerate / 2);
+		const auto moving = distinct();
+		std::vector<std::pair<uint16_t, size_t>> candidates;
+		for(size_t i = 0; i < moving.size(); ++i)
+		{
+			if(still[i] <= 1 && moving[i] >= 8)
+				candidates.push_back({moving[i], i});
+		}
+		std::sort(candidates.rbegin(), candidates.rend());
+		std::string list;
+		for(size_t c = 0; c < std::min<size_t>(candidates.size(), 16); ++c)
+		{
+			char text[32];
+			std::snprintf(text, sizeof(text), " $%06x:%u", addressOf(candidates[c].second), candidates[c].first);
+			list += text;
+		}
+		std::printf("MD LFO output candidates (address:values), %zu in all:%s\n", candidates.size(), list.c_str());
+		if(candidates.empty())
+			return;
+
+		// Each shape traced on the best candidate, the LFO restarted by the trigs of the pattern playing (TRIG),
+		// at a depth that does not clip: the one-shot shapes show after each trig
+		const auto address = addressOf(candidates.front().second);
+		lfoParam(4, 1);
+		cc(6, 40);
+		cc(5, 64);
+		panelTap(*hardware, md::PanelControl::Play);
+		for(uint8_t shape = 0; shape < 6; ++shape)
+		{
+			lfoParam(2, shape);
+			lfoParam(3, shape);
+			advance(*hardware, md::g_samplerate / 4);
+			std::string line;
+			for(size_t s = 0; s < 128; ++s)
+			{
+				advance(*hardware, 128);
+				line += " " + std::to_string(uc.read8(address));
+			}
+			std::printf("TRIG shape %u $%06x every 128 frames:%s\n", shape, address, line.c_str());
+		}
+		panelTap(*hardware, md::PanelControl::Stop);
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -684,6 +819,11 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 1 && std::string(_argv[1]) == "--livekit")
 		{
 			liveKitMachines();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--lfo")
+		{
+			probeLfo();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);

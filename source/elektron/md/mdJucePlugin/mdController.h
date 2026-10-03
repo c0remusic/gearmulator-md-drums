@@ -115,15 +115,26 @@ namespace mdJucePlugin
 		uint64_t getSelectionRevision() const { return m_selectionRevision.load(std::memory_order_acquire); }
 
 		// Machinedrum: a master effect parameter of the live Kit as last read from a
-		// Kit dump or set through setMasterEffect, nullopt while unknown. As for the
-		// machines, an applied dump replaces the values and an inspection dump of the
-		// stored Kit only fills unknown ones.
+		// Kit dump or the live Kit (serviceLiveKit), or set through setMasterEffect,
+		// nullopt while unknown. As for the machines, an applied dump replaces the
+		// values and an inspection dump of the stored Kit only fills unknown ones.
 		std::optional<uint8_t> getMasterEffect(md::automation::sysex::MasterEffect _effect, uint8_t _parameter) const;
 		// Sends one master effect parameter ($5D to $60) and keeps it. False on the
 		// Monomachine, out of range, or while the firmware is not ready.
 		bool setMasterEffect(md::automation::sysex::MasterEffect _effect, uint8_t _parameter, uint8_t _value);
 		// Increments whenever a master effect value changes or becomes known.
 		uint64_t getMasterEffectRevision() const { return m_masterEffectRevision.load(std::memory_order_acquire); }
+
+		// Machinedrum: a track's LFO (destination, shapes, update) as last read from a
+		// Kit dump or the live Kit, or set through setTrackLfo; nullopt while unknown.
+		// Speed, depth and the shapes' mix are the track's parameters LFOS, LFOD, LFOM.
+		std::optional<md::LfoSettings> getTrackLfo(uint8_t _part) const;
+		// Sends one field of a track's LFO ($62: 0 destination track, 1 parameter,
+		// 2 and 3 shapes, 4 update) and keeps it. False on the Monomachine, out of
+		// range, or while the firmware is not ready.
+		bool setTrackLfo(uint8_t _part, uint8_t _field, uint8_t _value);
+		// Increments whenever an LFO changes or becomes known.
+		uint64_t getLfoRevision() const { return m_lfoRevision.load(std::memory_order_acquire); }
 
 		// Machinedrum: the output of a track as last read from the Global dump (read
 		// again with every 5 s poll) or set through setTrackOutput, nullopt while unknown.
@@ -309,8 +320,9 @@ namespace mdJucePlugin
 		// An applied dump replaces every track's machine; an inspection dump only
 		// fills tracks whose machine is still unknown.
 		void storeKitMachines(const std::vector<uint16_t>& _machines, bool _authoritative);
-		// Same policy for the master effects
+		// Same policy for the master effects and the LFOs
 		void storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, bool _authoritative);
+		void storeLfo(uint8_t _track, const md::LfoSettings& _lfo, bool _authoritative);
 		// Asks for one library item, the Kits then the patterns, or ends the reading past the last
 		void requestLibraryItem(size_t _item, uint64_t _now);
 		// A pattern dump the library waits for: stores it and asks for the next item
@@ -359,6 +371,13 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint8_t>, md::automation::sysex::MasterEffectCount
 			* md::automation::sysex::MasterEffectParameters> m_masterEffects{};
 		std::atomic<uint64_t> m_masterEffectRevision{0};
+		// LfoSettings per track, packed a byte a field, bit 40 set once known
+		std::array<std::atomic<uint64_t>, md::automation::machinedrum::TrackCount> m_trackLfos{};
+		std::atomic<uint64_t> m_lfoRevision{0};
+		// Under m_synchronizationLock: when the editor last sent a master effect, or a track's LFO; the live
+		// Kit is not taken for them before the firmware shows the edit (serviceLiveKit)
+		uint64_t m_masterEffectEditMs = 0;
+		std::array<uint64_t, md::automation::machinedrum::TrackCount> m_lfoEditMs{};
 		// TrackOutput per track, 0xff while unknown
 		std::array<std::atomic<uint8_t>, md::automation::machinedrum::TrackCount> m_trackOutputs{};
 		std::atomic<uint64_t> m_routingRevision{0};

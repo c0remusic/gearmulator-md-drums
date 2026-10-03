@@ -1374,14 +1374,22 @@ namespace md
 		kit.frame = getEmulatedFrames();
 		if(m_firmwareFingerprint == g_mdOs163Fingerprint)
 		{
+			// Then, raw where the dump packs them in 7 bits: the LFOs from $1ea, 36 bytes a track (the five
+			// fields $62 sets, then the LFO's state), and the master effects from $42a
 			kit.tracks = automation::machinedrum::TrackCount;
+			kit.machinedrum = true;
 			for(uint8_t track = 0; track < kit.tracks; ++track)
 			{
 				for(uint8_t parameter = 0; parameter < 24; ++parameter)
 					kit.values[track][parameter] = m_uc.read8(0x0010001a + track * 24u + parameter);
 				kit.values[track][automation::machinedrum::Level * 8u] = m_uc.read8(0x0010019a + track);
 				kit.machines[track] = m_uc.read8(0x001001ad + track * 4u);
+				const uint32_t lfo = 0x001001ea + track * 36u;
+				kit.lfos[track] = {m_uc.read8(lfo), m_uc.read8(lfo + 1), m_uc.read8(lfo + 2), m_uc.read8(lfo + 3),
+					m_uc.read8(lfo + 4)};
 			}
+			for(uint32_t i = 0; i < kit.masterEffects.size(); ++i)
+				kit.masterEffects[i] = m_uc.read8(0x0010042a + i);
 			return kit;
 		}
 		if(m_firmwareFingerprint == g_mmOs132bFingerprint)

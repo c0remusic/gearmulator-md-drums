@@ -20,6 +20,7 @@ namespace md::automation::sysex
 		constexpr uint8_t g_assignMachine = 0x5b;
 		constexpr uint8_t g_trackRouting = 0x5c;
 		constexpr uint8_t g_masterEffect = 0x5d;    // RHYTHM ECHO; then reverb, EQ, dynamix
+		constexpr uint8_t g_lfoChange = 0x62;
 		constexpr uint8_t g_statusRequest = 0x70;
 		constexpr uint8_t g_setStatus = 0x71;
 		constexpr uint8_t g_statusResponse = 0x72;
@@ -903,6 +904,14 @@ namespace md::automation::sysex
 		}
 	}
 
+	MasterEffects masterEffectsFromKit(const uint8_t* _bytes)
+	{
+		MasterEffects values{};
+		for(uint8_t effect = 0; effect < MasterEffectCount; ++effect)
+			std::copy_n(_bytes + g_mdMasterEffectBlock[effect] * MasterEffectParameters, MasterEffectParameters, values[effect].begin());
+		return values;
+	}
+
 	std::optional<KitDump> parseKitDump(
 		const MachineModel _model, const MessageView _message)
 	{
@@ -935,21 +944,18 @@ namespace md::automation::sysex
 					_message[levelPosition + track]});
 			}
 
-			// Machine assignments follow the levels: 16 big-endian 32-bit values in
-			// 7-bit groups (a byte of top bits, MSB first, then up to seven bytes).
-			// The id is the low byte; the upper bits carry flags such as TONAL.
-			constexpr size_t machinePosition = 0x1aa;
-			constexpr size_t machineBytes = machinedrum::TrackCount * 4;
-			constexpr size_t machineEncoded = machineBytes + (machineBytes + 6) / 7;
-			std::vector<uint16_t> machines;
-			if(_message.size() >= machinePosition + machineEncoded + 5)
+			// _bytes bytes packed in 7-bit groups from _position (a byte of top bits, MSB first, then up
+			// to seven bytes); empty when the dump is too short to hold them
+			const auto unpack = [&](const size_t _position, const size_t _bytes)
 			{
 				std::vector<uint8_t> raw;
-				raw.reserve(machineBytes);
-				for(size_t position = machinePosition; raw.size() < machineBytes;)
+				if(_message.size() < _position + _bytes + (_bytes + 6) / 7 + 5)
+					return raw;
+				raw.reserve(_bytes);
+				for(size_t position = _position; raw.size() < _bytes;)
 				{
 					const auto highBits = _message[position++];
-					for(uint8_t bit = 0; bit < 7 && raw.size() < machineBytes; ++bit)
+					for(uint8_t bit = 0; bit < 7 && raw.size() < _bytes; ++bit)
 					{
 						auto value = _message[position++];
 						if(highBits & (1u << (6u - bit)))
@@ -957,24 +963,39 @@ namespace md::automation::sysex
 						raw.push_back(value);
 					}
 				}
+				return raw;
+			};
+
+			// Machine assignments follow the levels: 16 big-endian 32-bit values. The id
+			// is the low byte; the upper bits carry flags such as TONAL.
+			constexpr size_t machinePosition = 0x1aa;
+			constexpr size_t machineBytes = machinedrum::TrackCount * 4;
+			std::vector<uint16_t> machines;
+			if(const auto raw = unpack(machinePosition, machineBytes); !raw.empty())
+			{
 				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
 					machines.push_back(raw[track * 4 + 3]);
 			}
+			// Then the LFOs, 36 bytes a track: the five fields $62 sets, then the LFO's state
+			constexpr size_t lfoPosition = machinePosition + machineBytes + (machineBytes + 6) / 7;
+			constexpr size_t lfoBytes = 36;
+			std::optional<std::array<LfoSettings, machinedrum::TrackCount>> lfos;
+			if(const auto raw = unpack(lfoPosition, machinedrum::TrackCount * lfoBytes); !raw.empty())
+			{
+				lfos.emplace();
+				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+				{
+					const auto* lfo = &raw[track * lfoBytes];
+					(*lfos)[track] = {lfo[0], lfo[1], lfo[2], lfo[3], lfo[4]};
+				}
+			}
 			std::optional<MasterEffects> effects;
 			if(_message.size() == g_mdKitSize)
-			{
-				MasterEffects values{};
-				for(uint8_t effect = 0; effect < MasterEffectCount; ++effect)
-				{
-					const auto* block = &_message[g_mdMasterEffectsPosition + g_mdMasterEffectBlock[effect] * MasterEffectParameters];
-					std::copy_n(block, MasterEffectParameters, values[effect].begin());
-				}
-				effects = values;
-			}
+				effects = masterEffectsFromKit(&_message[g_mdMasterEffectsPosition]);
 			// 16 raw bytes between the slot and the parameters
 			constexpr size_t namePosition = 0x0a;
 			return KitDump{slot, std::move(result), std::move(machines),
-				kitName(&_message[namePosition], parameterPosition - namePosition), effects};
+				kitName(&_message[namePosition], parameterPosition - namePosition), effects, lfos};
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -1035,6 +1056,16 @@ namespace md::automation::sysex
 			return std::nullopt;
 		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00,
 			static_cast<uint8_t>(g_masterEffect + effect), _parameter, _value, 0xf7};
+	}
+
+	std::optional<Message> lfoChange(const uint8_t _track, const uint8_t _field, const uint8_t _value)
+	{
+		constexpr uint8_t maximum[] = {machinedrum::TrackCount - 1, 23, LfoSettings::ShapeCount - 1,
+			LfoSettings::ShapeCount - 1, LfoSettings::UpdateCount - 1};
+		if(_track >= machinedrum::TrackCount || _field >= std::size(maximum) || _value > maximum[_field])
+			return std::nullopt;
+		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, g_lfoChange,
+			static_cast<uint8_t>(_track << 3 | _field), _value, 0xf7};
 	}
 
 	std::optional<Message> trackRouting(const uint8_t _track, const TrackOutput _output)

@@ -61,6 +61,7 @@ namespace mdJucePlugin
 	class ChainView;
 	class LibraryView;
 	class TrackActivity;
+	class LfoView;
 	class PixelPerfectPanel;
 	struct EditorIdentityTestAccess;
 
@@ -207,6 +208,7 @@ namespace mdJucePlugin
 		std::unique_ptr<ChainView> m_chainView;
 		std::unique_ptr<LibraryView> m_libraryView;
 		std::unique_ptr<TrackActivity> m_trackActivity;
+		std::unique_ptr<LfoView> m_lfoView;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;
 		md::FrontPanel m_frontPanelSnapshot;
 		bool m_frontPanelSnapshotValid = false;

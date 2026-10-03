@@ -162,9 +162,25 @@ def md_sound(d):
     y += hb + GUT
     hc = rows_height(1)
     block_open(d + 1, "mdEdLfo", "MODULATION", "LFO de la piste", 0, 12, y, hc, "partCurrent")
-    for i, item in enumerate([("k", "LFOShape", "FORME"), ("k", "LFOSpeed", "SPEED"), ("k", "LFOAmount", "DEPTH")]):
+    # The LFO page's order on the machine: SPEED, DEPTH, SHMIX (the mix of shape 1 and shape 2)
+    for i, item in enumerate([("k", "LFOSpeed", "SPEED"), ("k", "LFOAmount", "DEPTH"), ("k", "LFOShape", "SHMIX")]):
         control(d + 2, bx(i), TOP, item)
-    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdNote" data-unread="LFOShape LFOSpeed LFOAmount" style="left: {bx(3) + 16}dp; top: {TOP + 12}dp; width: {span(9) - 32}dp;">LFO forme {{{{LFOShape_text}}}} · vitesse {{{{LFOSpeed_text}}}} · profondeur {{{{LFOAmount_text}}}} · destination : à venir</div>')
+    # LfoView (mdLfoView.cpp) fills what the Kit holds: the destination (a menu), the update, the two shapes
+    # (a menu each, an icon drawn by JUCE) and the wave they make with SHMIX
+    lx = bx(3) + 16
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: {lx}dp; top: {TOP + 4}dp; width: 90dp;">DESTINATION</div>')
+    w(f'{ind(d + 2)}<button id="mdEdLfoDest" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {lx + 94}dp; top: {TOP}dp; width: 220dp;">—</button>')
+    w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: {lx + 330}dp; top: {TOP + 4}dp; width: 90dp;">MISE À JOUR</div>')
+    selector(d + 2, lx + 424, TOP, ["FREE", "TRIG", "HOLD"], [56, 56, 56], ["mdEdLfoUpdate0", "mdEdLfoUpdate1", "mdEdLfoUpdate2"])
+    for n in range(2):
+        sx = lx + n * 214
+        w(f'{ind(d + 2)}<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: {sx}dp; top: {TOP + 36}dp; width: 90dp;">FORME {n + 1}</div>')
+        w(f'{ind(d + 2)}<div id="mdEdLfoShape{n + 1}" class="jucePos mdEdLfoShape" style="left: {sx + 94}dp; top: {TOP + 32}dp;">')
+        w(f'{ind(d + 3)}<div id="mdEdLfoShape{n + 1}Icon" class="jucePos mdEdLfoIcon" style="left: 6dp; top: 4dp;"/>')
+        w(f'{ind(d + 3)}<div id="mdEdLfoShape{n + 1}Name" class="jucePos juceLabel mdEdLfoShapeName" style="left: 40dp; top: 0dp;">—</div>')
+        w(f'{ind(d + 2)}</div>')
+    w(f'{ind(d + 2)}<div id="mdEdLfoWave" class="jucePos mdEdCurveArea" style="left: {lx + 610}dp; top: {TOP}dp; width: {span(12) - lx - 610 - 16}dp; height: 56dp;"/>')
+    w(f'{ind(d + 2)}<div id="mdEdLfoInfo" class="jucePos juceLabel mdEdNote" style="left: {lx}dp; top: {TOP + 66}dp; width: {span(12) - lx - 16}dp;">LFO inconnu : en attente du kit</div>')
     block_close(d + 1)
     track_h = y + hc + 12
     roomy_h = track_h + curves_row(d + 1, y + hc + GUT, [

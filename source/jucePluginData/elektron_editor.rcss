@@ -321,6 +321,13 @@ input.range.mdEdHFader { width: 62dp; height: 12dp; }
 .mdEdLed { width: 12dp; height: 12dp; border-radius: 6dp; background-color: #3a3d42; }
 .mdEdLed:checked { background-color: #ff6b1f; }
 
+/* MODULATION (Machinedrum, mdLfoView.cpp): a shape's cell, a click opens the shapes' menu; its icon is a
+   canvas the view draws, then its name */
+.mdEdLfoShape { box-sizing: border-box; width: 110dp; height: 24dp; border: 1dp #3a3d42; border-radius: 2dp; cursor: pointer; }
+.mdEdLfoShape:hover { border-color: #8a8d93; }
+.mdEdLfoIcon { width: 28dp; height: 16dp; pointer-events: none; }
+.mdEdLfoShapeName { width: 66dp; height: 22dp; line-height: 22dp; font-size: 11dp; font-weight: bold; color: #f4f1ea; pointer-events: none; }
+
 /* a track's trig LED, in the track strip and in JOUER (mdTrackActivity.cpp): lit for a moment when the
    sequencer plays a trig on the track; the track's MIX LED brightens then */
 .mdEdTrackLed { width: 6dp; height: 6dp; border-radius: 3dp; background-color: #3a3d42; pointer-events: none; }

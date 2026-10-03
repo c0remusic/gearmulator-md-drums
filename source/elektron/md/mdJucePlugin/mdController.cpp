@@ -388,9 +388,67 @@ namespace mdJucePlugin
 		if(!message)
 			return false;
 		sendEditorSysex(*message);
+		m_masterEffectEditMs = milliseconds();
 		auto& stored = m_masterEffects[static_cast<uint8_t>(_effect) * md::automation::sysex::MasterEffectParameters + _parameter];
 		if(stored.exchange(_value, std::memory_order_acq_rel) != _value)
 			m_masterEffectRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	namespace
+	{
+		constexpr uint64_t g_lfoKnown = uint64_t{1} << 40;
+
+		uint64_t packLfo(const md::LfoSettings& _lfo)
+		{
+			return g_lfoKnown | _lfo.track | uint64_t{_lfo.parameter} << 8 | uint64_t{_lfo.shape1} << 16
+				| uint64_t{_lfo.shape2} << 24 | uint64_t{_lfo.update} << 32;
+		}
+
+		md::LfoSettings unpackLfo(const uint64_t _packed)
+		{
+			return {static_cast<uint8_t>(_packed), static_cast<uint8_t>(_packed >> 8), static_cast<uint8_t>(_packed >> 16),
+				static_cast<uint8_t>(_packed >> 24), static_cast<uint8_t>(_packed >> 32)};
+		}
+	}
+
+	void Controller::storeLfo(const uint8_t _track, const md::LfoSettings& _lfo, const bool _authoritative)
+	{
+		if(_track >= m_trackLfos.size())
+			return;
+		auto& stored = m_trackLfos[_track];
+		const auto previous = stored.load(std::memory_order_acquire);
+		if((!_authoritative && previous) || previous == packLfo(_lfo))
+			return;
+		stored.store(packLfo(_lfo), std::memory_order_release);
+		m_lfoRevision.fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	std::optional<md::LfoSettings> Controller::getTrackLfo(const uint8_t _part) const
+	{
+		if(_part >= m_trackLfos.size())
+			return std::nullopt;
+		const auto packed = m_trackLfos[_part].load(std::memory_order_acquire);
+		return packed ? std::optional<md::LfoSettings>(unpackLfo(packed)) : std::nullopt;
+	}
+
+	bool Controller::setTrackLfo(const uint8_t _part, const uint8_t _field, const uint8_t _value)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::lfoChange(_part, _field, _value);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		m_lfoEditMs[_part] = milliseconds();
+		// A field of an LFO still unknown is sent, not kept: the others are not known
+		if(auto lfo = getTrackLfo(_part))
+		{
+			uint8_t* fields[] = {&lfo->track, &lfo->parameter, &lfo->shape1, &lfo->shape2, &lfo->update};
+			*fields[_field] = _value;
+			storeLfo(_part, *lfo, true);
+		}
 		return true;
 	}
 
@@ -1226,6 +1284,20 @@ namespace mdJucePlugin
 		if(!previous || kit->frame < previous->frame)
 			return;
 
+		// The Machinedrum's LFOs and master effects, once two reads agree and the editor's last change to
+		// them is old enough for the firmware to show it
+		if(kit->machinedrum && previous->machinedrum)
+		{
+			const auto settled = [&](const uint64_t _editMs) { return _now - _editMs >= 3 * LiveKitPollMilliseconds; };
+			for(uint8_t track = 0; track < kit->tracks; ++track)
+			{
+				if(kit->lfos[track] == previous->lfos[track] && settled(m_lfoEditMs[track]))
+					storeLfo(track, kit->lfos[track], true);
+			}
+			if(kit->masterEffects == previous->masterEffects && settled(m_masterEffectEditMs))
+				storeMasterEffects(md::automation::sysex::masterEffectsFromKit(kit->masterEffects.data()), true);
+		}
+
 		const bool mm = m_model == md::MachineModel::Monomachine;
 		// The pages an assignment gives the machine's values (assignMachine), and the last page the live
 		// Kit holds (the level's)
@@ -1448,18 +1520,27 @@ namespace mdJucePlugin
 					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
 				}
 			}
+			const auto storeLfos = [&](const bool _authoritative)
+			{
+				if(!kit->lfos)
+					return;
+				for(uint8_t track = 0; track < kit->lfos->size(); ++track)
+					storeLfo(track, (*kit->lfos)[track], _authoritative);
+			};
 			if(m_applyRequestedKitDump.exchange(false, std::memory_order_acq_rel))
 			{
 				applyKitParameters(kit->parameters);
 				storeKitMachines(kit->machines, true);
 				if(kit->masterEffects)
 					storeMasterEffects(*kit->masterEffects, true);
+				storeLfos(true);
 			}
 			else
 			{
 				storeKitMachines(kit->machines, false);
 				if(kit->masterEffects)
 					storeMasterEffects(*kit->masterEffects, false);
+				storeLfos(false);
 				// Even when the stored dump must not replace the live cache, retain its
 				// raw values for firmware-backed diagnostics.
 				for(const auto& change : kit->parameters)
