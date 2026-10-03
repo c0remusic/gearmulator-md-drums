@@ -38,10 +38,12 @@ namespace mdJucePlugin
 	// A click on a track name (mdPlayTrack<track>) makes it the edited track;
 	// a click on a step sets or clears its trig, written to the firmware as the PAS
 	// block does; LONGUEUR (mdPlayLength) opens a menu of the lengths, 1 to 64;
-	// TOUT EFFACER (mdPlayClear), clicked twice, clears every trig and lock.
-	// OUVRIR DANS SON (mdPlayOpen) shows the track in SON. While the sequencer plays, the column of its
-	// step is lit when its steps are shown (mdPlayNow on the step number and the cells), as the
-	// machine's position in its RAM gives it (Controller::getPlayingStep).
+	// COPIER VERS (mdPlayCopy) a menu of the slots, A01 to H16, to copy the pattern
+	// to (Controller::copyPattern); TOUT EFFACER (mdPlayClear), clicked twice, clears
+	// every trig and lock. OUVRIR DANS SON (mdPlayOpen) shows the track in SON. While
+	// the sequencer plays, the column of its step is lit when its steps are shown
+	// (mdPlayNow on the step number and the cells), as the machine's position in its
+	// RAM gives it (Controller::getPlayingStep).
 	class PatternView
 	{
 	public:
@@ -56,8 +58,14 @@ namespace mdJucePlugin
 
 		// Redraws, while JOUER is shown, what changed: the pattern, the machines or the
 		// edited track (grid and lane), the lane parameter or its Kit value (lane), the
-		// playing step. Returns true when it changed the DOM.
+		// playing step, the copy. Returns true when it changed the DOM.
 		bool update();
+
+		// What a slot chosen in COPIER VERS's menu does: the pattern copied there at once
+		// when the library knows the slot empty; otherwise the button asks to confirm
+		// (REMPLACER B05 ?), and a second click within ConfirmMilliseconds copies.
+		void copyTo(uint8_t _slot);
+		bool isCopyArmed() const { return m_copyArmedTo < 128; }
 		// The column lit as playing, -1 for none
 		int getShownPlayStep() const { return m_shownPlayStep; }
 		// The steps shown: 0 for 1 to 32, 1 for 33 to 64
@@ -72,13 +80,17 @@ namespace mdJucePlugin
 		int barValue(uint8_t _column) const { return _column < StepCount ? m_barValues[_column] : -1; }
 		bool barLocked(uint8_t _column) const { return _column < StepCount && m_barLocks[_column]; }
 
-		// TOUT EFFACER's second click must come within this
-		static constexpr double ClearConfirmMilliseconds = 3000.0;
+		// TOUT EFFACER's and REMPLACER's second click must come within this
+		static constexpr double ConfirmMilliseconds = 3000.0;
 		bool isClearArmed() const { return m_clearArmedAt >= 0.0; }
 
 	private:
 		void openLengthMenu(const Rml::Event& _event);
+		void openCopyMenu(const Rml::Event& _event);
 		void disarmClear();
+		void disarmCopy();
+		// COPIER VERS as the copy goes, and the pattern line with it
+		void renderCopy();
 		// Lights the playing step's column, a class on each cell: the column moves without a layout
 		bool showPlayStep(int _step);
 		void renderGrid(const md::automation::sysex::PatternDump* _pattern);
@@ -102,6 +114,14 @@ namespace mdJucePlugin
 		juceRmlUi::ElemCanvas* m_lane = nullptr;
 		Rml::Element* m_clear = nullptr;
 		double m_clearArmedAt = -1.0;
+		Rml::Element* m_copy = nullptr;
+		uint8_t m_copyArmedFrom = 0xff;		// the pattern shown when the menu was used
+		uint8_t m_copyArmedTo = 0xff;
+		double m_copyArmedAt = -1.0;
+		uint64_t m_shownCopy = ~uint64_t{0};	// the copy as last shown: state, slots and serial
+		std::string m_shownCopyLabel;
+		uint8_t m_shownSlot = 0xff;		// the pattern shown, 0xff for none
+		std::string m_patternLine;		// the pattern line, before what the copy adds
 		std::array<int, StepCount> m_barValues{};
 		std::array<bool, StepCount> m_barLocks{};
 		std::array<std::string, ParameterCount> m_names{};

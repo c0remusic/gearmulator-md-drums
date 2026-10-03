@@ -821,6 +821,15 @@ namespace md::automation::sysex
 		m_plain[5] = 0;
 	}
 
+	bool MdPatternEditor::setSlot(const uint8_t _slot)
+	{
+		if(_slot >= 128)
+			return false;
+		// The last byte of the header; the checksum, which counts it, is made again by toDump
+		m_header.back() = _slot;
+		return true;
+	}
+
 	Message MdPatternEditor::toDump() const
 	{
 		Message result(m_header);

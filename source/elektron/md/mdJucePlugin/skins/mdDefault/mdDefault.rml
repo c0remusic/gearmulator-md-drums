@@ -1113,7 +1113,8 @@
 							<div id="mdPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
 							<div id="mdPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
 							<button id="mdPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 286dp; top: 4dp; width: 110dp;">LONGUEUR —</button>
-							<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 408dp; top: 4dp; width: 442dp;">pattern : en attente du firmware</div>
+							<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 408dp; top: 4dp; width: 304dp;">pattern : en attente du firmware</div>
+							<button id="mdPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 724dp; top: 4dp; width: 130dp;">COPIER VERS…</button>
 							<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
 							<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
 							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 274dp;"/>
@@ -1891,7 +1892,9 @@
 						<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: 1100dp; height: 476dp;">
 							<div id="mdLibPatterns" class="jucePos mdEdBlock" style="left: 16dp; top: 44dp; width: 1068dp; height: 420dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERNS</div>
-								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 140dp; top: 4dp; width: 912dp;">—</div>
+								<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>
+								<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>
+								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 350dp; top: 4dp; width: 702dp;">—</div>
 								<div id="mdLibPattern0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 123dp;">A01  —</div>
 								<div id="mdLibPattern1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 123dp;">A02  —</div>
 								<div id="mdLibPattern2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 123dp;">A03  —</div>

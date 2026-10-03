@@ -133,6 +133,9 @@ namespace md::automation::sysex
 		bool setLength(uint8_t _length);
 		// Clears every trig and every lock of every step the dump holds, past the length too.
 		void clear();
+		// The pattern's number, 0 to 127 (A01 to H16): the firmware stores a dump in the
+		// slot it names, so a dump given another slot's number is a copy.
+		bool setSlot(uint8_t _slot);
 
 		Message toDump() const;
 
@@ -150,7 +153,7 @@ namespace md::automation::sysex
 		void insertRow(size_t _row);
 		void removeRow(size_t _row);
 
-		Message m_header;                  // F0 up to the pattern position
+		Message m_header;                  // F0 up to the pattern position, included
 		std::array<uint8_t, 64> m_trigs{};
 		std::array<uint8_t, 64> m_masks{};
 		std::array<uint8_t, 16> m_swing{};

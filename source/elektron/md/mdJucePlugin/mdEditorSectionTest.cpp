@@ -64,6 +64,13 @@ namespace mdJucePlugin
 			_controller.onControllerTimer();
 		}
 
+		// A copy's source or read back is not answered in time: the controller timer fails it
+		static void expirePatternCopy(Controller& _controller)
+		{
+			_controller.m_patternCopyMs = Controller::milliseconds() - Controller::PatternCopyTimeoutMilliseconds - 1;
+			_controller.onControllerTimer();
+		}
+
 		// The edits pause: the controller timer writes the pattern sendPatternSoon() waits with
 		static void pauseEdits(Controller& _controller)
 		{
@@ -149,6 +156,8 @@ namespace mdJucePlugin
 		static const PatternView& pattern(const Editor& _editor) { return *_editor.m_patternView; }
 		static const MmPatternView& mmPattern(const Editor& _editor) { return *_editor.m_mmPatternView; }
 		static const StepGrid& steps(const Editor& _editor) { return *_editor.m_stepGrid; }
+		// A slot chosen in COPIER VERS's menu
+		static void copyPatternTo(Editor& _editor, const uint8_t _slot) { _editor.m_patternView->copyTo(_slot); }
 
 		// Every editor component the presentation timer refreshes, for the snapshots
 		static void present(Editor& _editor)
@@ -1307,6 +1316,43 @@ int main()
 			require(lane.getStepPage() == 0 && text("mdPlayHead0") == "1" && element(doc, "mdPlayPage1").IsClassSet("mdEdOff")
 				&& cell(0, 0).IsClassSet("mdEdStepTrig") && text("mdPlayLength") == "LONGUEUR 32", "a short pattern still shows steps 33 to 64");
 
+			// COPIER VERS: a slot the library does not know asks to confirm (REMPLACER B06 ?); the second click
+			// copies the pattern shown there, read back as sent; read back different, the copy is refused
+			{
+				using PatternCopy = mdJucePlugin::Controller::PatternCopy;
+				const auto endsWith = [&](const std::string& _text, const std::string& _end)
+				{
+					return _text.size() >= _end.size() && _text.compare(_text.size() - _end.size(), _end.size(), _end) == 0;
+				};
+				require(text("mdPlayCopy") == "COPIER VERS…" && !element(doc, "mdPlayCopy").IsClassSet("mdEdOff"), "COPIER VERS not offered");
+				mdJucePlugin::EditorIdentityTestAccess::copyPatternTo(*editor, 21);
+				context.Update();
+				require(lane.isCopyArmed() && text("mdPlayCopy") == "REMPLACER B06 ?" && md.getPatternCopy().state == PatternCopy::None,
+					"a slot not known empty did not ask to confirm");
+				element(doc, "mdPlayCopy").Click();
+				context.Update();
+				const auto copy = md.getPatternCopy();
+				require(!lane.isCopyArmed() && copy.state == PatternCopy::Writing && copy.from == 20 && copy.to == 21,
+					"REMPLACER did not copy B05 to B06");
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(endsWith(text("mdPlayInfo"), "32 pas · 47 trigs · copie vers B06…") && text("mdPlayCopy") == "COPIE…",
+					"the line does not tell the copy: \"" + text("mdPlayInfo") + "\"");
+				// The firmware: B06 read back as the copy
+				md.parseSysexMessage(mdAutomationTest::makeMdPatternDump(21, 32, trigs, 77), synthLib::MidiEventSource::Device);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(md.getPatternCopy().state == PatternCopy::Copied && endsWith(text("mdPlayInfo"), "47 trigs · copié sur B06")
+					&& text("mdPlayCopy") == "COPIER VERS…", "the copy read back as sent not told: \"" + text("mdPlayInfo") + "\"");
+				// B07 read back without its trigs
+				mdJucePlugin::EditorIdentityTestAccess::copyPatternTo(*editor, 22);
+				element(doc, "mdPlayCopy").Click();
+				md.parseSysexMessage(mdAutomationTest::makeMdPatternDump(22, 32, std::array<uint32_t, 16>{}, 77),
+					synthLib::MidiEventSource::Device);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(md.getPatternCopy().state == PatternCopy::Refused && endsWith(text("mdPlayInfo"), " · copie sur B07 refusée"),
+					"a copy read back different not refused: \"" + text("mdPlayInfo") + "\"");
+				snap("-play-copy");
+			}
+
 			element(doc, "mdPlayParam0").Click();
 			element(doc, "mdPlayTrack0").Click();
 			// OUVRIR DANS SON shows the edited track's sound
@@ -1628,6 +1674,51 @@ int main()
 			require(text("mdLibPatternDetail") == "A01 · 16 pas · kit 01 · 4 trigs" && element(doc, "mdLibPattern0").IsClassSet("mdEdSelected"),
 				"a pattern does not show its detail: \"" + text("mdLibPatternDetail") + "\"");
 			snap("-library-patterns");
+#if !defined(MD_EDITOR_SECTION_TEST_MM)
+			// COPIER takes A01; COLLER onto B06, which has trigs, asks to confirm (REMPLACER), then copies: A01 read,
+			// sent as B06 and read back, B06's cell showing the copy. Onto A02, known empty, at once; not answered,
+			// the copy fails.
+			{
+				using PatternCopy = mdJucePlugin::Controller::PatternCopy;
+				const auto line = [&] { return text("mdLibPatternDetail"); };
+				const auto serial = md.getPatternCopy().serial;
+				require(element(doc, "mdLibPaste").IsClassSet("mdEdOff") && !element(doc, "mdLibCopy").IsClassSet("mdEdOff"),
+					"COLLER offered before COPIER, or COPIER not offered");
+				element(doc, "mdLibCopy").Click();
+				element(doc, "mdLibPattern21").Click();
+				present();
+				require(!element(doc, "mdLibPaste").IsClassSet("mdEdOff") && line() == "B06 · 32 pas · kit 01 · 4 trigs · à coller : A01"
+					&& element(doc, "mdLibPattern0").IsClassSet("mdLibSource"), "COPIER did not take A01: \"" + line() + "\"");
+				element(doc, "mdLibPaste").Click();
+				present();
+				require(text("mdLibPaste") == "REMPLACER B06 ?" && md.getPatternCopy().serial == serial,
+					"COLLER onto a pattern with trigs did not ask to confirm");
+				element(doc, "mdLibPaste").Click();
+				present();
+				auto copy = md.getPatternCopy();
+				require(copy.state == PatternCopy::Reading && copy.from == 0 && copy.to == 21 && text("mdLibPaste") == "COPIE…"
+					&& line() == "B06 · 32 pas · kit 01 · 4 trigs · à coller : A01 · copie de A01 vers B06…",
+					"REMPLACER did not start the copy: \"" + line() + "\"");
+				md.parseSysexMessage(patternDump(0, 16, true), synthLib::MidiEventSource::Device);
+				require(md.getPatternCopy().state == PatternCopy::Writing, "A01 read, the copy not sent");
+				md.parseSysexMessage(patternDump(21, 16, true), synthLib::MidiEventSource::Device);
+				present();
+				require(md.getPatternCopy().state == PatternCopy::Copied && text("mdLibPattern21") == "B06  16 pas · kit 01"
+					&& line() == "B06 · 16 pas · kit 01 · 4 trigs · à coller : A01 · A01 copié sur B06" && text("mdLibPaste") == "COLLER",
+					"the copy read back not shown: \"" + line() + "\"");
+				snap("-library-copy");
+				// Onto A02, empty: at once; no answer, the copy fails
+				element(doc, "mdLibPattern1").Click();
+				element(doc, "mdLibPaste").Click();
+				present();
+				copy = md.getPatternCopy();
+				require(copy.state == PatternCopy::Reading && copy.to == 1, "COLLER onto an empty pattern asked to confirm");
+				Access::expirePatternCopy(md);
+				present();
+				require(md.getPatternCopy().state == PatternCopy::Failed && line().find("copie de A01 vers A02 sans réponse") != std::string::npos,
+					"a copy not answered did not fail: \"" + line() + "\"");
+			}
+#endif
 			// RELIRE reads everything again
 			element(doc, "mdLibRead").Click();
 			present();

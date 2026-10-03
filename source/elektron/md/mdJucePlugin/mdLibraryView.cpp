@@ -30,6 +30,12 @@ namespace mdJucePlugin
 			_element->SetInnerRML(Rml::StringUtilities::EncodeRml(_text));
 			_shown = std::move(_text);
 		}
+
+		uint64_t copyKey(const Controller::PatternCopyState& _copy)
+		{
+			return uint64_t{static_cast<uint8_t>(_copy.state)} | uint64_t{_copy.from} << 8 | uint64_t{_copy.to} << 16
+				| uint64_t{_copy.serial} << 24;
+		}
 	}
 
 	LibraryView::LibraryView(Controller& _controller, const md::MachineModel _model, Rml::Element& _document)
@@ -56,6 +62,22 @@ namespace mdJucePlugin
 			if(pattern)
 				juceRmlUi::EventListener::Add(pattern, Rml::EventId::Click, [this, slot](Rml::Event&) { selectPattern(slot); });
 		}
+		// COPIER takes the pattern clicked, COLLER copies it onto the one clicked then (Machinedrum)
+		m_copy = _document.GetElementById("mdLibCopy");
+		if(m_copy)
+		{
+			juceRmlUi::EventListener::Add(m_copy, Rml::EventId::Click, [this](Rml::Event&)
+			{
+				if(m_selectedPattern >= m_patterns.size())
+					return;
+				m_copySource = m_selectedPattern;
+				m_pasteArmedTo = 0xff;
+				m_shownRevision = ~uint64_t{0};
+			});
+		}
+		m_paste = _document.GetElementById("mdLibPaste");
+		if(m_paste)
+			juceRmlUi::EventListener::Add(m_paste, Rml::EventId::Click, [this](Rml::Event&) { paste(); });
 		const auto tracks = _model == md::MachineModel::Monomachine ? 6 : 16;
 		for(int track = 0; track < tracks; ++track)
 			m_machines.push_back(_document.GetElementById("mdLibMachine" + std::to_string(track)));
@@ -94,6 +116,29 @@ namespace mdJucePlugin
 	void LibraryView::selectPattern(const uint8_t _slot)
 	{
 		m_selectedPattern = _slot;
+		m_pasteArmedTo = 0xff;
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::paste()
+	{
+		const auto to = m_selectedPattern;
+		if(m_copySource >= m_patterns.size() || to >= m_patterns.size() || to == m_copySource)
+			return;
+		// A pattern the library knows empty takes the copy at once; another asks for a second click
+		const auto stored = m_controller.getLibraryPattern(to);
+		const bool empty = stored && stored->read && stored->trigs == uint16_t{0};
+		if(empty || (m_pasteArmedTo == to && m_now - m_pasteArmedAt <= ConfirmMilliseconds))
+		{
+			m_pasteArmedTo = 0xff;
+			if(m_controller.copyPattern(m_copySource, to))
+				m_copySerial = m_controller.getPatternCopy().serial;
+		}
+		else
+		{
+			m_pasteArmedTo = to;
+			m_pasteArmedAt = m_now;
+		}
 		m_shownRevision = ~uint64_t{0};
 	}
 
@@ -107,11 +152,24 @@ namespace mdJucePlugin
 
 	bool LibraryView::update(const double _nowMilliseconds)
 	{
+		// REMPLACER not confirmed in time
+		m_now = _nowMilliseconds;
+		if(m_pasteArmedTo < m_patterns.size() && _nowMilliseconds - m_pasteArmedAt > ConfirmMilliseconds)
+		{
+			m_pasteArmedTo = 0xff;
+			m_shownRevision = ~uint64_t{0};
+		}
 		// Hidden: nothing read or drawn; drawn in full when shown
 		if(m_root && !m_root->IsVisible(true))
 		{
 			m_shownRevision = ~uint64_t{0};
 			return false;
+		}
+		// A copy going on shows on COLLER and the pattern line
+		if(const auto copy = copyKey(m_controller.getPatternCopy()); copy != m_shownCopy)
+		{
+			m_shownCopy = copy;
+			m_shownRevision = ~uint64_t{0};
 		}
 		// The first showing reads the library, RELIRE again; while the firmware boots, a try every second
 		if(m_readingWanted && !m_controller.isReadingLibrary() && _nowMilliseconds - m_lastAttempt > 1000.0)
@@ -160,6 +218,7 @@ namespace mdJucePlugin
 			setText(element, m_shownPatternLabels[slot], patternLabel(slot, read, read ? pattern->length : 0, read ? pattern->kit : 0));
 			element->SetClass("mdLibCurrent", slot == currentPattern);
 			element->SetClass("mdEdSelected", slot == m_selectedPattern);
+			element->SetClass("mdLibSource", slot == m_copySource);
 			element->SetClass("mdEdUnread", !read);
 			element->SetClass("mdLibEmpty", read && pattern->trigs == uint16_t{0});
 		}
@@ -195,7 +254,24 @@ namespace mdJucePlugin
 		}
 		renderDetail();
 		renderPatternDetail();
+		renderCopy();
 		return true;
+	}
+
+	void LibraryView::renderCopy()
+	{
+		if(m_copy)
+			m_copy->SetClass("mdEdOff", m_selectedPattern >= m_patterns.size());
+		if(!m_paste)
+			return;
+		const auto copy = m_controller.getPatternCopy();
+		const bool copying = copy.state == Controller::PatternCopy::Reading || copy.state == Controller::PatternCopy::Writing;
+		const bool armed = m_pasteArmedTo < m_patterns.size();
+		const bool ready = m_copySource < m_patterns.size() && m_selectedPattern < m_patterns.size() && m_selectedPattern != m_copySource;
+		m_paste->SetClass("mdEdOff", !ready || copying);
+		m_paste->SetClass("mdPlayArmed", armed);
+		setText(m_paste, m_shownPasteLabel, armed ? "REMPLACER " + patternName(m_pasteArmedTo) + " ?"
+			: copying ? std::string("COPIE…") : std::string("COLLER"));
 	}
 
 	void LibraryView::renderDetail()
@@ -250,6 +326,20 @@ namespace mdJucePlugin
 				text += " · pas lu";
 			if(m_selectedPattern == m_controller.getCurrentPattern())
 				text += " · celui de la machine";
+		}
+		// What COPIER took, and how COLLER's last copy went
+		if(m_copySource < m_patterns.size())
+			text += " · à coller : " + patternName(m_copySource);
+		const auto copy = m_controller.getPatternCopy();
+		const auto copied = "copie de " + patternName(copy.from) + " vers " + patternName(copy.to);
+		switch(m_copySerial && copy.serial == m_copySerial ? copy.state : Controller::PatternCopy::None)
+		{
+		case Controller::PatternCopy::Reading:
+		case Controller::PatternCopy::Writing: text += " · " + copied + "…"; break;
+		case Controller::PatternCopy::Copied: text += " · " + patternName(copy.from) + " copié sur " + patternName(copy.to); break;
+		case Controller::PatternCopy::Refused: text += " · " + copied + " refusée"; break;
+		case Controller::PatternCopy::Failed: text += " · " + copied + " sans réponse"; break;
+		default: break;
 		}
 		m_patternDetail->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 	}

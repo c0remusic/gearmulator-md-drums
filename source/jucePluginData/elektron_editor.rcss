@@ -217,6 +217,8 @@
 	border: 1dp transparent; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
 .mdLibKit:hover { background-color: #2a2c30; }
 .mdLibKit.mdEdSelected { background-color: #2e3034; border-color: #8a8d93; }
+/* the pattern COPIER took, framed in orange until COLLER */
+.mdLibKit.mdLibSource { border-color: #ff6b1f; }
 .mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
 /* a pattern read without a trig */
 .mdLibKit.mdLibEmpty { color: #6c6f75; }

@@ -463,6 +463,60 @@ namespace
 		require(_hardware.sendMidi(event), "CC rejected by the MIDI input");
 	}
 
+	// A copy as Controller::copyPattern makes it: the selected pattern's dump with another slot's number ($67),
+	// sent. The firmware stores it in that slot, which comes back as sent, and the selected pattern stays.
+	// Track 1 playing on the beats, silenced by a VOL of 0 sent by CC, stays silent across the copy: unlike a
+	// write to the selected pattern (checkLiveKitAcrossPatternWrite), a copy to another slot does not reload
+	// the Kit, and needs no SAVE KIT. Both patterns as they were, for the checks after this one.
+	void checkPatternCopy(md::Hardware& _hardware)
+	{
+		constexpr auto model = md::MachineModel::Machinedrum;
+		const auto selected = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto destination = static_cast<uint8_t>((selected + 16) % 128);	// the next bank
+		const auto original = readPattern(_hardware, selected);
+		const auto overwritten = readPattern(_hardware, destination);
+		const auto globalSlot = status(_hardware, sysex::StatusParameter::Global);
+		const auto global = sysex::parseGlobalDump(model, exchange(_hardware, sysex::globalRequest(model, globalSlot), 0x50));
+		require(global.has_value(), "no Global dump");
+
+		auto beats = sysex::MdPatternEditor::fromDump(original);
+		require(beats.has_value(), "pattern not editable");
+		beats->clear();
+		for(uint8_t step = 0; step < 16; step += 4)
+			require(beats->setTrig(0, step, true), "trig refused");
+		send(_hardware, beats->toDump());
+		advance(_hardware, md::g_samplerate);
+		constexpr size_t twoSeconds = 344;
+		const auto loud = playPeak(_hardware, twoSeconds);
+		const auto volume = md::automation::encodeParameterChange(model,
+			{md::automation::machinedrum::Routing, 0, 1, 0}, global->baseChannel);
+		require(volume.has_value(), "no CC for track 1 VOL");
+		sendControlChange(_hardware, *volume);
+		advance(_hardware, md::g_samplerate / 4);
+		const auto muted = playPeak(_hardware, twoSeconds);
+
+		auto copy = sysex::MdPatternEditor::fromDump(readPattern(_hardware, selected));
+		require(copy && copy->setSlot(destination), "the codec did not number the copy");
+		const auto sent = copy->toDump();
+		send(_hardware, sent);
+		advance(_hardware, md::g_samplerate);
+		const auto back = readPattern(_hardware, destination);
+		const auto stillSelected = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto afterCopy = playPeak(_hardware, twoSeconds);
+		std::printf("MD pattern %u copied to %u: read back %s; selected after the copy: %u; track 1 peak %.3f, VOL 0 by CC"
+			" %.4f, after the copy %.4f\n", selected + 1, destination + 1, back == sent ? "as sent" : differences(back, sent).c_str(),
+			stillSelected + 1, loud, muted, afterCopy);
+		require(back == sent, "the copy did not come back as sent");
+		require(stillSelected == selected, "the copy changed the selected pattern");
+		require(loud > 0.01f && muted < loud / 20, "track 1 VOL by CC does not silence it");
+		require(afterCopy < loud / 20, "the copy reloaded the Kit: Controller::copyPattern needs a SAVE KIT");
+
+		// As they were: the selected pattern written back reloads its Kit as stored, its VOL with it
+		send(_hardware, overwritten);
+		send(_hardware, original);
+		advance(_hardware, md::g_samplerate);
+	}
+
 	// What a pattern written to its slot does to the live Kit, track 1 playing alone on the beats: a VOL of 0
 	// sent by CC (as the editor's SON sends it) silences it until the pattern is written, stopped or playing;
 	// the Machinedrum then reloads the pattern's Kit as stored, as selecting the pattern does. With the Kit
@@ -736,6 +790,7 @@ namespace
 		checkTrackRouting(*hardware);
 		checkPattern(*hardware);
 		checkLongPattern(*hardware);
+		checkPatternCopy(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);
 		checkSequencerPosition(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");

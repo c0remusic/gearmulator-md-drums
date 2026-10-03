@@ -149,8 +149,9 @@ namespace mdJucePlugin
 		// BIBLIO: the stored Kits, name and machines (Kit requests, $53), then the
 		// stored patterns, length and Kit (pattern requests, $68), read one by one
 		// once readLibrary is called; a Kit not answered within 2 s, or a pattern
-		// within 4 s, is skipped. What was read stays until the next reading. Read
-		// only: nothing is loaded.
+		// within 4 s, is skipped. What was read stays until the next reading, and any
+		// pattern dump that comes after the first reading began (a copy read back, a
+		// write) replaces its slot's. Nothing is loaded.
 		struct LibraryKit
 		{
 			bool read = false;
@@ -162,8 +163,7 @@ namespace mdJucePlugin
 			bool read = false;
 			uint8_t length = 0;
 			uint8_t kit = 0;
-			// Trigs in the pattern's steps; nullopt when the dump read does not tell
-			// (a Machinedrum pattern longer than 32 steps: only 32 are read)
+			// Trigs within the pattern's length, on every step the dump holds
 			std::optional<uint16_t> trigs;
 		};
 		static constexpr size_t PatternLibrarySize = 128;
@@ -225,6 +225,42 @@ namespace mdJucePlugin
 			Refused     // read back different from what was sent
 		};
 		PatternWrite getPatternWrite() const { return m_patternWrite.load(std::memory_order_acquire); }
+
+		// Machinedrum only: copies a stored pattern into another slot, the source's dump with the
+		// destination's number ($67), then reads the destination back. The source is the pattern shown
+		// (getPattern()), its edits not written yet included, or else is read first. A copy onto the pattern
+		// shown replaces it as an edit does, written by sendPattern(); onto the selected pattern, the live
+		// Kit is saved first, as the firmware then reloads the pattern's Kit. A copy to another slot leaves
+		// the selected pattern and the live Kit as they are (mdEditorFirmwareTest, checkPatternCopy). False
+		// on the Monomachine, for the same slot or one out of range, while the firmware is not ready, or
+		// while another copy runs.
+		bool copyPattern(uint8_t _from, uint8_t _to);
+		enum class PatternCopy : uint8_t
+		{
+			None,       // no copy yet
+			Reading,    // the source asked for
+			Writing,    // the copy sent, waiting for the destination read back
+			Copied,     // read back as sent
+			Refused,    // read back different from what was sent
+			Failed      // the source or the destination did not come within PatternCopyTimeoutMilliseconds
+		};
+		struct PatternCopyState
+		{
+			PatternCopy state = PatternCopy::None;
+			uint8_t from = 0;
+			uint8_t to = 0;
+			uint32_t serial = 0;	// counts the copies started
+
+			bool operator==(const PatternCopyState& _other) const
+			{
+				return state == _other.state && from == _other.from && to == _other.to && serial == _other.serial;
+			}
+			bool operator!=(const PatternCopyState& _other) const { return !(*this == _other); }
+		};
+		PatternCopyState getPatternCopy() const;
+		// A pattern dump takes 1.7 s on the MIDI line: the copy and its read back, twice that
+		static constexpr uint64_t PatternCopyTimeoutMilliseconds = 8000;
+
 		void requestAutomationState();
 		std::vector<uint8_t> createAutomationSnapshot() const;
 		bool restoreAutomationSnapshot(const std::vector<uint8_t>& _snapshot);
@@ -234,6 +270,12 @@ namespace mdJucePlugin
 		bool editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit);
 		// The write sendPatternSoon() asked for, once due; under m_synchronizationLock
 		void servicePatternWrite(uint64_t _now);
+		// The copy copyPattern() started, once its source is there: sent with the destination's number, or
+		// made the pattern shown and written; under m_synchronizationLock
+		void writePatternCopy(const md::automation::sysex::Message& _source);
+		// A copy waiting too long fails; under m_synchronizationLock
+		void servicePatternCopy(uint64_t _now);
+		void setPatternCopyState(PatternCopy _state);
 		struct Address
 		{
 			uint8_t page = 0;
@@ -409,6 +451,13 @@ namespace mdJucePlugin
 		std::optional<md::automation::sysex::PatternDump> m_patternSent;
 		std::atomic<PatternWrite> m_patternWrite{PatternWrite::None};
 		std::atomic<uint64_t> m_patternRevision{0};
+		// copyPattern(): PatternCopyState packed, a byte each for the state, source and destination, then the
+		// serial; written under m_synchronizationLock, as are the phase's start, the copy sent to another slot,
+		// and whether it went onto the pattern shown (then its write tells how it went)
+		std::atomic<uint64_t> m_patternCopy{0};
+		uint64_t m_patternCopyMs = 0;
+		std::optional<md::automation::sysex::PatternDump> m_patternCopySent;
+		bool m_patternCopyShown = false;
 		std::atomic<bool> m_patternWanted{false};
 		std::atomic<uint8_t> m_patternRequestedSlot{0xff};
 		std::deque<AutomationSlot> m_automationSlots;

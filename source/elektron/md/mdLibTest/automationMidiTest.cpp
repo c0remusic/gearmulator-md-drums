@@ -737,6 +737,16 @@ namespace
 		require(dump == makePattern(48, {}, {}, {}, emptyExtension), "clearing the pattern changed something else");
 		require(longEditor->setLength(64) && !longEditor->setLength(65), "64-step form length range wrong");
 
+		// A copy: another slot's number, the checksum made again, every other byte kept
+		auto copy = MdPatternEditor::fromDump(longPattern);
+		require(copy && copy->setSlot(37) && !copy->setSlot(128), "slot 37 refused, or 128 accepted");
+		dump = copy->toDump();
+		parsed = parseMdPatternDump(dump);
+		const auto source = parseMdPatternDump(longPattern);
+		require(parsed && source && parsed->slot == 37 && parsed->length == source->length && parsed->trigs == source->trigs
+			&& parsed->lockRows == source->lockRows && dump.size() == longPattern.size()
+			&& std::equal(dump.begin() + 10, dump.end() - 5, longPattern.begin() + 10), "the copy is not the pattern under another number");
+
 		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");
 	}
 

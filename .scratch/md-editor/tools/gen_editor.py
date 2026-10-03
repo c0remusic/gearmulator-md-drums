@@ -459,9 +459,12 @@ def play_page_md(d):
     # LONGUEUR opens a menu of the lengths, 1 to 64
     w(f'{ind(d + 2)}<button id="mdPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {110 + 2 * 84 + 8}dp; top: 4dp; width: 110dp;">LONGUEUR —</button>')
     info_x = 110 + 2 * 84 + 8 + 110 + 12
-    # TOUT EFFACER asks for a second click (CONFIRMER), then clears every trig and lock of the pattern
+    # TOUT EFFACER asks for a second click (CONFIRMER), then clears every trig and lock of the pattern;
+    # COPIER VERS opens a menu of the slots, and asks for a second click (REMPLACER) for one not known empty
     clear_x = gw - 16 - 62 - 8 - 120
-    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {clear_x - 12 - info_x}dp;">pattern : en attente du firmware</div>')
+    copy_x = clear_x - 8 - 130
+    w(f'{ind(d + 2)}<div id="mdPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {info_x}dp; top: 4dp; width: {copy_x - 12 - info_x}dp;">pattern : en attente du firmware</div>')
+    w(f'{ind(d + 2)}<button id="mdPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: {copy_x}dp; top: 4dp; width: 130dp;">COPIER VERS…</button>')
     w(f'{ind(d + 2)}<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {clear_x}dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>')
     w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     gh = play_grid(d + 2, "mdPlay", 16, 16, gw, "", "",
@@ -549,7 +552,14 @@ def library_page(d):
     # PATTERNS: banks A to H in columns, 01 to 16 in rows
     w(f'{ind(d + 1)}<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: {page_w}dp; height: {{LIB_H}}dp;">')
     block_open(d + 2, "mdLibPatterns", "PATTERNS", "", 0, 12, by, kh)
-    w(f'{ind(d + 3)}<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 140dp; top: 4dp; width: {gw - 140 - 16}dp;">—</div>')
+    detail_x = 140
+    if MD:
+        # COPIER takes the pattern clicked, COLLER copies it onto the one clicked then; REMPLACER asks for a
+        # second click for one not known empty (LibraryView)
+        w(f'{ind(d + 3)}<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>')
+        w(f'{ind(d + 3)}<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>')
+        detail_x = 350
+    w(f'{ind(d + 3)}<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {detail_x}dp; top: 4dp; width: {gw - detail_x - 16}dp;">—</div>')
     pw = (gw - 32) // 8
     for slot in range(128):
         c, r = slot // 16, slot % 16
