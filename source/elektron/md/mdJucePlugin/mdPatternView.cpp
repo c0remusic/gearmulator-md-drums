@@ -7,6 +7,7 @@
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlEventListener.h"
+#include "juceRmlUi/rmlMenu.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -93,6 +94,29 @@ namespace mdJucePlugin
 					if(pattern && m_controller.setPatternTrig(track, shown, !pattern->hasTrig(track, shown)))
 						m_controller.sendPatternSoon();
 					update();
+				});
+			}
+		}
+		for(uint8_t row = 0; row < md::automation::sysex::StepFlagCount; ++row)
+		{
+			const auto rowId = std::to_string(row);
+			m_flagNames[row] = _document.GetElementById("mdPlayFlagName" + rowId);
+			if(auto* name = m_flagNames[row])
+			{
+				juceRmlUi::EventListener::Add(name, Rml::EventId::Click, [this, row](const Rml::Event& _event)
+				{
+					openFlagMenu(row, _event);
+				});
+			}
+			for(uint8_t column = 0; column < StepCount; ++column)
+			{
+				auto* cell = _document.GetElementById("mdPlayFlag" + rowId + "_" + std::to_string(column));
+				m_flagCells[row][column] = cell;
+				if(!cell)
+					continue;
+				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, row, column](Rml::Event&)
+				{
+					toggleFlag(row, column);
 				});
 			}
 		}
@@ -185,6 +209,72 @@ namespace mdJucePlugin
 		update();
 	}
 
+	void PatternView::toggleFlag(const uint8_t _row, const uint8_t _column)
+	{
+		using md::automation::sysex::StepFlag;
+		const auto pattern = m_controller.getPattern();
+		const auto track = m_shownTrack;
+		if(!pattern || _row >= md::automation::sysex::StepFlagCount || _column >= StepCount || track >= TrackCount)
+			return;
+		const auto flag = static_cast<StepFlag>(_row);
+		const auto step = static_cast<uint8_t>(m_shownStepPage * StepCount + _column);
+		// In the mask the row shows: every track's, or the edited track's for a kind set per track
+		const auto owner = pattern->flagPerTrack[_row] ? std::optional<uint8_t>(track) : std::nullopt;
+		if(m_controller.setPatternFlag(flag, owner, step, !pattern->hasFlag(flag, track, step)))
+			m_controller.sendPatternSoon();
+		update();
+	}
+
+	void PatternView::openFlagMenu(const uint8_t _row, const Rml::Event& _event)
+	{
+		using md::automation::sysex::StepFlag;
+		const auto pattern = m_controller.getPattern();
+		if(!pattern || _row >= md::automation::sysex::StepFlagCount)
+			return;
+		const auto flag = static_cast<StepFlag>(_row);
+		const bool perTrack = pattern->flagPerTrack[_row];
+		// Written as a click on a step is
+		const auto written = [this](const bool _edited)
+		{
+			if(_edited)
+				m_controller.sendPatternSoon();
+			update();
+		};
+		juceRmlUi::Menu menu;
+		for(const bool each : {false, true})
+		{
+			menu.addEntry(each ? "piste par piste" : "toutes les pistes", each == perTrack, [this, flag, each, written]
+			{
+				written(m_controller.setPatternFlagPerTrack(flag, each));
+			});
+		}
+		if(flag == StepFlag::Accent)
+		{
+			menu.addSeparator();
+			for(const uint8_t amount : {0, 16, 32, 48, 64, 80, 96, 112, 127})
+			{
+				const bool current = amount == pattern->accentAmount;
+				menu.addEntry("quantité " + std::to_string(amount), current, [this, amount, written]
+				{
+					written(m_controller.setPatternAccentAmount(amount));
+				});
+			}
+		}
+		else if(flag == StepFlag::Swing)
+		{
+			menu.addSeparator();
+			const auto current = md::automation::sysex::swingPercent(pattern->swingAmount);
+			for(uint8_t percent = 50; percent <= 80; percent += 2)
+			{
+				menu.addEntry(std::to_string(percent) + " %", percent == current, [this, percent, written]
+				{
+					written(m_controller.setPatternSwingAmount(percent));
+				});
+			}
+		}
+		menu.runModal(_event, 20);
+	}
+
 	uint8_t PatternView::kitValue(const uint8_t _track, const uint8_t _parameter) const
 	{
 		const auto* parameter = m_names[_parameter].empty() ? nullptr : m_controller.getParameter(m_names[_parameter], _track);
@@ -251,11 +341,47 @@ namespace mdJucePlugin
 				if(auto* cell = m_steps[track][static_cast<size_t>(_column)])
 					cell->SetClass("mdPlayNow", _on);
 			}
+			for(auto& cells : m_flagCells)
+			{
+				if(auto* cell = cells[static_cast<size_t>(_column)])
+					cell->SetClass("mdPlayNow", _on);
+			}
 		};
 		light(m_shownPlayStep, false);
 		light(_step, true);
 		m_shownPlayStep = _step;
 		return true;
+	}
+
+	void PatternView::renderFlags(const md::automation::sysex::PatternDump* _pattern)
+	{
+		using md::automation::sysex::StepFlag;
+		static constexpr const char* names[md::automation::sysex::StepFlagCount] = {"ACCENT", "SLIDE", "SWING"};
+		const uint8_t length = _pattern ? _pattern->length : 0;
+		const auto first = static_cast<uint8_t>(m_shownStepPage * StepCount);
+		for(uint8_t row = 0; row < md::automation::sysex::StepFlagCount; ++row)
+		{
+			const auto flag = static_cast<StepFlag>(row);
+			// The name tells whose steps the row shows, and the amount
+			std::string name = names[row];
+			if(_pattern && _pattern->flagPerTrack[row])
+				name += " " + number(m_shownTrack + 1u);
+			if(_pattern && flag == StepFlag::Accent)
+				name += " " + std::to_string(_pattern->accentAmount);
+			if(_pattern && flag == StepFlag::Swing)
+				name += " " + std::to_string(md::automation::sysex::swingPercent(_pattern->swingAmount)) + "%";
+			setText(m_flagNames[row], m_shownFlagNames[row], name);
+			const auto mask = _pattern ? _pattern->flagMask(flag, m_shownTrack) : uint64_t{0};
+			for(uint8_t column = 0; column < StepCount; ++column)
+			{
+				auto* cell = m_flagCells[row][column];
+				if(!cell)
+					continue;
+				const auto step = static_cast<uint8_t>(first + column);
+				cell->SetClass("mdPlayFlagOn", (mask >> step) & 1u);
+				cell->SetClass("mdEdStepOut", _pattern && step >= length);
+			}
+		}
 	}
 
 	void PatternView::paintLane(juce::Image& _image, juce::Graphics& _g) const
@@ -316,6 +442,7 @@ namespace mdJucePlugin
 			m_stepPages[page]->SetClass("mdEdSelected", page == m_shownStepPage);
 			m_stepPages[page]->SetClass("mdEdOff", page > 0 && (!_pattern || _pattern->length <= StepCount));
 		}
+		renderFlags(_pattern);
 		m_commands.show(_pattern ? std::optional<uint8_t>(_pattern->slot) : std::nullopt, length, _pattern
 			? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas" + " · " + std::to_string(trigs)
 				+ (trigs == 1 ? " trig" : " trigs")

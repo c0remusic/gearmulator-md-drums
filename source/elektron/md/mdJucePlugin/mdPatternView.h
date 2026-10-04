@@ -42,8 +42,12 @@ namespace mdJucePlugin
 	// that play; mdPlayParam<parameter> chooses the parameter and counts its locks.
 	// A click on a track name (mdPlayTrack<track>) makes it the edited track;
 	// a click on a step sets or clears its trig, written to the firmware as the PAS
-	// block does. In the lane, a press or a drag locks the parameter on a step with a
-	// trig at the pointer's height (LaneInput), a double click clears the lock.
+	// block does. Under the tracks, ACCENT, SLIDE and SWING (mdPlayFlagName<row>,
+	// mdPlayFlag<row>_<column>): the steps every track follows, or the edited track's
+	// when the kind is set per track; a click on a step sets or clears it, a click on
+	// the name opens a menu: every track or per track, and the accent or swing amount.
+	// In the lane, a press or a drag locks the parameter on a step with a trig at the
+	// pointer's height (LaneInput), a double click clears the lock.
 	// LONGUEUR, COPIER VERS and TOUT EFFACER: PatternCommands. OUVRIR DANS
 	// SON (mdPlayOpen) shows the track in SON. While the sequencer plays, the column of
 	// its step is lit when its steps are shown (mdPlayNow on the step number and the
@@ -68,6 +72,8 @@ namespace mdJucePlugin
 		// What the lane does under the mouse (LaneInput): the lane's parameter locked on the step
 		// of a visible column, or its lock cleared (nullopt)
 		void editLock(uint8_t _column, std::optional<uint8_t> _value);
+		// What a click on a step of the ACCENT, SLIDE or SWING row does (_row: a StepFlag)
+		void toggleFlag(uint8_t _row, uint8_t _column);
 		// What a slot chosen in COPIER VERS's menu does
 		void copyTo(const uint8_t _slot) { m_commands.copyTo(_slot); }
 		bool isCopyArmed() const { return m_commands.isCopyArmed(); }
@@ -89,6 +95,8 @@ namespace mdJucePlugin
 	private:
 		// Lights the playing step's column, a class on each cell: the column moves without a layout
 		bool showPlayStep(int _step);
+		void openFlagMenu(uint8_t _row, const Rml::Event& _event);
+		void renderFlags(const md::automation::sysex::PatternDump* _pattern);
 		void renderGrid(const md::automation::sysex::PatternDump* _pattern);
 		void renderLane(const md::automation::sysex::PatternDump* _pattern);
 		uint8_t kitValue(uint8_t _track, uint8_t _parameter) const;
@@ -104,6 +112,9 @@ namespace mdJucePlugin
 		std::array<Rml::Element*, StepCount> m_heads{};
 		std::array<Rml::Element*, TrackCount> m_tracks{};
 		std::array<std::array<Rml::Element*, StepCount>, TrackCount> m_steps{};
+		std::array<Rml::Element*, md::automation::sysex::StepFlagCount> m_flagNames{};
+		std::array<std::array<Rml::Element*, StepCount>, md::automation::sysex::StepFlagCount> m_flagCells{};
+		std::array<std::string, md::automation::sysex::StepFlagCount> m_shownFlagNames{};
 		std::array<Rml::Element*, ParameterCount> m_parameters{};
 		juceRmlUi::ElemCanvas* m_lane = nullptr;
 		std::unique_ptr<LaneInput> m_laneInput;

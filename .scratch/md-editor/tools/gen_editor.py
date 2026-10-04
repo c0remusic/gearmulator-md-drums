@@ -368,15 +368,21 @@ PLAY_LABEL_W = 96
 # Beside a lane (LaneInput): what its bars are, and what the mouse does on them
 LANE_NOTE = "gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer"
 
-def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend):
+FLAG_RH = 14
+
+def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend, flags=()):
     pitch = (gw - 32 - PLAY_LABEL_W) // 32
     cw = pitch - 5
     x0 = 16 + PLAY_LABEL_W
     rows_top = TOP + 16
     rows_bottom = rows_top + rows * rh
+    # Accent, slide and swing under the tracks (PatternView, MmPatternView): a row each, a click on a step sets or
+    # clears it, a click on its name opens its menu
+    flags_top = rows_bottom + 4
+    flags_bottom = flags_top + len(flags) * FLAG_RH if flags else rows_bottom
     for g in range(1, 8, 2):
-        w(f'{ind(d)}<div class="jucePos mdPlayBand" style="left: {x0 + 4 * g * pitch - 3}dp; top: {TOP - 2}dp; width: {3 * pitch + cw + 6}dp; height: {rows_bottom - TOP + 2}dp;"/>')
-    w(f'{ind(d)}<div class="jucePos mdPlayBar" style="left: {x0 + 16 * pitch - 4}dp; top: {TOP - 2}dp; width: 2dp; height: {rows_bottom - TOP + 2}dp;"/>')
+        w(f'{ind(d)}<div class="jucePos mdPlayBand" style="left: {x0 + 4 * g * pitch - 3}dp; top: {TOP - 2}dp; width: {3 * pitch + cw + 6}dp; height: {flags_bottom - TOP + 2}dp;"/>')
+    w(f'{ind(d)}<div class="jucePos mdPlayBar" style="left: {x0 + 16 * pitch - 4}dp; top: {TOP - 2}dp; width: 2dp; height: {flags_bottom - TOP + 2}dp;"/>')
     for s in range(32):
         beat = " mdPlayHeadBeat" if s % 4 == 0 else ""
         w(f'{ind(d)}<div id="{prefix}Head{s}" class="jucePos juceLabel mdPlayHead{beat}" style="left: {x0 + pitch * s}dp; top: {TOP}dp; width: {cw}dp;">{s + 1}</div>')
@@ -387,9 +393,14 @@ def play_grid(d, prefix, rows, rh, gw, track_class, step_class, legend):
         w(f'{ind(d)}<div id="{prefix}Led{t}" class="jucePos mdEdTrackLed" style="left: {16 + PLAY_LABEL_W - 10}dp; top: {y + (rh - 2 - 6) // 2}dp;"/>')
         for s in range(32):
             w(f'{ind(d)}<div id="{prefix}Step{t}_{s}" class="jucePos mdEdStep mdPlayStep{step_class}" style="left: {x0 + pitch * s}dp; top: {y}dp; width: {cw}dp; height: {rh - 2}dp;"/>')
+    for k, name in enumerate(flags):
+        y = flags_top + k * FLAG_RH
+        w(f'{ind(d)}<div id="{prefix}FlagName{k}" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: {y}dp; width: {PLAY_LABEL_W - 6}dp;">{name}</div>')
+        for s in range(32):
+            w(f'{ind(d)}<div id="{prefix}Flag{k}_{s}" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: {x0 + pitch * s}dp; top: {y}dp; width: {cw}dp; height: {FLAG_RH - 2}dp;"/>')
     chips = "".join(f'<span class="mdPlayChip mdPlayChip{kind}"/>{text}' for kind, text in legend[0])
-    w(f'{ind(d)}<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: {rows_bottom + 4}dp; width: {gw - 32}dp;">{chips} · {legend[1]}</div>')
-    return rows_bottom + 4 + 16 + 6
+    w(f'{ind(d)}<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: {flags_bottom + 4}dp; width: {gw - 32}dp;">{chips} · {legend[1]}</div>')
+    return flags_bottom + 4 + 16 + 6
 
 def play_page_mm(d):
     # The current pattern, the 6 tracks on 32 steps at a time (1-32 or 33-64), each trig with its note; then
@@ -414,8 +425,9 @@ def play_page_mm(d):
     w(f'{ind(d + 2)}<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
     gh = play_grid(d + 2, "mmPlay", 6, 26, gw, " mmPlayTrack", " mmPlayStep",
                    ([("Trig", "trig et sa note"), ("Lock", "trig avec locks"), ("Silent", "trig sans enveloppe d'ampli"),
-                     ("Out", "au-delà de la longueur")],
-                    "clic sur un pas : trig · clic dans le piano roll : la note · clic sur un nom : sa piste"))
+                     ("Flag", "slide, swing"), ("Out", "au-delà de la longueur")],
+                    "clic sur un pas : trig · piano roll : la note · sur un nom : sa piste · SWING : la quantité"),
+                   ["SLIDE", "SWING"])
     for i in range(marker, len(out)):
         out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)
@@ -480,9 +492,11 @@ def play_page_md(d):
     w(f'{ind(d + 2)}<button id="mdPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: {copy_x}dp; top: 4dp; width: 130dp;">COPIER VERS…</button>')
     w(f'{ind(d + 2)}<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {clear_x}dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>')
     w(f'{ind(d + 2)}<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: {gw - 16 - 62}dp; top: 4dp; width: 62dp;">RELIRE</button>')
-    gh = play_grid(d + 2, "mdPlay", 16, 16, gw, "", "",
-                   ([("Trig", "trig"), ("Lock", "trig avec locks"), ("Out", "au-delà de la longueur")],
-                    "clic sur un pas : poser ou retirer un trig · clic sur un nom : sa piste dans la lane"))
+    # Rows of 14 dp: room under the tracks for accent, slide and swing, and the lane keeps its height
+    gh = play_grid(d + 2, "mdPlay", 16, 14, gw, "", "",
+                   ([("Trig", "trig"), ("Lock", "trig avec locks"), ("Flag", "accent, slide, swing"), ("Out", "au-delà de la longueur")],
+                    "clic sur un pas : poser ou retirer · clic sur un nom : sa piste dans la lane, son menu"),
+                   ["ACCENT", "SLIDE", "SWING"])
     for i in range(marker, len(out)):
         out[i] = out[i].replace("{GRID_H}", str(gh))
     block_close(d + 1)

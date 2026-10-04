@@ -209,7 +209,18 @@ namespace mdJucePlugin
 		// the parameter at lock mask bit _bit (md::automation::sysex::mmLockBit) on a step with a trig
 		bool setMmPatternTrig(uint8_t _track, uint8_t _step, std::optional<uint8_t> _note);
 		bool setMmPatternLock(uint8_t _track, uint8_t _bit, uint8_t _step, std::optional<uint8_t> _value);
-		// Every trig and lock of the pattern, past its length too
+		// Machinedrum: a step's accent, slide or swing, in the mask every track follows (_track nullopt) or a
+		// track's own; whether a kind follows the tracks' own masks; the accent amount, 0..127
+		bool setPatternFlag(md::automation::sysex::StepFlag _flag, std::optional<uint8_t> _track, uint8_t _step,
+			bool _on);
+		bool setPatternFlagPerTrack(md::automation::sysex::StepFlag _flag, bool _perTrack);
+		bool setPatternAccentAmount(uint8_t _amount);
+		// Monomachine: a track's slide or swing on a step
+		bool setMmPatternFlag(md::automation::sysex::StepFlag _flag, uint8_t _track, uint8_t _step, bool _on);
+		// The swing amount, 50 to 80 percent, on either model
+		bool setPatternSwingAmount(uint8_t _percent);
+		// Every trig and lock of the pattern, past its length too, accents and slides with them; the swing
+		// steps stay
 		bool clearPattern();
 		// The pattern's length, 1 to 64
 		bool setPatternLength(uint8_t _length);

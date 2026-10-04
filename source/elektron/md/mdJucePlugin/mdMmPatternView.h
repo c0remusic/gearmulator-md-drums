@@ -27,6 +27,7 @@ namespace juceRmlUi
 namespace Rml
 {
 	class Element;
+	class Event;
 }
 
 namespace mdJucePlugin
@@ -48,7 +49,9 @@ namespace mdJucePlugin
 	// that step, or clears it when it is the note already there. OCTAVE – and + (mmPlayRollDown, Up) and
 	// the wheel over the roll move the notes it shows; another track or pattern brings back the notes it
 	// plays. In the lane, a press or a drag locks the parameter on a step with a trig at the pointer's
-	// height (LaneInput), a double click clears the lock. LONGUEUR, COPIER VERS and TOUT EFFACER:
+	// height (LaneInput), a double click clears the lock. Under the tracks, SLIDE and SWING
+	// (mmPlayFlagName<row>, mmPlayFlag<row>_<column>): the edited track's steps, a click sets or clears one;
+	// a click on SWING's name opens a menu of the swing amounts. LONGUEUR, COPIER VERS and TOUT EFFACER:
 	// PatternCommands. Written as on the Machinedrum once the clicks pause (Controller::sendPatternSoon),
 	// through the Monomachine's SYSEX RECV menu, which the Device drives: about half a second a write.
 	class MmPatternView
@@ -87,6 +90,9 @@ namespace mdJucePlugin
 		// What the lane does under the mouse (LaneInput): the parameter shown locked on the step of a
 		// visible column, or its lock cleared (nullopt)
 		void editLock(uint8_t _column, std::optional<uint8_t> _value);
+		// What a click on a step of the SLIDE (_row 0) or SWING (_row 1) row does
+		void toggleFlag(uint8_t _row, uint8_t _column);
+		static constexpr uint8_t FlagRows = 2;
 
 		// What a slot chosen in COPIER VERS's menu does
 		void copyTo(const uint8_t _slot) { m_commands.copyTo(_slot); }
@@ -109,6 +115,8 @@ namespace mdJucePlugin
 
 	private:
 		bool showPlayColumn(int _column);
+		void openSwingMenu(const Rml::Event& _event);
+		void renderFlags(const Pattern* _pattern);
 		void renderGrid(const Pattern* _pattern);
 		void renderRoll(const Pattern* _pattern);
 		void renderLane(const Pattern* _pattern);
@@ -127,6 +135,9 @@ namespace mdJucePlugin
 		std::array<Rml::Element*, VisibleSteps> m_heads{};
 		std::array<Rml::Element*, TrackCount> m_tracks{};
 		std::array<std::array<Rml::Element*, VisibleSteps>, TrackCount> m_steps{};
+		std::array<Rml::Element*, FlagRows> m_flagNames{};
+		std::array<std::array<Rml::Element*, VisibleSteps>, FlagRows> m_flagCells{};
+		std::array<std::string, FlagRows> m_shownFlagNames{};
 		std::array<Rml::Element*, 2> m_stepPages{};
 		std::array<Rml::Element*, PageCount> m_parameterPages{};
 		std::array<Rml::Element*, 8> m_parameters{};

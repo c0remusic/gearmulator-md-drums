@@ -324,6 +324,10 @@ namespace
 			slot, first.size(), parsed->length, lockRows, describeTrigs(*parsed).c_str(),
 			editor->toDump() == first ? "identical" : differences(editor->toDump(), first).c_str());
 		require(editor->toDump() == first, "MdPatternEditor does not re-encode the firmware's dump byte for byte");
+		std::printf("MD pattern %u: accent %08llx slide %08llx swing %08llx, per track %d %d %d, accent amount %u, swing %u (%u %%)\n",
+			slot, static_cast<unsigned long long>(parsed->flags[0]), static_cast<unsigned long long>(parsed->flags[1]),
+			static_cast<unsigned long long>(parsed->flags[2]), parsed->flagPerTrack[0], parsed->flagPerTrack[1], parsed->flagPerTrack[2],
+			parsed->accentAmount, parsed->swingAmount, sysex::swingPercent(parsed->swingAmount));
 
 		// Grid recording, not saved: two tracks down from track 1, then steps 1 and 5 toggled
 		panelTap(_hardware, md::PanelControl::Record);
@@ -588,6 +592,64 @@ namespace
 		require(savedThenWritten < loud / 20, "the saved Kit did not survive the pattern write");
 	}
 
+	// The first frame from the press on PLAY whose 256-frame window reaches a tenth of the run's peak, and
+	// that peak: rendered from the press on, the key released after 2048 frames
+	std::pair<size_t, float> onsetFromPlay(md::Hardware& _hardware, const size_t _windows)
+	{
+		const auto play = md::panelPacket(md::MachineModel::Machinedrum, md::PanelControl::Play);
+		require(play.has_value() && _hardware.trySendPanelEvent(play->row, play->mask), "PLAY not pressed");
+		auto peaks = renderPeaks(_hardware, 8);
+		require(_hardware.trySendPanelEvent(play->row, 0), "PLAY not released");
+		const auto rest = renderPeaks(_hardware, _windows);
+		peaks.insert(peaks.end(), rest.begin(), rest.end());
+		panelTap(_hardware, md::PanelControl::Stop);
+		advance(_hardware, md::g_samplerate / 2);
+		const auto peak = *std::max_element(peaks.begin(), peaks.end());
+		for(size_t window = 0; window < peaks.size(); ++window)
+		{
+			if(peaks[window] >= peak / 10)
+				return {window * 256, peak};
+		}
+		return {0, peak};
+	}
+
+	// Accent, track 1 alone on step 1 (the Kit's kick): the accent amount at 127 makes an accented step louder
+	// than twice a plain one. Accent per track (the machine's EDIT ALL off): the mask every track follows no
+	// longer accents it, the track's own does. Factory patterns accent every beat for every track, amount 0.
+	void checkAccent(md::Hardware& _hardware)
+	{
+		const auto slot = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto original = readPattern(_hardware, slot);
+		const auto peakWith = [&](const bool _perTrack, const bool _everyTrack, const bool _ownTrack)
+		{
+			auto editor = sysex::MdPatternEditor::fromDump(original);
+			require(editor.has_value(), "pattern not editable");
+			editor->clear();
+			require(editor->setLength(16) && editor->setTrig(0, 0, true) && editor->setAccentAmount(127)
+				&& editor->setFlagPerTrack(sysex::StepFlag::Accent, _perTrack)
+				&& editor->setFlag(sysex::StepFlag::Accent, std::nullopt, 0, _everyTrack)
+				&& editor->setFlag(sysex::StepFlag::Accent, uint8_t{0}, 0, _ownTrack), "accent edits refused");
+			const auto dump = editor->toDump();
+			const auto parsed = sysex::parseMdPatternDump(dump);
+			require(parsed && parsed->accentAmount == 127 && parsed->flagPerTrack[0] == _perTrack
+				&& parsed->hasFlag(sysex::StepFlag::Accent, 0, 0) == (_perTrack ? _ownTrack : _everyTrack), "accent not decoded as written");
+			send(_hardware, dump);
+			advance(_hardware, md::g_samplerate * 2);
+			return onsetFromPlay(_hardware, 60).second;
+		};
+		const auto plain = peakWith(false, false, false);
+		const auto accented = peakWith(false, true, false);
+		const auto everyTrackOnly = peakWith(true, true, false);
+		const auto ownTrack = peakWith(true, false, true);
+		std::printf("MD accent at 127, track 1 step 1 peak: plain %.3f, accented %.3f; per track: every track's mask %.3f,"
+			" the track's own %.3f\n", plain, accented, everyTrackOnly, ownTrack);
+		require(plain > 0.01f && accented > plain * 2, "an accented step not louder");
+		require(everyTrackOnly < plain * 1.3f, "per track, the mask every track follows still accents");
+		require(ownTrack > plain * 2, "per track, the track's own mask does not accent");
+		send(_hardware, original);
+		advance(_hardware, md::g_samplerate * 2);
+	}
+
 	// SET LFO PARAM ($62): each field of track 3's LFO shows in the live Kit at once, and the saved Kit holds it
 	void checkLfo(md::Hardware& _hardware)
 	{
@@ -791,6 +853,7 @@ namespace
 		checkPattern(*hardware);
 		checkLongPattern(*hardware);
 		checkPatternCopy(*hardware);
+		checkAccent(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);
 		checkSequencerPosition(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");

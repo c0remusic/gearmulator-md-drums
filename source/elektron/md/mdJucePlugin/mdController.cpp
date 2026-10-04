@@ -692,6 +692,55 @@ namespace mdJucePlugin
 		});
 	}
 
+	bool Controller::setPatternFlag(const md::automation::sysex::StepFlag _flag, const std::optional<uint8_t> _track,
+		const uint8_t _step, const bool _on)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setFlag(_flag, _track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternFlagPerTrack(const md::automation::sysex::StepFlag _flag, const bool _perTrack)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setFlagPerTrack(_flag, _perTrack);
+		});
+	}
+
+	bool Controller::setPatternAccentAmount(const uint8_t _amount)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setAccentAmount(_amount);
+		});
+	}
+
+	bool Controller::setMmPatternFlag(const md::automation::sysex::StepFlag _flag, const uint8_t _track,
+		const uint8_t _step, const bool _on)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setFlag(_flag, _track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternSwingAmount(const uint8_t _percent)
+	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				return _editor.setSwingAmount(_percent);
+			});
+		}
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setSwingAmount(_percent);
+		});
+	}
+
 	bool Controller::clearPattern()
 	{
 		if(m_model == md::MachineModel::Monomachine)

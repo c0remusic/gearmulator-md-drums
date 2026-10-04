@@ -814,7 +814,7 @@
 			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
 				<div class="mdEdScroll">
 					<div class="mdEdContent" style="height: 538dp;">
-						<div id="mmPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 230dp;">
+						<div id="mmPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 262dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERN</div>
 							<div id="mmPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
 							<div id="mmPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
@@ -823,11 +823,11 @@
 							<button id="mmPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 724dp; top: 4dp; width: 130dp;">COPIER VERS…</button>
 							<button id="mmPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
 							<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
-							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 174dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 174dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 689dp; top: 30dp; width: 117dp; height: 174dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 921dp; top: 30dp; width: 117dp; height: 174dp;"/>
-							<div class="jucePos mdPlayBar" style="left: 572dp; top: 30dp; width: 2dp; height: 174dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 689dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 921dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBar" style="left: 572dp; top: 30dp; width: 2dp; height: 206dp;"/>
 							<div id="mmPlayHead0" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 112dp; top: 32dp; width: 24dp;">1</div>
 							<div id="mmPlayHead1" class="jucePos juceLabel mdPlayHead" style="left: 141dp; top: 32dp; width: 24dp;">2</div>
 							<div id="mmPlayHead2" class="jucePos juceLabel mdPlayHead" style="left: 170dp; top: 32dp; width: 24dp;">3</div>
@@ -1064,21 +1064,87 @@
 							<div id="mmPlayStep5_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 178dp; width: 24dp; height: 24dp;"/>
 							<div id="mmPlayStep5_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 178dp; width: 24dp; height: 24dp;"/>
 							<div id="mmPlayStep5_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 178dp; width: 24dp; height: 24dp;"/>
-							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 208dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig et sa note<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipSilent"/>trig sans enveloppe d'ampli<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : trig · clic dans le piano roll : la note · clic sur un nom : sa piste</div>
+							<div id="mmPlayFlagName0" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 208dp; width: 90dp;">SLIDE</div>
+							<div id="mmPlayFlag0_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlagName1" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 222dp; width: 90dp;">SWING</div>
+							<div id="mmPlayFlag1_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 240dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig et sa note<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipSilent"/>trig sans enveloppe d'ampli<span class="mdPlayChip mdPlayChipFlag"/>slide, swing<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : trig · piano roll : la note · sur un nom : sa piste · SWING : la quantité</div>
 						</div>
-						<div id="mmPlayBottom" class="jucePos mdEdBlock" style="left: 16dp; top: 254dp; width: 1068dp; height: 272dp;">
+						<div id="mmPlayBottom" class="jucePos mdEdBlock" style="left: 16dp; top: 286dp; width: 1068dp; height: 240dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;"></div>
 							<button id="mmPlayTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="0" style="left: 16dp; top: 4dp; width: 90dp;">PIANO ROLL</button>
 							<button id="mmPlayTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="1" style="left: 112dp; top: 4dp; width: 90dp;">LANE</button>
 							<button id="mmPlayTab2" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="2" style="left: 208dp; top: 4dp; width: 90dp;">CHAÎNE</button>
-							<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 272dp;">
+							<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
 								<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 560dp;">—</div>
 								<button id="mmPlayRollDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 888dp; top: 4dp; width: 80dp;">OCTAVE –</button>
 								<button id="mmPlayRollUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 972dp; top: 4dp; width: 80dp;">OCTAVE +</button>
-								<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 90dp; height: 232dp;"/>
-								<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 32dp; width: 928dp; height: 232dp;"/>
+								<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 90dp; height: 200dp;"/>
+								<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 32dp; width: 928dp; height: 200dp;"/>
 							</div>
-							<div id="mmPlayLanePage" class="jucePos" tabgroup="mmPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 272dp;">
+							<div id="mmPlayLanePage" class="jucePos" tabgroup="mmPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
 								<div id="mmPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 736dp;">—</div>
 								<div id="mmPlayParamPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 32dp; width: 80dp;">SYN</div>
 								<div id="mmPlayParamPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 96dp; top: 32dp; width: 80dp;">AMP</div>
@@ -1096,9 +1162,9 @@
 								<div id="mmPlayParam6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 934dp; top: 32dp; width: 57dp;">PAN</div>
 								<div id="mmPlayParam7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 991dp; top: 32dp; width: 57dp;">PORT</div>
 								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer</div>
-								<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 200dp;"/>
+								<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 168dp;"/>
 							</div>
-							<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: 1068dp; height: 272dp;">
+							<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
 								<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 586dp;">chaîne inactive</div>
 								<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 912dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>
 								<div id="mdChainSlot0" class="jucePos mdChainSlot mdEdUnread" style="left: 16dp; top: 32dp; width: 60dp;">—</div>

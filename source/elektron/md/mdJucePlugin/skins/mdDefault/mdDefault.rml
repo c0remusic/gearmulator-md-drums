@@ -1108,7 +1108,7 @@
 			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
 				<div class="mdEdScroll">
 					<div class="mdEdContent" style="height: 538dp;">
-						<div id="mdPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 330dp;">
+						<div id="mdPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 344dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERN</div>
 							<div id="mdPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
 							<div id="mdPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
@@ -1117,11 +1117,11 @@
 							<button id="mdPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 724dp; top: 4dp; width: 130dp;">COPIER VERS…</button>
 							<button id="mdPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
 							<button id="mdPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
-							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 274dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 274dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 689dp; top: 30dp; width: 117dp; height: 274dp;"/>
-							<div class="jucePos mdPlayBand" style="left: 921dp; top: 30dp; width: 117dp; height: 274dp;"/>
-							<div class="jucePos mdPlayBar" style="left: 572dp; top: 30dp; width: 2dp; height: 274dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 288dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 288dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 689dp; top: 30dp; width: 117dp; height: 288dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 921dp; top: 30dp; width: 117dp; height: 288dp;"/>
+							<div class="jucePos mdPlayBar" style="left: 572dp; top: 30dp; width: 2dp; height: 288dp;"/>
 							<div id="mdPlayHead0" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 112dp; top: 32dp; width: 24dp;">1</div>
 							<div id="mdPlayHead1" class="jucePos juceLabel mdPlayHead" style="left: 141dp; top: 32dp; width: 24dp;">2</div>
 							<div id="mdPlayHead2" class="jucePos juceLabel mdPlayHead" style="left: 170dp; top: 32dp; width: 24dp;">3</div>
@@ -1155,556 +1155,655 @@
 							<div id="mdPlayHead30" class="jucePos juceLabel mdPlayHead" style="left: 982dp; top: 32dp; width: 24dp;">31</div>
 							<div id="mdPlayHead31" class="jucePos juceLabel mdPlayHead" style="left: 1011dp; top: 32dp; width: 24dp;">32</div>
 							<div id="mdPlayTrack0" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 48dp; width: 90dp;">01 —</div>
-							<div id="mdPlayLed0" class="jucePos mdEdTrackLed" style="left: 102dp; top: 52dp;"/>
-							<div id="mdPlayStep0_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep0_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 48dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack1" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 64dp; width: 90dp;">02 —</div>
-							<div id="mdPlayLed1" class="jucePos mdEdTrackLed" style="left: 102dp; top: 68dp;"/>
-							<div id="mdPlayStep1_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep1_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 64dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack2" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 80dp; width: 90dp;">03 —</div>
-							<div id="mdPlayLed2" class="jucePos mdEdTrackLed" style="left: 102dp; top: 84dp;"/>
-							<div id="mdPlayStep2_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep2_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 80dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack3" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 96dp; width: 90dp;">04 —</div>
-							<div id="mdPlayLed3" class="jucePos mdEdTrackLed" style="left: 102dp; top: 100dp;"/>
-							<div id="mdPlayStep3_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep3_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 96dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack4" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 112dp; width: 90dp;">05 —</div>
-							<div id="mdPlayLed4" class="jucePos mdEdTrackLed" style="left: 102dp; top: 116dp;"/>
-							<div id="mdPlayStep4_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep4_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 112dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack5" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 128dp; width: 90dp;">06 —</div>
-							<div id="mdPlayLed5" class="jucePos mdEdTrackLed" style="left: 102dp; top: 132dp;"/>
-							<div id="mdPlayStep5_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep5_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 128dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack6" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 144dp; width: 90dp;">07 —</div>
-							<div id="mdPlayLed6" class="jucePos mdEdTrackLed" style="left: 102dp; top: 148dp;"/>
-							<div id="mdPlayStep6_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep6_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 144dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack7" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 160dp; width: 90dp;">08 —</div>
-							<div id="mdPlayLed7" class="jucePos mdEdTrackLed" style="left: 102dp; top: 164dp;"/>
-							<div id="mdPlayStep7_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep7_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 160dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack8" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 176dp; width: 90dp;">09 —</div>
-							<div id="mdPlayLed8" class="jucePos mdEdTrackLed" style="left: 102dp; top: 180dp;"/>
-							<div id="mdPlayStep8_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep8_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 176dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack9" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 192dp; width: 90dp;">10 —</div>
-							<div id="mdPlayLed9" class="jucePos mdEdTrackLed" style="left: 102dp; top: 196dp;"/>
-							<div id="mdPlayStep9_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep9_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 192dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack10" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 208dp; width: 90dp;">11 —</div>
-							<div id="mdPlayLed10" class="jucePos mdEdTrackLed" style="left: 102dp; top: 212dp;"/>
-							<div id="mdPlayStep10_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep10_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 208dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack11" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 224dp; width: 90dp;">12 —</div>
-							<div id="mdPlayLed11" class="jucePos mdEdTrackLed" style="left: 102dp; top: 228dp;"/>
-							<div id="mdPlayStep11_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep11_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 224dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack12" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 240dp; width: 90dp;">13 —</div>
-							<div id="mdPlayLed12" class="jucePos mdEdTrackLed" style="left: 102dp; top: 244dp;"/>
-							<div id="mdPlayStep12_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep12_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 240dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack13" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 256dp; width: 90dp;">14 —</div>
-							<div id="mdPlayLed13" class="jucePos mdEdTrackLed" style="left: 102dp; top: 260dp;"/>
-							<div id="mdPlayStep13_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep13_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 256dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack14" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 272dp; width: 90dp;">15 —</div>
-							<div id="mdPlayLed14" class="jucePos mdEdTrackLed" style="left: 102dp; top: 276dp;"/>
-							<div id="mdPlayStep14_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep14_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 272dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayTrack15" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 288dp; width: 90dp;">16 —</div>
-							<div id="mdPlayLed15" class="jucePos mdEdTrackLed" style="left: 102dp; top: 292dp;"/>
-							<div id="mdPlayStep15_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div id="mdPlayStep15_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 288dp; width: 24dp; height: 14dp;"/>
-							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 308dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : poser ou retirer un trig · clic sur un nom : sa piste dans la lane</div>
+							<div id="mdPlayLed0" class="jucePos mdEdTrackLed" style="left: 102dp; top: 51dp;"/>
+							<div id="mdPlayStep0_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep0_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 48dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack1" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 62dp; width: 90dp;">02 —</div>
+							<div id="mdPlayLed1" class="jucePos mdEdTrackLed" style="left: 102dp; top: 65dp;"/>
+							<div id="mdPlayStep1_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep1_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 62dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack2" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 76dp; width: 90dp;">03 —</div>
+							<div id="mdPlayLed2" class="jucePos mdEdTrackLed" style="left: 102dp; top: 79dp;"/>
+							<div id="mdPlayStep2_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep2_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 76dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack3" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 90dp; width: 90dp;">04 —</div>
+							<div id="mdPlayLed3" class="jucePos mdEdTrackLed" style="left: 102dp; top: 93dp;"/>
+							<div id="mdPlayStep3_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep3_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 90dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack4" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 104dp; width: 90dp;">05 —</div>
+							<div id="mdPlayLed4" class="jucePos mdEdTrackLed" style="left: 102dp; top: 107dp;"/>
+							<div id="mdPlayStep4_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep4_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 104dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack5" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 118dp; width: 90dp;">06 —</div>
+							<div id="mdPlayLed5" class="jucePos mdEdTrackLed" style="left: 102dp; top: 121dp;"/>
+							<div id="mdPlayStep5_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep5_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 118dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack6" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 132dp; width: 90dp;">07 —</div>
+							<div id="mdPlayLed6" class="jucePos mdEdTrackLed" style="left: 102dp; top: 135dp;"/>
+							<div id="mdPlayStep6_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep6_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 132dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack7" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 146dp; width: 90dp;">08 —</div>
+							<div id="mdPlayLed7" class="jucePos mdEdTrackLed" style="left: 102dp; top: 149dp;"/>
+							<div id="mdPlayStep7_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep7_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 146dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack8" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 160dp; width: 90dp;">09 —</div>
+							<div id="mdPlayLed8" class="jucePos mdEdTrackLed" style="left: 102dp; top: 163dp;"/>
+							<div id="mdPlayStep8_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep8_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 160dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack9" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 174dp; width: 90dp;">10 —</div>
+							<div id="mdPlayLed9" class="jucePos mdEdTrackLed" style="left: 102dp; top: 177dp;"/>
+							<div id="mdPlayStep9_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep9_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 174dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack10" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 188dp; width: 90dp;">11 —</div>
+							<div id="mdPlayLed10" class="jucePos mdEdTrackLed" style="left: 102dp; top: 191dp;"/>
+							<div id="mdPlayStep10_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep10_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 188dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack11" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 202dp; width: 90dp;">12 —</div>
+							<div id="mdPlayLed11" class="jucePos mdEdTrackLed" style="left: 102dp; top: 205dp;"/>
+							<div id="mdPlayStep11_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep11_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 202dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack12" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 216dp; width: 90dp;">13 —</div>
+							<div id="mdPlayLed12" class="jucePos mdEdTrackLed" style="left: 102dp; top: 219dp;"/>
+							<div id="mdPlayStep12_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep12_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 216dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack13" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 230dp; width: 90dp;">14 —</div>
+							<div id="mdPlayLed13" class="jucePos mdEdTrackLed" style="left: 102dp; top: 233dp;"/>
+							<div id="mdPlayStep13_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep13_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 230dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack14" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 244dp; width: 90dp;">15 —</div>
+							<div id="mdPlayLed14" class="jucePos mdEdTrackLed" style="left: 102dp; top: 247dp;"/>
+							<div id="mdPlayStep14_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep14_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 244dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayTrack15" class="jucePos juceLabel mdPlayTrack" style="left: 16dp; top: 258dp; width: 90dp;">16 —</div>
+							<div id="mdPlayLed15" class="jucePos mdEdTrackLed" style="left: 102dp; top: 261dp;"/>
+							<div id="mdPlayStep15_0" class="jucePos mdEdStep mdPlayStep" style="left: 112dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_1" class="jucePos mdEdStep mdPlayStep" style="left: 141dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_2" class="jucePos mdEdStep mdPlayStep" style="left: 170dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_3" class="jucePos mdEdStep mdPlayStep" style="left: 199dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_4" class="jucePos mdEdStep mdPlayStep" style="left: 228dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_5" class="jucePos mdEdStep mdPlayStep" style="left: 257dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_6" class="jucePos mdEdStep mdPlayStep" style="left: 286dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_7" class="jucePos mdEdStep mdPlayStep" style="left: 315dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_8" class="jucePos mdEdStep mdPlayStep" style="left: 344dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_9" class="jucePos mdEdStep mdPlayStep" style="left: 373dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_10" class="jucePos mdEdStep mdPlayStep" style="left: 402dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_11" class="jucePos mdEdStep mdPlayStep" style="left: 431dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_12" class="jucePos mdEdStep mdPlayStep" style="left: 460dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_13" class="jucePos mdEdStep mdPlayStep" style="left: 489dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_14" class="jucePos mdEdStep mdPlayStep" style="left: 518dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_15" class="jucePos mdEdStep mdPlayStep" style="left: 547dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_16" class="jucePos mdEdStep mdPlayStep" style="left: 576dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_17" class="jucePos mdEdStep mdPlayStep" style="left: 605dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_18" class="jucePos mdEdStep mdPlayStep" style="left: 634dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_19" class="jucePos mdEdStep mdPlayStep" style="left: 663dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_20" class="jucePos mdEdStep mdPlayStep" style="left: 692dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_21" class="jucePos mdEdStep mdPlayStep" style="left: 721dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_22" class="jucePos mdEdStep mdPlayStep" style="left: 750dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_23" class="jucePos mdEdStep mdPlayStep" style="left: 779dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_24" class="jucePos mdEdStep mdPlayStep" style="left: 808dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_25" class="jucePos mdEdStep mdPlayStep" style="left: 837dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_26" class="jucePos mdEdStep mdPlayStep" style="left: 866dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_27" class="jucePos mdEdStep mdPlayStep" style="left: 895dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_28" class="jucePos mdEdStep mdPlayStep" style="left: 924dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_29" class="jucePos mdEdStep mdPlayStep" style="left: 953dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_30" class="jucePos mdEdStep mdPlayStep" style="left: 982dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayStep15_31" class="jucePos mdEdStep mdPlayStep" style="left: 1011dp; top: 258dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlagName0" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 276dp; width: 90dp;">ACCENT</div>
+							<div id="mdPlayFlag0_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag0_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 276dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlagName1" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 290dp; width: 90dp;">SLIDE</div>
+							<div id="mdPlayFlag1_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag1_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 290dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlagName2" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 304dp; width: 90dp;">SWING</div>
+							<div id="mdPlayFlag2_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div id="mdPlayFlag2_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 304dp; width: 24dp; height: 12dp;"/>
+							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 322dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipFlag"/>accent, slide, swing<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : poser ou retirer · clic sur un nom : sa piste dans la lane, son menu</div>
 						</div>
-						<div id="mdPlayLane" class="jucePos mdEdBlock" style="left: 16dp; top: 354dp; width: 1068dp; height: 172dp;">
+						<div id="mdPlayLane" class="jucePos mdEdBlock" style="left: 16dp; top: 368dp; width: 1068dp; height: 158dp;">
 							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;"></div>
 							<button id="mdPlayTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdPlayBottom" tabbutton="0" style="left: 16dp; top: 4dp;">LANE</button>
 							<button id="mdPlayTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdPlayBottom" tabbutton="1" style="left: 100dp; top: 4dp;">CHAÎNE</button>
-							<div id="mdPlayLanePage" class="jucePos" tabgroup="mdPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 172dp;">
+							<div id="mdPlayLanePage" class="jucePos" tabgroup="mdPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 158dp;">
 								<div id="mdPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 196dp; top: 4dp; width: 696dp;">—</div>
 								<button id="mdPlayOpen" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 902dp; top: 4dp; width: 150dp;">OUVRIR DANS SON</button>
 								<div id="mdPlayParam0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 32dp; width: 41dp;">P1</div>
@@ -1732,9 +1831,9 @@
 								<div id="mdPlayParam22" class="jucePos mdEdSeg mdEdSegChoice" style="left: 962dp; top: 32dp; width: 41dp;">LFOD</div>
 								<div id="mdPlayParam23" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1005dp; top: 32dp; width: 41dp;">LFOM</div>
 								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer</div>
-								<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 100dp;"/>
+								<div id="mdPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 86dp;"/>
 							</div>
-							<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 172dp;">
+							<div id="mdPlayChainPage" class="jucePos" tabgroup="mdPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 158dp;">
 								<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: 196dp; top: 4dp; width: 706dp;">chaîne inactive</div>
 								<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 912dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>
 								<div id="mdChainSlot0" class="jucePos mdChainSlot mdEdUnread" style="left: 16dp; top: 32dp; width: 60dp;">—</div>

@@ -287,8 +287,13 @@ namespace md::automation::sysex
 		constexpr size_t g_patternShortSize = 0xacb;
 		constexpr size_t g_patternLongSize = 0x1522;
 		constexpr size_t g_patternTailSize = 204;
+		// In the tail, after the three EDIT ALL words: the tracks' accent, slide and swing masks
+		constexpr size_t g_patternTrackFlags = 12;
 		constexpr size_t g_patternExtensionSize = 64 + 12 + 64 * 32 + 192;
+		// In the extension: steps 33 to 64 of every track's flags, of the lock rows, of the tracks' flags
+		constexpr size_t g_patternExtensionFlags = 64;
 		constexpr size_t g_patternExtensionLocks = 64 + 12;
+		constexpr size_t g_patternExtensionTrackFlags = 64 + 12 + 64 * 32;
 		constexpr size_t g_patternRows = 64;
 		constexpr uint8_t g_patternParameters = 24;
 		constexpr uint8_t g_noLock = 0xff;
@@ -299,11 +304,32 @@ namespace md::automation::sysex
 			return static_cast<uint32_t>(_bytes[0]) << 24 | static_cast<uint32_t>(_bytes[1]) << 16
 				| static_cast<uint32_t>(_bytes[2]) << 8 | _bytes[3];
 		}
+
+		void writeMask32(uint8_t* _bytes, const uint32_t _mask)
+		{
+			_bytes[0] = static_cast<uint8_t>(_mask >> 24);
+			_bytes[1] = static_cast<uint8_t>(_mask >> 16);
+			_bytes[2] = static_cast<uint8_t>(_mask >> 8);
+			_bytes[3] = static_cast<uint8_t>(_mask);
+		}
 	}
 
 	bool PatternDump::hasTrig(const uint8_t _track, const uint8_t _step) const
 	{
 		return _track < 16 && _step < steps && (trigs[_track] >> _step) & 1u;
+	}
+
+	uint64_t PatternDump::flagMask(const StepFlag _flag, const uint8_t _track) const
+	{
+		const auto flag = static_cast<uint8_t>(_flag);
+		if(flag >= StepFlagCount || _track >= 16)
+			return 0;
+		return flagPerTrack[flag] ? trackFlags[flag][_track] : flags[flag];
+	}
+
+	bool PatternDump::hasFlag(const StepFlag _flag, const uint8_t _track, const uint8_t _step) const
+	{
+		return _step < steps && (flagMask(_flag, _track) >> _step) & 1u;
 	}
 
 	std::optional<uint8_t> PatternDump::lock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step) const
@@ -344,12 +370,16 @@ namespace md::automation::sysex
 			return std::nullopt;
 		for(size_t track = 0; track < 16; ++track)
 			result.lockMasks[track] = readMask32(&raw[track * 4]);
-		// Accent, slide and swing patterns and the swing amount, then six plain bytes:
-		// accent amount, length, double tempo, scale, kit, locked rows.
-		std::array<uint8_t, 16> skipped{};
-		if(!read7Bit(_message, position, skipped.size(), skipped.data()))
+		// Accent, slide and swing patterns (steps 1 to 32) and the swing amount, then six plain
+		// bytes: accent amount, length, double tempo, scale, kit, locked rows.
+		std::array<uint8_t, 16> flags{};
+		if(!read7Bit(_message, position, flags.size(), flags.data()))
 			return std::nullopt;
+		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
+			result.flags[flag] = readMask32(&flags[flag * 4]);
+		result.swingAmount = readMask32(&flags[12]);
 		// The row count byte is not needed: rows follow the masks, as on the machine.
+		result.accentAmount = _message[position];
 		result.length = _message[position + 1];
 		result.kit = _message[position + 4];
 		position += 6;
@@ -365,16 +395,35 @@ namespace md::automation::sysex
 			result.lockRows[row].fill(g_noLock);
 			std::copy_n(locks.begin() + row * 32, 32, result.lockRows[row].begin());
 		}
-		// The 64-step form: steps 33 to 64 of the trigs and of each lock row, after the tail
+		// The tail: per kind, whether every track follows one mask (MCL: EDIT ALL), then the tracks'
+		// own masks, steps 1 to 32
+		std::vector<uint8_t> tail(g_patternTailSize);
+		if(!read7Bit(_message, position, tail.size(), tail.data()))
+			return std::nullopt;
+		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
+		{
+			result.flagPerTrack[flag] = readMask32(&tail[flag * 4]) == 0;
+			for(size_t track = 0; track < 16; ++track)
+				result.trackFlags[flag][track] = readMask32(&tail[g_patternTrackFlags + (flag * 16 + track) * 4]);
+		}
+		// The 64-step form: steps 33 to 64 of the trigs, the flags and each lock row, after the tail
 		if(result.steps == 64)
 		{
-			std::vector<uint8_t> tail(g_patternTailSize);
 			std::vector<uint8_t> extension(g_patternExtensionSize);
-			if(!read7Bit(_message, position, tail.size(), tail.data())
-				|| !read7Bit(_message, position, extension.size(), extension.data()))
+			if(!read7Bit(_message, position, extension.size(), extension.data()))
 				return std::nullopt;
 			for(size_t track = 0; track < 16; ++track)
 				result.trigs[track] |= static_cast<uint64_t>(readMask32(&extension[track * 4])) << 32;
+			for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
+			{
+				const auto everyTrack = readMask32(&extension[g_patternExtensionFlags + flag * 4]);
+				result.flags[flag] |= static_cast<uint64_t>(everyTrack) << 32;
+				for(size_t track = 0; track < 16; ++track)
+				{
+					result.trackFlags[flag][track] |= static_cast<uint64_t>(readMask32(
+						&extension[g_patternExtensionTrackFlags + (flag * 16 + track) * 4])) << 32;
+				}
+			}
 			for(size_t row = 0; row < g_patternRows; ++row)
 				std::copy_n(&extension[g_patternExtensionLocks + row * 32], 32, result.lockRows[row].begin() + 32);
 		}
@@ -399,6 +448,10 @@ namespace md::automation::sysex
 		constexpr size_t g_mmFilterTrigs = 1 * g_mmMaskSize;
 		constexpr size_t g_mmLfoTrigs = 2 * g_mmMaskSize;
 		constexpr size_t g_mmTrigs = 6 * g_mmMaskSize;
+		constexpr size_t g_mmSlides = 9 * g_mmMaskSize;
+		constexpr size_t g_mmSwings = 10 * g_mmMaskSize;
+		constexpr size_t g_mmMidiSwings = 12 * g_mmMaskSize;
+		constexpr size_t g_mmSwingAmount = 13 * g_mmMaskSize;		// big-endian, as swingWord makes it
 		constexpr size_t g_mmLockMasks = 13 * g_mmMaskSize + 4;
 		constexpr size_t g_mmNotes = g_mmLockMasks + g_mmMaskSize;
 		constexpr size_t g_mmPatternLengthIndex = g_mmNotes + 6 * 64;
@@ -486,9 +539,12 @@ namespace md::automation::sysex
 			result.lfoTrigs[track] = readMask(&data[g_mmLfoTrigs + track * 8]);
 			result.trigs[track] = readMask(&data[g_mmTrigs + track * 8]);
 			result.lockMasks[track] = readMask(&data[g_mmLockMasks + track * 8]);
+			result.slides[track] = readMask(&data[g_mmSlides + track * 8]);
+			result.swings[track] = readMask(&data[g_mmSwings + track * 8]);
 			std::copy_n(&data[g_mmNotes + track * 64], 64, result.notes[track].begin());
 			rows += std::bitset<64>(result.lockMasks[track]).count();
 		}
+		result.swingAmount = readMask32(&data[g_mmSwingAmount]);
 		// As MCL reads them: a row per set bit, as many as the pattern holds
 		result.lockRows.resize(std::min<size_t>(rows, MmPatternDump::LockRowCount));
 		for(size_t row = 0; row < result.lockRows.size(); ++row)
@@ -618,12 +674,38 @@ namespace md::automation::sysex
 
 	void MmPatternEditor::clear()
 	{
-		// The 13 kinds of step masks, the lock masks and rows, the notes
+		// The 13 kinds of step masks but the swing ones (where the groove falls, as MCL leaves them), the lock
+		// masks and rows, the notes
+		const auto swingsAt = m_payload.begin() + g_mmSwings;
+		const auto midiSwingsAt = m_payload.begin() + g_mmMidiSwings;
+		const std::vector<uint8_t> swings(swingsAt, swingsAt + g_mmMaskSize);
+		const std::vector<uint8_t> midiSwings(midiSwingsAt, midiSwingsAt + g_mmMaskSize);
 		std::fill_n(m_payload.begin(), g_mmTrigKinds * g_mmMaskSize, uint8_t{0});
+		std::copy(swings.begin(), swings.end(), m_payload.begin() + g_mmSwings);
+		std::copy(midiSwings.begin(), midiSwings.end(), m_payload.begin() + g_mmMidiSwings);
 		std::fill_n(m_payload.begin() + g_mmLockMasks, g_mmMaskSize, uint8_t{0});
 		std::fill_n(m_payload.begin() + g_mmNotes, MmPatternDump::TrackCount * 64, MmPatternDump::None);
 		std::fill_n(m_payload.begin() + g_mmLockRows, MmPatternDump::LockRowCount * 64, MmPatternDump::None);
 		m_payload[g_mmLocksUsed] = 0;
+	}
+
+	bool MmPatternEditor::setFlag(const StepFlag _flag, const uint8_t _track, const uint8_t _step, const bool _on)
+	{
+		if((_flag != StepFlag::Slide && _flag != StepFlag::Swing) || _track >= MmPatternDump::TrackCount
+			|| _step >= m_payload[g_mmPatternLengthIndex])
+			return false;
+		const auto offset = (_flag == StepFlag::Slide ? g_mmSlides : g_mmSwings) + _track * 8;
+		const auto bit = uint64_t{1} << _step;
+		setMask(offset, _on ? mask(offset) | bit : mask(offset) & ~bit);
+		return true;
+	}
+
+	bool MmPatternEditor::setSwingAmount(const uint8_t _percent)
+	{
+		if(_percent < 50 || _percent > 80)
+			return false;
+		writeMask32(&m_payload[g_mmSwingAmount], swingWord(_percent));
+		return true;
 	}
 
 	bool MmPatternEditor::setSlot(const uint8_t _slot)
@@ -839,6 +921,21 @@ namespace md::automation::sysex
 				lockValue(row, step) = g_noLock;
 		}
 		m_plain[5] = 0;
+		// The accents and slides too, every track's and each track's; the swing steps stay, as MCL leaves them:
+		// they say where the groove falls, the swing amount how much
+		for(const auto flag : {StepFlag::Accent, StepFlag::Slide})
+		{
+			const auto kind = static_cast<uint8_t>(flag);
+			writeMask32(&m_swing[kind * 4], 0);
+			if(!m_extension.empty())
+				writeMask32(&m_extension[g_patternExtensionFlags + kind * 4], 0);
+			for(uint8_t track = 0; track < 16; ++track)
+			{
+				writeMask32(&m_tail[g_patternTrackFlags + (kind * 16 + track) * 4], 0);
+				if(!m_extension.empty())
+					writeMask32(&m_extension[g_patternExtensionTrackFlags + (kind * 16 + track) * 4], 0);
+			}
+		}
 	}
 
 	bool MdPatternEditor::setSlot(const uint8_t _slot)
@@ -848,6 +945,56 @@ namespace md::automation::sysex
 		// The last byte of the header; the checksum, which counts it, is made again by toDump
 		m_header.back() = _slot;
 		return true;
+	}
+
+	bool MdPatternEditor::setFlag(const StepFlag _flag, const std::optional<uint8_t> _track, const uint8_t _step,
+		const bool _on)
+	{
+		const auto flag = static_cast<uint8_t>(_flag);
+		if(flag >= StepFlagCount || (_track && *_track >= 16) || _step >= std::min(length(), stepCount()))
+			return false;
+		// Steps 1 to 32 in the masks' first words, 33 to 64 in the long form's
+		uint8_t* word = nullptr;
+		const auto trackWord = _track ? (flag * 16 + *_track) * 4 : 0;
+		if(_step < 32)
+			word = _track ? &m_tail[g_patternTrackFlags + trackWord] : &m_swing[flag * 4];
+		else if(_track)
+			word = &m_extension[g_patternExtensionTrackFlags + trackWord];
+		else
+			word = &m_extension[g_patternExtensionFlags + flag * 4];
+		const auto bit = uint32_t{1} << (_step % 32);
+		writeMask32(word, _on ? readMask32(word) | bit : readMask32(word) & ~bit);
+		return true;
+	}
+
+	bool MdPatternEditor::setFlagPerTrack(const StepFlag _flag, const bool _perTrack)
+	{
+		const auto flag = static_cast<uint8_t>(_flag);
+		if(flag >= StepFlagCount)
+			return false;
+		writeMask32(&m_tail[flag * 4], _perTrack ? 0 : 1);
+		return true;
+	}
+
+	bool MdPatternEditor::setAccentAmount(const uint8_t _amount)
+	{
+		if(_amount >= 0x80)
+			return false;
+		m_plain[0] = _amount;
+		return true;
+	}
+
+	bool MdPatternEditor::setSwingAmount(const uint8_t _percent)
+	{
+		if(_percent < 50 || _percent > 80)
+			return false;
+		setSwingWord(swingWord(_percent));
+		return true;
+	}
+
+	void MdPatternEditor::setSwingWord(const uint32_t _word)
+	{
+		writeMask32(&m_swing[12], _word);
 	}
 
 	Message MdPatternEditor::toDump() const

@@ -94,6 +94,27 @@ namespace md::automation::sysex
 
 	// A Machinedrum pattern's trigs and locks, as far as the editor shows them. The
 	// dump holds 32 steps, or 64 in its long form (a length over 32).
+	// What a step does besides its trig: accent (Machinedrum), slide and swing
+	enum class StepFlag : uint8_t
+	{
+		Accent,
+		Slide,
+		Swing
+	};
+	constexpr uint8_t StepFlagCount = 3;
+	// The swing amount as dumps hold it: how far a swung step is delayed, in 16384ths of the step, scaled so
+	// that 50 % is 0 and 80 %, the most the machines take, 9830 (MCL's MDSeqTrack; the factory patterns hold
+	// 0, and 60 % delays a swung step by a fifth of a step on the Machinedrum, mdEditorFirmwareTest)
+	constexpr uint32_t swingWord(const uint8_t _percent)
+	{
+		return _percent <= 50 ? 0 : ((static_cast<uint32_t>(_percent > 80 ? 80 : _percent) - 50) * 16384 + 25) / 50;
+	}
+	constexpr uint8_t swingPercent(const uint32_t _word)
+	{
+		const auto extra = (static_cast<uint64_t>(_word) * 50 + 8192) >> 14;
+		return static_cast<uint8_t>(50 + (extra > 30 ? 30 : extra));
+	}
+
 	struct PatternDump
 	{
 		uint8_t slot = 0;      // 0..127, A01..H16
@@ -106,11 +127,24 @@ namespace md::automation::sysex
 		// track then parameter order; 128 and above means no lock on that step
 		// (always past the steps the dump holds).
 		std::vector<std::array<uint8_t, 64>> lockRows;
+		// Accent, slide and swing (by StepFlag): a mask of steps every track follows,
+		// or, when the pattern sets that kind per track (the machine's EDIT ALL off),
+		// a mask per track. Bit n: step n + 1.
+		std::array<uint64_t, StepFlagCount> flags{};
+		std::array<bool, StepFlagCount> flagPerTrack{};
+		std::array<std::array<uint64_t, 16>, StepFlagCount> trackFlags{};
+		uint8_t accentAmount = 0;
+		uint32_t swingAmount = 0;		// swingPercent
 
 		bool hasTrig(uint8_t _track, uint8_t _step) const;
 		// Locked value of parameter _parameter (0..23: synthesis, effects, routing)
 		// on a step, or nullopt.
 		std::optional<uint8_t> lock(uint8_t _track, uint8_t _parameter, uint8_t _step) const;
+		// Whether a track's step is accented, slid or swung: by the track's own mask
+		// when the kind is set per track, else by every track's
+		bool hasFlag(StepFlag _flag, uint8_t _track, uint8_t _step) const;
+		// The steps of a kind a track follows
+		uint64_t flagMask(StepFlag _flag, uint8_t _track) const;
 	};
 
 	// A Machinedrum pattern dump ($67) that can be edited and sent back. Every
@@ -136,6 +170,15 @@ namespace md::automation::sysex
 		// The pattern's number, 0 to 127 (A01 to H16): the firmware stores a dump in the
 		// slot it names, so a dump given another slot's number is a copy.
 		bool setSlot(uint8_t _slot);
+		// A step's accent, slide or swing below the pattern length: in the mask every
+		// track follows (_track nullopt), or in a track's own (0..15)
+		bool setFlag(StepFlag _flag, std::optional<uint8_t> _track, uint8_t _step, bool _on);
+		// Whether a kind follows the tracks' own masks (EDIT ALL off) or every track's
+		bool setFlagPerTrack(StepFlag _flag, bool _perTrack);
+		bool setAccentAmount(uint8_t _amount);		// 0..127
+		bool setSwingAmount(uint8_t _percent);		// 50..80
+		// The swing amount's word as the dump holds it
+		void setSwingWord(uint32_t _word);
 
 		Message toDump() const;
 
@@ -239,6 +282,10 @@ namespace md::automation::sysex
 		std::array<uint64_t, TrackCount> lockMasks{};
 		// The lock rows: row k belongs to the k-th set bit of the masks, in track then bit order
 		std::vector<std::array<uint8_t, StepCount>> lockRows;
+		// Slide and swing, a mask per track (no accent on the Monomachine)
+		std::array<uint64_t, TrackCount> slides{};
+		std::array<uint64_t, TrackCount> swings{};
+		uint32_t swingAmount = 0;		// swingPercent
 
 		bool hasTrig(uint8_t _track, uint8_t _step) const;
 		std::optional<uint8_t> note(uint8_t _track, uint8_t _step) const;
@@ -279,6 +326,9 @@ namespace md::automation::sysex
 		// The pattern's number, 0 to 127 (A01 to H16): received in SYSEX RECV's ORIG mode, a dump goes to the
 		// slot it names, so a dump given another slot's number is a copy.
 		bool setSlot(uint8_t _slot);
+		// A track's slide or swing on a step below the length (no accent on the Monomachine)
+		bool setFlag(StepFlag _flag, uint8_t _track, uint8_t _step, bool _on);
+		bool setSwingAmount(uint8_t _percent);		// 50..80
 
 		Message toDump() const;
 

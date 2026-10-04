@@ -7,6 +7,7 @@
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlEventListener.h"
+#include "juceRmlUi/rmlMenu.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -125,6 +126,30 @@ namespace mdJucePlugin
 					toggleStep(track, static_cast<uint8_t>(page * VisibleSteps + step));
 				});
 			}
+		}
+		for(uint8_t row = 0; row < FlagRows; ++row)
+		{
+			const auto rowId = std::to_string(row);
+			m_flagNames[row] = _document.GetElementById("mmPlayFlagName" + rowId);
+			for(uint8_t column = 0; column < VisibleSteps; ++column)
+			{
+				auto* cell = _document.GetElementById("mmPlayFlag" + rowId + "_" + std::to_string(column));
+				m_flagCells[row][column] = cell;
+				if(!cell)
+					continue;
+				juceRmlUi::EventListener::Add(cell, Rml::EventId::Click, [this, row, column](Rml::Event&)
+				{
+					toggleFlag(row, column);
+				});
+			}
+		}
+		// SWING's name: its menu of amounts
+		if(m_flagNames[1])
+		{
+			juceRmlUi::EventListener::Add(m_flagNames[1], Rml::EventId::Click, [this](const Rml::Event& _event)
+			{
+				openSwingMenu(_event);
+			});
 		}
 		for(uint8_t page = 0; page < m_stepPages.size(); ++page)
 		{
@@ -323,6 +348,68 @@ namespace mdJucePlugin
 		forceRedraw();
 	}
 
+	void MmPatternView::toggleFlag(const uint8_t _row, const uint8_t _column)
+	{
+		using md::automation::sysex::StepFlag;
+		const auto pattern = m_controller.getMmPattern();
+		const auto track = m_shownTrack;
+		if(!pattern || _row >= FlagRows || _column >= VisibleSteps || track >= TrackCount)
+			return;
+		const auto page = m_shownStepPage < 2 ? m_shownStepPage : uint8_t{0};
+		const auto step = static_cast<uint8_t>(page * VisibleSteps + _column);
+		const auto kind = _row == 0 ? StepFlag::Slide : StepFlag::Swing;
+		const auto mask = _row == 0 ? pattern->slides[track] : pattern->swings[track];
+		if(m_controller.setMmPatternFlag(kind, track, step, !((mask >> step) & 1u)))
+			m_controller.sendPatternSoon();
+		forceRedraw();
+	}
+
+	void MmPatternView::openSwingMenu(const Rml::Event& _event)
+	{
+		const auto pattern = m_controller.getMmPattern();
+		if(!pattern)
+			return;
+		const auto current = md::automation::sysex::swingPercent(pattern->swingAmount);
+		juceRmlUi::Menu menu;
+		for(uint8_t percent = 50; percent <= 80; percent += 2)
+		{
+			menu.addEntry(std::to_string(percent) + " %", percent == current, [this, percent]
+			{
+				if(m_controller.setPatternSwingAmount(percent))
+					m_controller.sendPatternSoon();
+				forceRedraw();
+			});
+		}
+		menu.runModal(_event, 16);
+	}
+
+	void MmPatternView::renderFlags(const Pattern* _pattern)
+	{
+		const uint8_t length = _pattern ? _pattern->length : 0;
+		const auto first = static_cast<uint8_t>(m_shownStepPage * VisibleSteps);
+		const auto track = m_shownTrack;
+		for(uint8_t row = 0; row < FlagRows; ++row)
+		{
+			// The edited track's steps, the swing amount on SWING's name
+			std::string name = (row == 0 ? "SLIDE " : "SWING ") + number(track + 1u);
+			if(_pattern && row == 1)
+				name += " " + std::to_string(md::automation::sysex::swingPercent(_pattern->swingAmount)) + "%";
+			setText(m_flagNames[row], m_shownFlagNames[row], name);
+			uint64_t mask = 0;
+			if(_pattern && track < TrackCount)
+				mask = row == 0 ? _pattern->slides[track] : _pattern->swings[track];
+			for(uint8_t column = 0; column < VisibleSteps; ++column)
+			{
+				auto* cell = m_flagCells[row][column];
+				if(!cell)
+					continue;
+				const auto step = static_cast<uint8_t>(first + column);
+				cell->SetClass("mdPlayFlagOn", (mask >> step) & 1u);
+				cell->SetClass("mdEdStepOut", _pattern && step >= length);
+			}
+		}
+	}
+
 	std::optional<std::pair<uint8_t, uint8_t>> MmPatternView::rollCell(const float _x, const float _y, const float _width,
 		const float _height) const
 	{
@@ -408,6 +495,11 @@ namespace mdJucePlugin
 				if(auto* element = m_steps[track][static_cast<size_t>(_cell)])
 					element->SetClass("mdPlayNow", _on);
 			}
+			for(auto& cells : m_flagCells)
+			{
+				if(auto* element = cells[static_cast<size_t>(_cell)])
+					element->SetClass("mdPlayNow", _on);
+			}
 		};
 		light(m_shownPlayColumn, false);
 		light(_column, true);
@@ -464,6 +556,7 @@ namespace mdJucePlugin
 				button->SetClass("mdEdOff", _pattern && page * VisibleSteps >= length);
 			}
 		}
+		renderFlags(_pattern);
 		m_commands.show(_pattern ? std::optional<uint8_t>(_pattern->slot) : std::nullopt, length, _pattern
 			? "pattern " + patternName(_pattern->slot) + " · " + std::to_string(length) + " pas"
 				+ (_pattern->doubleTempo ? " · tempo double" : "") + " · " + std::to_string(trigs) + (trigs == 1 ? " trig" : " trigs")

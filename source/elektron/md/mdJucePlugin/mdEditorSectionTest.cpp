@@ -1240,6 +1240,51 @@ int main()
 			mdJucePlugin::ControllerAutomationTestAccess::pauseEdits(md);
 			require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending
 				&& !mdJucePlugin::ControllerAutomationTestAccess::patternWriteWaiting(md), "the clicks were not written once they paused");
+			// ACCENT, SLIDE and SWING under the tracks. The test pattern sets each kind per track (EditAll 0): a
+			// row shows the edited track's steps (track 2), its number in the name. A click on a step sets it, a
+			// second one clears it, written as a trig is. Every track (the name's menu): the steps every track
+			// follows, the edited track's number gone; the menu's amounts show on the names.
+			{
+				using md::automation::sysex::StepFlag;
+				auto& edit = mdJucePlugin::EditorIdentityTestAccess::editPattern(*editor);
+				const auto flag = [&](const int _row, const int _column) -> Rml::Element&
+				{
+					return element(doc, "mdPlayFlag" + std::to_string(_row) + "_" + std::to_string(_column));
+				};
+				require(text("mdPlayFlagName0") == "ACCENT 02 0" && text("mdPlayFlagName1") == "SLIDE 02"
+					&& text("mdPlayFlagName2") == "SWING 02 50%", "the flag rows do not name the edited track: \""
+					+ text("mdPlayFlagName0") + "\"");
+				flag(0, 2).Click();
+				context.Update();
+				require(md.getPattern()->trackFlags[0][1] == 4u && !md.getPattern()->hasFlag(StepFlag::Accent, 0, 2)
+					&& flag(0, 2).IsClassSet("mdPlayFlagOn") && Access::patternWriteWaiting(md), "a click did not accent step 3 of track 2");
+				flag(1, 7).Click();
+				flag(1, 7).Click();
+				context.Update();
+				require(md.getPattern()->trackFlags[1][1] == 0 && !flag(1, 7).IsClassSet("mdPlayFlagOn"), "a second click did not clear the slide");
+				edit.toggleFlag(2, 2);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(md.getPattern()->hasFlag(StepFlag::Swing, 1, 2) && flag(2, 2).IsClassSet("mdPlayFlagOn"), "a click did not swing step 3");
+				require(md.setPatternFlagPerTrack(StepFlag::Accent, false) && md.setPatternAccentAmount(96) && md.setPatternSwingAmount(60)
+					&& !md.setPatternAccentAmount(128) && !md.setPatternSwingAmount(81), "the menus' choices not taken, or out of range ones taken");
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(text("mdPlayFlagName0") == "ACCENT 96" && text("mdPlayFlagName2") == "SWING 02 60%"
+					&& !flag(0, 2).IsClassSet("mdPlayFlagOn") && md.getPattern()->swingAmount == 3277,
+					"every track or the amounts not shown: \"" + text("mdPlayFlagName0") + "\"");
+				flag(0, 5).Click();
+				context.Update();
+				require(md.getPattern()->flags[0] == 32u && md.getPattern()->hasFlag(StepFlag::Accent, 15, 5)
+					&& flag(0, 5).IsClassSet("mdPlayFlagOn"), "a click on every track's row did not accent step 6 for every track");
+				// The playing step lights the rows' column too
+				Access::setPlayingStep(md, uint8_t{5});
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				require(flag(0, 5).IsClassSet("mdPlayNow") && flag(2, 5).IsClassSet("mdPlayNow"), "the playing step not lit on the flag rows");
+				snap("-play-flags");
+				Access::setPlayingStep(md, std::nullopt);
+				mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+				Access::pauseEdits(md);
+				require(md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "the flags not written once the clicks paused");
+			}
 			// TOUT EFFACER: the first click asks to confirm, the second clears every trig and writes the pattern
 			element(doc, "mdPlayClear").Click();
 			context.Update();
@@ -1251,6 +1296,9 @@ int main()
 			require(cleared && std::all_of(cleared->trigs.begin(), cleared->trigs.end(), [](const auto _trigs) { return _trigs == 0; })
 				&& !lane.isClearArmed() && text("mdPlayClear") == "TOUT EFFACER" && !cell(0, 0).IsClassSet("mdEdStepTrig")
 				&& md.getPatternWrite() == mdJucePlugin::Controller::PatternWrite::Pending, "TOUT EFFACER did not clear and write the pattern");
+			// The accents go with the trigs; the swing stays, as the groove of the pattern
+			require(cleared->flags[0] == 0 && cleared->hasFlag(md::automation::sysex::StepFlag::Swing, 1, 2)
+				&& cleared->swingAmount == 3277, "TOUT EFFACER kept the accents, or cleared the swing");
 
 			// A pattern over 32 steps: PAS 33–64 shows steps 33 to 64, numbered from 33, past the length greyed;
 			// the playing step and a click there are steps 33 to 64 too
@@ -1607,6 +1655,53 @@ int main()
 				readBack(*pattern);
 				require(mm.getPatternWrite() == PatternWrite::Written && text("mmPlayInfo").rfind("pattern B05 · 48 pas · 0 trigs", 0) == 0,
 					"the cleared pattern not read back: \"" + text("mmPlayInfo") + "\"");
+
+				// SLIDE and SWING under the tracks: the edited track's steps (track 1), its number in the name; a
+				// click sets one, a second clears it, written as a trig is; SWING's menu amount shows on its name
+				{
+					using md::automation::sysex::StepFlag;
+					const auto flag = [&](const int _row, const int _column) -> Rml::Element&
+					{
+						return element(doc, "mmPlayFlag" + std::to_string(_row) + "_" + std::to_string(_column));
+					};
+					// The view redraws on its next update, as for a click on a step
+					const auto click = [&](const int _row, const int _column)
+					{
+						flag(_row, _column).Click();
+						mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+						context.Update();
+					};
+					require(text("mmPlayFlagName0") == "SLIDE 01" && text("mmPlayFlagName1") == "SWING 01 50%",
+						"the flag rows do not name the edited track: \"" + text("mmPlayFlagName0") + "\"");
+					click(0, 3);
+					require(mm.getMmPattern()->slides[0] == 8u && Access::patternWriteWaiting(mm), "a click did not set a slide on step 4");
+					require(flag(0, 3).IsClassSet("mdPlayFlagOn"), "the slide set not shown");
+					click(1, 3);
+					click(1, 3);
+					require(mm.getMmPattern()->swings[0] == 0 && !flag(1, 3).IsClassSet("mdPlayFlagOn"), "a second click did not clear the swing");
+					edit.toggleFlag(1, 6);
+					require(mm.setPatternSwingAmount(60) && !mm.setPatternSwingAmount(49), "the swing amounts not taken as the menu's");
+					mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+					context.Update();
+					require(mm.getMmPattern()->swings[0] == 64u && mm.getMmPattern()->swingAmount == 3277
+						&& text("mmPlayFlagName1") == "SWING 01 60%" && flag(1, 6).IsClassSet("mdPlayFlagOn"),
+						"a swing or its amount not shown: \"" + text("mmPlayFlagName1") + "\"");
+					// Steps 33 to 64: past the length (48), the rows' steps are greyed
+					element(doc, "mmPlayPage1").Click();
+					mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+					context.Update();
+					require(flag(0, 16).IsClassSet("mdEdStepOut") && !flag(0, 15).IsClassSet("mdEdStepOut") && !flag(0, 3).IsClassSet("mdPlayFlagOn"),
+						"the rows do not show steps 33 to 64");
+					element(doc, "mmPlayPage0").Click();
+					mdJucePlugin::EditorIdentityTestAccess::present(*editor);
+					context.Update();
+					Access::pauseEdits(mm);
+					require(mm.getPatternWrite() == PatternWrite::Pending && pattern->setFlag(StepFlag::Slide, 0, 3, true)
+						&& pattern->setFlag(StepFlag::Swing, 0, 6, true) && pattern->setSwingAmount(60), "the flags not written");
+					readBack(*pattern);
+					require(mm.getPatternWrite() == PatternWrite::Written && flag(0, 3).IsClassSet("mdPlayFlagOn"),
+						"the flags not read back as written");
+				}
 
 				// COPIER VERS B06: confirmed, sent with B06's number through the Device's write, read back as sent
 				edit.copyTo(21);

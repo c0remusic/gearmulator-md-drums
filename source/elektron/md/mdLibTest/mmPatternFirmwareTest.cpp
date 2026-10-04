@@ -166,8 +166,10 @@ namespace
 					_failures.push_back(name + ": a lock on a step without a trig");
 			}
 		}
-		std::printf("MM %s: %u steps, Kit %u, %zu trigs, %zu lock rows\n", name.c_str(), _pattern.length, _pattern.kit + 1,
-			trigs, _pattern.lockRows.size());
+		std::printf("MM %s: %u steps, Kit %u, %zu trigs, %zu lock rows; track 1 slide %016llx swing %016llx, swing %u (%u %%)\n",
+			name.c_str(), _pattern.length, _pattern.kit + 1, trigs, _pattern.lockRows.size(),
+			static_cast<unsigned long long>(_pattern.slides[0]), static_cast<unsigned long long>(_pattern.swings[0]),
+			_pattern.swingAmount, sysex::swingPercent(_pattern.swingAmount));
 		if(_pattern.slot != _slot || _pattern.length != 64 || _pattern.kit != _slot || trigs == 0)
 			_failures.push_back(name + ": not the factory pattern's length, Kit or trigs");
 		if(_pattern.lockRows.size() != std::min<size_t>(rows, Pattern::LockRowCount))

@@ -738,6 +738,35 @@ namespace
 		require(dump == makePattern(48, {}, {}, {}, emptyExtension), "clearing the pattern changed something else");
 		require(longEditor->setLength(64) && !longEditor->setLength(65), "64-step form length range wrong");
 
+		// Accent, slide and swing: in the mask every track follows or a track's own, the per-track setting (the
+		// test pattern's words are 0: per track, until set otherwise), the amounts; steps 33 to 64 in the long
+		// form's second words
+		auto flagged = MdPatternEditor::fromDump(pattern);
+		require(flagged && flagged->setFlagPerTrack(StepFlag::Accent, false) && flagged->setFlag(StepFlag::Accent, std::nullopt, 4, true)
+			&& flagged->setFlag(StepFlag::Swing, uint8_t{2}, 31, true) && flagged->setFlagPerTrack(StepFlag::Swing, true)
+			&& flagged->setAccentAmount(100) && flagged->setSwingAmount(66), "accent, swing or their amounts refused");
+		require(!flagged->setSwingAmount(81) && !flagged->setSwingAmount(49) && !flagged->setAccentAmount(128)
+			&& !flagged->setFlag(StepFlag::Slide, std::nullopt, 32, true) && !flagged->setFlag(StepFlag::Slide, uint8_t{16}, 0, true),
+			"a flag or an amount out of range accepted");
+		parsed = parseMdPatternDump(flagged->toDump());
+		require(parsed && parsed->flags[0] == 0x10 && parsed->hasFlag(StepFlag::Accent, 7, 4) && !parsed->flagPerTrack[0]
+			&& parsed->flagPerTrack[2] && parsed->trackFlags[2][2] == 0x80000000ull && parsed->hasFlag(StepFlag::Swing, 2, 31)
+			&& !parsed->hasFlag(StepFlag::Swing, 1, 31) && parsed->accentAmount == 100 && swingPercent(parsed->swingAmount) == 66,
+			"accent, swing or their amounts misread");
+		auto longFlags = MdPatternEditor::fromDump(longPattern);
+		require(longFlags && longFlags->setFlag(StepFlag::Slide, std::nullopt, 40, true) && longFlags->setFlag(StepFlag::Accent, uint8_t{15}, 47, true)
+			&& longFlags->setFlag(StepFlag::Swing, std::nullopt, 3, true), "flags of the long form refused");
+		parsed = parseMdPatternDump(longFlags->toDump());
+		require(parsed && parsed->flags[1] == uint64_t{1} << 40 && parsed->trackFlags[0][15] == uint64_t{1} << 47 && parsed->flags[2] == 0x8,
+			"steps 33 to 64 of the flags misread");
+		// Cleared: accents and slides go, the swing steps stay (where the groove falls)
+		longFlags->clear();
+		parsed = parseMdPatternDump(longFlags->toDump());
+		require(parsed && parsed->flags[1] == 0 && parsed->trackFlags[0][15] == 0 && parsed->flags[2] == 0x8, "clearing took a swing step or left an accent");
+		// The swing word: 50 % none, 80 % the most (MCL), 60 % a fifth of a step
+		require(swingWord(50) == 0 && swingWord(60) == 3277 && swingWord(80) == 9830 && swingWord(90) == 9830 && swingPercent(0) == 50
+			&& swingPercent(3277) == 60 && swingPercent(9830) == 80 && swingPercent(819200) == 80, "swing word and percent do not match");
+
 		// A copy: another slot's number, the checksum made again, every other byte kept
 		auto copy = MdPatternEditor::fromDump(longPattern);
 		require(copy && copy->setSlot(37) && !copy->setSlot(128), "slot 37 refused, or 128 accepted");
@@ -884,6 +913,24 @@ namespace
 		require(clearing->toDump() == makeMonomachinePattern(17, expected), "clearing the MM pattern left a trig or a lock, or changed the rest");
 		require(clearing->setSlot(40) && !clearing->setSlot(128), "MM slot 40 refused, or 128 accepted");
 		require(clearing->toDump() == makeMonomachinePattern(40, expected), "the MM copy is not the pattern under another number");
+
+		// Slide and swing, a track's: kinds 9 and 10 of the step masks; the swing amount just before the lock masks.
+		// No accent on the Monomachine.
+		auto grooved = MmPatternEditor::fromDump(pattern);
+		require(grooved && grooved->setFlag(StepFlag::Slide, 1, 3, true) && grooved->setFlag(StepFlag::Swing, 5, 23, true)
+			&& grooved->setSwingAmount(70), "MM slide, swing or swing amount refused");
+		require(!grooved->setFlag(StepFlag::Accent, 0, 0, true) && !grooved->setFlag(StepFlag::Slide, 6, 0, true)
+			&& !grooved->setFlag(StepFlag::Swing, 0, 24, true) && !grooved->setSwingAmount(81), "an MM accent, or a flag out of range, accepted");
+		expected = decoded;
+		setMmBit(expected, 9 * 48 + 8, 3);
+		setMmBit(expected, 10 * 48 + 5 * 8, 23);
+		const auto word = swingWord(70);
+		for(size_t i = 0; i < 4; ++i)
+			expected[13 * 48 + i] = static_cast<uint8_t>(word >> (24 - 8 * i));
+		require(grooved->toDump() == makeMonomachinePattern(17, expected), "MM slide or swing written wrong");
+		const auto groovedPattern = parseMmPatternDump(grooved->toDump());
+		require(groovedPattern && groovedPattern->slides[1] == 8 && groovedPattern->swings[5] == uint64_t{1} << 23
+			&& swingPercent(groovedPattern->swingAmount) == 70, "MM slide or swing misread");
 
 		decoded[1060] = 0;
 		require(!parseMmPatternDump(makeMonomachinePattern(17, decoded)), "MM pattern of length 0 accepted");
