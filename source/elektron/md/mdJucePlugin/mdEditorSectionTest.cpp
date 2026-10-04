@@ -65,6 +65,22 @@ namespace mdJucePlugin
 			_controller.onControllerTimer();
 		}
 
+		// The controller timer's round, as the plug-in runs it
+		static void timer(Controller& _controller)
+		{
+			_controller.onControllerTimer();
+		}
+
+		// The pattern a load waited for has played long enough for its Kit to be the live one: the timer reads it
+		static void settlePatternLoad(Controller& _controller)
+		{
+			{
+				const std::lock_guard lock(_controller.m_synchronizationLock);
+				_controller.m_patternLoadSeenMs = Controller::milliseconds() - Controller::PatternLoadSettleMilliseconds - 1;
+			}
+			_controller.onControllerTimer();
+		}
+
 		// A copy's source or read back is not answered in time, on either model: the controller timer fails it
 		static void expirePatternCopy(Controller& _controller)
 		{
@@ -1946,6 +1962,135 @@ int main()
 				present();
 				require(md.getPatternCopy().state == PatternCopy::Failed && line().find("copie de A01 vers A02 sans réponse") != std::string::npos,
 					"a copy not answered did not fail: \"" + line() + "\"");
+			}
+			// What the machine answers: its status, then the Kit's dump the controller asks for
+			const uint8_t product = g_model == md::MachineModel::Monomachine ? 0x03 : 0x02;
+			const auto answerStatus = [&](const uint8_t _parameter, const uint8_t _value)
+			{
+				md.parseSysexMessage({0xf0, 0x00, 0x20, 0x3c, product, 0x00, 0x72, _parameter, _value, 0xf7}, synthLib::MidiEventSource::Device);
+			};
+			const auto answerKit = [&](const uint8_t _slot)
+			{
+				answerStatus(0x02, _slot);
+				std::vector<uint16_t> machines(g_trackCount, _slot % 2 ? g_pickMachine : g_otherFamilyMachine);
+				md.parseSysexMessage(mdAutomationTest::makeKitDump(g_model, _slot, 64, machines, "KIT " + std::to_string(_slot + 1)),
+					synthLib::MidiEventSource::Device);
+				present();
+			};
+			const auto number = [](const unsigned _value) { return (_value < 10 ? "0" : "") + std::to_string(_value); };
+			// PATTERNS, CHARGER: B06, once clicked again, as its Kit replaces the live one. Stopped, the machine
+			// takes it at once: the status answers with it, then the controller reads its Kit. Playing, it waits
+			// for the end of the pattern playing, the controller asking until the status answers with it.
+			{
+				const auto load = [&] { return text("mdLibPatternLoad"); };
+				element(doc, "mdLibPattern21").Click();
+				present();
+				require(load() == "CHARGER" && !element(doc, "mdLibPatternLoad").IsClassSet("mdEdOff") && md.getCurrentPattern() != 21,
+					"CHARGER not offered for B06");
+				element(doc, "mdLibPatternLoad").Click();
+				present();
+				require(load() == "CHARGER B06 ?" && md.getPatternLoad() == 0xff
+					&& text("mdLibInfo") == "CHARGER B06 ? son kit 01 remplace le kit en cours, réglages non sauvés perdus",
+					"CHARGER did not ask to confirm: \"" + text("mdLibInfo") + "\"");
+				element(doc, "mdLibPatternLoad").Click();
+				present();
+				require(md.getPatternLoad() == 21 && load() == "CHARGER" && text("mdLibInfo").find("chargement de B06…") != std::string::npos,
+					"the second click did not load B06: \"" + text("mdLibInfo") + "\"");
+				answerStatus(0x04, 21);
+				Access::timer(md);
+				present();
+				require(md.getPatternLoad() == 0xff && md.getCurrentPattern() == 21 && element(doc, "mdLibPattern21").IsClassSet("mdLibCurrent")
+					&& text("mdLibInfo").find("B06 chargé") != std::string::npos && element(doc, "mdLibPatternLoad").IsClassSet("mdEdOff"),
+					"B06 taken not shown: \"" + text("mdLibInfo") + "\"");
+				answerKit(md.getCurrentKit() < md.getKitLibrarySize() ? md.getCurrentKit() : uint8_t{0});
+				// Playing: A01 waits for the end of the pattern
+				Access::setPlayingStep(md, uint8_t{5});
+				element(doc, "mdLibPattern0").Click();
+				element(doc, "mdLibPatternLoad").Click();
+				element(doc, "mdLibPatternLoad").Click();
+				present();
+				require(md.getPatternLoad() == 0 && text("mdLibInfo").find("A01 demandé : joue à la fin du pattern en cours") != std::string::npos,
+					"a load while playing does not wait for the end of the pattern: \"" + text("mdLibInfo") + "\"");
+				answerStatus(0x04, 21);
+				Access::timer(md);
+				present();
+				require(md.getPatternLoad() == 0 && md.getCurrentPattern() == 21, "the load ended before the machine took A01");
+				// The status answers with A01 a few clock ticks before it plays and its Kit loads: the Kit is read a
+				// moment later, no Kit load or save going meanwhile
+				answerStatus(0x04, 0);
+				Access::timer(md);
+				present();
+				require(md.getPatternLoad() == 0 && md.getCurrentPattern() == 0 && element(doc, "mdLibKitSave").IsClassSet("mdEdOff")
+					&& element(doc, "mdLibKitLoad").IsClassSet("mdEdOff") && !md.saveKit() && !md.loadKit(3),
+					"A01's Kit taken before it played, or a Kit load or save went meanwhile");
+				Access::settlePatternLoad(md);
+				present();
+				require(md.getPatternLoad() == 0xff && md.getCurrentPattern() == 0 && text("mdLibInfo").find("A01 chargé") != std::string::npos,
+					"A01 taken at the end of the pattern not shown: \"" + text("mdLibInfo") + "\"");
+				Access::setPlayingStep(md, std::nullopt);
+				answerKit(md.getCurrentKit() < md.getKitLibrarySize() ? md.getCurrentKit() : uint8_t{0});
+			}
+#if defined(MD_EDITOR_SECTION_TEST_MM)
+			// A copy onto the current pattern plays the live Kit, not the source's: B06 (Kit 1) pasted onto A01, the
+			// current pattern, while Kit 6 plays comes back with Kit 6
+			{
+				using PatternCopy = mdJucePlugin::Controller::PatternCopy;
+				require(md.getCurrentPattern() == 0 && md.loadKit(5), "Kit 6 not loaded for the copy");
+				answerKit(5);
+				element(doc, "mdLibPattern21").Click();
+				element(doc, "mdLibCopy").Click();
+				element(doc, "mdLibPattern0").Click();
+				element(doc, "mdLibPaste").Click();
+				element(doc, "mdLibPaste").Click();
+				present();
+				require(md.getCurrentKit() == 5 && md.getPatternCopy().state == PatternCopy::Reading && md.getPatternCopy().to == 0,
+					"the copy onto the current pattern did not start");
+				md.parseSysexMessage(patternDump(21, 16, true), synthLib::MidiEventSource::Device);
+				auto copied = md::automation::sysex::MmPatternEditor::fromDump(patternDump(21, 16, true));
+				require(copied && copied->setSlot(0) && copied->setKit(5), "MM test copy not built");
+				const auto back = copied->toDump();
+				md.parseSysexMessage(pluginLib::SysEx(back.begin(), back.end()), synthLib::MidiEventSource::Device);
+				require(md.getPatternCopy().state == PatternCopy::Copied, "the copy onto the current pattern did not keep the live Kit");
+			}
+#endif
+			// KITS, CHARGER: Kit 12, once clicked again, the line warning what goes; the machine plays it at once and
+			// the editor reads it again. On the live Kit, RECHARGER. SAUVER saves the live Kit, the library showing it.
+			{
+				tabButton(doc, "mdLib", "0").Click();
+				context.Update();
+				element(doc, "mdLibKit11").Click();
+				present();
+				const auto before = md.getCurrentKit();
+				require(before < md.getKitLibrarySize() && before != 11, "the test needs a live Kit other than 12");
+				require(text("mdLibKitLoad") == "CHARGER" && !element(doc, "mdLibKitLoad").IsClassSet("mdEdOff")
+					&& text("mdLibKitSave") == "SAUVER KIT " + number(before + 1u) && !element(doc, "mdLibKitSave").IsClassSet("mdEdOff"),
+					"CHARGER or SAUVER not offered: \"" + text("mdLibKitSave") + "\"");
+				element(doc, "mdLibKitLoad").Click();
+				present();
+				require(text("mdLibKitLoad") == "CHARGER KIT 12 ?" && md.getCurrentKit() == before
+					&& text("mdLibInfo") == "CHARGER KIT 12 ? les réglages du kit " + number(before + 1u) + " non sauvés seront perdus",
+					"CHARGER did not ask to confirm: \"" + text("mdLibInfo") + "\"");
+				snap("-library-load");
+				element(doc, "mdLibKitLoad").Click();
+				present();
+				require(md.getCurrentKit() == 11 && element(doc, "mdLibKit11").IsClassSet("mdLibCurrent") && text("mdLibKitLoad") == "RECHARGER"
+					&& text("mdLibKitSave") == "SAUVER KIT 12" && text("mdLibInfo").find("kit 12 chargé") != std::string::npos,
+					"the second click did not load Kit 12: \"" + text("mdLibInfo") + "\"");
+				answerKit(11);
+				require(md.getKitName() == "KIT 12", "Kit 12 not read again once loaded");
+				element(doc, "mdLibKitLoad").Click();
+				present();
+				require(text("mdLibInfo") == "RECHARGER KIT 12 ? ses réglages non sauvés seront perdus",
+					"RECHARGER did not ask to confirm: \"" + text("mdLibInfo") + "\"");
+				// SAUVER: the library's Kit 12 is the live one, its machines changed since it was read
+				Access::setMachines(md, std::vector<uint16_t>(g_trackCount, g_otherFamilyMachine));
+				element(doc, "mdLibKitSave").Click();
+				present();
+				const auto saved = md.getLibraryKit(11);
+				require(saved && saved->read && saved->name == "KIT 12" && !saved->machines.empty()
+					&& saved->machines[0] == g_otherFamilyMachine && !element(doc, "mdLibKitLoad").IsClassSet("mdPlayArmed")
+					&& text("mdLibInfo").find("kit 12 sauvé") != std::string::npos, "SAUVER not shown: \"" + text("mdLibInfo") + "\"");
+				Access::setMachines(md, std::vector<uint16_t>(g_trackCount, g_pickMachine));
 			}
 			// RELIRE reads everything again
 			element(doc, "mdLibRead").Click();

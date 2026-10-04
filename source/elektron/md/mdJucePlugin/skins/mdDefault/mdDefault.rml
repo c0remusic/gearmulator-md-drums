@@ -1900,7 +1900,9 @@
 						<div id="mdLibKitsPage" class="jucePos" tabgroup="mdLib" tabpage="0" style="left: 0dp; top: 0dp; width: 1100dp; height: 476dp;">
 							<div id="mdLibKits" class="jucePos mdEdBlock" style="left: 16dp; top: 44dp; width: 708dp; height: 420dp;">
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 676dp;">KITS</div>
-								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 676dp;">clic : ses machines, sans le charger · en ambre : le kit chargé</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 676dp;">clic : ses machines · en ambre : le kit chargé</div>
+								<button id="mdLibKitLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 150dp;">CHARGER</button>
+								<button id="mdLibKitSave" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 268dp; top: 4dp; width: 150dp;">SAUVER</button>
 								<div id="mdLibKit0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 163dp;">01  —</div>
 								<div id="mdLibKit1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 163dp;">02  —</div>
 								<div id="mdLibKit2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 163dp;">03  —</div>
@@ -1993,7 +1995,8 @@
 								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERNS</div>
 								<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>
 								<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>
-								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 350dp; top: 4dp; width: 702dp;">—</div>
+								<button id="mdLibPatternLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 346dp; top: 4dp; width: 150dp;">CHARGER</button>
+								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 508dp; top: 4dp; width: 544dp;">—</div>
 								<div id="mdLibPattern0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 123dp;">A01  —</div>
 								<div id="mdLibPattern1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 123dp;">A02  —</div>
 								<div id="mdLibPattern2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 123dp;">A03  —</div>

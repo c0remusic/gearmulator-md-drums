@@ -14,6 +14,7 @@ namespace md::automation::sysex
 		constexpr uint8_t g_globalRequest = 0x51;
 		constexpr uint8_t g_kitDump = 0x52;
 		constexpr uint8_t g_kitRequest = 0x53;
+		constexpr uint8_t g_kitLoad = 0x58;
 		constexpr uint8_t g_kitSave = 0x59;
 		constexpr uint8_t g_patternDump = 0x67;
 		constexpr uint8_t g_patternRequest = 0x68;
@@ -700,6 +701,14 @@ namespace md::automation::sysex
 		return true;
 	}
 
+	bool MmPatternEditor::setKit(const uint8_t _kit)
+	{
+		if(_kit >= 128)
+			return false;
+		m_payload[g_mmPatternLengthIndex + 2] = _kit;
+		return true;
+	}
+
 	bool MmPatternEditor::setSwingAmount(const uint8_t _percent)
 	{
 		if(_percent < 50 || _percent > 80)
@@ -947,6 +956,14 @@ namespace md::automation::sysex
 		return true;
 	}
 
+	bool MdPatternEditor::setKit(const uint8_t _kit)
+	{
+		if(_kit >= 64)
+			return false;
+		m_plain[4] = _kit;
+		return true;
+	}
+
 	bool MdPatternEditor::setFlag(const StepFlag _flag, const std::optional<uint8_t> _track, const uint8_t _step,
 		const bool _on)
 	{
@@ -1040,6 +1057,17 @@ namespace md::automation::sysex
 	Message kitSave(const MachineModel _model, const uint8_t _slot)
 	{
 		return request(_model, g_kitSave, _slot);
+	}
+
+	Message kitLoad(const MachineModel _model, const uint8_t _slot)
+	{
+		return request(_model, g_kitLoad, _slot);
+	}
+
+	Message patternSelect(const MachineModel _model, const uint8_t _slot)
+	{
+		return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_setStatus,
+			static_cast<uint8_t>(StatusParameter::Pattern), static_cast<uint8_t>(_slot & 0x7f), 0xf7};
 	}
 
 	std::optional<StatusResponse> parseStatusResponse(const MachineModel _model,

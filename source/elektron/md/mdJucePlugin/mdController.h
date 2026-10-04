@@ -151,7 +151,7 @@ namespace mdJucePlugin
 		// once readLibrary is called; a Kit not answered within 2 s, or a pattern
 		// within 4 s, is skipped. What was read stays until the next reading, and any
 		// pattern dump that comes after the first reading began (a copy read back, a
-		// write) replaces its slot's. Nothing is loaded.
+		// write) replaces its slot's. Reading loads nothing: loadKit and loadPattern below do.
 		struct LibraryKit
 		{
 			bool read = false;
@@ -180,6 +180,33 @@ namespace mdJucePlugin
 		std::optional<LibraryPattern> getLibraryPattern(uint8_t _slot) const;
 		// Increments whenever a library Kit or pattern is read or the reading starts or ends
 		uint64_t getLibraryRevision() const { return m_libraryRevision.load(std::memory_order_acquire); }
+
+		// BIBLIO's CHARGER on a Kit: the stored Kit made the live one (LOAD KIT, md::automation::sysex::kitLoad),
+		// as stored: what the live Kit held and was not saved is gone, and the current pattern plays the Kit from
+		// then on (mdEditorFirmwareTest). Pattern edits not written yet go first, with the Kit they were made
+		// with; then the Kit and the pattern shown are read again. False out of range, while the firmware is not
+		// ready, while a pattern load waits (getPatternLoad), or while isPatternBusy().
+		bool loadKit(uint8_t _slot);
+		// CHARGER on a pattern: the machine's pattern (SET STATUS), at once when stopped, at the end of the
+		// pattern playing otherwise; its Kit comes with it, read once the pattern is the current one (asked every
+		// PatternLoadPollMilliseconds meanwhile). Edits not written yet go first. False as for loadKit.
+		bool loadPattern(uint8_t _slot);
+		// The pattern loadPattern() waits for, 0xff for none: none once it plays and its Kit is read, or after
+		// PatternLoadTimeoutMilliseconds. Meanwhile the live Kit is not known for sure: loadKit and saveKit wait.
+		uint8_t getPatternLoad() const { return m_patternLoad.load(std::memory_order_acquire); }
+		static constexpr uint64_t PatternLoadPollMilliseconds = 500;
+		static constexpr uint64_t PatternLoadTimeoutMilliseconds = 60000;
+		// Playing, the status answers with the pattern from the moment the machine commits to it: 7 clock ticks
+		// before the end of the pattern playing on the Machinedrum, 1 on the Monomachine, its Kit loading at the
+		// end (patternChainFirmwareTest). The Kit is read after this, 7 ticks lasting 0.6 s at 30 BPM.
+		static constexpr uint64_t PatternLoadSettleMilliseconds = 1000;
+		// SAUVER: the live Kit saved into its slot (SAVE KIT); the library's entry for it takes the live Kit's
+		// name and machines. False while the current Kit is not known, the firmware is not ready, a pattern load
+		// waits, or isPatternBusy().
+		bool saveKit();
+		// A copy runs, or a Monomachine pattern write waits or goes on (the Device drives its SYSEX RECV menu, and
+		// the write reloads the pattern's Kit): a Kit or pattern load, or a save, waits for it
+		bool isPatternBusy();
 
 		// Asks the firmware for the current pattern number, then for that pattern's
 		// dump. False while the firmware is not ready. A pattern selected through SET
@@ -249,8 +276,9 @@ namespace mdJucePlugin
 		// Copies a stored pattern into another slot, the source's dump with the destination's number ($67),
 		// then reads the destination back. The source is the pattern shown (getPattern(), getMmPattern()),
 		// its edits not written yet included, or else is read first. Onto the selected pattern, the live Kit
-		// is saved first, as the firmware then reloads the pattern's Kit; a copy to another slot leaves the
-		// selected pattern and the live Kit as they are (mdEditorFirmwareTest, mmPatternWriteFirmwareTest).
+		// is saved first, as the firmware then reloads the pattern's Kit, and the copy plays the live Kit, not
+		// the source's; a copy to another slot leaves the selected pattern and the live Kit as they are
+		// (mdEditorFirmwareTest, mmPatternWriteFirmwareTest).
 		// On the Machinedrum a copy onto the pattern shown replaces it as an edit does, written by
 		// sendPattern(); on the Monomachine it goes through the Device's SYSEX RECV write
 		// (md::MmPatternWriter), the pattern shown's edits not written yet dropped, and the copy read back
@@ -303,6 +331,13 @@ namespace mdJucePlugin
 		void writePatternCopy(const md::automation::sysex::Message& _source);
 		// A copy waiting too long fails; under m_synchronizationLock
 		void servicePatternCopy(uint64_t _now);
+		// The pattern loadPattern() waits for: its status asked again, its Kit read once it is the current one;
+		// under m_synchronizationLock
+		void servicePatternLoad(uint64_t _now);
+		// The pattern shown, when it is the current one, made to play the live Kit as the machine holds it,
+		// whichever Kit its dump was read with (a Kit loaded since): written with the other, it would load that
+		// Kit again. Under m_patternMutex.
+		void linkCurrentKit();
 		void setPatternCopyState(PatternCopy _state);
 		struct Address
 		{
@@ -492,6 +527,12 @@ namespace mdJucePlugin
 		bool m_patternCopyShown = false;
 		std::atomic<bool> m_patternWanted{false};
 		std::atomic<uint8_t> m_patternRequestedSlot{0xff};
+		// loadPattern(): the pattern waited for, when it was asked, its status last asked, and when the status
+		// first answered with it (0: not yet; under m_synchronizationLock)
+		std::atomic<uint8_t> m_patternLoad{0xff};
+		uint64_t m_patternLoadMs = 0;
+		uint64_t m_patternLoadPollMs = 0;
+		uint64_t m_patternLoadSeenMs = 0;
 		std::deque<AutomationSlot> m_automationSlots;
 		std::map<Address, size_t> m_automationSlotIndices;
 		RealtimeQueue<QueuedAutomationChange,

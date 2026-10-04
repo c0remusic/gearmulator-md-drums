@@ -78,6 +78,16 @@ namespace mdJucePlugin
 		m_paste = _document.GetElementById("mdLibPaste");
 		if(m_paste)
 			juceRmlUi::EventListener::Add(m_paste, Rml::EventId::Click, [this](Rml::Event&) { paste(); });
+		// CHARGER and SAUVER on KITS, CHARGER on PATTERNS
+		m_kitLoad = _document.GetElementById("mdLibKitLoad");
+		if(m_kitLoad)
+			juceRmlUi::EventListener::Add(m_kitLoad, Rml::EventId::Click, [this](Rml::Event&) { loadKit(); });
+		m_kitSave = _document.GetElementById("mdLibKitSave");
+		if(m_kitSave)
+			juceRmlUi::EventListener::Add(m_kitSave, Rml::EventId::Click, [this](Rml::Event&) { saveKit(); });
+		m_patternLoad = _document.GetElementById("mdLibPatternLoad");
+		if(m_patternLoad)
+			juceRmlUi::EventListener::Add(m_patternLoad, Rml::EventId::Click, [this](Rml::Event&) { loadPattern(); });
 		const auto tracks = _model == md::MachineModel::Monomachine ? 6 : 16;
 		for(int track = 0; track < tracks; ++track)
 			m_machines.push_back(_document.GetElementById("mdLibMachine" + std::to_string(track)));
@@ -110,6 +120,7 @@ namespace mdJucePlugin
 	void LibraryView::select(const uint8_t _slot)
 	{
 		m_selected = _slot;
+		m_kitLoadArmed = 0xff;
 		m_shownRevision = ~uint64_t{0};
 	}
 
@@ -117,7 +128,128 @@ namespace mdJucePlugin
 	{
 		m_selectedPattern = _slot;
 		m_pasteArmedTo = 0xff;
+		m_patternLoadArmed = 0xff;
 		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::note(std::string _text)
+	{
+		m_note = std::move(_text);
+		m_noteUntil = m_now + NoteMilliseconds;
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::loadKit()
+	{
+		// A pattern load waiting brings its own Kit: no Kit load or save before it plays
+		const auto slot = m_selected;
+		if(slot >= m_kits.size() || m_controller.isPatternBusy() || m_controller.getPatternLoad() < m_patterns.size())
+			return;
+		// The live Kit's values not saved go: a second click within ConfirmMilliseconds
+		if(m_kitLoadArmed == slot && m_now - m_kitLoadArmedAt <= ConfirmMilliseconds)
+		{
+			m_kitLoadArmed = 0xff;
+			const bool again = slot == m_controller.getCurrentKit();
+			if(m_controller.loadKit(slot))
+				note("kit " + number(slot + 1u) + (again ? " rechargé" : " chargé"));
+		}
+		else
+		{
+			m_kitLoadArmed = slot;
+			m_kitLoadArmedAt = m_now;
+		}
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::saveKit()
+	{
+		const auto kit = m_controller.getCurrentKit();
+		m_kitLoadArmed = 0xff;
+		if(m_controller.saveKit())
+			note("kit " + number(kit + 1u) + " sauvé");
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	void LibraryView::loadPattern()
+	{
+		const auto slot = m_selectedPattern;
+		if(slot >= m_patterns.size() || slot == m_controller.getCurrentPattern() || m_controller.isPatternBusy())
+			return;
+		// Its Kit replaces the live one: a second click within ConfirmMilliseconds
+		if(m_patternLoadArmed == slot && m_now - m_patternLoadArmedAt <= ConfirmMilliseconds)
+		{
+			m_patternLoadArmed = 0xff;
+			if(m_controller.loadPattern(slot))
+				m_note.clear();
+		}
+		else
+		{
+			m_patternLoadArmed = slot;
+			m_patternLoadArmedAt = m_now;
+		}
+		m_shownRevision = ~uint64_t{0};
+	}
+
+	std::string LibraryView::loadText() const
+	{
+		if(m_kitLoadArmed < m_kits.size())
+		{
+			const auto current = m_controller.getCurrentKit();
+			if(m_kitLoadArmed == current)
+				return "RECHARGER KIT " + number(current + 1u) + " ? ses réglages non sauvés seront perdus";
+			const std::string live = current < m_kits.size() ? "du kit " + number(current + 1u) : "du kit en cours";
+			return "CHARGER KIT " + number(m_kitLoadArmed + 1u) + " ? les réglages " + live + " non sauvés seront perdus";
+		}
+		if(m_patternLoadArmed < m_patterns.size())
+		{
+			const auto pattern = m_controller.getLibraryPattern(m_patternLoadArmed);
+			const std::string kit = pattern && pattern->read ? "son kit " + number(pattern->kit + 1u) : "son kit";
+			return "CHARGER " + patternName(m_patternLoadArmed) + " ? " + kit
+				+ " remplace le kit en cours, réglages non sauvés perdus";
+		}
+		const auto loading = m_controller.getPatternLoad();
+		if(loading < m_patterns.size())
+		{
+			// Playing, the machine takes it at the end of the pattern; stopped for long, at the next PLAY
+			if(m_controller.getPlayingStep())
+				return patternName(loading) + " demandé : joue à la fin du pattern en cours";
+			return m_now - m_patternLoadSeenAt > 1500.0 ? patternName(loading) + " demandé : joue au prochain PLAY"
+				: "chargement de " + patternName(loading) + "…";
+		}
+		return m_note;
+	}
+
+	void LibraryView::renderLoad(const bool _busy)
+	{
+		const auto currentKit = m_controller.getCurrentKit();
+		// A pattern load waiting brings its own Kit
+		const bool kitBusy = _busy || m_controller.getPatternLoad() < m_patterns.size();
+		if(m_kitLoad)
+		{
+			const bool armed = m_kitLoadArmed < m_kits.size();
+			const bool again = m_selected == currentKit;
+			m_kitLoad->SetClass("mdEdOff", m_selected >= m_kits.size() || kitBusy);
+			m_kitLoad->SetClass("mdPlayArmed", armed);
+			std::string label = again ? "RECHARGER" : "CHARGER";
+			if(armed)
+				label += " KIT " + number(m_kitLoadArmed + 1u) + " ?";
+			setText(m_kitLoad, m_shownKitLoadLabel, label);
+		}
+		if(m_kitSave)
+		{
+			m_kitSave->SetClass("mdEdOff", currentKit >= m_kits.size() || kitBusy);
+			setText(m_kitSave, m_shownKitSaveLabel, currentKit < m_kits.size() ? "SAUVER KIT " + number(currentKit + 1u)
+				: std::string("SAUVER"));
+		}
+		if(m_patternLoad)
+		{
+			const bool armed = m_patternLoadArmed < m_patterns.size();
+			m_patternLoad->SetClass("mdEdOff", m_selectedPattern >= m_patterns.size()
+				|| m_selectedPattern == m_controller.getCurrentPattern() || _busy);
+			m_patternLoad->SetClass("mdPlayArmed", armed);
+			setText(m_patternLoad, m_shownPatternLoadLabel, armed ? "CHARGER " + patternName(m_patternLoadArmed) + " ?"
+				: std::string("CHARGER"));
+		}
 	}
 
 	void LibraryView::paste()
@@ -152,11 +284,34 @@ namespace mdJucePlugin
 
 	bool LibraryView::update(const double _nowMilliseconds)
 	{
-		// REMPLACER not confirmed in time
+		// REMPLACER or a CHARGER not confirmed in time, a note shown long enough
 		m_now = _nowMilliseconds;
-		if(m_pasteArmedTo < m_patterns.size() && _nowMilliseconds - m_pasteArmedAt > ConfirmMilliseconds)
+		const auto expired = [&](uint8_t& _armed, const size_t _count, const double _at)
 		{
-			m_pasteArmedTo = 0xff;
+			if(_armed < _count && _nowMilliseconds - _at > ConfirmMilliseconds)
+			{
+				_armed = 0xff;
+				m_shownRevision = ~uint64_t{0};
+			}
+		};
+		expired(m_pasteArmedTo, m_patterns.size(), m_pasteArmedAt);
+		expired(m_kitLoadArmed, m_kits.size(), m_kitLoadArmedAt);
+		expired(m_patternLoadArmed, m_patterns.size(), m_patternLoadArmedAt);
+		if(!m_note.empty() && _nowMilliseconds > m_noteUntil)
+		{
+			m_note.clear();
+			m_shownRevision = ~uint64_t{0};
+		}
+		// The pattern load the controller waited for is over: the pattern plays, or it did not come in time
+		if(const auto loading = m_controller.getPatternLoad(); loading != m_shownPatternLoad)
+		{
+			if(m_shownPatternLoad < m_patterns.size() && loading >= m_patterns.size())
+			{
+				const bool loaded = m_controller.getCurrentPattern() == m_shownPatternLoad;
+				note(patternName(m_shownPatternLoad) + (loaded ? " chargé" : " : pas chargé, la machine ne l'a pas pris"));
+			}
+			m_shownPatternLoad = loading;
+			m_patternLoadSeenAt = _nowMilliseconds;
 			m_shownRevision = ~uint64_t{0};
 		}
 		// Hidden: nothing read or drawn; drawn in full when shown
@@ -180,14 +335,24 @@ namespace mdJucePlugin
 		const auto current = m_controller.getCurrentKit();
 		const auto currentPattern = m_controller.getCurrentPattern();
 		const auto reading = m_controller.isReadingLibrary();
+		// A pattern write or a copy holds CHARGER and SAUVER back; a load waits for the end of the pattern playing
+		const bool busy = m_controller.isPatternBusy();
+		const bool playing = m_controller.getPlayingStep().has_value();
+		// Stopped with a load waiting, the line changes on its own after a while (loadText)
+		const bool waitingLong = m_shownPatternLoad < m_patterns.size() && !playing
+			&& _nowMilliseconds - m_patternLoadSeenAt > 1500.0;
 		if(revision == m_shownRevision && current == m_shownCurrent && currentPattern == m_shownCurrentPattern
-			&& reading == m_shownReading && m_waitingForMachine == m_shownWaiting)
+			&& reading == m_shownReading && m_waitingForMachine == m_shownWaiting && busy == m_shownBusy
+			&& playing == m_shownPlaying && waitingLong == m_shownWaitingLong)
 			return false;
+		m_shownWaitingLong = waitingLong;
 		m_shownRevision = revision;
 		m_shownCurrent = current;
 		m_shownCurrentPattern = currentPattern;
 		m_shownReading = reading;
 		m_shownWaiting = m_waitingForMachine;
+		m_shownBusy = busy;
+		m_shownPlaying = playing;
 
 		// Only the cells that changed: a reading brings one Kit or pattern at a time
 		size_t kitsRead = 0;
@@ -245,6 +410,12 @@ namespace mdJucePlugin
 				if(missing)
 					text += " (" + std::to_string(missing) + " sans réponse)";
 			}
+			// What CHARGER asks to confirm takes the line; a load waiting, or what a load or a save did, follows
+			const auto load = loadText();
+			if(m_kitLoadArmed < kits || m_patternLoadArmed < patterns)
+				text = load;
+			else if(!load.empty())
+				text += " · " + load;
 			m_info->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 		}
 		if(m_read)
@@ -255,6 +426,7 @@ namespace mdJucePlugin
 		renderDetail();
 		renderPatternDetail();
 		renderCopy();
+		renderLoad(busy);
 		return true;
 	}
 

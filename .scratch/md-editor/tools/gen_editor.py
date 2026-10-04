@@ -534,9 +534,9 @@ def play_page_md(d):
 
 def library_page(d):
     # Two tabs, KITS and PATTERNS, with the reading's state and RELIRE beside them. KITS: every stored Kit,
-    # number and name; a click shows its machines without loading it. PATTERNS: every stored pattern, its
-    # length and Kit, A to H in columns. LibraryView (mdLibraryView.cpp) reads both when BIBLIO first shows,
-    # and fills them.
+    # number and name; a click shows its machines, CHARGER loads it, SAUVER saves the live Kit. PATTERNS: every
+    # stored pattern, its length and Kit, A to H in columns; COPIER, COLLER, CHARGER. LibraryView
+    # (mdLibraryView.cpp) reads both when BIBLIO first shows, and fills them.
     kits, cols, kb = (64, 4, 8) if MD else (128, 8, 12)
     rows, rh = 16, 22
     ty = 12
@@ -552,7 +552,11 @@ def library_page(d):
     page_w = M + gw + M
     # KITS
     w(f'{ind(d + 1)}<div id="mdLibKitsPage" class="jucePos" tabgroup="mdLib" tabpage="0" style="left: 0dp; top: 0dp; width: {page_w}dp; height: {{LIB_H}}dp;">')
-    block_open(d + 2, "mdLibKits", "KITS", "clic : ses machines, sans le charger · en ambre : le kit chargé", 0, kb, by, kh)
+    block_open(d + 2, "mdLibKits", "KITS", "clic : ses machines · en ambre : le kit chargé", 0, kb, by, kh)
+    # CHARGER loads the Kit clicked, once clicked again (the live Kit's unsaved values go); SAUVER saves the
+    # live Kit into its slot (LibraryView)
+    w(f'{ind(d + 3)}<button id="mdLibKitLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 150dp;">CHARGER</button>')
+    w(f'{ind(d + 3)}<button id="mdLibKitSave" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 268dp; top: 4dp; width: 150dp;">SAUVER</button>')
     cw = (span(kb) - 32) // cols
     for slot in range(kits):
         c, r = slot // rows, slot % rows
@@ -583,7 +587,9 @@ def library_page(d):
     # second click for one not known empty (LibraryView)
     w(f'{ind(d + 3)}<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>')
     w(f'{ind(d + 3)}<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>')
-    detail_x = 350
+    # CHARGER makes the pattern clicked the machine's, once clicked again (its Kit replaces the live one)
+    w(f'{ind(d + 3)}<button id="mdLibPatternLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 346dp; top: 4dp; width: 150dp;">CHARGER</button>')
+    detail_x = 508
     w(f'{ind(d + 3)}<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: {detail_x}dp; top: 4dp; width: {gw - detail_x - 16}dp;">—</div>')
     pw = (gw - 32) // 8
     for slot in range(128):

@@ -104,7 +104,7 @@ namespace md::automation::sysex
 	constexpr uint8_t StepFlagCount = 3;
 	// The swing amount as dumps hold it: how far a swung step is delayed, in 16384ths of the step, scaled so
 	// that 50 % is 0 and 80 %, the most the machines take, 9830 (MCL's MDSeqTrack; the factory patterns hold
-	// 0, and 60 % delays a swung step by a fifth of a step on the Machinedrum, mdEditorFirmwareTest)
+	// 0). Not measured on the firmware.
 	constexpr uint32_t swingWord(const uint8_t _percent)
 	{
 		return _percent <= 50 ? 0 : ((static_cast<uint32_t>(_percent > 80 ? 80 : _percent) - 50) * 16384 + 25) / 50;
@@ -170,6 +170,9 @@ namespace md::automation::sysex
 		// The pattern's number, 0 to 127 (A01 to H16): the firmware stores a dump in the
 		// slot it names, so a dump given another slot's number is a copy.
 		bool setSlot(uint8_t _slot);
+		// The Kit the pattern plays, 0 to 63: the machine loads it when it selects the pattern, or takes the
+		// pattern as its current one; a Kit loaded makes it the current pattern's (mdEditorFirmwareTest)
+		bool setKit(uint8_t _kit);
 		// A step's accent, slide or swing below the pattern length: in the mask every
 		// track follows (_track nullopt), or in a track's own (0..15)
 		bool setFlag(StepFlag _flag, std::optional<uint8_t> _track, uint8_t _step, bool _on);
@@ -227,6 +230,12 @@ namespace md::automation::sysex
 	// factory image is being learned without making that image user-modified.
 	bool isReadOnlyRequest(MachineModel _model, MessageView _message);
 	Message kitSave(MachineModel _model, uint8_t _slot);
+	// LOAD KIT ($58, MCL's MD::loadKit): the stored Kit becomes the live one, as stored; what the live Kit held
+	// and was not saved is gone. SET STATUS with the Kit does the same on both machines (mdEditorFirmwareTest).
+	Message kitLoad(MachineModel _model, uint8_t _slot);
+	// SET STATUS with the pattern ($71 $04): the machine's pattern at once when stopped, at the end of the one
+	// playing otherwise (patternChainFirmwareTest), its Kit loaded with it (mdEditorFirmwareTest)
+	Message patternSelect(MachineModel _model, uint8_t _slot);
 	// ASSIGN MACHINE ($5B) for a track of the live Kit. Machinedrum ids 128 and up
 	// go out as id - 128 with the UW flag; the Monomachine form asks for no page
 	// initialisation. Empty for a track or machine the model does not have.
@@ -326,6 +335,8 @@ namespace md::automation::sysex
 		// The pattern's number, 0 to 127 (A01 to H16): received in SYSEX RECV's ORIG mode, a dump goes to the
 		// slot it names, so a dump given another slot's number is a copy.
 		bool setSlot(uint8_t _slot);
+		// The Kit the pattern plays, 0 to 127, as on the Machinedrum
+		bool setKit(uint8_t _kit);
 		// A track's slide or swing on a step below the length (no accent on the Monomachine)
 		bool setFlag(StepFlag _flag, uint8_t _track, uint8_t _step, bool _on);
 		bool setSwingAmount(uint8_t _percent);		// 50..80

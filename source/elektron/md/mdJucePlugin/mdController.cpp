@@ -826,14 +826,19 @@ namespace mdJucePlugin
 			uint8_t slot = 0;
 			{
 				const std::lock_guard lock(m_patternMutex);
+				// Nothing left to write (the edits gave way to another pattern's dump, say): no write waits
 				if(!m_patternEdited || !m_mmPattern)
+				{
+					m_patternWriteFirstMs = 0;
 					return false;
+				}
 				if(m_patternWritesInFlight > 0)
 				{
 					if(!m_patternWriteFirstMs)
 						m_patternWriteFirstMs = m_patternWriteLastMs = milliseconds();
 					return false;
 				}
+				linkCurrentKit();
 				dump = m_patternDump;
 				slot = m_mmPattern->slot;
 				m_patternEdited = false;
@@ -855,6 +860,7 @@ namespace mdJucePlugin
 			const std::lock_guard lock(m_patternMutex);
 			if(!m_patternEdited || !m_pattern)
 				return false;
+			linkCurrentKit();
 			dump = m_patternDump;
 			slot = m_pattern->slot;
 			m_patternEdited = false;
@@ -915,12 +921,16 @@ namespace mdJucePlugin
 	void Controller::writePatternCopy(const md::automation::sysex::Message& _source)
 	{
 		const auto to = getPatternCopy().to;
+		// Onto the current pattern, the copy plays the live Kit, as an edit of it does (linkCurrentKit): with the
+		// source's, the machine would load that Kit, unknown to the controller
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		const bool keepKit = to == m_currentPattern.load(std::memory_order_acquire) && kit < getKitLibrarySize();
 		if(m_model == md::MachineModel::Monomachine)
 		{
 			auto editor = md::automation::sysex::MmPatternEditor::fromDump(_source);
 			md::automation::sysex::Message dump;
 			std::optional<md::automation::sysex::MmPatternDump> copy;
-			if(editor && editor->setSlot(to))
+			if(editor && editor->setSlot(to) && (!keepKit || editor->setKit(kit)))
 			{
 				dump = editor->toDump();
 				copy = md::automation::sysex::parseMmPatternDump(dump);
@@ -950,7 +960,7 @@ namespace mdJucePlugin
 		auto editor = md::automation::sysex::MdPatternEditor::fromDump(_source);
 		md::automation::sysex::Message dump;
 		std::optional<md::automation::sysex::PatternDump> copy;
-		if(editor && editor->setSlot(to))
+		if(editor && editor->setSlot(to) && (!keepKit || editor->setKit(kit)))
 		{
 			dump = editor->toDump();
 			copy = md::automation::sysex::parseMdPatternDump(dump);
@@ -982,8 +992,7 @@ namespace mdJucePlugin
 		}
 		m_patternCopySent = std::move(copy);
 		// The selected pattern reloads its Kit as stored when it is written (see sendPattern)
-		const auto kit = m_currentKit.load(std::memory_order_acquire);
-		if(to == m_currentPattern.load(std::memory_order_acquire) && kit < 64)
+		if(keepKit)
 			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
 		sendEditorSysex(dump);
 		sendEditorSysex(md::automation::sysex::patternRequest(m_model, to));
@@ -995,6 +1004,150 @@ namespace mdJucePlugin
 		const auto timeout = m_model == md::MachineModel::Monomachine ? MmWriteTimeoutMilliseconds : PatternCopyTimeoutMilliseconds;
 		if((state == PatternCopy::Reading || state == PatternCopy::Writing) && _now - m_patternCopyMs > timeout)
 			setPatternCopyState(PatternCopy::Failed);
+	}
+
+	void Controller::linkCurrentKit()
+	{
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		const auto current = m_currentPattern.load(std::memory_order_acquire);
+		if(kit >= getKitLibrarySize())
+			return;
+		if(m_mmPattern && m_mmPattern->slot == current && m_mmPattern->kit != kit)
+		{
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(m_patternDump);
+			if(!editor || !editor->setKit(kit))
+				return;
+			auto dump = editor->toDump();
+			if(auto pattern = md::automation::sysex::parseMmPatternDump(dump))
+			{
+				m_patternDump = std::move(dump);
+				m_mmPattern = std::move(*pattern);
+			}
+		}
+		else if(m_pattern && m_pattern->slot == current && m_pattern->kit != kit)
+		{
+			auto editor = md::automation::sysex::MdPatternEditor::fromDump(m_patternDump);
+			if(!editor || !editor->setKit(kit))
+				return;
+			auto dump = editor->toDump();
+			if(auto pattern = md::automation::sysex::parseMdPatternDump(dump))
+			{
+				m_patternDump = std::move(dump);
+				m_pattern = std::move(*pattern);
+			}
+		}
+	}
+
+	bool Controller::isPatternBusy()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto copy = getPatternCopy().state;
+		if(copy == PatternCopy::Reading || copy == PatternCopy::Writing)
+			return true;
+		if(m_model != md::MachineModel::Monomachine)
+			return false;
+		const std::lock_guard lock(m_patternMutex);
+		return m_patternWriteFirstMs != 0 || m_patternWritesInFlight > 0;
+	}
+
+	bool Controller::loadKit(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_slot >= getKitLibrarySize() || !firmwareReadyForAutomation() || isPatternBusy()
+			|| m_patternLoad.load(std::memory_order_acquire) < PatternLibrarySize)
+			return false;
+		// Edits waiting go first, saved with the Kit they were made with (sendPattern)
+		if(m_patternWriteFirstMs)
+			(void)sendPattern();
+		sendEditorSysex(md::automation::sysex::kitLoad(m_model, _slot));
+		// The machine plays the Kit from here on, a SAVE KIT sent after goes to its slot; its name comes with its
+		// dump, which requestKitState applies
+		if(m_currentKit.exchange(_slot, std::memory_order_acq_rel) != _slot)
+		{
+			{
+				const std::lock_guard lock(m_kitNameMutex);
+				m_kitName.clear();
+			}
+			m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+		}
+		requestKitState();
+		// The current pattern plays it too: read again, the pattern shown says so
+		if(m_patternRevision.load(std::memory_order_acquire) > 0)
+			requestPattern();
+		return true;
+	}
+
+	bool Controller::loadPattern(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_slot >= PatternLibrarySize || !firmwareReadyForAutomation() || isPatternBusy())
+			return false;
+		if(m_patternWriteFirstMs)
+			(void)sendPattern();
+		sendEditorSysex(md::automation::sysex::patternSelect(m_model, _slot));
+		const auto now = milliseconds();
+		m_patternLoad.store(_slot, std::memory_order_release);
+		m_patternLoadMs = m_patternLoadPollMs = now;
+		m_patternLoadSeenMs = 0;
+		// Stopped, the machine takes it at once: the status answers with it, and the pattern shown follows (the
+		// status handler); playing, servicePatternLoad asks until it does
+		if(!getPlayingStep())
+			requestPattern();
+		return true;
+	}
+
+	void Controller::servicePatternLoad(const uint64_t _now)
+	{
+		const auto slot = m_patternLoad.load(std::memory_order_acquire);
+		if(slot >= PatternLibrarySize)
+			return;
+		// The pattern is the current one: its Kit is the live one once the pattern plays, which the status
+		// answers before (PatternLoadSettleMilliseconds); stopped, at once
+		if(m_currentPattern.load(std::memory_order_acquire) == slot)
+		{
+			if(!m_patternLoadSeenMs)
+				m_patternLoadSeenMs = _now;
+			if(getPlayingStep() && _now - m_patternLoadSeenMs < PatternLoadSettleMilliseconds)
+				return;
+			m_patternLoad.store(0xff, std::memory_order_release);
+			requestKitState();
+			return;
+		}
+		if(_now - m_patternLoadMs > PatternLoadTimeoutMilliseconds)
+		{
+			m_patternLoad.store(0xff, std::memory_order_release);
+			return;
+		}
+		// Playing: the machine takes it at the end of the pattern playing
+		if(_now - m_patternLoadPollMs >= PatternLoadPollMilliseconds)
+		{
+			m_patternLoadPollMs = _now;
+			sendEditorSysex(md::automation::sysex::statusRequest(m_model, md::automation::sysex::StatusParameter::Pattern));
+		}
+	}
+
+	bool Controller::saveKit()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(kit >= getKitLibrarySize() || !firmwareReadyForAutomation() || isPatternBusy()
+			|| m_patternLoad.load(std::memory_order_acquire) < PatternLibrarySize)
+			return false;
+		sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		// The stored Kit is the live one now: the library shows it so
+		{
+			std::vector<uint16_t> machines;
+			for(uint8_t track = 0; track < getPartCount(); ++track)
+				machines.push_back(getTrackMachine(track));
+			const auto name = getKitName();
+			const std::lock_guard lock(m_libraryMutex);
+			if(kit < m_library.size())
+			{
+				m_library[kit] = LibraryKit{true, name.empty() && m_library[kit].read ? m_library[kit].name : name, machines};
+				m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
+		}
+		return true;
 	}
 
 	void Controller::requestKitState()
@@ -1089,6 +1242,7 @@ namespace mdJucePlugin
 		const auto now = milliseconds();
 		servicePatternWrite(now);
 		servicePatternCopy(now);
+		servicePatternLoad(now);
 		// A library Kit not answered: skip it (the firmware may drop a request while busy)
 		// A Kit not answered within 2 s, a pattern (a longer dump) within 4 s, is skipped
 		if(m_libraryReading.load(std::memory_order_acquire)

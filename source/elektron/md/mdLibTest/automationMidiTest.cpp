@@ -227,6 +227,17 @@ namespace
 		require(kitSave(md::MachineModel::Monomachine, 127)
 			== Message({0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x59, 0x7f, 0xf7}),
 			"wrong MM kit save");
+		require(kitLoad(md::MachineModel::Machinedrum, 5)
+			== Message({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x58, 0x05, 0xf7}),
+			"wrong MD kit load");
+		require(patternSelect(md::MachineModel::Monomachine, 20)
+			== Message({0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x71, 0x04, 0x14, 0xf7}),
+			"wrong MM pattern selection");
+		// Read back as the SET STATUS it is
+		const auto selection = parseSetStatus(md::MachineModel::Machinedrum,
+			patternSelect(md::MachineModel::Machinedrum, 127));
+		require(selection && selection->parameter == StatusParameter::Pattern
+			&& selection->value == 127, "pattern selection not read as SET STATUS");
 
 		const Message response{0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00,
 			0x72, 0x02, 0x37, 0xf7};
@@ -777,6 +788,13 @@ namespace
 			&& parsed->lockRows == source->lockRows && dump.size() == longPattern.size()
 			&& std::equal(dump.begin() + 10, dump.end() - 5, longPattern.begin() + 10), "the copy is not the pattern under another number");
 
+		// The Kit the pattern plays, 0 to 63: the plain byte after the scale
+		auto relinked = MdPatternEditor::fromDump(longPattern);
+		require(relinked && relinked->setKit(12) && !relinked->setKit(64), "Kit 12 refused, or 64 accepted");
+		parsed = parseMdPatternDump(relinked->toDump());
+		require(parsed && parsed->kit == 12 && parsed->length == source->length && parsed->trigs == source->trigs
+			&& parsed->lockRows == source->lockRows, "the Kit not written, or the rest of the pattern changed");
+
 		require(!MdPatternEditor::fromDump(Message(pattern.begin(), pattern.begin() + 100)), "editor accepted a truncated pattern");
 	}
 
@@ -913,6 +931,10 @@ namespace
 		require(clearing->toDump() == makeMonomachinePattern(17, expected), "clearing the MM pattern left a trig or a lock, or changed the rest");
 		require(clearing->setSlot(40) && !clearing->setSlot(128), "MM slot 40 refused, or 128 accepted");
 		require(clearing->toDump() == makeMonomachinePattern(40, expected), "the MM copy is not the pattern under another number");
+		// The Kit the pattern plays, 0 to 127, after the length and the double tempo
+		require(clearing->setKit(100) && !clearing->setKit(128), "MM Kit 100 refused, or 128 accepted");
+		expected[1062] = 100;
+		require(clearing->toDump() == makeMonomachinePattern(40, expected), "the MM Kit not written after the length");
 
 		// Slide and swing, a track's: kinds 9 and 10 of the step masks; the swing amount just before the lock masks.
 		// No accent on the Monomachine.

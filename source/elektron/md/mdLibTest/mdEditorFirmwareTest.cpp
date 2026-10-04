@@ -5,7 +5,8 @@
 // and its change ($5C), the Machinedrum pattern dump ($67) as
 // MdPatternEditor reads it (with trigs and a lock placed on the front panel,
 // unsaved), and a pattern written back to its slot, stopped and playing; the
-// sequencer's step and running state as JOUER reads them in the firmware's RAM.
+// sequencer's step and running state as JOUER reads them in the firmware's RAM;
+// the Kit and pattern loads of BIBLIO's CHARGER.
 // Every message comes from the codec the editor uses (mdsysexautomation.h). The
 // silence around a write during playback is printed, not checked.
 //
@@ -834,6 +835,126 @@ namespace
 		require(after && !after->playing, "the sequencer position plays on after STOP");
 	}
 
+	// BIBLIO's CHARGER (Controller::loadKit, loadPattern), on either machine. LOAD KIT ($58, the codec's
+	// kitLoad, MCL's MD::loadKit) makes another stored Kit the live one, and loading the live Kit's slot again
+	// brings back its stored values: track 1 VOL changed by CC and not saved is gone. SET STATUS with the Kit
+	// ($71 $02) does the same, as the controller assumes of one it did not send. The current pattern plays the
+	// Kit loaded from then on: its dump says so, and on the Machinedrum, written back so, it keeps the Kit
+	// (Controller::linkCurrentKit; the Monomachine takes a pattern only on its SYSEX RECV menu). SET STATUS with
+	// a pattern (the codec's patternSelect), stopped: the pattern is the machine's at once, its Kit with it.
+	void checkKitAndPatternLoad(md::Hardware& _hardware)
+	{
+		const auto model = _hardware.getModel();
+		const bool mm = model == md::MachineModel::Monomachine;
+		const auto name = mm ? "MM" : "MD";
+		const uint8_t product = mm ? 0x03 : 0x02;
+		const auto kit = status(_hardware, sysex::StatusParameter::Kit);
+		const auto other = static_cast<uint8_t>((kit + 1) % (mm ? 128 : 64));
+		const auto globalSlot = status(_hardware, sysex::StatusParameter::Global);
+		const auto global = sysex::parseGlobalDump(model, exchange(_hardware, sysex::globalRequest(model, globalSlot), 0x50));
+		require(global.has_value(), "no Global dump");
+		// Track 1 VOL: AMP VOL on the Monomachine
+		const uint8_t page = mm ? md::automation::monomachine::Amplification : md::automation::machinedrum::Routing;
+		const uint8_t index = mm ? 5 : 1;
+		const auto storedVolume = [&](const uint8_t _slot)
+		{
+			for(const auto& change : readKit(_hardware, _slot).parameters)
+			{
+				if(change.track == 0 && change.page == page && change.index == index)
+					return static_cast<int>(change.value);
+			}
+			return -1;
+		};
+		const auto liveVolume = [&]
+		{
+			advance(_hardware, md::g_samplerate / 4);
+			const auto live = _hardware.readLiveKit();
+			require(live.has_value(), "live Kit not read");
+			return static_cast<int>(live->value(0, page, index));
+		};
+		const auto stored = storedVolume(kit);
+		require(stored >= 0, "track 1 VOL not in the Kit dump");
+		const auto edited = static_cast<uint8_t>((stored + 37) % 128);
+		const auto edit = [&]
+		{
+			const auto cc = md::automation::encodeParameterChange(model, {page, 0, index, edited}, global->baseChannel);
+			require(cc.has_value(), "no CC for track 1 VOL");
+			sendControlChange(_hardware, *cc);
+			return liveVolume();
+		};
+		const auto load = [&](const Bytes& _message)
+		{
+			send(_hardware, _message);
+			advance(_hardware, md::g_samplerate / 2);
+			return status(_hardware, sysex::StatusParameter::Kit);
+		};
+		// SET STATUS with the Kit, which the codec only reads
+		const auto setKit = [&](const uint8_t _slot) { return Bytes{0xf0, 0x00, 0x20, 0x3c, product, 0x00, 0x71, 0x02, _slot, 0xf7}; };
+		const auto readPatternDump = [&](const uint8_t _slot)
+		{
+			const auto dump = exchange(_hardware, sysex::patternRequest(model, _slot), 0x67);
+			require(!dump.empty(), "no pattern dump for slot " + std::to_string(_slot));
+			return dump;
+		};
+		const auto patternKit = [&](const uint8_t _slot)
+		{
+			const auto dump = readPatternDump(_slot);
+			if(mm)
+			{
+				const auto parsed = sysex::parseMmPatternDump(dump);
+				return parsed ? static_cast<int>(parsed->kit) : -1;
+			}
+			const auto parsed = sysex::parseMdPatternDump(dump);
+			return parsed ? static_cast<int>(parsed->kit) : -1;
+		};
+		const auto pattern = status(_hardware, sysex::StatusParameter::Pattern);
+		for(const bool viaStatus : {false, true})
+		{
+			const auto message = viaStatus ? "SET STATUS KIT $71 $02" : "LOAD KIT $58";
+			const auto build = [&](const uint8_t _slot) { return viaStatus ? setKit(_slot) : sysex::kitLoad(model, _slot); };
+			const auto changed = edit();
+			const auto there = load(build(other));
+			const auto playedThere = patternKit(pattern);
+			// The Machinedrum's pattern written back as read: the machine keeps the Kit
+			int keptAfterWrite = -1;
+			if(!mm)
+			{
+				send(_hardware, readPatternDump(pattern));
+				advance(_hardware, md::g_samplerate / 2);
+				keptAfterWrite = status(_hardware, sysex::StatusParameter::Kit);
+			}
+			const auto back = load(build(kit));
+			const auto restored = liveVolume();
+			// As stored before: the pattern written back plays its Kit again
+			if(!mm)
+			{
+				send(_hardware, readPatternDump(pattern));
+				advance(_hardware, md::g_samplerate / 2);
+			}
+			std::printf("%s %s: Kit %u, track 1 VOL %d stored, %d by CC; Kit %u loaded: Kit %u, pattern %u plays Kit %d,"
+				" written back Kit %d; Kit %u again: Kit %u, VOL %d\n", name, message, kit + 1, stored, changed, other + 1,
+				there + 1, pattern + 1, playedThere + 1, keptAfterWrite + 1, kit + 1, back + 1, restored);
+			require(changed != stored, "track 1 VOL by CC did not change the live Kit");
+			require(there == other && back == kit, std::string(message) + " did not load the Kit");
+			require(restored == stored, std::string(message) + " again did not bring back the Kit's stored values");
+			require(playedThere == other, "the current pattern does not play the Kit loaded");
+			require(mm || keptAfterWrite == other, "the current pattern written back did not keep the Kit loaded");
+		}
+		// Selecting a pattern, stopped
+		const auto next = static_cast<uint8_t>((pattern + 1) % 128);
+		const auto nextKit = patternKit(next);
+		send(_hardware, sysex::patternSelect(model, next));
+		advance(_hardware, md::g_samplerate / 2);
+		const auto selected = status(_hardware, sysex::StatusParameter::Pattern);
+		const auto selectedKit = status(_hardware, sysex::StatusParameter::Kit);
+		std::printf("%s pattern %u selected from %u, its Kit %d: pattern %u, Kit %u\n", name, next + 1, pattern + 1,
+			nextKit + 1, selected + 1, selectedKit + 1);
+		require(selected == next, "SET STATUS did not select the pattern");
+		require(static_cast<int>(selectedKit) == nextKit, "the pattern selected did not bring its Kit");
+		send(_hardware, sysex::patternSelect(model, pattern));
+		advance(_hardware, md::g_samplerate / 2);
+	}
+
 	bool runMachinedrum()
 	{
 		const auto hardware = start("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
@@ -856,6 +977,7 @@ namespace
 		checkAccent(*hardware);
 		checkLiveKitAcrossPatternWrite(*hardware);
 		checkSequencerPosition(*hardware);
+		checkKitAndPatternLoad(*hardware);
 		std::printf("mdEditorFirmwareTest: MD PASS\n");
 		return true;
 	}
@@ -869,6 +991,7 @@ namespace
 		std::printf("MM Kit %u \"%s\", pattern %u\n", kit.slot + 1, kit.name.c_str(),
 			status(*hardware, sysex::StatusParameter::Pattern));
 		checkAssignment(*hardware, 1, {32, 33});     // DPRO-DDRW or DPRO-DENS, sent without page initialisation
+		checkKitAndPatternLoad(*hardware);
 		std::printf("mdEditorFirmwareTest: MM PASS\n");
 		return true;
 	}
