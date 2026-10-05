@@ -589,6 +589,8 @@ namespace mdJucePlugin
 		// audio thread): a track that got one may not show it in the machine's RAM yet
 		std::array<std::atomic<uint32_t>, md::automation::machinedrum::TrackCount> m_trackDeliveries{};
 		bool m_syntheticFirmwareReadyForTests = false;
+		// Tests: where BIBLIO's reading comes from whatever the machine, requests (false) or the RAM (true)
+		std::optional<bool> m_libraryReadableForTests;
 		// Tests without a running machine: the step getPlayingStep() answers with, set
 		std::optional<std::optional<uint8_t>> m_syntheticPlayingStepForTests;
 		// and the live Kit readLiveKit() answers with, set

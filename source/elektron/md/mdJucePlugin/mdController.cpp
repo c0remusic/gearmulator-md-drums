@@ -487,6 +487,8 @@ namespace mdJucePlugin
 
 	bool Controller::libraryReadable() const
 	{
+		if(m_libraryReadableForTests)
+			return *m_libraryReadableForTests;
 		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
 		return status && status->librarySupported;
 	}

@@ -71,6 +71,12 @@ namespace mdJucePlugin
 			_controller.onControllerTimer();
 		}
 
+		// Where BIBLIO's reading comes from, whatever the machine: requests, or the Device's reading of its RAM
+		static void readLibraryFromRam(Controller& _controller, const bool _ram)
+		{
+			_controller.m_libraryReadableForTests = _ram;
+		}
+
 		// The pattern a load waited for has played long enough for its Kit to be the live one: the timer reads it
 		static void settlePatternLoad(Controller& _controller)
 		{
@@ -1840,6 +1846,8 @@ int main()
 			const auto patterns = mdJucePlugin::Controller::PatternLibrarySize;
 			require(kits == (g_model == md::MachineModel::Monomachine ? 128u : 64u), "library size is not the machine's Kit count");
 			require(!md.isReadingLibrary() && !md.isLibraryRead(), "library read before BIBLIO showed");
+			// Through requests first, whatever the firmware this test runs with; from the RAM at the end
+			Access::readLibraryFromRam(md, false);
 			tabButton(doc, "mdEdit", "3").Click();
 			context.Update();
 			present();
@@ -2099,6 +2107,38 @@ int main()
 			for(size_t item = 0; item < kits + patterns; ++item)
 				Access::expireLibraryRequest(md);
 			require(!md.isReadingLibrary() && md.isLibraryRead(), "the second reading did not end");
+			// From the machine's RAM (Hardware::readLibrary): RELIRE asks the Device for one reading, and the
+			// controller timer fills every Kit and pattern from it at once, a pattern without a length left unread
+			{
+				Access::readLibraryFromRam(md, true);
+				element(doc, "mdLibRead").Click();
+				present();
+				auto& control = processor.getLibraryControl();
+				require(md.isReadingLibrary() && control.getRequested() > control.getReadId(),
+					"RELIRE did not ask the Device for a reading");
+				auto library = std::make_unique<md::Library>();
+				library->kitCount = static_cast<uint8_t>(kits);
+				library->tracks = static_cast<uint8_t>(g_trackCount);
+				library->nameSize = g_model == md::MachineModel::Monomachine ? 11 : 16;
+				for(size_t slot = 0; slot < kits; ++slot)
+				{
+					const auto name = "RAM " + std::to_string(slot + 1);
+					std::copy(name.begin(), name.end(), library->kits[slot].name.begin());
+					std::fill_n(library->kits[slot].machines.begin(), g_trackCount, slot % 2 ? g_pickMachine : g_otherFamilyMachine);
+				}
+				library->patterns[0] = {16, 0, 4};
+				library->patterns[21] = {32, 2, 9};
+				require(control.publish(control.getRequested(), *library), "the reading was not published");
+				Access::timer(md);
+				present();
+				require(!md.isReadingLibrary() && md.isLibraryRead() && md.getLibraryProgress() == kits + patterns
+					&& md.getLibraryKit(11)->name == "RAM 12" && md.getLibraryKit(3)->read
+					&& md.getLibraryPattern(21)->length == 32 && md.getLibraryPattern(21)->kit == 2
+					&& md.getLibraryPattern(21)->trigs == uint16_t{9} && !md.getLibraryPattern(2)->read,
+					"the RAM reading did not fill the library at once");
+				require(text("mdLibKit11") == "12  RAM 12", "library cells do not show the RAM reading: \"" + text("mdLibKit11") + "\"");
+				Access::readLibraryFromRam(md, false);
+			}
 			tabButton(doc, "mdLib", "0").Click();
 			tabButton(doc, "mdEdit", "0").Click();
 			context.Update();
