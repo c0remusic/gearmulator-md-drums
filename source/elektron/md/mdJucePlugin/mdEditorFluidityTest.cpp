@@ -559,6 +559,9 @@ namespace
 		struct Sample { double at; double ms; };
 		std::vector<Sample> callbacks;
 		callbacks.reserve(1 << 20);
+		// Each block's highest sample: whether the machine sounds
+		std::vector<Sample> levels;
+		levels.reserve(1 << 20);
 		std::atomic<bool> running{true};
 		std::atomic<bool> audioStopped{false};
 		// Callbacks that started more than half a period after their time: a host's audio thread is never
@@ -583,6 +586,7 @@ namespace
 				audioProcessor.processBlock(buffer, midi);
 				const auto end = std::chrono::steady_clock::now();
 				callbacks.push_back({msAt(start), std::chrono::duration<double, std::milli>(end - start).count()});
+				levels.push_back({msAt(start), static_cast<double>(buffer.getMagnitude(0, blockSize))});
 				next += period;
 				// No sleep: a process without a visible window may get the default 15.6 ms timer resolution,
 				// and a sleep then overshoots a whole period. Spin, as a host's audio thread waits on its device.
@@ -618,7 +622,7 @@ namespace
 				: controller.getPattern().has_value();
 		};
 
-		enum class Phase { Boot, Start, Pattern, Baseline, Clicks, Library, Done };
+		enum class Phase { Boot, Pattern, Baseline, Clicks, Verify, Library, Done };
 		Phase phase = Phase::Boot;
 		double phaseSince = 0;
 		std::vector<double> ticks;
@@ -629,6 +633,15 @@ namespace
 		double baselineStart = 0;
 		double patternAsked = 0;
 		bool playingAtBaseline = false;
+		double playTapped = 0;
+		bool playHeld = false;
+		// The Machinedrum's track 1 trigs when the clicks began, the steps they toggled, and what the machine
+		// answered with when read again after them
+		std::optional<uint64_t> trigsBefore, trigsAfter;
+		uint64_t toggled = 0;
+		uint64_t revisionAtVerify = 0;
+		std::vector<int> clickSteps;	// the step the playhead was on at each click, -1 when not seen playing
+		double playingSince = 0;		// the playhead seen moving since then, without a break; 0: not moving
 		// The library reading: started, Kits done, ended (0 until then), and when progress was last printed
 		double libraryStart = 0, libraryKitsDone = 0, libraryEnd = 0, libraryNote = 0;
 		// A fresh config may prepare the factory flash and reboot the machine in process: the measure waits
@@ -678,7 +691,9 @@ namespace
 					element(*component.getDocument(), "mdViewEditor")->Click();
 					tabButton(*component.getDocument(), "mdEdit", "2")->Click();
 					panel(md::PanelControl::Play, true);
-					next(Phase::Start);
+					playHeld = true;
+					playTapped = now;
+					next(Phase::Pattern);
 				}
 				else if(inPhase > 90000)
 				{
@@ -686,15 +701,24 @@ namespace
 					next(Phase::Done);
 				}
 				break;
-			case Phase::Start:
-				if(inPhase > 100)
+			case Phase::Pattern:
+			{
+				// PLAY again, held 100 ms, until the playhead moves: for seconds after its boot the machine does
+				// not take it. The measure starts once it has moved for a second.
+				const bool moving = controller.getPlayingStep().has_value();
+				playingSince = moving ? (playingSince ? playingSince : now) : 0;
+				if(playHeld && now - playTapped > 100)
 				{
 					panel(md::PanelControl::Play, false);
-					next(Phase::Pattern);
+					playHeld = false;
 				}
-				break;
-			case Phase::Pattern:
-				if(patternKnown() && inPhase > 2000)
+				else if(!playHeld && !moving && now - playTapped > 2000)
+				{
+					panel(md::PanelControl::Play, true);
+					playHeld = true;
+					playTapped = now;
+				}
+				if(patternKnown() && playingSince && now - playingSince > 1000 && !playHeld && inPhase > 2000)
 				{
 					progress("pattern read: baseline");
 					baselineStart = now;
@@ -704,16 +728,17 @@ namespace
 				}
 				else if(inPhase > 30000)
 				{
-					progress("pattern never read");
+					progress(patternKnown() ? "the sequencer never played" : "pattern never read");
 					next(Phase::Done);
 				}
-				else if(now - patternAsked > 2000.0)
+				else if(!patternKnown() && now - patternAsked > 2000.0)
 				{
 					// As JOUER asks while it has none: the Monomachine's view asks only while drawn, which it is not here
 					patternAsked = now;
 					(void)controller.requestPattern();
 				}
 				break;
+			}
 			case Phase::Baseline:
 				if(inPhase <= _interval * 1000.0)
 					break;
@@ -758,17 +783,34 @@ namespace
 				{
 					if(inPhase > _interval * 1000.0)
 					{
-						silentAtClick.push_back(silentBlocks());
-						next(Phase::Done);
+						// The last click's window ends here, the wait for its write after
+						if(silentAtClick.size() == static_cast<size_t>(clicks))
+							silentAtClick.push_back(silentBlocks());
+						// The Machinedrum's pattern read again once the last write is done: what it plays
+						if(_model == md::MachineModel::Machinedrum && controller.getPatternWrite()
+							!= mdJucePlugin::Controller::PatternWrite::Pending)
+						{
+							revisionAtVerify = controller.getPatternRevision();
+							(void)controller.requestPattern();
+							next(Phase::Verify);
+						}
+						else if(_model != md::MachineModel::Machinedrum || inPhase > _interval * 1000.0 + 10000.0)
+							next(Phase::Done);
 					}
 					break;
 				}
 				if(clicks == 0 || inPhase > _interval * 1000.0)
 				{
 					juceRmlUi::RmlInterfaces::ScopedAccess access(component);
+					const auto step = 2 + 4 * (clicks % 4);
 					const auto id = std::string(_model == md::MachineModel::Monomachine ? "mmPlayStep" : "mdPlayStep")
-						+ "0_" + std::to_string(2 + 4 * (clicks % 4));
+						+ "0_" + std::to_string(step);
 					auto* cell = element(*component.getDocument(), id);
+					if(clicks == 0 && _model == md::MachineModel::Machinedrum && controller.getPattern())
+						trigsBefore = controller.getPattern()->trigs[0];
+					toggled ^= uint64_t{1} << step;
+					const auto playing = controller.getPlayingStep();
+					clickSteps.push_back(playing ? *playing : -1);
 					silentAtClick.push_back(silentBlocks());
 					const auto start = std::chrono::steady_clock::now();
 					cell->Click();
@@ -776,6 +818,18 @@ namespace
 					clickTimes.push_back(msAt(start));
 					++clicks;
 					phaseSince = now;
+				}
+				break;
+			case Phase::Verify:
+				if(controller.getPatternRevision() != revisionAtVerify && controller.getPattern())
+				{
+					trigsAfter = controller.getPattern()->trigs[0];
+					next(Phase::Done);
+				}
+				else if(inPhase > 8000)
+				{
+					progress("pattern not read again");
+					next(Phase::Done);
 				}
 				break;
 			case Phase::Done:
@@ -847,18 +901,22 @@ namespace
 		{
 			const auto [host, hostOver] = window(callbacks, _from, _to);
 			const auto [render, renderOver] = window(renders, _from, _to);
+			const auto [level, levelOver] = window(levels, _from, _to);
 			std::printf("  %-14s host callback p50 %5.2f p99 %5.2f max %6.2f ms (%u over the period) | render p50 %5.2f p99 %5.2f"
-				" max %6.2f ms (%u over) | %3llu blocks silent | message thread longest gap %6.1f ms\n", _label, host.p50,
-				host.p99, host.max, hostOver, render.p50, render.p99, render.max, renderOver,
-				static_cast<unsigned long long>(_silent), longestGap(_from, _to));
+				" max %6.2f ms (%u over) | %3llu blocks silent | output peak %.3f | message thread longest gap %6.1f ms\n",
+				_label, host.p50, host.p99, host.max, hostOver, render.p50, render.p99, render.max, renderOver,
+				static_cast<unsigned long long>(_silent), level.max, longestGap(_from, _to));
 		};
 		if(!clickTimes.empty() && silentAtClick.size() == clickTimes.size() + 1)
 		{
 			report("before clicks", baselineStart, clickTimes.front(), silentAtClick.front() - silentAtBaseline);
 			for(size_t c = 0; c < clickTimes.size(); ++c)
 			{
-				char label[32];
-				std::snprintf(label, sizeof(label), "click %zu (%.1f ms)", c + 1, clickCosts[c]);
+				char label[48];
+				if(clickSteps[c] >= 0)
+					std::snprintf(label, sizeof(label), "click %zu (%.1f ms, step %d)", c + 1, clickCosts[c], clickSteps[c] + 1);
+				else
+					std::snprintf(label, sizeof(label), "click %zu (%.1f ms, stopped)", c + 1, clickCosts[c]);
 				report(label, clickTimes[c], c + 1 < clickTimes.size() ? clickTimes[c + 1] : clickTimes[c] + _interval * 1000.0,
 					silentAtClick[c + 1] - silentAtClick[c]);
 			}
@@ -904,9 +962,19 @@ namespace
 			static_cast<unsigned long long>(missed), static_cast<unsigned long long>(dropped));
 		std::printf("  audio thread: %llu of %zu callbacks over half a period late, the latest by %.1f ms\n",
 			static_cast<unsigned long long>(lateCallbacks), callbacks.size(), latestCallbackMs);
+		const bool clicksKept = !trigsBefore || (trigsAfter && *trigsAfter == (*trigsBefore ^ toggled));
+		if(trigsBefore)
+		{
+			char after[24] = "none";
+			if(trigsAfter)
+				std::snprintf(after, sizeof(after), "%016llx", static_cast<unsigned long long>(*trigsAfter));
+			std::printf("  track 1 trigs before the clicks %016llx, toggled %016llx, read again from the machine %s: %s\n",
+				static_cast<unsigned long long>(*trigsBefore), static_cast<unsigned long long>(toggled), after,
+				clicksKept ? "as clicked" : "NOT as clicked");
+		}
 		std::fflush(stdout);
 		audioProcessor.releaseResources();
-		return missed == 0 && (!_library || libraryEnd > 0);
+		return missed == 0 && clicksKept && (!_library || libraryEnd > 0);
 	}
 }
 
