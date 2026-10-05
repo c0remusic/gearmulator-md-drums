@@ -244,7 +244,7 @@ namespace
 
 int main(int argc, char** argv)
 {
-	std::setvbuf(stdout, nullptr, _IOLBF, 0);
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	if(argc == 2 && std::string(argv[1]) == "--audio-oracle")
 	{
 		try { oracleSelfTest(); return 0; }

@@ -211,7 +211,7 @@ namespace
 
 int main(int argc, char** argv)
 {
-	std::setvbuf(stdout, nullptr, _IOLBF, 0);
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	if(argc != 3 && argc != 4)
 	{
 		std::puts("usage: mmSysexExportFirmwareTest <MM-ROM> <1MiB-patch-ram> [full]");
