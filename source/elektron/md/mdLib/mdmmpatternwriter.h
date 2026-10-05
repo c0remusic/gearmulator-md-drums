@@ -61,7 +61,10 @@ namespace md
 			uint32_t sends = 3;
 		};
 
-		explicit MmPatternWriter(const Timing _timing = {}) : m_timing(_timing) {}
+		// Two constructors rather than a {} default argument: GCC and Clang refuse Timing's member initializers
+		// within this class's definition outside its member functions
+		MmPatternWriter() : m_timing() {}
+		explicit MmPatternWriter(const Timing _timing) : m_timing(_timing) {}
 
 		// Takes _write, once idle
 		bool start(Write _write);
