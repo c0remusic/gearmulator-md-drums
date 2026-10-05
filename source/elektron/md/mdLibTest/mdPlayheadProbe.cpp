@@ -1575,6 +1575,407 @@ namespace
 		panelTap(*hardware, md::PanelControl::Stop);
 	}
 
+	// Where the Machinedrum keeps the pattern it plays (--pattern-ram): the RAM bytes that follow one trig written
+	// on and off by pattern dumps ($67), for a few tracks and steps; then whether a trig written there directly is
+	// what the next pattern request answers with, and whether it plays.
+	void patternRamMachinedrum()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
+		if(!path)
+			return;
+		namespace sysex = md::automation::sysex;
+		constexpr auto model = md::MachineModel::Machinedrum;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		auto hardware = std::make_unique<md::Hardware>(rom, path, model);
+		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			advance(*hardware, 64);
+		advance(*hardware, md::g_samplerate * 20);
+		auto& uc = hardware->getUC();
+		const auto send = [&](const sysex::Message& _bytes)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.sysex.assign(_bytes.begin(), _bytes.end());
+			require(hardware->sendMidi(event), "SysEx rejected");
+		};
+		const auto exchange = [&](const sysex::Message& _request, const uint8_t _command)
+		{
+			std::vector<synthLib::SMidiEvent> events;
+			hardware->readMidiOut(events);
+			send(_request);
+			for(uint32_t block = 0; block < md::g_samplerate * 4 / 64; ++block)
+			{
+				advance(*hardware, 64);
+				events.clear();
+				hardware->readMidiOut(events);
+				for(const auto& e : events)
+					if(e.sysex.size() > 9 && e.sysex[6] == _command)
+						return sysex::Message(e.sysex.begin(), e.sysex.end());
+			}
+			throw std::runtime_error("no answer");
+		};
+		const auto status = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, sysex::StatusParameter::Pattern), 0x72));
+		require(status.has_value(), "no pattern status");
+		const auto slot = status->value;
+
+		// A pattern of 16 steps, no trig: what each toggle starts from
+		auto blank = sysex::MdPatternEditor::fromDump(exchange(sysex::patternRequest(model, slot), 0x67));
+		require(blank.has_value() && blank->setLength(16), "pattern unreadable");
+		blank->clear();
+		const auto blankDump = blank->toDump();
+
+		constexpr uint32_t dramBegin = 0x00100000, dramSize = 0x00300000, sramBegin = 0x01000000, sramSize = 0x2000;
+		const auto snapshot = [&]
+		{
+			std::vector<uint8_t> bytes(dramSize + sramSize);
+			for(uint32_t i = 0; i < dramSize; ++i)
+			{
+				const auto address = dramBegin + i;
+				if(address < 0x00300000 || address >= 0x00310000)
+					bytes[i] = uc.read8(address);
+			}
+			for(uint32_t i = 0; i < sramSize; ++i)
+				bytes[dramSize + i] = uc.read8(sramBegin + i);
+			return bytes;
+		};
+		const auto addressOf = [&](const size_t _index)
+		{
+			return _index < dramSize ? dramBegin + static_cast<uint32_t>(_index) : sramBegin + static_cast<uint32_t>(_index - dramSize);
+		};
+		const auto written = [&](const std::optional<std::pair<uint8_t, uint8_t>> _trig)
+		{
+			auto editor = sysex::MdPatternEditor::fromDump(blankDump);
+			require(editor.has_value() && (!_trig || editor->setTrig(_trig->first, _trig->second, true)), "trig not set");
+			send(editor->toDump());
+			advance(*hardware, md::g_samplerate);
+			return snapshot();
+		};
+
+		// Bytes equal in both snapshots without the trig and in both with it, and different between the two
+		struct Spot { uint32_t address; uint8_t off; uint8_t on; };
+		const auto locate = [&](const uint8_t _track, const uint8_t _step)
+		{
+			const auto off1 = written(std::nullopt);
+			const auto on1 = written(std::make_pair(_track, _step));
+			const auto off2 = written(std::nullopt);
+			const auto on2 = written(std::make_pair(_track, _step));
+			std::vector<Spot> spots;
+			for(size_t i = 0; i < off1.size(); ++i)
+			{
+				if(off1[i] == off2[i] && on1[i] == on2[i] && off1[i] != on1[i])
+					spots.push_back({addressOf(i), off1[i], on1[i]});
+			}
+			std::string line;
+			for(size_t s = 0; s < std::min<size_t>(spots.size(), 16); ++s)
+			{
+				char text[32];
+				std::snprintf(text, sizeof(text), " $%06x:%02x>%02x", spots[s].address, spots[s].off, spots[s].on);
+				line += text;
+			}
+			std::printf("MD trig track %u step %u: %zu bytes follow it:%s\n", _track + 1, _step + 1, spots.size(), line.c_str());
+			std::fflush(stdout);
+			return spots;
+		};
+		for(const auto& [track, step] : std::vector<std::pair<uint8_t, uint8_t>>{{0, 1}, {0, 2}, {0, 9}, {1, 2}, {15, 2}})
+			(void)locate(track, step);
+		const auto spots = locate(0, 4);
+		if(spots.empty())
+			return;
+
+		// Written directly: the blank pattern taken, then track 1 step 5's bytes given their value with the trig
+		const auto trigInDump = [&]
+		{
+			const auto pattern = sysex::parseMdPatternDump(exchange(sysex::patternRequest(model, slot), 0x67));
+			require(pattern.has_value(), "pattern unreadable");
+			return pattern->hasTrig(0, 4);
+		};
+		(void)written(std::nullopt);
+		std::printf("MD before the direct write: the dump has the trig %d\n", trigInDump() ? 1 : 0);
+		for(const auto& spot : spots)
+			uc.write8(spot.address, spot.on);
+		advance(*hardware, md::g_samplerate / 4);
+		std::printf("MD after the direct write: the dump has the trig %d\n", trigInDump() ? 1 : 0);
+
+		// Heard: the output's energy over two bars playing, without the trig and with it written directly
+		const auto energy = [&]
+		{
+			std::array<std::array<float, 256>, 2> samples{};
+			synthLib::TAudioOutputs outputs{};
+			outputs[0] = samples[0].data();
+			outputs[1] = samples[1].data();
+			double sum = 0;
+			for(uint32_t block = 0; block < md::g_samplerate * 4 / 256; ++block)
+			{
+				hardware->processAudio(outputs, 256, 0);
+				for(const auto& channel : samples)
+					for(const auto value : channel)
+						sum += static_cast<double>(value) * value;
+			}
+			return sum;
+		};
+		(void)written(std::nullopt);
+		panelTap(*hardware, md::PanelControl::Play);
+		const auto silent = energy();
+		for(const auto& spot : spots)
+			uc.write8(spot.address, spot.on);
+		const auto withTrig = energy();
+		for(const auto& spot : spots)
+			uc.write8(spot.address, spot.off);
+		const auto cleared = energy();
+		panelTap(*hardware, md::PanelControl::Stop);
+		std::printf("MD playing, energy over 4 s: blank %.3g, trig written directly %.3g, cleared again %.3g\n",
+			silent, withTrig, cleared);
+
+		// The whole pattern: a dump's payload (trigs, lock masks, accent/slide/swing, the plain bytes, lock rows,
+		// tail, then the 64-step extension), unpacked, against the RAM from the trigs found above
+		const auto unpack = [](const sysex::Message& _dump)
+		{
+			std::vector<uint8_t> payload;
+			size_t position = 0x0a;
+			const auto read7 = [&](const size_t _count)
+			{
+				for(size_t done = 0; done < _count;)
+				{
+					const auto high = _dump[position++];
+					for(uint8_t bit = 0; bit < 7 && done < _count; ++bit, ++done)
+						payload.push_back(static_cast<uint8_t>(_dump[position++] | ((high >> (6 - bit)) & 1u) << 7));
+				}
+			};
+			read7(64);
+			read7(64);
+			read7(16);
+			payload.insert(payload.end(), _dump.begin() + static_cast<std::ptrdiff_t>(position), _dump.begin() + static_cast<std::ptrdiff_t>(position) + 6);
+			position += 6;
+			read7(64 * 32);
+			read7(204);
+			if(_dump.size() == 0x1522)
+				read7(64 + 12 + 64 * 32 + 192);
+			return payload;
+		};
+		auto rich = sysex::MdPatternEditor::fromDump(blankDump);
+		require(rich.has_value() && rich->setLength(64), "pattern not made 64 steps");
+		for(uint8_t step = 0; step < 64; step += 3)
+			require(rich->setTrig(static_cast<uint8_t>(step % 16), step, true), "trig not set");
+		require(rich->setTrig(3, 9, true) && rich->setTrig(6, 18, true) && rich->setTrig(5, 40, true), "trig not set");
+		require(rich->setLock(0, 3, 0, 55) && rich->setLock(3, 7, 9, 77) && rich->setLock(6, 1, 18, 99)
+			&& rich->setLock(5, 2, 40, 33), "lock not set");
+		require(rich->setFlag(sysex::StepFlag::Accent, std::nullopt, 6, true), "accent not set");
+		const auto richDump = rich->toDump();
+		send(richDump);
+		advance(*hardware, md::g_samplerate);
+		const auto payload = unpack(exchange(sysex::patternRequest(model, slot), 0x67));
+		const auto trigs = spots.front().address & ~0x3fu;	// track 1's word ends with steps 1-8 at +3
+		std::string mismatches;
+		size_t equal = 0, count = 0;
+		for(size_t i = 0; i < payload.size(); ++i)
+		{
+			if(uc.read8(trigs + static_cast<uint32_t>(i)) == payload[i])
+			{
+				++equal;
+				continue;
+			}
+			if(++count <= 24)
+			{
+				char text[32];
+				std::snprintf(text, sizeof(text), " +%zu:%02x/%02x", i, uc.read8(trigs + static_cast<uint32_t>(i)), payload[i]);
+				mismatches += text;
+			}
+		}
+		std::printf("MD pattern of %zu payload bytes against RAM from $%06x: %zu equal, %zu differ (offset:RAM/dump):%s\n",
+			payload.size(), trigs, equal, count, mismatches.c_str());
+
+		// Only track 1 step 5's trig byte written, the energy every half second: when it plays, when it stops
+		const auto halves = [&](const int _count)
+		{
+			std::string line;
+			for(int h = 0; h < _count; ++h)
+			{
+				std::array<std::array<float, 256>, 2> samples{};
+				synthLib::TAudioOutputs outputs{};
+				outputs[0] = samples[0].data();
+				outputs[1] = samples[1].data();
+				double sum = 0;
+				for(uint32_t block = 0; block < md::g_samplerate / 2 / 256; ++block)
+				{
+					hardware->processAudio(outputs, 256, 0);
+					for(const auto& channel : samples)
+						for(const auto value : channel)
+							sum += static_cast<double>(value) * value;
+				}
+				char text[24];
+				std::snprintf(text, sizeof(text), " %.0f", sum);
+				line += text;
+			}
+			return line;
+		};
+		(void)written(std::nullopt);
+		const uint32_t trigByte = trigs + 3;
+		panelTap(*hardware, md::PanelControl::Play);
+		std::printf("MD energy per half second, blank:%s\n", halves(4).c_str());
+		uc.write8(trigByte, static_cast<uint8_t>(uc.read8(trigByte) | 0x10));
+		std::printf("MD trig byte $%06x set:%s\n", trigByte, halves(8).c_str());
+		uc.write8(trigByte, static_cast<uint8_t>(uc.read8(trigByte) & ~0x10));
+		std::printf("MD trig byte cleared:%s\n", halves(8).c_str());
+		panelTap(*hardware, md::PanelControl::Stop);
+
+		// Kept as the hardware keeps a grid edit? The trig written in RAM, another pattern selected, then this one
+		uc.write8(trigByte, static_cast<uint8_t>(uc.read8(trigByte) | 0x10));
+		advance(*hardware, md::g_samplerate / 4);
+		const auto other = static_cast<uint8_t>((slot + 1) % 128);
+		send(sysex::patternSelect(model, other));
+		advance(*hardware, md::g_samplerate);
+		const auto otherStatus = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, sysex::StatusParameter::Pattern), 0x72));
+		send(sysex::patternSelect(model, slot));
+		advance(*hardware, md::g_samplerate);
+		const auto backStatus = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, sysex::StatusParameter::Pattern), 0x72));
+		std::printf("MD trig written in RAM, pattern %u selected (status %d), then %u again (status %d): RAM byte %02x, dump has the trig %d\n",
+			other, otherStatus ? otherStatus->value : -1, slot, backStatus ? backStatus->value : -1, uc.read8(trigByte),
+			trigInDump() ? 1 : 0);
+
+		// What lives outside the first 2198 bytes: the tail (EDIT ALL words, the tracks' own accent, slide and
+		// swing) and the 64-step extension, each located as the trigs were, from a 64-step blank pattern
+		auto longBlank = sysex::MdPatternEditor::fromDump(blankDump);
+		require(longBlank.has_value() && longBlank->setLength(64), "pattern not made 64 steps");
+		const auto longBlankDump = longBlank->toDump();
+		const auto editedFrom = [&](const sysex::Message& _base, const std::function<bool(sysex::MdPatternEditor&)>& _edit, const bool _on)
+		{
+			auto editor = sysex::MdPatternEditor::fromDump(_base);
+			require(editor.has_value() && (!_on || _edit(*editor)), "edit refused");
+			send(editor->toDump());
+			advance(*hardware, md::g_samplerate);
+			return snapshot();
+		};
+		const auto locateEdit = [&](const char* _what, const sysex::Message& _base, const std::function<bool(sysex::MdPatternEditor&)>& _edit)
+		{
+			const auto off1 = editedFrom(_base, _edit, false);
+			const auto on1 = editedFrom(_base, _edit, true);
+			const auto off2 = editedFrom(_base, _edit, false);
+			const auto on2 = editedFrom(_base, _edit, true);
+			std::string line;
+			size_t count = 0;
+			for(size_t i = 0; i < off1.size(); ++i)
+			{
+				if(off1[i] != off2[i] || on1[i] != on2[i] || off1[i] == on1[i])
+					continue;
+				if(++count <= 12)
+				{
+					char text[32];
+					std::snprintf(text, sizeof(text), " $%06x:%02x>%02x", addressOf(i), off1[i], on1[i]);
+					line += text;
+				}
+			}
+			std::printf("MD %s: %zu bytes follow it:%s\n", _what, count, line.c_str());
+			std::fflush(stdout);
+		};
+		locateEdit("track 1 own accent step 2", blankDump, [](sysex::MdPatternEditor& _e)
+		{
+			return _e.setFlagPerTrack(sysex::StepFlag::Accent, true) && _e.setTrig(0, 1, true)
+				&& _e.setFlag(sysex::StepFlag::Accent, uint8_t{0}, 1, true);
+		});
+		locateEdit("track 1 own slide step 2", blankDump, [](sysex::MdPatternEditor& _e)
+		{
+			return _e.setFlagPerTrack(sysex::StepFlag::Slide, true) && _e.setTrig(0, 1, true)
+				&& _e.setFlag(sysex::StepFlag::Slide, uint8_t{0}, 1, true);
+		});
+		locateEdit("EDIT ALL off for accents", blankDump, [](sysex::MdPatternEditor& _e)
+		{
+			return _e.setFlagPerTrack(sysex::StepFlag::Accent, true);
+		});
+		locateEdit("64 steps: track 1 step 34", longBlankDump, [](sysex::MdPatternEditor& _e) { return _e.setTrig(0, 33, true); });
+		locateEdit("64 steps: track 2 step 34", longBlankDump, [](sysex::MdPatternEditor& _e) { return _e.setTrig(1, 33, true); });
+		locateEdit("64 steps: track 1 step 34 lock param 4", longBlankDump, [](sysex::MdPatternEditor& _e)
+		{
+			return _e.setTrig(0, 33, true) && _e.setLock(0, 3, 33, 66);
+		});
+		locateEdit("64 steps: accent step 34", longBlankDump, [](sysex::MdPatternEditor& _e)
+		{
+			return _e.setTrig(0, 33, true) && _e.setFlag(sysex::StepFlag::Accent, std::nullopt, 33, true);
+		});
+		locateEdit("length 16 to 64", blankDump, [](sysex::MdPatternEditor& _e) { return _e.setLength(64); });
+	}
+
+	// Which copy of the 64-step extension plays (--pattern-ext): a 64-step pattern without trigs, then track 1
+	// step 34's trig written in one copy only, the energy every half second
+	void patternExtensionMachinedrum()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
+		if(!path)
+			return;
+		namespace sysex = md::automation::sysex;
+		constexpr auto model = md::MachineModel::Machinedrum;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		auto hardware = std::make_unique<md::Hardware>(rom, path, model);
+		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			advance(*hardware, 64);
+		advance(*hardware, md::g_samplerate * 20);
+		auto& uc = hardware->getUC();
+		const auto send = [&](const sysex::Message& _bytes)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.sysex.assign(_bytes.begin(), _bytes.end());
+			require(hardware->sendMidi(event), "SysEx rejected");
+		};
+		const auto exchange = [&](const sysex::Message& _request, const uint8_t _command)
+		{
+			std::vector<synthLib::SMidiEvent> events;
+			hardware->readMidiOut(events);
+			send(_request);
+			for(uint32_t block = 0; block < md::g_samplerate * 4 / 64; ++block)
+			{
+				advance(*hardware, 64);
+				events.clear();
+				hardware->readMidiOut(events);
+				for(const auto& e : events)
+					if(e.sysex.size() > 9 && e.sysex[6] == _command)
+						return sysex::Message(e.sysex.begin(), e.sysex.end());
+			}
+			throw std::runtime_error("no answer");
+		};
+		const auto status = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, sysex::StatusParameter::Pattern), 0x72));
+		require(status.has_value(), "no pattern status");
+		auto blank = sysex::MdPatternEditor::fromDump(exchange(sysex::patternRequest(model, status->value), 0x67));
+		require(blank.has_value() && blank->setLength(64), "pattern unreadable");
+		blank->clear();
+		const auto halves = [&](const int _count)
+		{
+			std::string line;
+			for(int h = 0; h < _count; ++h)
+			{
+				std::array<std::array<float, 256>, 2> samples{};
+				synthLib::TAudioOutputs outputs{};
+				outputs[0] = samples[0].data();
+				outputs[1] = samples[1].data();
+				double sum = 0;
+				for(uint32_t block = 0; block < md::g_samplerate / 2 / 256; ++block)
+				{
+					hardware->processAudio(outputs, 256, 0);
+					for(const auto& channel : samples)
+						for(const auto value : channel)
+							sum += static_cast<double>(value) * value;
+				}
+				char text[24];
+				std::snprintf(text, sizeof(text), " %.0f", sum);
+				line += text;
+			}
+			return line;
+		};
+		for(const uint32_t address : {0x00180003u, 0x00262563u})
+		{
+			send(blank->toDump());
+			advance(*hardware, md::g_samplerate);
+			panelTap(*hardware, md::PanelControl::Play);
+			// 64 steps at 120 BPM: 8 s a loop
+			const auto before = halves(4);
+			uc.write8(address, static_cast<uint8_t>(uc.read8(address) | 0x02));
+			const auto after = halves(20);
+			panelTap(*hardware, md::PanelControl::Stop);
+			std::printf("MD 64 steps, track 1 step 34 written at $%06x only; energy per half second before:%s after:%s\n",
+				address, before.c_str(), after.c_str());
+			std::fflush(stdout);
+		}
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -1642,6 +2043,16 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 1 && std::string(_argv[1]) == "--write-cost")
 		{
 			writeCostMachinedrum();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--pattern-ram")
+		{
+			patternRamMachinedrum();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--pattern-ext")
+		{
+			patternExtensionMachinedrum();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
