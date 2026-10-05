@@ -24,9 +24,14 @@
 
 #include "mdAutomationTestSupport.h"
 #include "mdController.h"
+#include "mdLiveDevice.h"
 #include "mdMasterEffectsView.h"
 #include "mdOutputMetersView.h"
 #include "mdSystemPage.h"
+
+#include "mdLib/mddevice.h"
+#include "mdLib/mdhardware.h"
+#include "mdLib/mdpanel.h"
 
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -182,6 +187,16 @@ namespace
 			element(_doc, "mdViewEditor")->Click();
 			tabButton(_doc, "mdEdit", "1")->Click();
 		}});
+		result.push_back({"JOUER", [](Rml::ElementDocument& _doc)
+		{
+			element(_doc, "mdViewEditor")->Click();
+			tabButton(_doc, "mdEdit", "2")->Click();
+		}});
+		result.push_back({"BIBLIO", [](Rml::ElementDocument& _doc)
+		{
+			element(_doc, "mdViewEditor")->Click();
+			tabButton(_doc, "mdEdit", "3")->Click();
+		}});
 		result.push_back({"SYSTÈME", [](Rml::ElementDocument& _doc)
 		{
 			element(_doc, "mdViewEditor")->Click();
@@ -243,8 +258,8 @@ namespace
 		uint64_t m_frame = 0;
 	};
 
-	// Software renderer: the cost of each frame, page by page
-	bool measureFrameCost(const md::MachineModel _model)
+	// Software renderer: the cost of each frame, page by page, rasterized at _scalePercent of the editor's size
+	bool measureFrameCost(const md::MachineModel _model, const double _scalePercent)
 	{
 		mdJucePlugin::AudioPluginAudioProcessor processor(_model,
 			mdJucePlugin::AudioPluginAudioProcessor::EphemeralConfig{std::string{}}, false);
@@ -268,12 +283,20 @@ namespace
 
 		juceRmlUi::LookAndFeel lookAndFeel;
 		component->setLookAndFeel(&lookAndFeel);
+		// The size a host gives the editor at a GUI scale (1100 x 606 dp at 100 %): the software renderer
+		// rasterizes that many pixels
+		{
+			auto& state = processor.getOrCreateEditorState();
+			const auto scale = _scalePercent / 100.0 * state.getRootScale();
+			editor->setSize(juce::roundToInt(state.getWidth() * scale), juce::roundToInt(state.getHeight() * scale));
+			juceRmlUi::RenderingTestAccess::update(*component);
+		}
 		juce::Image image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true);
 		Mover mover(processor, _model);
 
 		const char* name = _model == md::MachineModel::Monomachine ? "MM" : "MD";
-		std::printf("mdEditorFluidityTest %s: software renderer, %dx%d, one frame = presentation timer + RmlUi update + rasterized frame\n",
-			name, component->getWidth(), component->getHeight());
+		std::printf("mdEditorFluidityTest %s: software renderer, %dx%d (%.1f %%), one frame = presentation timer"
+			" + RmlUi update + rasterized frame\n", name, component->getWidth(), component->getHeight(), _scalePercent);
 
 		// Frames reach the machine without the device lock, which pauses its rendering: counted from
 		// the second frame, the first takes what the device shares with the editor
@@ -508,6 +531,365 @@ namespace
 		progress("closed");
 		return smooth;
 	}
+
+	// Editing while the machine plays, as in a host: the plug-in with a fresh config (two blocks of latency,
+	// the machine rendering on its own thread, the firmware when a ROM is found), no window. An audio thread
+	// calls processBlock in real time; the message thread runs the controller and editor timers, starts the
+	// sequencer from the panel, shows JOUER and then sets or clears a trig every _interval seconds, as a click
+	// does. Reported before the first click and in the two seconds after each: the host callback's time per
+	// block (what a DAW's CPU meter shows), the render thread's time per block, and the longest wait between
+	// two ticks of a 60 Hz timer on the message thread (an interface freeze). With _library, BIBLIO's reading
+	// of every stored Kit and pattern instead of the clicks: how long it takes, and the same figures meanwhile.
+	bool measureEditLoad(const md::MachineModel _model, const double _interval, const int _clicks, const bool _library)
+	{
+		mdJucePlugin::AudioPluginAudioProcessor processor(_model, mdJucePlugin::AudioPluginAudioProcessor::EphemeralConfig{}, false);
+		auto& audioProcessor = static_cast<juce::AudioProcessor&>(processor);
+		constexpr double sampleRate = 48000.0;
+		constexpr int blockSize = 256;
+		audioProcessor.prepareToPlay(sampleRate, blockSize);
+		const auto channels = std::max(audioProcessor.getTotalNumInputChannels(), audioProcessor.getTotalNumOutputChannels());
+		const double periodMs = 1000.0 * blockSize / sampleRate;
+		const char* name = _model == md::MachineModel::Monomachine ? "MM" : "MD";
+
+		const auto origin = std::chrono::steady_clock::now();
+		const auto msAt = [&](const std::chrono::steady_clock::time_point _time)
+		{
+			return std::chrono::duration<double, std::milli>(_time - origin).count();
+		};
+		struct Sample { double at; double ms; };
+		std::vector<Sample> callbacks;
+		callbacks.reserve(1 << 20);
+		std::atomic<bool> running{true};
+		std::atomic<bool> audioStopped{false};
+		std::thread audio([&]
+		{
+			juce::AudioBuffer<float> buffer(channels, blockSize);
+			juce::MidiBuffer midi;
+			const auto period = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+				std::chrono::duration<double>(blockSize / sampleRate));
+			auto next = std::chrono::steady_clock::now();
+			while(running.load())
+			{
+				buffer.clear();
+				midi.clear();
+				const auto start = std::chrono::steady_clock::now();
+				audioProcessor.processBlock(buffer, midi);
+				const auto end = std::chrono::steady_clock::now();
+				callbacks.push_back({msAt(start), std::chrono::duration<double, std::milli>(end - start).count()});
+				next += period;
+				// A sleep can overshoot by a whole Windows timer tick: sleep short, then spin to the period
+				std::this_thread::sleep_until(next - std::chrono::milliseconds(2));
+				while(std::chrono::steady_clock::now() < next)
+					std::this_thread::yield();
+			}
+			audioStopped = true;
+		});
+
+		// No disclaimer box on the desktop: this config is never saved
+		processor.getConfig().setValue("disclaimerSeen", true);
+		auto& editorState = static_cast<mdJucePlugin::PluginEditorState&>(processor.getOrCreateEditorState());
+		auto* editor = dynamic_cast<mdJucePlugin::Editor*>(editorState.getEditor());
+		require(editor != nullptr && editor->getRmlComponent() && editor->getRmlComponent()->getDocument(), "no editor");
+		auto& component = *editor->getRmlComponent();
+		auto& controller = dynamic_cast<mdJucePlugin::Controller&>(processor.getController());
+
+		const auto panel = [&](const md::PanelControl _control, const bool _down)
+		{
+			processor.getPlugin().withDeviceLocked([&](synthLib::Device* _device)
+			{
+				auto* device = dynamic_cast<md::Device*>(_device);
+				if(!device)
+					return;
+				const auto packet = md::panelPacket(_model, _control);
+				if(packet)
+					(void)device->getHardware().trySendPanelEvent(packet->row, _down ? packet->mask : uint8_t{0});
+			});
+		};
+		const auto patternKnown = [&]
+		{
+			return _model == md::MachineModel::Monomachine ? controller.getMmPattern().has_value()
+				: controller.getPattern().has_value();
+		};
+
+		enum class Phase { Boot, Start, Pattern, Baseline, Clicks, Library, Done };
+		Phase phase = Phase::Boot;
+		double phaseSince = 0;
+		std::vector<double> ticks;
+		ticks.reserve(1 << 16);
+		std::vector<double> clickTimes, clickCosts;
+		bool firmware = false;
+		int clicks = 0;
+		double baselineStart = 0;
+		// The library reading: started, Kits done, ended (0 until then), and when progress was last printed
+		double libraryStart = 0, libraryKitsDone = 0, libraryEnd = 0, libraryNote = 0;
+		// A fresh config may prepare the factory flash and reboot the machine in process: the measure waits
+		// until the machine has kept its epoch for five seconds
+		uint64_t epoch = ~uint64_t{0};
+		double epochSince = 0;
+		// The render thread's silent blocks so far, read without the device lock (its counters are atomic)
+		const md::AsyncRender* async = nullptr;
+		const auto silentBlocks = [&] { return async ? async->missedBlocks() + async->droppedBlocks() : 0; };
+		uint64_t silentAtBaseline = 0;
+		std::vector<uint64_t> silentAtClick;
+		uint64_t silentAtLibrary = 0, silentAfterLibrary = 0;
+		struct Ticker final : juce::Timer
+		{
+			std::function<void()> tick;
+			void timerCallback() override { tick(); }
+		} ticker;
+		ticker.tick = [&]
+		{
+			const auto now = msAt(std::chrono::steady_clock::now());
+			ticks.push_back(now);
+			const auto inPhase = now - phaseSince;
+			const auto next = [&](const Phase _phase)
+			{
+				phase = _phase;
+				phaseSince = now;
+			};
+			switch(phase)
+			{
+			case Phase::Boot:
+				if(const auto status = processor.getLiveDevice().status(); status && status->hardwareEpoch != epoch)
+				{
+					epoch = status->hardwareEpoch;
+					epochSince = now;
+				}
+				if(const auto status = processor.getLiveDevice().status(); status && status->firmwareReady
+					&& !status->factoryInitializationExpected && !status->restorePending && now - epochSince > 5000 && inPhase > 3000)
+				{
+					firmware = true;
+					processor.getPlugin().withDeviceLocked([&](synthLib::Device* _device)
+					{
+						if(auto* device = dynamic_cast<md::Device*>(_device))
+							async = device->asyncRender();
+					});
+					progress("firmware ready: showing JOUER, pressing PLAY");
+					juceRmlUi::RmlInterfaces::ScopedAccess access(component);
+					element(*component.getDocument(), "mdViewEditor")->Click();
+					tabButton(*component.getDocument(), "mdEdit", "2")->Click();
+					panel(md::PanelControl::Play, true);
+					next(Phase::Start);
+				}
+				else if(inPhase > 90000)
+				{
+					progress("no firmware after 90 s");
+					next(Phase::Done);
+				}
+				break;
+			case Phase::Start:
+				if(inPhase > 100)
+				{
+					panel(md::PanelControl::Play, false);
+					next(Phase::Pattern);
+				}
+				break;
+			case Phase::Pattern:
+				if(patternKnown() && inPhase > 2000)
+				{
+					progress("pattern read: baseline");
+					baselineStart = now;
+					silentAtBaseline = silentBlocks();
+					next(Phase::Baseline);
+				}
+				else if(inPhase > 30000)
+				{
+					progress("pattern never read");
+					next(Phase::Done);
+				}
+				break;
+			case Phase::Baseline:
+				if(inPhase <= _interval * 1000.0)
+					break;
+				if(!_library)
+					next(Phase::Clicks);
+				else if(controller.readLibrary())
+				{
+					progress("reading the library");
+					libraryStart = now;
+					libraryNote = now;
+					silentAtLibrary = silentBlocks();
+					next(Phase::Library);
+				}
+				break;
+			case Phase::Library:
+			{
+				const auto done = controller.getLibraryProgress();
+				if(!libraryKitsDone && done >= controller.getKitLibrarySize())
+					libraryKitsDone = now;
+				if(controller.isLibraryRead())
+				{
+					libraryEnd = now;
+					silentAfterLibrary = silentBlocks();
+					next(Phase::Done);
+				}
+				else if(inPhase > 900000)
+				{
+					progress("library not read after 15 min");
+					next(Phase::Done);
+				}
+				else if(now - libraryNote > 30000)
+				{
+					libraryNote = now;
+					std::printf("  ... %zu of %zu read\n", done,
+						controller.getKitLibrarySize() + mdJucePlugin::Controller::PatternLibrarySize);
+					std::fflush(stdout);
+				}
+				break;
+			}
+			case Phase::Clicks:
+				if(clicks >= _clicks)
+				{
+					if(inPhase > _interval * 1000.0)
+					{
+						silentAtClick.push_back(silentBlocks());
+						next(Phase::Done);
+					}
+					break;
+				}
+				if(clicks == 0 || inPhase > _interval * 1000.0)
+				{
+					juceRmlUi::RmlInterfaces::ScopedAccess access(component);
+					const auto id = std::string(_model == md::MachineModel::Monomachine ? "mmPlayStep" : "mdPlayStep")
+						+ "0_" + std::to_string(2 + 4 * (clicks % 4));
+					auto* cell = element(*component.getDocument(), id);
+					silentAtClick.push_back(silentBlocks());
+					const auto start = std::chrono::steady_clock::now();
+					cell->Click();
+					clickCosts.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+					clickTimes.push_back(msAt(start));
+					++clicks;
+					phaseSince = now;
+				}
+				break;
+			case Phase::Done:
+				running = false;
+				if(audioStopped)
+					juce::MessageManager::getInstance()->stopDispatchLoop();
+				break;
+			}
+		};
+		ticker.startTimerHz(60);
+		progress("dispatch loop");
+		juce::MessageManager::getInstance()->runDispatchLoop();
+		ticker.stopTimer();
+		audio.join();
+
+		// What the render thread did, per job: render start and duration
+		std::vector<Sample> renders;
+		md::AsyncRender::Stats asyncStats{};
+		uint64_t late = 0, missed = 0, dropped = 0;
+		processor.getPlugin().withDeviceLocked([&](synthLib::Device* _device)
+		{
+			auto* device = dynamic_cast<md::Device*>(_device);
+			if(!device || !device->asyncRender())
+				return;
+			const auto* async = device->asyncRender();
+			asyncStats = async->stats();
+			late = async->lateBlocks();
+			missed = async->missedBlocks();
+			dropped = async->droppedBlocks();
+			const auto jobs = std::min<uint64_t>(asyncStats.jobs, md::AsyncRender::JobTimeCount);
+			const auto& timeline = async->timeline();
+			const auto originNs = std::chrono::duration_cast<std::chrono::nanoseconds>(origin.time_since_epoch()).count();
+			for(uint64_t j = asyncStats.jobs - jobs; j < asyncStats.jobs; ++j)
+			{
+				const auto& t = timeline[j % md::AsyncRender::JobTimeCount];
+				if(t.renderStart && t.renderEnd > t.renderStart)
+					renders.push_back({static_cast<double>(t.renderStart - originNs) / 1e6, static_cast<double>(t.renderEnd - t.renderStart) / 1e6});
+			}
+		});
+
+		std::printf("mdEditorFluidityTest %s %s: %d blocks at %.0f Hz (%.2f ms), %s, render %s; %d clicks %.1f s apart\n",
+			name, _library ? "--library-load" : "--edit-load", blockSize, sampleRate, periodMs,
+			firmware ? "firmware running" : "no firmware", renders.empty() ? "on the host's thread" : "on its own thread",
+			clicks, _interval);
+		const auto window = [&](const std::vector<Sample>& _samples, const double _from, const double _to)
+		{
+			std::vector<double> values;
+			uint32_t over = 0;
+			for(const auto& s : _samples)
+			{
+				if(s.at < _from || s.at >= _to)
+					continue;
+				values.push_back(s.ms);
+				over += s.ms > periodMs ? 1 : 0;
+			}
+			return std::make_pair(stats(values), over);
+		};
+		const auto longestGap = [&](const double _from, const double _to)
+		{
+			double gap = 0;
+			for(size_t i = 1; i < ticks.size(); ++i)
+			{
+				if(ticks[i] >= _from && ticks[i - 1] < _to)
+					gap = std::max(gap, ticks[i] - ticks[i - 1]);
+			}
+			return gap;
+		};
+		const auto report = [&](const char* _label, const double _from, const double _to, const uint64_t _silent)
+		{
+			const auto [host, hostOver] = window(callbacks, _from, _to);
+			const auto [render, renderOver] = window(renders, _from, _to);
+			std::printf("  %-14s host callback p50 %5.2f p99 %5.2f max %6.2f ms (%u over the period) | render p50 %5.2f p99 %5.2f"
+				" max %6.2f ms (%u over) | %3llu blocks silent | message thread longest gap %6.1f ms\n", _label, host.p50,
+				host.p99, host.max, hostOver, render.p50, render.p99, render.max, renderOver,
+				static_cast<unsigned long long>(_silent), longestGap(_from, _to));
+		};
+		if(!clickTimes.empty() && silentAtClick.size() == clickTimes.size() + 1)
+		{
+			report("before clicks", baselineStart, clickTimes.front(), silentAtClick.front() - silentAtBaseline);
+			for(size_t c = 0; c < clickTimes.size(); ++c)
+			{
+				char label[32];
+				std::snprintf(label, sizeof(label), "click %zu (%.1f ms)", c + 1, clickCosts[c]);
+				report(label, clickTimes[c], c + 1 < clickTimes.size() ? clickTimes[c + 1] : clickTimes[c] + _interval * 1000.0,
+					silentAtClick[c + 1] - silentAtClick[c]);
+			}
+			// The slowest renders after the clicks, when they happened
+			std::vector<Sample> slow;
+			for(const auto& r : renders)
+			{
+				if(r.at >= clickTimes.front() && r.ms > periodMs)
+					slow.push_back(r);
+			}
+			std::sort(slow.begin(), slow.end(), [](const Sample& _a, const Sample& _b) { return _a.ms > _b.ms; });
+			std::string list;
+			for(size_t i = 0; i < std::min<size_t>(slow.size(), 12); ++i)
+			{
+				// Time after the latest click before it
+				double click = clickTimes.front();
+				for(const auto t : clickTimes)
+					if(t <= slow[i].at)
+						click = t;
+				char text[48];
+				std::snprintf(text, sizeof(text), " %.1f ms @+%.0f", slow[i].ms, slow[i].at - click);
+				list += text;
+			}
+			std::printf("  slowest renders after the clicks (duration @ms after the click):%s\n", list.c_str());
+		}
+		if(libraryEnd > 0)
+		{
+			report("before reading", baselineStart, libraryStart, silentAtLibrary - silentAtBaseline);
+			report("library read", libraryStart, libraryEnd, silentAfterLibrary - silentAtLibrary);
+			const auto kits = controller.getKitLibrarySize();
+			size_t kitsRead = 0, patternsRead = 0;
+			for(size_t slot = 0; slot < kits; ++slot)
+				kitsRead += controller.getLibraryKit(static_cast<uint8_t>(slot)).value_or(mdJucePlugin::Controller::LibraryKit{}).read;
+			for(size_t slot = 0; slot < mdJucePlugin::Controller::PatternLibrarySize; ++slot)
+				patternsRead += controller.getLibraryPattern(static_cast<uint8_t>(slot)).value_or(mdJucePlugin::Controller::LibraryPattern{}).read;
+			const auto kitsEnd = libraryKitsDone ? libraryKitsDone : libraryEnd;
+			std::printf("  library: %zu of %zu Kits read in %.1f s, %zu of %zu patterns in %.1f s, %.1f s in all\n",
+				kitsRead, kits, (kitsEnd - libraryStart) / 1000.0, patternsRead, mdJucePlugin::Controller::PatternLibrarySize,
+				(libraryEnd - kitsEnd) / 1000.0, (libraryEnd - libraryStart) / 1000.0);
+		}
+		std::printf("  render thread: %llu jobs, late %llu, played as silence %llu, dropped %llu\n",
+			static_cast<unsigned long long>(asyncStats.jobs), static_cast<unsigned long long>(late),
+			static_cast<unsigned long long>(missed), static_cast<unsigned long long>(dropped));
+		std::fflush(stdout);
+		audioProcessor.releaseResources();
+		return missed == 0 && (!_library || libraryEnd > 0);
+	}
 }
 
 int main(const int _argc, const char* const* _argv)
@@ -528,8 +910,12 @@ int main(const int _argc, const char* const* _argv)
 		constexpr auto model = md::MachineModel::Machinedrum;
 #endif
 		bool window = false;
+		bool editLoad = false;
+		bool libraryLoad = false;
 		double secondsPerPage = 4.0;
 		double scalePercent = 100.0;
+		double clickInterval = 2.0;
+		int clickCount = 6;
 		for(int argument = 1; argument < _argc; ++argument)
 		{
 			const std::string value(_argv[argument]);
@@ -539,10 +925,28 @@ int main(const int _argc, const char* const* _argv)
 				if(argument + 1 < _argc && std::atof(_argv[argument + 1]) > 0)
 					secondsPerPage = std::atof(_argv[++argument]);
 			}
+			else if(value == "--edit-load")
+			{
+				editLoad = true;
+				if(argument + 1 < _argc && std::atof(_argv[argument + 1]) > 0)
+					clickInterval = std::atof(_argv[++argument]);
+				if(argument + 1 < _argc && std::atoi(_argv[argument + 1]) > 0)
+					clickCount = std::atoi(_argv[++argument]);
+			}
+			else if(value == "--library-load")
+				libraryLoad = true;
 			else if(value == "--scale" && argument + 1 < _argc && std::atof(_argv[argument + 1]) > 0)
 				scalePercent = std::atof(_argv[++argument]);
 		}
-		const bool ok = window ? measureWindow(model, secondsPerPage, scalePercent) : measureFrameCost(model);
+		if(editLoad || libraryLoad)
+		{
+			const bool clean = measureEditLoad(model, clickInterval, libraryLoad ? 0 : clickCount, libraryLoad);
+			std::printf("mdEditorFluidityTest: %s\n", clean ? "no block played as silence" : "blocks played as silence");
+			std::fflush(stdout);
+			// As with --window: the fresh config's disclaimer may be open on its own thread
+			std::_Exit(clean ? 0 : 1);
+		}
+		const bool ok = window ? measureWindow(model, secondsPerPage, scalePercent) : measureFrameCost(model, scalePercent);
 		const auto failed = !ok && failuresRequired();
 		std::printf("mdEditorFluidityTest: %s\n", failed ? "FAIL below 60 frames per second"
 			: ok ? "PASS" : "below 60 frames per second (not required)");

@@ -6,6 +6,8 @@
 // OS keeps what its flash holds compressed, such as the machine table (md::machines::parameterNames).
 // --livekit prints the RAM bytes that follow ASSIGN MACHINE and parameter CCs: the live Kit
 // (md::Hardware::readLiveKit).
+// --tempo feeds each machine following the host a perfect MIDI clock and prints what its firmware makes of it:
+// the RAM words that follow the tempo, how steady they are, the sequencer tick's lag and the TEMPO screen.
 
 #include "mmFirmwareMachine.h"
 
@@ -17,15 +19,20 @@
 
 #include "baseLib/filesystem.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+extern "C" unsigned int m68k_disassemble(char* _buffer, unsigned int _pc, unsigned int _cpuType);
 
 namespace
 {
@@ -426,6 +433,802 @@ namespace
 		scanRunFlagMidi(machine.hardware(), [&](const uint8_t _byte) { machine.send({_byte}); }, "MM");
 	}
 
+	// MIDI clock as synthLib::MidiClock sends it from a host playing at a steady tempo: each tick on the first
+	// native frame at or after its time, scheduled at its offset in the chunk, as md::Device does
+	class ClockedRun
+	{
+	public:
+		static constexpr uint32_t Chunk = 16;
+
+		explicit ClockedRun(md::Hardware& _hardware) : m_hardware(_hardware)
+		{
+			m_outputs[0] = m_samples[0].data();
+			m_outputs[1] = m_samples[1].data();
+		}
+
+		void start(const double _bpm)
+		{
+			m_bpm = _bpm;
+			m_next = static_cast<double>(m_frame);
+			require(m_hardware.scheduleMidi({synthLib::MidiEventSource::Internal, synthLib::M_START}, 0), "START rejected");
+		}
+
+		void setBpm(const double _bpm) { m_bpm = _bpm; }
+		uint64_t frame() const { return m_frame; }
+		const std::vector<uint64_t>& ticks() const { return m_ticks; }
+
+		void run(const uint32_t _frames, const std::function<void()>& _afterChunk = {}, const uint32_t _chunk = Chunk)
+		{
+			require(_chunk > 0 && _chunk <= Chunk, "chunk out of range");
+			for(uint32_t done = 0; done < _frames; done += _chunk)
+			{
+				if(m_bpm > 0)
+				{
+					const auto perTick = md::g_samplerate * 60.0 / (m_bpm * 24.0);
+					for(;;)
+					{
+						const auto at = static_cast<uint64_t>(std::ceil(m_next - 1e-7));
+						if(at >= m_frame + _chunk)
+							break;
+						m_ticks.push_back(at);
+						require(m_hardware.scheduleMidi({synthLib::MidiEventSource::Internal, synthLib::M_TIMINGCLOCK, 0, 0,
+							static_cast<uint32_t>(at - m_frame)}, 0), "clock rejected");
+						m_next += perTick;
+					}
+				}
+				m_hardware.processAudio(m_outputs, _chunk, 0);
+				m_frame += _chunk;
+				m_events.clear();
+				m_hardware.readMidiOut(m_events);
+				if(_afterChunk)
+					_afterChunk();
+			}
+		}
+
+		// A panel key pressed and released while the clock runs
+		void tap(const md::PanelControl _control)
+		{
+			const auto packet = md::panelPacket(m_hardware.getModel(), _control);
+			require(packet.has_value(), "unknown panel control");
+			require(m_hardware.trySendPanelEvent(packet->row, packet->mask), "panel press rejected");
+			run(2048);
+			require(m_hardware.trySendPanelEvent(packet->row, 0), "panel release rejected");
+			run(6400);
+		}
+
+	private:
+		md::Hardware& m_hardware;
+		std::array<std::array<float, Chunk>, 2> m_samples{};
+		synthLib::TAudioOutputs m_outputs{};
+		std::vector<synthLib::SMidiEvent> m_events;
+		double m_bpm = 0;
+		double m_next = 0;
+		uint64_t m_frame = 0;
+		std::vector<uint64_t> m_ticks;
+	};
+
+	void printLcd(const md::Hardware& _hardware, const std::string& _title)
+	{
+		const auto panel = _hardware.getFrontPanelSnapshot();
+		std::printf("%s\n", _title.c_str());
+		for(uint32_t y = 0; y < md::FrontPanel::g_lcdHeight; ++y)
+		{
+			std::string row;
+			for(uint32_t x = 0; x < md::FrontPanel::g_lcdWidth; ++x)
+				row += panel.getLcdPixel(x, y) ? '#' : '.';
+			std::printf("  %s\n", row.c_str());
+		}
+	}
+
+	// Main RAM, patch RAM and the ColdFire's SRAM, as one byte array
+	std::vector<uint8_t> tempoRam(md::Hardware& _hardware)
+	{
+		auto& uc = _hardware.getUC();
+		std::vector<uint8_t> bytes;
+		bytes.reserve(0x00200000 + 0x2000);
+		for(uint32_t i = 0; i < 0x00200000; ++i)
+			bytes.push_back(uc.read8(0x00100000 + i));
+		for(uint32_t i = 0; i < 0x2000; ++i)
+			bytes.push_back(uc.read8(0x01000000 + i));
+		return bytes;
+	}
+
+	uint32_t tempoRamAddress(const size_t _index)
+	{
+		return _index < 0x00200000 ? 0x00100000 + static_cast<uint32_t>(_index) : 0x01000000 + static_cast<uint32_t>(_index - 0x00200000);
+	}
+
+	uint16_t wordAt(const std::vector<uint8_t>& _bytes, const size_t _index)
+	{
+		return static_cast<uint16_t>(_bytes[_index] << 8 | _bytes[_index + 1]);
+	}
+
+	// What the firmware makes of a perfect clock: the 16-bit words that follow the tempo (x1.25 from 120 to 150
+	// BPM) or its period (x0.8), how they move at a steady 120 BPM, the LCD before and after TEMPO, and when the
+	// sequencer's tick moves after the clock tick that drives it
+	void probeTempo(md::Hardware& _hardware, const char* _name, const uint32_t _tickAddress, const uint32_t _stepAddress,
+		const uint32_t _ring, const uint32_t _ringCount)
+	{
+		ClockedRun run(_hardware);
+		run.start(120);
+		run.run(md::g_samplerate * 6);
+
+		const auto snapshots = [&](const double _bpm)
+		{
+			run.setBpm(_bpm);
+			run.run(md::g_samplerate * 6);
+			std::vector<std::vector<uint8_t>> taken;
+			for(int i = 0; i < 4; ++i)
+			{
+				run.run(md::g_samplerate);
+				taken.push_back(tempoRam(_hardware));
+			}
+			return taken;
+		};
+		const auto at120 = snapshots(120);
+		const auto at150 = snapshots(150);
+
+		struct Candidate { size_t index; double mean120, mean150; };
+		std::vector<Candidate> candidates;
+		const auto steady = [](const std::vector<std::vector<uint8_t>>& _set, const size_t _index, double& _mean)
+		{
+			uint16_t lo = 0xffff, hi = 0;
+			double sum = 0;
+			for(const auto& bytes : _set)
+			{
+				const auto word = wordAt(bytes, _index);
+				lo = std::min(lo, word);
+				hi = std::max(hi, word);
+				sum += word;
+			}
+			_mean = sum / static_cast<double>(_set.size());
+			return lo > 0 && (hi - lo) <= _mean * 0.03;
+		};
+		for(size_t i = 0; i + 1 < at120.front().size(); ++i)
+		{
+			double mean120 = 0, mean150 = 0;
+			if(!steady(at120, i, mean120) || !steady(at150, i, mean150) || mean120 < 64)
+				continue;
+			const auto ratio = mean150 / mean120;
+			if((ratio > 1.22 && ratio < 1.28) || (ratio > 0.78 && ratio < 0.82))
+				candidates.push_back({i, mean120, mean150});
+		}
+		std::printf("%s tempo word candidates (address: mean at 120 -> at 150 BPM), %zu in all:\n", _name, candidates.size());
+		for(size_t c = 0; c < std::min<size_t>(candidates.size(), 40); ++c)
+		{
+			std::printf("  $%08x: %.1f -> %.1f\n", tempoRamAddress(candidates[c].index), candidates[c].mean120,
+				candidates[c].mean150);
+		}
+
+		// The tempo as the firmware shows it, in 1/24 BPM: about 2880 at 120 BPM and 3600 at 150
+		std::vector<size_t> tempo24;
+		for(const auto& candidate : candidates)
+		{
+			if(std::abs(candidate.mean120 - 2880.0) < 40.0 && std::abs(candidate.mean150 - 3600.0) < 50.0)
+				tempo24.push_back(candidate.index);
+		}
+
+		// At a steady 120 BPM for 20 s: every clock interval the firmware measured (its ring of the last 25, in
+		// 2 us units), and the values its tempo took
+		run.setBpm(120);
+		run.run(md::g_samplerate * 4);
+		auto& uc = _hardware.getUC();
+		{
+			const auto read16 = [&](const uint32_t _address)
+			{
+				return static_cast<uint16_t>(uc.read8(_address) << 8 | uc.read8(_address + 1));
+			};
+			// The whole ring once every _ringCount clock ticks: each read finds only intervals measured since
+			// the last one
+			const double ringFrames = _ringCount * md::g_samplerate * 60.0 / (120.0 * 24.0);
+			double nextRing = static_cast<double>(run.frame()) + ringFrames;
+			std::vector<double> intervals;
+			std::vector<std::map<uint16_t, uint32_t>> tempoValues(tempo24.size());
+			uint32_t chunks = 0;
+			run.run(md::g_samplerate * 20, [&]
+			{
+				if(static_cast<double>(run.frame()) >= nextRing)
+				{
+					nextRing += ringFrames;
+					for(uint32_t s = 0; s < _ringCount; ++s)
+						intervals.push_back(2.0 * read16(_ring + 4 * s));
+				}
+				if((++chunks % (256 / ClockedRun::Chunk)) != 0)
+					return;
+				for(size_t t = 0; t < tempo24.size(); ++t)
+					++tempoValues[t][read16(tempoRamAddress(tempo24[t]))];
+			});
+			const double expected = 1e6 * 60.0 / (120.0 * 24.0);
+			if(!intervals.empty())
+			{
+				double sum = 0, squares = 0;
+				uint32_t exact = 0;
+				for(const auto interval : intervals)
+				{
+					sum += interval;
+					squares += (interval - expected) * (interval - expected);
+					exact += std::abs(interval - expected) <= 2.0 ? 1 : 0;
+				}
+				const auto [lo, hi] = std::minmax_element(intervals.begin(), intervals.end());
+				std::printf("%s clock intervals measured by the firmware at 120 BPM (%.1f us sent): %zu, mean %.1f us, "
+					"rms error %.1f us, min %.0f us, max %.0f us, within 2 us %.0f%%\n", _name, expected, intervals.size(),
+					sum / static_cast<double>(intervals.size()), std::sqrt(squares / static_cast<double>(intervals.size())),
+					*lo, *hi, 100.0 * exact / static_cast<double>(intervals.size()));
+			}
+			for(size_t t = 0; t < tempo24.size(); ++t)
+			{
+				std::string shown;
+				for(const auto& [value, count] : tempoValues[t])
+				{
+					char text[32];
+					std::snprintf(text, sizeof(text), " %.2f:%u", value / 24.0, count);
+					shown += text;
+				}
+				std::printf("%s tempo at $%08x over 20 s at 120 BPM (BPM:samples):%s\n", _name,
+					tempoRamAddress(tempo24[t]), shown.c_str());
+			}
+		}
+		// Each clock interval as the firmware wrote it, tick by tick: its ring read 3 ms after every tick (one
+		// slot changes, or none when the new interval equals the old one), with the sequencer's step then
+		const auto series = [&](const char* _state)
+		{
+			const auto read16 = [&](const uint32_t _address)
+			{
+				return static_cast<uint16_t>(uc.read8(_address) << 8 | uc.read8(_address + 1));
+			};
+			std::vector<uint16_t> ring(_ringCount);
+			for(uint32_t s = 0; s < _ringCount; ++s)
+				ring[s] = read16(_ring + 4 * s);
+			struct Sample { int slot; int changes; uint16_t value; uint8_t step; };
+			std::vector<Sample> samples;
+			size_t seenTicks = run.ticks().size();
+			int lastSlot = -1;
+			uint64_t readAt = 0;
+			bool pending = false;
+			run.run(md::g_samplerate * 10, [&]
+			{
+				const auto& ticks = run.ticks();
+				if(ticks.size() != seenTicks)
+				{
+					seenTicks = ticks.size();
+					readAt = ticks.back() + md::g_samplerate * 3 / 1000;
+					pending = true;
+				}
+				if(!pending || run.frame() < readAt)
+					return;
+				pending = false;
+				int changed = -1, changes = 0;
+				for(uint32_t s = 0; s < _ringCount; ++s)
+				{
+					const auto value = read16(_ring + 4 * s);
+					if(value == ring[s])
+						continue;
+					ring[s] = value;
+					changed = static_cast<int>(s);
+					++changes;
+				}
+				const int slot = changed >= 0 ? changed : lastSlot >= 0 ? (lastSlot + 1) % static_cast<int>(_ringCount) : -1;
+				lastSlot = slot;
+				samples.push_back({slot, changes, slot >= 0 ? ring[static_cast<size_t>(slot)] : uint16_t{0}, uc.read8(_stepAddress)});
+			});
+			double squares = 0;
+			for(const auto& s : samples)
+			{
+				const auto deviation = 2.0 * s.value - 1e6 * 60.0 / (120.0 * 24.0);
+				squares += deviation * deviation;
+			}
+			std::printf("%s %s, each clock interval at 120 BPM, rms %.1f us; us from 20833 (step:deviation, ! when not "
+				"one slot changed):\n", _name, _state, samples.empty() ? 0.0 : std::sqrt(squares / static_cast<double>(samples.size())));
+			std::string line;
+			for(size_t i = 0; i < samples.size(); ++i)
+			{
+				const auto& s = samples[i];
+				char text[32];
+				std::snprintf(text, sizeof(text), " %2u:%+5.0f%s", s.step, 2.0 * s.value - 1e6 * 60.0 / (120.0 * 24.0),
+					s.changes == 1 ? "" : "!");
+				line += text;
+				if((i + 1) % 12 == 0 || i + 1 == samples.size())
+				{
+					std::printf("  %s\n", line.c_str());
+					line.clear();
+				}
+			}
+		};
+		series("playing");
+		// The same with the sequencer stopped, the clock still running
+		require(_hardware.scheduleMidi({synthLib::MidiEventSource::Internal, synthLib::M_STOP}, 0), "STOP rejected");
+		run.run(md::g_samplerate * 4);
+		series("stopped");
+		require(_hardware.scheduleMidi({synthLib::MidiEventSource::Internal, synthLib::M_START}, 0), "START rejected");
+		run.run(md::g_samplerate * 2);
+		const auto traced = std::min<size_t>(candidates.size(), 6);
+		std::vector<std::vector<uint16_t>> traces(traced);
+		uint32_t chunks = 0;
+		run.run(md::g_samplerate * 8, [&]
+		{
+			if((++chunks % (1024 / ClockedRun::Chunk)) != 0)
+				return;
+			for(size_t c = 0; c < traced; ++c)
+			{
+				const auto address = tempoRamAddress(candidates[c].index);
+				traces[c].push_back(static_cast<uint16_t>(uc.read8(address) << 8 | uc.read8(address + 1)));
+			}
+		});
+		for(size_t c = 0; c < traced; ++c)
+		{
+			const auto& values = traces[c];
+			const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
+			std::string head;
+			for(size_t v = 0; v < std::min<size_t>(values.size(), 24); ++v)
+				head += " " + std::to_string(values[v]);
+			std::printf("%s $%08x at 120 BPM: min %u max %u over %zu samples:%s\n", _name,
+				tempoRamAddress(candidates[c].index), *lo, *hi, values.size(), head.c_str());
+		}
+
+		// The sequencer's tick after each clock tick: frames from the tick's scheduled frame to the end of the
+		// chunk that shows the change
+		const auto firstTick = run.ticks().size();
+		auto lastTick = uc.read8(_tickAddress);
+		std::vector<int64_t> lags;
+		uint32_t changes = 0;
+		run.run(md::g_samplerate * 10, [&]
+		{
+			const auto tick = uc.read8(_tickAddress);
+			if(tick == lastTick)
+				return;
+			lastTick = tick;
+			++changes;
+			const auto& ticks = run.ticks();
+			const auto now = run.frame();
+			// The latest clock tick scheduled before this chunk's end
+			for(size_t t = ticks.size(); t > firstTick; --t)
+			{
+				if(ticks[t - 1] < now)
+				{
+					lags.push_back(static_cast<int64_t>(now - ticks[t - 1]));
+					break;
+				}
+			}
+		});
+		const auto clocks = run.ticks().size() - firstTick;
+		if(!lags.empty())
+		{
+			std::sort(lags.begin(), lags.end());
+			double sum = 0;
+			for(const auto lag : lags)
+				sum += static_cast<double>(lag);
+			const auto ms = [](const double _frames) { return 1000.0 * _frames / md::g_samplerate; };
+			std::printf("%s sequencer tick at 120 BPM: %u changes for %zu clocks; lag after the clock min %.2f ms, "
+				"median %.2f ms, max %.2f ms, mean %.2f ms (chunks of %u frames)\n", _name, changes, clocks,
+				ms(static_cast<double>(lags.front())), ms(static_cast<double>(lags[lags.size() / 2])),
+				ms(static_cast<double>(lags.back())), ms(sum / static_cast<double>(lags.size())), ClockedRun::Chunk);
+		}
+
+		// When the firmware reads each clock byte from its UART: frames from the tick's scheduled frame to the
+		// end of the one-frame chunk whose emulation consumed it. Started between two ticks, the last one read.
+		while(run.ticks().empty() || run.frame() < run.ticks().back() + 300)
+			run.run(1, {}, 1);
+		const auto firstRead = run.ticks().size();
+		auto consumed = uc.midiRxConsumedCount();
+		size_t reads = 0;
+		std::vector<int64_t> readLags;
+		run.run(md::g_samplerate * 4, [&]
+		{
+			const auto now = uc.midiRxConsumedCount();
+			const auto& ticks = run.ticks();
+			for(; consumed < now; ++consumed, ++reads)
+			{
+				if(firstRead + reads < ticks.size())
+					readLags.push_back(static_cast<int64_t>(run.frame()) - static_cast<int64_t>(ticks[firstRead + reads]));
+			}
+		}, 1);
+		if(!readLags.empty())
+		{
+			std::sort(readLags.begin(), readLags.end());
+			const auto us = [](const int64_t _frames) { return 1e6 * static_cast<double>(_frames) / md::g_samplerate; };
+			std::map<int64_t, uint32_t> histogram;	// 100 us buckets
+			for(const auto lag : readLags)
+				++histogram[static_cast<int64_t>(us(lag) / 100.0)];
+			std::string buckets;
+			for(const auto& [bucket, count] : histogram)
+				buckets += " " + std::to_string(bucket * 100) + ":" + std::to_string(count);
+			std::printf("%s UART read of each clock byte: %zu reads for %zu clocks; lag min %.0f us, median %.0f us, "
+				"p90 %.0f us, max %.0f us; per 100 us from (us:count):%s\n", _name, reads,
+				run.ticks().size() - firstRead, us(readLags.front()), us(readLags[readLags.size() / 2]),
+				us(readLags[readLags.size() * 9 / 10]), us(readLags.back()), buckets.c_str());
+		}
+
+		printLcd(_hardware, std::string(_name) + " LCD at 120 BPM");
+		run.tap(md::PanelControl::Tempo);
+		printLcd(_hardware, std::string(_name) + " LCD after TEMPO");
+		for(int i = 0; i < 3; ++i)
+		{
+			run.run(md::g_samplerate);
+			printLcd(_hardware, std::string(_name) + " LCD after TEMPO, " + std::to_string(i + 1) + " s later");
+		}
+	}
+
+	// The ColdFire stepped alone, one instruction at a time, from the UART read of a clock byte until the firmware
+	// writes the interval into its ring: the instructions that led there, with how often each ran (the DSPs stand
+	// still meanwhile), and the interrupt setup they ran under
+	void traceTimestamp(md::Hardware& _hardware, const char* _name, const uint32_t _ring, const uint32_t _ringCount)
+	{
+		auto& uc = _hardware.getUC();
+		auto& sim = uc.getSim();
+		std::printf("%s TMR1 %04x TRR1 %04x TMR2 %04x TRR2 %04x; ICR timer1 %02x timer2 %02x uart1 %02x uart2 %02x irq4 %02x; "
+			"IMR %04x\n", _name, sim.read16(md::Sim::g_timer1Base + md::Sim::g_timerTmr),
+			sim.read16(md::Sim::g_timer1Base + md::Sim::g_timerTrr), sim.read16(md::Sim::g_timer2Base + md::Sim::g_timerTmr),
+			sim.read16(md::Sim::g_timer2Base + md::Sim::g_timerTrr), sim.read8(md::Sim::g_icrTimer1),
+			sim.read8(md::Sim::g_icrTimer2), sim.read8(md::Sim::g_icrUart1), sim.read8(md::Sim::g_icrUart2),
+			sim.read8(md::Sim::g_icrExtIrq4), sim.read16(md::Sim::g_imr));
+
+		ClockedRun run(_hardware);
+		run.start(120);
+		run.run(md::g_samplerate * 6);
+		for(int round = 0; round < 3; ++round)
+		{
+			// Between two ticks, then one-frame chunks until the firmware reads the next clock byte
+			while(run.ticks().empty() || run.frame() < run.ticks().back() + 300)
+				run.run(1, {}, 1);
+			const auto consumed = uc.midiRxConsumedCount();
+			while(uc.midiRxConsumedCount() == consumed)
+				run.run(1, {}, 1);
+			const auto readRing = [&]
+			{
+				std::vector<uint8_t> bytes(_ringCount * 4);
+				for(uint32_t i = 0; i < bytes.size(); ++i)
+					bytes[i] = uc.read8(_ring + i);
+				return bytes;
+			};
+			const auto before = readRing();
+			std::vector<uint32_t> trail;
+			bool written = false;
+			for(uint32_t step = 0; step < 2000000 && !written; ++step)
+			{
+				trail.push_back(uc.getPC());
+				if(trail.size() > 8000)
+					trail.erase(trail.begin(), trail.begin() + 4000);
+				uc.exec();
+				const auto now = readRing();
+				if(now == before)
+					continue;
+				written = true;
+				std::printf("%s round %d: interval written %u instructions after the clock byte was read; the last "
+					"2000 instructions, each address once (runs, disassembly):\n", _name, round, step + 1);
+				const auto first = trail.size() > 2000 ? trail.size() - 2000 : 0;
+				std::vector<uint32_t> order;
+				std::map<uint32_t, uint32_t> hits;
+				for(size_t i = first; i < trail.size(); ++i)
+				{
+					if(!hits[trail[i]]++)
+						order.push_back(trail[i]);
+				}
+				for(const auto pc : order)
+				{
+					// Musashi's disassembler has no ColdFire type: the 68020 one decodes ISA_A
+					char text[256] = {};
+					m68k_disassemble(text, pc, 4);
+					std::printf("  %08x %5u  %s\n", pc, hits[pc], text);
+				}
+				for(uint32_t i = 0; i < now.size(); ++i)
+				{
+					if(now[i] != before[i])
+						std::printf("  ring byte $%08x: %02x -> %02x\n", _ring + i, before[i], now[i]);
+				}
+			}
+			if(!written)
+				std::printf("%s round %d: no interval written within 2M instructions\n", _name, round);
+			// Let the scheduler run again before the next round
+			run.run(md::g_samplerate / 2);
+		}
+	}
+
+	// --write-cost: what the editor's pattern write costs the emulation, block by block (256 frames, wall clock,
+	// serial transport), the sequencer playing: before, after SAVE KIT, after the pattern dump, after the pattern
+	// request, and after the three as Controller::sendPattern sends them. Each phase prints its block times and,
+	// per 100 ms, the mean block time, so the stretch the machine works through the message shows.
+	void writeCostMachinedrum()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
+		if(!path)
+			return;
+		namespace sysex = md::automation::sysex;
+		constexpr auto model = md::MachineModel::Machinedrum;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		auto hardware = std::make_unique<md::Hardware>(rom, path, model);
+		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			advance(*hardware, 64);
+		advance(*hardware, md::g_samplerate * 20);
+		const auto send = [&](const sysex::Message& _bytes)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.sysex.assign(_bytes.begin(), _bytes.end());
+			require(hardware->sendMidi(event), "SysEx rejected");
+		};
+		const auto exchange = [&](const sysex::Message& _request, const uint8_t _command)
+		{
+			std::vector<synthLib::SMidiEvent> events;
+			hardware->readMidiOut(events);
+			send(_request);
+			for(uint32_t block = 0; block < md::g_samplerate * 3 / 64; ++block)
+			{
+				advance(*hardware, 64);
+				events.clear();
+				hardware->readMidiOut(events);
+				for(const auto& e : events)
+					if(e.sysex.size() > 9 && e.sysex[6] == _command)
+						return sysex::Message(e.sysex.begin(), e.sysex.end());
+			}
+			throw std::runtime_error("no answer");
+		};
+		const auto status = [&](const sysex::StatusParameter _parameter)
+		{
+			const auto response = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, _parameter), 0x72));
+			require(response.has_value(), "no status");
+			return response->value;
+		};
+		const auto pattern = status(sysex::StatusParameter::Pattern);
+		const auto kit = status(sysex::StatusParameter::Kit);
+		auto editor = sysex::MdPatternEditor::fromDump(exchange(sysex::patternRequest(model, pattern), 0x67));
+		require(editor.has_value(), "pattern dump unreadable");
+		panelTap(*hardware, md::PanelControl::Play);
+
+		std::array<std::array<float, 256>, 2> samples{};
+		synthLib::TAudioOutputs outputs{};
+		outputs[0] = samples[0].data();
+		outputs[1] = samples[1].data();
+		std::vector<synthLib::SMidiEvent> events;
+		double baseline = 0;
+		uint8_t step = 2;
+		// Bytes handed over at MIDI wire speed (31250 baud, 320 us a byte), as a cable delivers them: each
+		// block schedules the bytes that arrive within it, at their offset
+		std::vector<uint8_t> wire;
+		size_t wireSent = 0;
+		double nextByteFrame = 0;
+		uint64_t frame = 0;
+		const auto sendPaced = [&](const sysex::Message& _bytes)
+		{
+			wire.insert(wire.end(), _bytes.begin(), _bytes.end());
+			nextByteFrame = std::max(nextByteFrame, static_cast<double>(frame));
+		};
+		const auto scheduleWire = [&]
+		{
+			constexpr double framesPerByte = md::g_samplerate * 10.0 / 31250.0;
+			while(wireSent < wire.size())
+			{
+				const auto at = static_cast<uint64_t>(nextByteFrame);
+				if(at >= frame + 256)
+					break;
+				synthLib::SMidiEvent chunk(synthLib::MidiEventSource::Host);
+				chunk.sysex.push_back(wire[wireSent]);
+				chunk.offset = static_cast<uint32_t>(at > frame ? at - frame : 0);
+				require(hardware->scheduleMidi(chunk, 0), "byte not scheduled");
+				++wireSent;
+				nextByteFrame += framesPerByte;
+			}
+		};
+		const auto measure = [&](const char* _label, const std::function<void()>& _action)
+		{
+			if(_action)
+				_action();
+			constexpr uint32_t blocks = 3 * md::g_samplerate / 256;
+			std::vector<double> ms;
+			size_t midiOut = 0;
+			for(uint32_t b = 0; b < blocks; ++b)
+			{
+				scheduleWire();
+				frame += 256;
+				const auto start = std::chrono::steady_clock::now();
+				hardware->processAudio(outputs, 256, 0);
+				ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+				events.clear();
+				hardware->readMidiOut(events);
+				for(const auto& e : events)
+					midiOut += e.sysex.empty() ? 1 : e.sysex.size();
+			}
+			auto sorted = ms;
+			std::sort(sorted.begin(), sorted.end());
+			double sum = 0;
+			for(const auto value : ms)
+				sum += value;
+			const auto mean = sum / static_cast<double>(ms.size());
+			if(!_action)
+				baseline = mean;
+			// Mean block time per 100 ms (17 blocks of 256 frames)
+			std::string bins;
+			constexpr size_t perBin = md::g_samplerate / 10 / 256;
+			for(size_t i = 0; i + perBin <= ms.size() && i < perBin * 20; i += perBin)
+			{
+				double binSum = 0;
+				for(size_t j = i; j < i + perBin; ++j)
+					binSum += ms[j];
+				char text[16];
+				std::snprintf(text, sizeof(text), " %.2f", binSum / perBin);
+				bins += text;
+			}
+			std::printf("MD %-16s block (5.80 ms of audio) mean %.2f p99 %.2f max %.2f ms; %+.0f ms over 3 s against the baseline; "
+				"%zu MIDI bytes out\n  per 100 ms:%s\n", _label, mean, sorted[sorted.size() * 99 / 100], sorted.back(),
+				(mean - baseline) * static_cast<double>(ms.size()), midiOut, bins.c_str());
+			std::fflush(stdout);
+		};
+		const auto toggled = [&]
+		{
+			step = static_cast<uint8_t>((step + 4) % 16);
+			require(editor->setTrig(0, step, true), "trig not set");
+			return editor->toDump();
+		};
+		measure("baseline", {});
+		measure("SAVE KIT", [&] { send(sysex::kitSave(model, kit)); });
+		measure("pattern dump", [&] { send(toggled()); });
+		measure("pattern request", [&] { send(sysex::patternRequest(model, pattern)); });
+		measure("all three", [&]
+		{
+			send(sysex::kitSave(model, kit));
+			send(toggled());
+			send(sysex::patternRequest(model, pattern));
+		});
+		measure("baseline again", {});
+
+		// Controlled trials: the same trig set then cleared (the pattern plays the same notes), each sent when
+		// the sequencer enters step 1, four times per case. Per trial: CPU over the 3 s baseline, the worst 100 ms
+		// and the blocks slower than real time (5.80 ms)
+		const auto waitStep = [&](const uint8_t _step)
+		{
+			for(uint32_t guard = 0; guard < md::g_samplerate * 4 / 64; ++guard)
+			{
+				if(hardware->getUC().read8(0x00261aa7) == _step)
+					return;
+				advance(*hardware, 64);
+				frame += 64;
+				events.clear();
+				hardware->readMidiOut(events);
+			}
+		};
+		bool on = false;
+		const auto flip = [&]
+		{
+			on = !on;
+			require(editor->setTrig(0, 9, on), "trig not set");
+			return editor->toDump();
+		};
+		const auto trial = [&](const std::function<void()>& _action)
+		{
+			waitStep(0);
+			_action();
+			constexpr uint32_t blocks = 3 * md::g_samplerate / 256;
+			constexpr size_t perBin = md::g_samplerate / 10 / 256;
+			std::vector<double> ms;
+			for(uint32_t b = 0; b < blocks; ++b)
+			{
+				scheduleWire();
+				frame += 256;
+				const auto start = std::chrono::steady_clock::now();
+				hardware->processAudio(outputs, 256, 0);
+				ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+				events.clear();
+				hardware->readMidiOut(events);
+			}
+			double extra = 0, worst = 0;
+			uint32_t slow = 0;
+			for(size_t i = 0; i < ms.size(); ++i)
+			{
+				extra += ms[i];
+				slow += ms[i] > 5.80 ? 1 : 0;
+			}
+			for(size_t i = 0; i + perBin <= ms.size(); i += perBin)
+			{
+				double bin = 0;
+				for(size_t j = i; j < i + perBin; ++j)
+					bin += ms[j];
+				worst = std::max(worst, bin / perBin);
+			}
+			return std::array<double, 3>{extra, worst, static_cast<double>(slow)};
+		};
+		const auto cases = std::vector<std::pair<const char*, std::function<void()>>>{
+			{"nothing", [] {}},
+			{"dump, current", [&] { send(flip()); }},
+			{"dump, other slot", [&]
+			{
+				auto other = sysex::MdPatternEditor::fromDump(flip());
+				require(other && other->setSlot(static_cast<uint8_t>((pattern + 1) % 128)), "slot not set");
+				send(other->toDump());
+			}},
+			{"dump at 31250", [&] { sendPaced(flip()); }},
+			{"SAVE KIT", [&] { send(sysex::kitSave(model, kit)); }},
+			{"pattern request", [&] { send(sysex::patternRequest(model, pattern)); }},
+			{"write as sent", [&]
+			{
+				send(sysex::kitSave(model, kit));
+				send(flip());
+				send(sysex::patternRequest(model, pattern));
+			}},
+		};
+		double nothing = 0;
+		for(const auto& [label, action] : cases)
+		{
+			std::string line;
+			double extraSum = 0;
+			for(int t = 0; t < 4; ++t)
+			{
+				const auto [total, worst, slow] = trial(action);
+				extraSum += total;
+				char text[64];
+				std::snprintf(text, sizeof(text), "  worst 100 ms %.2f, %2.0f slow", worst, slow);
+				line += text;
+			}
+			const auto mean = extraSum / 4.0;
+			if(std::string(label) == "nothing")
+				nothing = mean;
+			std::printf("MD trial %-16s CPU over 3 s %+6.0f ms against nothing;%s\n", label, mean - nothing, line.c_str());
+			std::fflush(stdout);
+		}
+	}
+
+	void tempoMachines(const bool _code)
+	{
+		if(const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN"))
+		{
+			namespace sysex = md::automation::sysex;
+			constexpr auto model = md::MachineModel::Machinedrum;
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			auto hardware = std::make_unique<md::Hardware>(rom, path, model);
+			while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+				advance(*hardware, 64);
+			advance(*hardware, md::g_samplerate * 20);
+			const auto exchange = [&](const sysex::Message& _request, const uint8_t _command)
+			{
+				std::vector<synthLib::SMidiEvent> events;
+				hardware->readMidiOut(events);
+				synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+				event.sysex.assign(_request.begin(), _request.end());
+				require(hardware->sendMidi(event), "SysEx rejected");
+				for(uint32_t block = 0; block < md::g_samplerate * 3 / 64; ++block)
+				{
+					advance(*hardware, 64);
+					events.clear();
+					hardware->readMidiOut(events);
+					for(const auto& e : events)
+						if(e.sysex.size() > 9 && e.sysex[6] == _command)
+							return sysex::Message(e.sysex.begin(), e.sysex.end());
+				}
+				throw std::runtime_error("no answer");
+			};
+			const auto slot = sysex::parseStatusResponse(model, exchange(sysex::statusRequest(model, sysex::StatusParameter::Global), 0x72));
+			require(slot.has_value(), "no Global status");
+			const auto global = exchange(sysex::globalRequest(model, slot->value), 0x50);
+			const auto patched = sysex::withGlobalSync(model, global, {true, true});
+			require(patched.has_value(), "Global not patched");
+			// As md::HostSync does: the patched Global, then the slot reloaded, without which it is stored only
+			for(const auto& message : {*patched, sysex::globalReload(model, global[9])})
+			{
+				synthLib::SMidiEvent write(synthLib::MidiEventSource::Host);
+				write.sysex.assign(message.begin(), message.end());
+				require(hardware->sendMidi(write), "Global rejected");
+				advance(*hardware, md::g_samplerate / 2);
+			}
+			const auto check = sysex::parseGlobalSync(model, exchange(sysex::globalRequest(model, slot->value), 0x50));
+			require(check && *check == sysex::GlobalSync{true, true}, "the Machinedrum does not follow the host");
+			advance(*hardware, md::g_samplerate);
+			if(_code)
+				traceTimestamp(*hardware, "MD", 0x002654fc, 25);
+			else
+				probeTempo(*hardware, "MD", 0x01001f33, 0x00261aa7, 0x002654fc, 25);
+		}
+		if(const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN"))
+		{
+			std::vector<uint8_t> rom;
+			require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+			md::test::Monomachine machine(rom, path);
+			machine.follow();
+			if(_code)
+				traceTimestamp(machine.hardware(), "MM", 0x0029cd86, 25);
+			else
+				probeTempo(machine.hardware(), "MM", 0x002bc29f, 0x002bc287, 0x0029cd86, 25);
+		}
+	}
+
 	void confirmMachinedrum()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
@@ -824,6 +1627,21 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 1 && std::string(_argv[1]) == "--lfo")
 		{
 			probeLfo();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--tempo")
+		{
+			tempoMachines(false);
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--tempo-code")
+		{
+			tempoMachines(true);
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--write-cost")
+		{
+			writeCostMachinedrum();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
