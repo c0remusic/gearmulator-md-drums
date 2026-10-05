@@ -1,15 +1,18 @@
 // The Machinedrum's pattern edited in its RAM (md::LivePatternLayout, md::livePatternWrites), as the editor's
 // JOUER does: a trig and its lock written there are what the next pattern request answers with, the trig plays
-// from the next pass, it is kept when another pattern is selected, and an edit made from a pattern the RAM no
-// longer holds is refused without a byte written.
+// from the next pass, it is kept when another pattern is selected, an edit made from a pattern the RAM no
+// longer holds is refused without a byte written, and the edits are in the state a project saves, the last
+// one too when no pattern was selected after it.
 //
 // Firmware from GEARMULATOR_MD_FIRMWARE_BIN; 77 without it.
 
+#include "mdLib/mddevice.h"
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdlivepattern.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdsysexautomation.h"
+#include "mdLib/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 
@@ -112,14 +115,25 @@ namespace
 		std::vector<uint8_t> rom;
 		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
 		require(md::RomLoader::isRomForModel(rom, g_model), std::string(path) + " is not a Machinedrum firmware");
-		auto hardware = std::make_unique<md::Hardware>(rom, path, g_model);
-		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(180);
-		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+		// A Device, for the state a project saves; no home path, so no machine-local factory cache
+		synthLib::DeviceCreateParams params;
+		params.romData = rom;
+		params.romName = path;
+		params.customData = md::deviceCustomData(g_model);
+		const auto device = std::make_unique<md::Device>(params);
+		require(device->isValid(), "the firmware did not make a valid device");
+		auto* hardware = &device->getHardware();
+		const auto boot = [&]
 		{
-			advance(*hardware, 64);
-			require(std::chrono::steady_clock::now() < deadline, "firmware boot timed out");
-		}
-		advance(*hardware, md::g_samplerate * 20);
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(180);
+			while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			{
+				advance(*hardware, 64);
+				require(std::chrono::steady_clock::now() < deadline, "firmware boot timed out");
+			}
+			advance(*hardware, md::g_samplerate * 20);
+		};
+		boot();
 		const auto layout = hardware->livePatternLayout();
 		require(layout.has_value(), "no pattern RAM layout for Machinedrum OS 1.63");
 
@@ -179,6 +193,32 @@ namespace
 		require(kept && kept->hasTrig(0, 4) && kept->lock(0, 3, 4) == std::optional<uint8_t>{77},
 			"the edit was not kept across a pattern change");
 		std::printf("mdLivePatternFirmwareTest: read back, a stale edit refused, kept across patterns %u and %u\n", other, slot);
+
+		// Saved: a second edit, with no pattern selected after it, then the state a project saves booted again
+		const auto beforeSave = readPattern();
+		auto last = sysex::MdPatternEditor::fromDump(beforeSave);
+		require(last.has_value() && last->setTrig(1, 8, true), "second edit refused");
+		const auto lastWrites = md::livePatternWrites(*layout, beforeSave, last->toDump());
+		require(lastWrites.has_value() && hardware->writeRamIfUnchanged(*lastWrites), "the second edit was refused");
+		std::vector<uint8_t> state;
+		require(device->getState(state, synthLib::StateTypeGlobal), "no state to save");
+		md::FactoryFlashSnapshot factoryFlash;
+		(void)hardware->copyFactoryFlashSnapshot(factoryFlash);
+		std::string error;
+		auto reboot = md::Device::prepareState(device->getPreparationContext(), state, synthLib::StateTypeGlobal,
+			factoryFlash, &error);
+		require(reboot && device->commitPreparedState(*reboot), "the saved state did not boot: " + error);
+		reboot.reset();
+		hardware = &device->getHardware();
+		boot();
+		const auto restoredStatus = sysex::parseStatusResponse(g_model,
+			exchange(*hardware, sysex::statusRequest(g_model, sysex::StatusParameter::Pattern), 0x72));
+		require(restoredStatus && restoredStatus->value == slot, "another pattern selected after the saved state");
+		const auto restored = sysex::parseMdPatternDump(readPattern());
+		require(restored && restored->hasTrig(0, 4) && restored->lock(0, 3, 4) == std::optional<uint8_t>{77},
+			"the edit kept across patterns was lost with the saved state");
+		require(restored->hasTrig(1, 8), "the edit made since the last pattern change was lost with the saved state");
+		std::printf("mdLivePatternFirmwareTest: both edits in the saved state, %zu bytes\n", state.size());
 		return true;
 	}
 }
