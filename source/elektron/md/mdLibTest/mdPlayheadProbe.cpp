@@ -13,6 +13,7 @@
 
 #include "mdLib/mdautomation.h"
 #include "mdLib/mdhardware.h"
+#include "mdLib/mdlivepattern.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdsysexautomation.h"
@@ -1976,6 +1977,222 @@ namespace
 		}
 	}
 
+	// Where the Machinedrum stores its 128 patterns and 64 Kits, for BIBLIO to read them without a request each:
+	// two patterns written with marked trigs on 64 steps, two Kits saved with marked parameters, then the marks
+	// searched for in the RAM and the flash, and the bytes there compared with the dumps
+	void libraryRamMachinedrum()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
+		if(!path)
+			return;
+		namespace sysex = md::automation::sysex;
+		constexpr auto model = md::MachineModel::Machinedrum;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		auto hardware = std::make_unique<md::Hardware>(rom, path, model);
+		while(!hardware->isFirmwareMidiReady() || !hardware->isAudioReady())
+			advance(*hardware, 64);
+		advance(*hardware, md::g_samplerate * 20);
+		auto& uc = hardware->getUC();
+		const auto send = [&](const sysex::Message& _bytes)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			if(_bytes.front() == 0xf0)
+				event.sysex.assign(_bytes.begin(), _bytes.end());
+			else
+			{
+				event.a = _bytes[0];
+				event.b = _bytes.size() > 1 ? _bytes[1] : 0;
+				event.c = _bytes.size() > 2 ? _bytes[2] : 0;
+			}
+			require(hardware->sendMidi(event), "MIDI rejected");
+		};
+		const auto exchange = [&](const sysex::Message& _request, const uint8_t _command)
+		{
+			std::vector<synthLib::SMidiEvent> events;
+			hardware->readMidiOut(events);
+			send(_request);
+			for(uint32_t block = 0; block < md::g_samplerate * 4 / 64; ++block)
+			{
+				advance(*hardware, 64);
+				events.clear();
+				hardware->readMidiOut(events);
+				for(const auto& e : events)
+					if(e.sysex.size() > 9 && e.sysex[6] == _command)
+						return sysex::Message(e.sysex.begin(), e.sysex.end());
+			}
+			throw std::runtime_error("no answer");
+		};
+		constexpr uint32_t ramBegin = 0x00100000, ramEnd = 0x00400000;
+		const auto snapshot = [&]
+		{
+			std::vector<uint8_t> bytes(ramEnd - ramBegin);
+			for(uint32_t i = 0; i < bytes.size(); ++i)
+			{
+				const auto address = ramBegin + i;
+				if(address < 0x00300000 || address >= 0x00310000)
+					bytes[i] = uc.read8(address);
+			}
+			return bytes;
+		};
+		const auto find = [](const std::vector<uint8_t>& _haystack, const std::vector<uint8_t>& _needle)
+		{
+			std::vector<size_t> hits;
+			auto it = _haystack.begin();
+			while((it = std::search(it, _haystack.end(), _needle.begin(), _needle.end())) != _haystack.end())
+			{
+				hits.push_back(static_cast<size_t>(it - _haystack.begin()));
+				++it;
+			}
+			return hits;
+		};
+		const auto print = [&](const std::string& _what, const std::vector<size_t>& _ram, const std::vector<size_t>& _flash)
+		{
+			std::string line;
+			for(size_t i = 0; i < std::min<size_t>(_ram.size(), 8); ++i)
+			{
+				char text[16];
+				std::snprintf(text, sizeof(text), " $%06x", static_cast<unsigned>(ramBegin + _ram[i]));
+				line += text;
+			}
+			for(size_t i = 0; i < std::min<size_t>(_flash.size(), 8); ++i)
+			{
+				char text[24];
+				std::snprintf(text, sizeof(text), " flash+$%06x", static_cast<unsigned>(_flash[i]));
+				line += text;
+			}
+			std::printf("%s: %zu in the RAM, %zu in the flash:%s\n", _what.c_str(), _ram.size(), _flash.size(), line.c_str());
+			std::fflush(stdout);
+		};
+		// The bytes at _address against _expected: how many differ, and the first ranges that do
+		const auto compare = [&](const std::string& _what, const std::vector<uint8_t>& _ram, const size_t _offset,
+			const std::vector<uint8_t>& _expected)
+		{
+			size_t differ = 0;
+			std::string ranges;
+			size_t rangeCount = 0;
+			for(size_t i = 0; i < _expected.size(); ++i)
+			{
+				const bool same = _offset + i < _ram.size() && _ram[_offset + i] == _expected[i];
+				if(same)
+					continue;
+				++differ;
+				if(i == 0 || (_offset + i - 1 < _ram.size() && _ram[_offset + i - 1] == _expected[i - 1]))
+				{
+					if(++rangeCount <= 12)
+					{
+						size_t end = i;
+						while(end + 1 < _expected.size() && !(_offset + end + 1 < _ram.size() && _ram[_offset + end + 1] == _expected[end + 1]))
+							++end;
+						char text[48];
+						std::snprintf(text, sizeof(text), " [%zx..%zx]", i, end);
+						ranges += text;
+					}
+				}
+			}
+			std::printf("%s at $%06x: %zu of %zu bytes differ%s\n", _what.c_str(), static_cast<unsigned>(ramBegin + _offset),
+				differ, _expected.size(), ranges.c_str());
+			std::fflush(stdout);
+		};
+		const auto bigEndian = [](const uint32_t _a, const uint32_t _b)
+		{
+			return std::vector<uint8_t>{static_cast<uint8_t>(_a >> 24), static_cast<uint8_t>(_a >> 16),
+				static_cast<uint8_t>(_a >> 8), static_cast<uint8_t>(_a), static_cast<uint8_t>(_b >> 24),
+				static_cast<uint8_t>(_b >> 16), static_cast<uint8_t>(_b >> 8), static_cast<uint8_t>(_b)};
+		};
+
+		// Patterns: the current one made 64 steps long, its trigs cleared, then tracks 1 and 2 given marked trigs
+		const auto status = sysex::parseStatusResponse(model,
+			exchange(sysex::statusRequest(model, sysex::StatusParameter::Pattern), 0x72));
+		require(status.has_value(), "no pattern status");
+		const auto source = exchange(sysex::patternRequest(model, status->value), 0x67);
+		struct Marked { uint8_t slot; std::array<uint32_t, 2> low; std::array<uint32_t, 2> high; sysex::Message dump; };
+		std::vector<Marked> patterns{
+			{40, {0xa5c3f00fu, 0x3c5a0ff0u}, {0x96e1d22du, 0x69871ee1u}, {}},
+			{41, {0xc3a50ff0u, 0x5a3cf00fu}, {0xe196d22du, 0x87691ee1u}, {}}};
+		for(auto& pattern : patterns)
+		{
+			auto editor = sysex::MdPatternEditor::fromDump(source);
+			require(editor && editor->setSlot(pattern.slot) && editor->setLength(64), "pattern not editable");
+			editor->clear();
+			for(uint8_t track = 0; track < 2; ++track)
+			{
+				for(uint8_t step = 0; step < 64; ++step)
+				{
+					const auto mask = step < 32 ? pattern.low[track] : pattern.high[track];
+					if((mask >> (step % 32)) & 1u)
+						require(editor->setTrig(track, step, true), "trig refused");
+				}
+			}
+			pattern.dump = editor->toDump();
+			send(pattern.dump);
+			advance(*hardware, md::g_samplerate);
+		}
+
+		// Kits: track 1's first eight synthesis parameters marked, the live Kit saved into slots 20 and 21
+		const auto cc = [&](const uint8_t _index, const uint8_t _value)
+		{
+			const auto message = md::automation::encodeParameterChange(model, {0, 0, _index, _value}, 0);
+			require(message.has_value(), "parameter not encodable");
+			send(sysex::Message(message->begin(), message->end()));
+			advance(*hardware, md::g_samplerate / 8);
+		};
+		const std::vector<std::pair<uint8_t, std::vector<uint8_t>>> kits{
+			{20, {101, 13, 77, 42, 99, 5, 64, 120}}, {21, {102, 14, 78, 43, 100, 6, 65, 121}}};
+		for(const auto& [slot, values] : kits)
+		{
+			for(uint8_t i = 0; i < values.size(); ++i)
+				cc(i, values[i]);
+			send(sysex::kitSave(model, slot));
+			advance(*hardware, md::g_samplerate);
+		}
+
+		const auto ram = snapshot();
+		const auto flash = hardware->copyFlashData();
+		std::printf("MD flash image: %zu bytes\n", flash.size());
+		for(const auto& pattern : patterns)
+		{
+			const auto low = find(ram, bigEndian(pattern.low[0], pattern.low[1]));
+			const auto high = find(ram, bigEndian(pattern.high[0], pattern.high[1]));
+			print("MD pattern " + std::to_string(pattern.slot) + " steps 1-32", low,
+				find(flash, bigEndian(pattern.low[0], pattern.low[1])));
+			print("MD pattern " + std::to_string(pattern.slot) + " steps 33-64", high,
+				find(flash, bigEndian(pattern.high[0], pattern.high[1])));
+			const auto payload = md::unpackMdPatternPayload(pattern.dump);
+			require(payload.has_value(), "pattern payload unreadable");
+			std::printf("MD pattern %u payload: %zu bytes (main %u, tail %u, extension %u)\n", pattern.slot,
+				payload->size(), md::LivePatternLayout::MainSize, md::LivePatternLayout::TailSize,
+				md::LivePatternLayout::ExtensionSize);
+			const std::vector<uint8_t> main(payload->begin(), payload->begin() + md::LivePatternLayout::MainSize);
+			const std::vector<uint8_t> tail(payload->begin() + md::LivePatternLayout::MainSize,
+				payload->begin() + md::LivePatternLayout::MainSize + md::LivePatternLayout::TailSize);
+			const std::vector<uint8_t> extension(payload->begin() + md::LivePatternLayout::MainSize
+				+ md::LivePatternLayout::TailSize, payload->end());
+			for(const auto at : low)
+			{
+				compare("MD pattern " + std::to_string(pattern.slot) + " main", ram, at, main);
+				compare("MD pattern " + std::to_string(pattern.slot) + " tail after main", ram,
+					at + md::LivePatternLayout::MainSize, tail);
+				compare("MD pattern " + std::to_string(pattern.slot) + " whole payload", ram, at, *payload);
+			}
+			for(const auto at : high)
+				compare("MD pattern " + std::to_string(pattern.slot) + " extension", ram, at, extension);
+			print("MD pattern " + std::to_string(pattern.slot) + " tail anywhere", find(ram, tail), {});
+		}
+		for(const auto& [slot, values] : kits)
+		{
+			const auto hits = find(ram, values);
+			print("MD Kit " + std::to_string(slot) + " parameters", hits, find(flash, values));
+			const auto dump = exchange(sysex::kitRequest(model, slot), 0x52);
+			std::printf("MD Kit %u dump: %zu bytes\n", slot, dump.size());
+			for(const auto at : hits)
+			{
+				if(at >= 0x1a)
+					compare("MD Kit " + std::to_string(slot) + " dump from $1a before", ram, at - 0x1a, dump);
+			}
+		}
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -2053,6 +2270,11 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 1 && std::string(_argv[1]) == "--pattern-ext")
 		{
 			patternExtensionMachinedrum();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--library-ram")
+		{
+			libraryRamMachinedrum();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
