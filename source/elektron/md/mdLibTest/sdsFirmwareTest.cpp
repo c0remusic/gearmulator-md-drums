@@ -114,7 +114,7 @@ namespace
 			hardware.readMidiOut(events);
 			for(const auto& event : events)
 				if(event.sysex.size() > 30 && event.sysex[1] == 0 && event.sysex[4] == 2
-					&& event.sysex[6] == 0x52) return event.sysex;
+					&& event.sysex[6] == 0x52) return std::vector<uint8_t>(event.sysex.begin(), event.sysex.end());
 		}
 		return {};
 	}

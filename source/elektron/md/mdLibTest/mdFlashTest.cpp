@@ -80,7 +80,9 @@ int main()
 	}
 	std::vector<uint8_t> bytes(md::g_romSize, 0xff);
 	md::Rom rom(bytes, "synthetic-md-flash.bin");
-	md::Microcontroller flash(rom, md::MachineModel::Machinedrum);
+	// On the heap: the microcontroller's buffers outgrow the default 1 MB stack of Windows' main thread
+	auto flashStorage = std::make_unique<md::Microcontroller>(rom, md::MachineModel::Machinedrum);
+	auto& flash = *flashStorage;
 
 	constexpr uint32_t regularSector = g_flashBase + 0x200000;
 	constexpr uint32_t target = regularSector + 0x1234;

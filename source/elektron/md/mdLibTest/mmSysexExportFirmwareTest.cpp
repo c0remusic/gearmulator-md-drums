@@ -104,7 +104,7 @@ namespace
 			for(const auto& event : events)
 				if(event.sysex.size() > 14 && event.sysex[4] == 3
 					&& event.sysex[6] == _command && event.sysex[9] == _slot)
-					host = event.sysex;
+					host.assign(event.sysex.begin(), event.sysex.end());
 		}
 		_hardware.getUC().setMidiTransmitTap({});
 		const auto rawMessage = findMessage(raw, _command, _slot);
@@ -223,7 +223,9 @@ int main(int argc, char** argv)
 		const auto rom = load(argv[1]);
 		const auto patchRam = load(argv[2]);
 		require(patchRam.size() == 0x100000, "MM patch RAM must be exactly 1 MiB");
-		md::Hardware hardware(rom, argv[1], md::MachineModel::Monomachine, patchRam);
+		// On the heap: a Hardware outgrows the default 1 MB stack of Windows' main thread
+		auto hardwareStorage = std::make_unique<md::Hardware>(rom, argv[1], md::MachineModel::Monomachine, patchRam);
+		auto& hardware = *hardwareStorage;
 		require(hardware.isValid(), "firmware did not construct a valid machine");
 		boot(hardware);
 		if(argc == 4 && std::string(argv[3]) == "full")

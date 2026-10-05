@@ -83,7 +83,8 @@ namespace md::test
 			hardware.readMidiOut(events);
 			for(const auto& event : events)
 				if(event.sysex.size() > 14 && event.sysex[4] == expected[4]
-					&& event.sysex[6] == expected[6] && event.sysex[9] == expected[9]) return event.sysex;
+					&& event.sysex[6] == expected[6] && event.sysex[9] == expected[9])
+					return Sysex(event.sysex.begin(), event.sysex.end());
 		}
 		return {};
 	}
