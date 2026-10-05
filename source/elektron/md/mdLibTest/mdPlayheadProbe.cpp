@@ -2193,6 +2193,168 @@ namespace
 		}
 	}
 
+	// Where the Monomachine stores its 128 patterns and 128 Kits: two patterns written with marked trigs on track 1
+	// and 2, a length and a Kit each, two Kits saved with marked parameters, then the marks searched for in the RAM
+	// and the flash, and the length and Kit bytes checked where the decoded payload puts them
+	void libraryRamMonomachine()
+	{
+		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
+		if(!path)
+			return;
+		namespace sysex = md::automation::sysex;
+		constexpr auto model = md::MachineModel::Monomachine;
+		std::vector<uint8_t> rom;
+		require(baseLib::filesystem::readFile(rom, path), std::string("cannot read ") + path);
+		md::test::Monomachine machine(rom, path);
+		auto& hardware = machine.hardware();
+		auto& uc = hardware.getUC();
+		constexpr uint32_t ramBegin = 0x00100000, ramEnd = 0x00400000;
+		const auto snapshot = [&]
+		{
+			std::vector<uint8_t> bytes(ramEnd - ramBegin);
+			for(uint32_t i = 0; i < bytes.size(); ++i)
+			{
+				const auto address = ramBegin + i;
+				if(address < 0x00300000 || address >= 0x00310000)
+					bytes[i] = uc.read8(address);
+			}
+			return bytes;
+		};
+		const auto find = [](const std::vector<uint8_t>& _haystack, const std::vector<uint8_t>& _needle)
+		{
+			std::vector<size_t> hits;
+			auto it = _haystack.begin();
+			while((it = std::search(it, _haystack.end(), _needle.begin(), _needle.end())) != _haystack.end())
+			{
+				hits.push_back(static_cast<size_t>(it - _haystack.begin()));
+				++it;
+			}
+			return hits;
+		};
+		const auto print = [&](const std::string& _what, const std::vector<size_t>& _ram, const std::vector<size_t>& _flash)
+		{
+			std::string line;
+			for(size_t i = 0; i < std::min<size_t>(_ram.size(), 12); ++i)
+			{
+				char text[16];
+				std::snprintf(text, sizeof(text), " $%06x", static_cast<unsigned>(ramBegin + _ram[i]));
+				line += text;
+			}
+			for(size_t i = 0; i < std::min<size_t>(_flash.size(), 8); ++i)
+			{
+				char text[24];
+				std::snprintf(text, sizeof(text), " flash+$%06x", static_cast<unsigned>(_flash[i]));
+				line += text;
+			}
+			std::printf("%s: %zu in the RAM, %zu in the flash:%s\n", _what.c_str(), _ram.size(), _flash.size(), line.c_str());
+			std::fflush(stdout);
+		};
+		const auto bigEndian = [](const uint64_t _mask)
+		{
+			std::vector<uint8_t> bytes(8);
+			for(size_t i = 0; i < 8; ++i)
+				bytes[i] = static_cast<uint8_t>(_mask >> (56 - 8 * i));
+			return bytes;
+		};
+
+		// Patterns: the current one made 64 steps long, its trigs on tracks 1 and 2 cleared, then marked
+		struct Marked { uint8_t slot; uint8_t length; uint8_t kit; std::array<uint64_t, 2> trigs; };
+		const std::vector<Marked> patterns{
+			{40, 64, 5, {0xa5c3f00f96e1d22dull, 0x3c5a0ff069871ee1ull}},
+			{41, 47, 9, {0xc3a50ff0e196d22dull & ((1ull << 47) - 1), 0x5a3cf00f87691ee1ull & ((1ull << 47) - 1)}}};
+		const auto current = machine.status(sysex::StatusParameter::Pattern);
+		const auto source = machine.readPattern(current);
+		for(const auto& pattern : patterns)
+		{
+			auto editor = sysex::MmPatternEditor::fromDump(source);
+			require(editor && editor->setSlot(pattern.slot) && editor->setLength(64) && editor->setKit(pattern.kit),
+				"pattern not editable");
+			for(uint8_t track = 0; track < 2; ++track)
+			{
+				for(uint8_t step = 0; step < 64; ++step)
+					require(editor->setTrig(track, step, std::nullopt), "trig not cleared");
+				for(uint8_t step = 0; step < 64; ++step)
+				{
+					if((pattern.trigs[track] >> step) & 1u)
+						require(editor->setTrig(track, step, uint8_t{60}), "trig refused");
+				}
+			}
+			require(editor->setLength(pattern.length), "length refused");
+			machine.writePattern(editor->toDump());
+		}
+
+		// Kits: track 1's first eight synthesis parameters marked, the live Kit saved into slots 20 and 21
+		const std::vector<std::pair<uint8_t, std::vector<uint8_t>>> kits{
+			{20, {101, 13, 77, 42, 99, 5, 64, 120}}, {21, {102, 14, 78, 43, 100, 6, 65, 121}}};
+		for(const auto& [slot, values] : kits)
+		{
+			for(uint8_t i = 0; i < values.size(); ++i)
+			{
+				const auto message = md::automation::encodeParameterChange(model, {0, 0, i, values[i]}, 0);
+				require(message.has_value(), "parameter not encodable");
+				machine.send(sysex::Message(message->begin(), message->end()));
+				advance(hardware, md::g_samplerate / 8);
+			}
+			machine.send(sysex::kitSave(model, slot));
+			advance(hardware, md::g_samplerate);
+		}
+
+		const auto ram = snapshot();
+		const auto flash = hardware.copyFlashData();
+		std::printf("MM flash image: %zu bytes\n", flash.size());
+		for(const auto& pattern : patterns)
+		{
+			for(uint8_t track = 0; track < 2; ++track)
+			{
+				const auto hits = find(ram, bigEndian(pattern.trigs[track]));
+				print("MM pattern " + std::to_string(pattern.slot) + " track " + std::to_string(track + 1) + " trigs", hits,
+					find(flash, bigEndian(pattern.trigs[track])));
+				// The decoded payload: amp trigs first (track * 8), the trigs at 6 * 48, the length at 1060, the Kit at 1062
+				for(const auto at : hits)
+				{
+					const auto base = static_cast<int64_t>(at) - static_cast<int64_t>(track * 8);
+					if(base < 0 || static_cast<size_t>(base) + 1063 > ram.size())
+						continue;
+					std::printf("  if $%06x is the amp trigs: length %u, Kit %u (expected %u and %u)\n",
+						static_cast<unsigned>(ramBegin + base), ram[base + 1060], ram[base + 1062], pattern.length, pattern.kit);
+				}
+			}
+			const auto dump = machine.readPattern(pattern.slot);
+			const auto parsed = sysex::parseMmPatternDump(dump);
+			std::printf("MM pattern %u dump: %zu bytes, length %u, Kit %u\n", pattern.slot, dump.size(),
+				parsed ? parsed->length : 0, parsed ? parsed->kit : 0);
+		}
+		for(const auto& [slot, values] : kits)
+		{
+			const auto hits = find(ram, values);
+			print("MM Kit " + std::to_string(slot) + " parameters", hits, find(flash, values));
+			const auto dump = machine.exchange(sysex::kitRequest(model, slot), 0x52);
+			const auto parsed = sysex::parseKitDump(model, dump);
+			std::string machines;
+			if(parsed)
+			{
+				for(const auto id : parsed->machines)
+					machines += " " + std::to_string(id);
+			}
+			std::printf("MM Kit %u dump: %zu bytes, name \"%s\", machines%s\n", slot, dump.size(),
+				parsed ? parsed->name.c_str() : "?", machines.c_str());
+			for(const auto at : hits)
+			{
+				if(at < 0x11)
+					continue;
+				const auto base = at - 0x11;
+				std::string name;
+				for(size_t i = 0; i < 11; ++i)
+					name += ram[base + i] >= 0x20 && ram[base + i] < 0x7f ? static_cast<char>(ram[base + i]) : '.';
+				std::string ids;
+				for(size_t track = 0; track < 6 && base + 0x1c1 + track < ram.size(); ++track)
+					ids += " " + std::to_string(ram[base + 0x1c1 + track]);
+				std::printf("  if $%06x is the Kit: name \"%s\", machines%s\n", static_cast<unsigned>(ramBegin + base),
+					name.c_str(), ids.c_str());
+			}
+		}
+	}
+
 	void confirmMonomachine()
 	{
 		const auto* path = std::getenv("GEARMULATOR_MM_FIRMWARE_BIN");
@@ -2275,6 +2437,11 @@ int main(const int _argc, const char* const* _argv)
 		if(_argc > 1 && std::string(_argv[1]) == "--library-ram")
 		{
 			libraryRamMachinedrum();
+			return 0;
+		}
+		if(_argc > 1 && std::string(_argv[1]) == "--library-ram-mm")
+		{
+			libraryRamMonomachine();
 			return 0;
 		}
 		probe("GEARMULATOR_MD_FIRMWARE_BIN", md::MachineModel::Machinedrum);
