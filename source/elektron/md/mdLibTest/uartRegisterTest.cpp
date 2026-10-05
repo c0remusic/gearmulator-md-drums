@@ -145,87 +145,106 @@ namespace
 		require(!sim.takeNextInterrupt(level, vector), "reset retained a receive request");
 	}
 
-	void panelTransmitPacing()
+	// The transmitter as MD OS 1.63 programs it: 8N1 on the internal baud generator. UBG=8 on the panel
+	// UART, 2560 cycles a byte; UBG=40 on the MIDI UART, 12800 cycles a byte (31250 baud at 40 MHz).
+	struct TransmitConfig
+	{
+		unsigned uart;
+		uint32_t base;
+		uint8_t divisor;
+		uint32_t cycles;
+		uint32_t icr;
+		const char* name;
+	};
+	constexpr TransmitConfig g_panelTransmit{md::Sim::g_uartPanel, md::Sim::g_uart2Base, 0x08, 2560, md::Sim::g_icrUart2, "panel"};
+	constexpr TransmitConfig g_midiTransmit{md::Sim::g_uartMidi, md::Sim::g_uart1Base, 0x28, 12800, md::Sim::g_icrUart1, "MIDI"};
+
+	void configureTransmitter(md::Sim& _sim, const TransmitConfig& _config)
+	{
+		_sim.write8(_config.base + md::Sim::g_uartMr, 0xb3);
+		_sim.write8(_config.base + md::Sim::g_uartMr, 0x07);
+		_sim.write8(_config.base + md::Sim::g_uartUsr, 0xdd);
+		_sim.write8(_config.base + md::Sim::g_uartBg1, 0x00);
+		_sim.write8(_config.base + md::Sim::g_uartBg2, _config.divisor);
+		_sim.write8(_config.base + md::Sim::g_uartCr, 0x04);
+	}
+
+	void transmitPacing(const TransmitConfig& _config)
 	{
 		md::Sim sim;
-		constexpr auto uart = md::Sim::g_uartPanel;
-		constexpr auto base = md::Sim::g_uart2Base;
+		const auto base = _config.base;
+		const auto cycles = _config.cycles;
 		std::array<uint8_t, 3> received{};
 		size_t count = 0;
-		sim.setTransmitCallback(uart, [&](const uint8_t byte)
+		sim.setTransmitCallback(_config.uart, [&](const uint8_t byte)
 		{
 			if(count < received.size())
 				received[count++] = byte;
 		});
+		// The other UART untouched transmits at once and adds no deadline
+		const auto other = _config.uart == md::Sim::g_uartMidi ? md::Sim::g_uartPanel : md::Sim::g_uartMidi;
+		unsigned otherReceived = 0;
+		sim.setTransmitCallback(other, [&](uint8_t) { ++otherReceived; });
 
-		// MD OS 1.63 panel configuration: 8N1, internal baud generator, UBG=8.
-		sim.write8(base + md::Sim::g_uartMr, 0xb3);
-		sim.write8(base + md::Sim::g_uartMr, 0x07);
-		sim.write8(base + md::Sim::g_uartUsr, 0xdd);
-		sim.write8(base + md::Sim::g_uartBg1, 0x00);
-		sim.write8(base + md::Sim::g_uartBg2, 0x08);
-		sim.write8(base + md::Sim::g_uartCr, 0x04);
+		configureTransmitter(sim, _config);
 		require(sim.read8(base + md::Sim::g_uartUsr)
 			== (md::Sim::g_usrTxEmp | md::Sim::g_usrTxRdy),
-			"enabled empty panel transmitter did not report ready");
+			"enabled empty transmitter did not report ready");
 
 		sim.write8(base + md::Sim::g_uartRxTx, 0x11);
-		require(count == 0 && sim.cyclesUntilNextUartTransmit() == 2560,
-			"first panel byte bypassed its configured wire time");
+		require(count == 0 && sim.cyclesUntilNextUartTransmit() == cycles,
+			"first byte bypassed its configured wire time");
 		require(sim.read8(base + md::Sim::g_uartUsr) == md::Sim::g_usrTxRdy,
 			"shift-register load did not free the holding register");
 		sim.write8(base + md::Sim::g_uartRxTx, 0x22);
 		sim.write8(base + md::Sim::g_uartRxTx, 0x33);
 		require(sim.read8(base + md::Sim::g_uartUsr) == 0,
-			"full panel holding register still reported ready");
+			"full holding register still reported ready");
+		sim.write8((other == md::Sim::g_uartPanel ? md::Sim::g_uart2Base : md::Sim::g_uart1Base) + md::Sim::g_uartRxTx, 0x44);
+		require(otherReceived == 1 && sim.cyclesUntilNextUartTransmit() == cycles,
+			"an unconfigured UART did not transmit at once");
 
-		sim.exec(2559);
+		sim.exec(cycles - 1);
 		require(count == 0 && sim.cyclesUntilNextUartTransmit() == 1,
-			"panel byte completed before its stop bit");
+			"byte completed before its stop bit");
 		sim.exec(1);
 		require(count == 1 && received[0] == 0x11
-			&& sim.cyclesUntilNextUartTransmit() == 2560,
+			&& sim.cyclesUntilNextUartTransmit() == cycles,
 			"first completion did not advance the queued holding byte");
 		require(sim.read8(base + md::Sim::g_uartUsr) == md::Sim::g_usrTxRdy,
 			"holding-to-shift transfer did not reassert ready");
-		sim.exec(2560);
+		sim.exec(cycles);
 		require(count == 2 && received[1] == 0x22,
-			"second panel byte did not complete at its wire deadline");
+			"second byte did not complete at its wire deadline");
 		require(sim.read8(base + md::Sim::g_uartUsr)
 			== (md::Sim::g_usrTxEmp | md::Sim::g_usrTxRdy),
-			"drained panel transmitter did not report empty");
+			"drained transmitter did not report empty");
 		require(sim.cyclesUntilNextUartTransmit() == md::Sim::g_noTimerInterruptDeadline,
-			"drained panel transmitter retained a deadline");
+			"drained transmitter retained a deadline");
 	}
 
-	void panelTransmitInterruptTiming()
+	void transmitInterruptTiming(const TransmitConfig& _config)
 	{
 		md::Sim sim;
-		constexpr auto uart = md::Sim::g_uartPanel;
-		constexpr auto base = md::Sim::g_uart2Base;
+		const auto base = _config.base;
 		unsigned received = 0;
-		sim.setTransmitCallback(uart, [&](uint8_t) { ++received; });
-		sim.write8(base + md::Sim::g_uartMr, 0xb3);
-		sim.write8(base + md::Sim::g_uartMr, 0x07);
-		sim.write8(base + md::Sim::g_uartUsr, 0xdd);
-		sim.write8(base + md::Sim::g_uartBg1, 0x00);
-		sim.write8(base + md::Sim::g_uartBg2, 0x08);
-		sim.write8(base + md::Sim::g_uartCr, 0x04);
-		sim.write8(md::Sim::g_icrUart2, 3 << 2);
+		sim.setTransmitCallback(_config.uart, [&](uint8_t) { ++received; });
+		configureTransmitter(sim, _config);
+		sim.write8(_config.icr, 3 << 2);
 		sim.write8(base + md::Sim::g_uartIvr, 0x60);
 		sim.write16(md::Sim::g_imr, 0);
 		sim.write8(base + md::Sim::g_uartIsr, md::Sim::g_uimrTxRdy);
 
 		uint8_t level = 0, vector = 0;
 		require(sim.takeNextInterrupt(level, vector) && level == 3 && vector == 0x60,
-			"enabling an empty panel transmitter did not request its first byte");
+			"enabling an empty transmitter did not request its first byte");
 		sim.write8(base + md::Sim::g_uartRxTx, 0x11);
 		require(sim.takeNextInterrupt(level, vector),
 			"loading the shift register did not request a second holding byte");
 		sim.write8(base + md::Sim::g_uartRxTx, 0x22);
 		require(!sim.takeNextInterrupt(level, vector),
 			"full holding register requested another transmit byte");
-		sim.exec(2559);
+		sim.exec(_config.cycles - 1);
 		require(received == 0 && !sim.takeNextInterrupt(level, vector),
 			"transmit interrupt arrived before the first stop bit completed");
 		sim.exec(1);
@@ -255,18 +274,21 @@ int main()
 			}
 		}
 	}
-	try
+	for(const auto& config : {g_panelTransmit, g_midiTransmit})
 	{
-		panelTransmitPacing();
-		panelTransmitInterruptTiming();
-	}
-	catch(const std::exception& error)
-	{
-		std::cerr << "panel transmit pacing: " << error.what() << '\n';
-		++failures;
+		try
+		{
+			transmitPacing(config);
+			transmitInterruptTiming(config);
+		}
+		catch(const std::exception& error)
+		{
+			std::cerr << config.name << " transmit pacing: " << error.what() << '\n';
+			++failures;
+		}
 	}
 	if(failures)
 		return 1;
-	std::cout << "UART register, receive-unmask, and panel transmit timing tests passed\n";
+	std::cout << "UART register, receive-unmask, and panel and MIDI transmit timing tests passed\n";
 	return 0;
 }

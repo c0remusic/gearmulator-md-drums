@@ -120,8 +120,17 @@ namespace
 		const auto before=uc.getCycles();
 		uc.getSim().write8(md::Sim::g_uart1Base+md::Sim::g_uartRxTx,0xf8);
 		const auto absolute=(before*44100+39999999)/40000000;
-		uc.readMidiOut(output,absolute-3);
-		require(output.size()==1 && output[0].a==0xf8 && output[0].offset==3,
+		// At the 31250 baud the firmware programs, the byte leaves once its ten bits are shifted out, 12800
+		// cycles later: it carries the cycle of the instruction that completes it
+		uint64_t completed=before;
+		for(unsigned i=0; i<100000 && output.empty(); ++i)
+		{
+			Access::instruction(hardware);
+			uc.readMidiOut(output,absolute-3);
+			completed=uc.getCycles();
+		}
+		const auto expected=(completed*44100+39999999)/40000000-(absolute-3);
+		require(output.size()==1 && output[0].a==0xf8 && output[0].offset==expected && completed>=before+12800,
 			"UART output lost its emulated cycle timestamp or native block origin");
 	}
 
