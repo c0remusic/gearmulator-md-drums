@@ -561,6 +561,10 @@ namespace
 		callbacks.reserve(1 << 20);
 		std::atomic<bool> running{true};
 		std::atomic<bool> audioStopped{false};
+		// Callbacks that started more than half a period after their time: a host's audio thread is never
+		// that late, so the measure is not one of the plug-in
+		uint64_t lateCallbacks = 0;
+		double latestCallbackMs = 0;
 		std::thread audio([&]
 		{
 			juce::AudioBuffer<float> buffer(channels, blockSize);
@@ -573,12 +577,15 @@ namespace
 				buffer.clear();
 				midi.clear();
 				const auto start = std::chrono::steady_clock::now();
+				const auto lateMs = std::chrono::duration<double, std::milli>(start - next).count();
+				lateCallbacks += lateMs > periodMs / 2 ? 1 : 0;
+				latestCallbackMs = std::max(latestCallbackMs, lateMs);
 				audioProcessor.processBlock(buffer, midi);
 				const auto end = std::chrono::steady_clock::now();
 				callbacks.push_back({msAt(start), std::chrono::duration<double, std::milli>(end - start).count()});
 				next += period;
-				// A sleep can overshoot by a whole Windows timer tick: sleep short, then spin to the period
-				std::this_thread::sleep_until(next - std::chrono::milliseconds(2));
+				// No sleep: a process without a visible window may get the default 15.6 ms timer resolution,
+				// and a sleep then overshoots a whole period. Spin, as a host's audio thread waits on its device.
 				while(std::chrono::steady_clock::now() < next)
 					std::this_thread::yield();
 			}
@@ -620,6 +627,8 @@ namespace
 		bool firmware = false;
 		int clicks = 0;
 		double baselineStart = 0;
+		double patternAsked = 0;
+		bool playingAtBaseline = false;
 		// The library reading: started, Kits done, ended (0 until then), and when progress was last printed
 		double libraryStart = 0, libraryKitsDone = 0, libraryEnd = 0, libraryNote = 0;
 		// A fresh config may prepare the factory flash and reboot the machine in process: the measure waits
@@ -690,12 +699,19 @@ namespace
 					progress("pattern read: baseline");
 					baselineStart = now;
 					silentAtBaseline = silentBlocks();
+					playingAtBaseline = controller.getPlayingStep().has_value();
 					next(Phase::Baseline);
 				}
 				else if(inPhase > 30000)
 				{
 					progress("pattern never read");
 					next(Phase::Done);
+				}
+				else if(now - patternAsked > 2000.0)
+				{
+					// As JOUER asks while it has none: the Monomachine's view asks only while drawn, which it is not here
+					patternAsked = now;
+					(void)controller.requestPattern();
 				}
 				break;
 			case Phase::Baseline:
@@ -800,10 +816,10 @@ namespace
 			}
 		});
 
-		std::printf("mdEditorFluidityTest %s %s: %d blocks at %.0f Hz (%.2f ms), %s, render %s; %d clicks %.1f s apart\n",
+		std::printf("mdEditorFluidityTest %s %s: %d blocks at %.0f Hz (%.2f ms), %s, render %s, playhead %s; %d clicks %.1f s apart\n",
 			name, _library ? "--library-load" : "--edit-load", blockSize, sampleRate, periodMs,
 			firmware ? "firmware running" : "no firmware", renders.empty() ? "on the host's thread" : "on its own thread",
-			clicks, _interval);
+			playingAtBaseline ? "moving" : "not seen moving", clicks, _interval);
 		const auto window = [&](const std::vector<Sample>& _samples, const double _from, const double _to)
 		{
 			std::vector<double> values;
@@ -886,6 +902,8 @@ namespace
 		std::printf("  render thread: %llu jobs, late %llu, played as silence %llu, dropped %llu\n",
 			static_cast<unsigned long long>(asyncStats.jobs), static_cast<unsigned long long>(late),
 			static_cast<unsigned long long>(missed), static_cast<unsigned long long>(dropped));
+		std::printf("  audio thread: %llu of %zu callbacks over half a period late, the latest by %.1f ms\n",
+			static_cast<unsigned long long>(lateCallbacks), callbacks.size(), latestCallbackMs);
 		std::fflush(stdout);
 		audioProcessor.releaseResources();
 		return missed == 0 && (!_library || libraryEnd > 0);
