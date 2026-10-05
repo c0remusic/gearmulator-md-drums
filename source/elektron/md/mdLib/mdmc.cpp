@@ -144,6 +144,14 @@ namespace md
 		return m_patchRam;
 	}
 
+	bool Microcontroller::readPatchRam(const uint32_t _address, uint8_t* _out, const size_t _size) const
+	{
+		if(!memorymap::g_patchBootstrap.contains(_address) || _size > memorymap::g_patchBootstrap.end - _address)
+			return false;
+		std::copy_n(m_patchRam.data() + memorymap::g_patchBootstrap.offset(_address), _size, _out);
+		return true;
+	}
+
 	bool Microcontroller::replacePatchRam(const std::vector<uint8_t>& _data)
 	{
 		if(_data.size() != m_patchRam.size())

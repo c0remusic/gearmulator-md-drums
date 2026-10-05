@@ -8,6 +8,8 @@
 #include "synthLib/realtimeInstrumentation.h"
 
 #include <algorithm>
+#include <array>
+#include <bitset>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -1415,6 +1417,126 @@ namespace md
 		if(m_model == MachineModel::Machinedrum && m_firmwareFingerprint == g_mdOs163Fingerprint)
 			return LivePatternLayout{0x001272c0, 0x0016bdc0, 0x00180000};
 		return std::nullopt;
+	}
+
+	bool Hardware::canReadLibrary() const
+	{
+		return livePatternLayout().has_value()
+			|| (m_model == MachineModel::Monomachine && m_firmwareFingerprint == g_mmOs132bFingerprint);
+	}
+
+	bool Hardware::readLibrary(Library& _library) const
+	{
+		const auto word = [](const uint8_t* _bytes)
+		{
+			return static_cast<uint32_t>(_bytes[0]) << 24 | static_cast<uint32_t>(_bytes[1]) << 16
+				| static_cast<uint32_t>(_bytes[2]) << 8 | _bytes[3];
+		};
+		if(m_model == MachineModel::Monomachine && m_firmwareFingerprint == g_mmOs132bFingerprint)
+		{
+			// Found with mdPlayheadProbe --library-ram-mm: the 128 Kits from $10059c, 698 bytes each, as their
+			// dump's decoded payload (the name first, 11 bytes, then a machine id byte per track at +$1c1); the
+			// 128 patterns from $116ae4, 6520 bytes each, as theirs (64-bit big-endian masks, a track's amp trigs
+			// at 8 * track, its trigs 288 further; the length at 1060, the Kit at 1062)
+			constexpr uint32_t kitFirst = 0x0010059c, kitSize = 698, machineOffset = 0x1c1;
+			constexpr uint32_t patternFirst = 0x00116ae4, patternSize = 6520;
+			constexpr uint32_t trigOffset = 288, lengthOffset = 1060;
+			constexpr uint8_t tracks = automation::monomachine::TrackCount;
+			_library.frame = getEmulatedFrames();
+			_library.kitCount = 128;
+			_library.tracks = tracks;
+			_library.nameSize = 11;
+			for(uint8_t slot = 0; slot < _library.kitCount; ++slot)
+			{
+				auto& kit = _library.kits[slot];
+				const auto first = kitFirst + slot * kitSize;
+				std::array<uint8_t, tracks> ids{};
+				if(!m_uc.readPatchRam(first, kit.name.data(), _library.nameSize)
+					|| !m_uc.readPatchRam(first + machineOffset, ids.data(), ids.size()))
+					return false;
+				for(uint8_t track = 0; track < tracks; ++track)
+					kit.machines[track] = ids[track];
+			}
+			for(uint8_t slot = 0; slot < Library::PatternCount; ++slot)
+			{
+				const auto first = patternFirst + slot * patternSize;
+				std::array<uint8_t, tracks * 8> amp{};
+				std::array<uint8_t, tracks * 8> trigs{};
+				std::array<uint8_t, 3> plain{};		// length, double tempo, Kit
+				if(!m_uc.readPatchRam(first, amp.data(), amp.size())
+					|| !m_uc.readPatchRam(first + trigOffset, trigs.data(), trigs.size())
+					|| !m_uc.readPatchRam(first + lengthOffset, plain.data(), plain.size()))
+					return false;
+				auto& pattern = _library.patterns[slot];
+				pattern = {};
+				const auto length = plain[0];
+				if(length == 0 || length > 64)
+					continue;
+				pattern.length = length;
+				pattern.kit = plain[2];
+				// A step with a trig or an amp trig, within the length, as BIBLIO counts a dump's
+				const auto inLength = length >= 64 ? ~uint64_t{0} : (uint64_t{1} << length) - 1;
+				for(uint8_t track = 0; track < tracks; ++track)
+				{
+					const auto mask = [&](const std::array<uint8_t, tracks * 8>& _masks)
+					{
+						return static_cast<uint64_t>(word(&_masks[track * 8])) << 32 | word(&_masks[track * 8 + 4]);
+					};
+					pattern.trigs = static_cast<uint16_t>(pattern.trigs
+						+ std::bitset<64>((mask(amp) | mask(trigs)) & inLength).count());
+				}
+			}
+			return true;
+		}
+
+		const auto patterns = livePatternLayout();
+		if(!patterns)
+			return false;
+		// Found with mdPlayheadProbe --library-ram: the 64 Kits from $1008c0, $460 bytes each, laid out as their
+		// dump from its name at +$0a; the machines' 32-bit words at +$1aa are raw where the dump packs them, each
+		// id their low byte. A pattern's first block (livePatternLayout) starts with its trigs, a big-endian word
+		// per track, then the lock masks and accent/slide/swing, its length at 145 and its Kit at 148; its steps 33
+		// to 64 block starts with their trigs.
+		constexpr uint32_t kitFirst = 0x001008c0, kitSize = 0x460, nameOffset = 0x0a, machineOffset = 0x1aa;
+		constexpr size_t lengthIndex = 145, kitIndex = 148;
+		_library.frame = getEmulatedFrames();
+		_library.kitCount = 64;
+		_library.tracks = automation::machinedrum::TrackCount;
+		_library.nameSize = 16;
+		for(uint8_t slot = 0; slot < _library.kitCount; ++slot)
+		{
+			auto& kit = _library.kits[slot];
+			const auto first = kitFirst + slot * kitSize;
+			std::array<uint8_t, automation::machinedrum::TrackCount * 4> words{};
+			if(!m_uc.readPatchRam(first + nameOffset, kit.name.data(), _library.nameSize)
+				|| !m_uc.readPatchRam(first + machineOffset, words.data(), words.size()))
+				return false;
+			for(uint8_t track = 0; track < _library.tracks; ++track)
+				kit.machines[track] = words[track * 4 + 3];
+		}
+		for(uint8_t slot = 0; slot < LivePatternLayout::PatternCount; ++slot)
+		{
+			std::array<uint8_t, kitIndex + 1> main{};
+			std::array<uint8_t, automation::machinedrum::TrackCount * 4> high{};
+			if(!m_uc.readPatchRam(patterns->mainOf(slot), main.data(), main.size())
+				|| !m_uc.readPatchRam(patterns->extensionOf(slot), high.data(), high.size()))
+				return false;
+			auto& pattern = _library.patterns[slot];
+			pattern = {};
+			const auto length = main[lengthIndex];
+			if(length == 0 || length > 64)
+				continue;
+			pattern.length = length;
+			pattern.kit = main[kitIndex];
+			// Within the length, as BIBLIO counts a dump's: steps past 32 only in a longer pattern
+			const auto inLength = length >= 64 ? ~uint64_t{0} : (uint64_t{1} << length) - 1;
+			for(uint8_t track = 0; track < automation::machinedrum::TrackCount; ++track)
+			{
+				const auto trigs = word(&main[track * 4]) | static_cast<uint64_t>(word(&high[track * 4])) << 32;
+				pattern.trigs = static_cast<uint16_t>(pattern.trigs + std::bitset<64>(trigs & inLength).count());
+			}
+		}
+		return true;
 	}
 
 	bool Hardware::writeRamIfUnchanged(const std::vector<RamWrite>& _writes)

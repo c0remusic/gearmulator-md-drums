@@ -152,6 +152,9 @@ namespace md
 			m_midiTransmitTap = std::move(_tap);
 		}
 		std::vector<uint8_t> copyPatchRam() const;
+		// _size bytes of the patch RAM from _address ($100000 to $1fffff) into _out, as they are; false, and nothing
+		// copied, when they do not all lie there. Scheduler thread only, between the firmware's instructions.
+		bool readPatchRam(uint32_t _address, uint8_t* _out, size_t _size) const;
 		bool replacePatchRam(const std::vector<uint8_t>& _data);
 		std::vector<uint8_t> copyFlashData() const;
 		std::vector<uint8_t> copyUserFlash() const;

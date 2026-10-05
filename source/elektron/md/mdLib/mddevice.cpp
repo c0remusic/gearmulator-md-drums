@@ -707,6 +707,23 @@ namespace md
 		serviceHostSync(_midiOut, first);
 		serviceMmPatternWriter();
 		serviceLivePattern();
+		serviceLibrary();
+	}
+
+	void Device::serviceLibrary()
+	{
+		if(!m_libraryControl || isProjectStateRestorePending() || !m_hardware->isFirmwareMidiReady())
+			return;
+		const auto requested = m_libraryControl->getRequested();
+		if(requested == m_libraryServed)
+			return;
+		// Between two blocks, the firmware paused: about 19 KB copied out of its RAM. A firmware whose layout is not
+		// known gives no Kit, and the controller asks for dumps instead. A reader holding the last reading makes it
+		// wait for the next block.
+		if(!m_hardware->readLibrary(*m_library))
+			m_library->kitCount = 0;
+		if(m_libraryControl->publish(requested, *m_library))
+			m_libraryServed = requested;
 	}
 
 	void Device::serviceLivePattern()
@@ -894,6 +911,7 @@ namespace md
 		values.parallelTransportActive = m_hardware->isProducerThreaded();
 		values.ramRecordingModeSupported = m_hardware->supportsRamRecordingMode();
 		values.livePatternSupported = m_hardware->livePatternLayout().has_value();
+		values.librarySupported = m_hardware->canReadLibrary();
 		values.userSysexState = userSysexImportProgress().state;
 		if(const auto position = m_hardware->readSequencerPosition())
 		{

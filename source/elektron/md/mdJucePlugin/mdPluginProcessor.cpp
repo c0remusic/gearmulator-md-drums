@@ -918,6 +918,7 @@ namespace mdJucePlugin
 		d->setChainPlayer(m_chainControl.getPlayer());
 		d->setMmPatternWriteControl(m_mmPatternWriteControl);
 		d->setLivePatternControl(m_livePatternControl);
+		d->setLibraryControl(m_libraryControl);
 		return d.release();
 	}
 

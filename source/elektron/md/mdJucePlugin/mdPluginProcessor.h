@@ -5,6 +5,7 @@
 #include "mdLiveDevice.h"
 #include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
+#include "mdLib/mdlibrary.h"
 #include "mdLib/mdlivepattern.h"
 #include "mdLib/mdmmpatternwriter.h"
 #include "mdLib/mdtypes.h"
@@ -100,6 +101,8 @@ namespace mdJucePlugin
 		md::MmPatternWriteControl& getMmPatternWriteControl() { return *m_mmPatternWriteControl; }
 		// The editor's edits of the pattern the Machinedrum plays, which the Device writes into its RAM
 		md::LivePatternControl& getLivePatternControl() { return *m_livePatternControl; }
+		// BIBLIO's readings of the stored Kits and patterns, which the Device makes from the machine's RAM
+		md::LibraryControl& getLibraryControl() { return *m_libraryControl; }
 		using jucePluginEditorLib::Processor::processBlock;
 		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
 
@@ -144,6 +147,7 @@ namespace mdJucePlugin
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
 		const std::shared_ptr<md::MmPatternWriteControl> m_mmPatternWriteControl = std::make_shared<md::MmPatternWriteControl>();
 		const std::shared_ptr<md::LivePatternControl> m_livePatternControl = std::make_shared<md::LivePatternControl>();
+		const std::shared_ptr<md::LibraryControl> m_libraryControl = std::make_shared<md::LibraryControl>();
 		LiveDevice m_liveDevice{*this};
 		OutputMeters m_outputMeters;
 		ChainControl m_chainControl{m_model};

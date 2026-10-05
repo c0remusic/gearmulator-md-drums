@@ -236,6 +236,12 @@ namespace md
 		{
 			m_livePatternControl = std::move(_control);
 		}
+		// BIBLIO's readings of the stored Kits and patterns: the Device reads them from the RAM
+		// (Hardware::readLibrary) on its rendering thread. Set before the Device renders.
+		void setLibraryControl(std::shared_ptr<LibraryControl> _control)
+		{
+			m_libraryControl = std::move(_control);
+		}
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -331,6 +337,7 @@ namespace md
 		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
 		void serviceMmPatternWriter();
 		void serviceLivePattern();
+		void serviceLibrary();
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
 		uint32_t hardwareLatency() const { return isRenderingAsync() ? 0 : getExtraLatencySamples(); }
@@ -369,6 +376,9 @@ namespace md
 		MmPatternWriter::Actions m_mmPatternWriterActions;
 		std::shared_ptr<MmPatternWriteControl> m_mmPatternWriteControl;
 		std::shared_ptr<LivePatternControl> m_livePatternControl;
+		std::shared_ptr<LibraryControl> m_libraryControl;
+		uint32_t m_libraryServed = 0;		// the last reading asked for that was read
+		std::unique_ptr<Library> m_library = std::make_unique<Library>();	// a reading's bytes, allocated once
 		std::shared_ptr<ChainPlayer> m_chainPlayer;
 		std::vector<synthLib::SMidiEvent> m_chainEvents;	// what the chain forwards for one event
 		// Last member: destroyed (render thread stopped) before everything it renders.

@@ -20,6 +20,7 @@ set(SOURCES
 	mdhardware.cpp mdhardware.h
 	mdhostclock.h
 	mdhostsync.cpp mdhostsync.h
+	mdlibrary.cpp mdlibrary.h
 	mdlivepattern.cpp mdlivepattern.h
 	mdmachines.cpp mdmachines.h
 	mdmmpatternwriter.cpp mdmmpatternwriter.h

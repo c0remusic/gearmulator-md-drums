@@ -472,8 +472,70 @@ namespace mdJucePlugin
 		m_libraryProgress.store(0, std::memory_order_release);
 		m_libraryReading.store(true, std::memory_order_release);
 		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+		// From the machine's RAM where its layout is known: everything at the Device's next block. No item is
+		// waited for meanwhile.
+		if(libraryReadable())
+		{
+			m_libraryWaiting = getKitLibrarySize() + PatternLibrarySize;
+			m_libraryRead = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLibraryControl().request();
+			return true;
+		}
+		m_libraryRead = 0;
 		requestLibraryItem(0, milliseconds());
 		return true;
+	}
+
+	bool Controller::libraryReadable() const
+	{
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		return status && status->librarySupported;
+	}
+
+	void Controller::serviceLibraryRead()
+	{
+		auto& control = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLibraryControl();
+		if(!m_libraryRead || control.getReadId() < m_libraryRead)
+			return;
+		uint32_t id = 0;
+		const auto library = control.read(id);
+		m_libraryRead = 0;
+		if(library.kitCount != getKitLibrarySize())
+		{
+			// The machine's layout is not the one expected: ask for every item instead
+			requestLibraryItem(0, milliseconds());
+			return;
+		}
+		{
+			const std::lock_guard lock(m_libraryMutex);
+			for(uint8_t slot = 0; slot < library.kitCount && slot < m_library.size(); ++slot)
+			{
+				const auto& kit = library.kits[slot];
+				m_library[slot] = LibraryKit{true, library.name(slot),
+					std::vector<uint16_t>(kit.machines.begin(), kit.machines.begin() + library.tracks)};
+			}
+			for(uint8_t slot = 0; slot < m_libraryPatterns.size(); ++slot)
+			{
+				const auto& pattern = library.patterns[slot];
+				if(pattern.length)
+					m_libraryPatterns[slot] = LibraryPattern{true, pattern.length, pattern.kit, pattern.trigs};
+			}
+		}
+		// Every pattern's length, for the chain
+		auto& chain = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl();
+		for(uint8_t slot = 0; slot < library.patterns.size(); ++slot)
+		{
+			if(library.patterns[slot].length)
+				chain.setLength(slot, library.patterns[slot].length);
+		}
+		m_libraryProgress.store(getKitLibrarySize() + PatternLibrarySize, std::memory_order_release);
+		endLibraryReading();
+	}
+
+	void Controller::endLibraryReading()
+	{
+		m_libraryReading.store(false, std::memory_order_release);
+		m_libraryDone.store(true, std::memory_order_release);
+		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
 	}
 
 	void Controller::requestLibraryItem(const size_t _item, const uint64_t _now)
@@ -482,9 +544,7 @@ namespace mdJucePlugin
 		const auto kits = getKitLibrarySize();
 		if(_item >= kits + PatternLibrarySize)
 		{
-			m_libraryReading.store(false, std::memory_order_release);
-			m_libraryDone.store(true, std::memory_order_release);
-			m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+			endLibraryReading();
 			return;
 		}
 		m_libraryWaiting = _item;
@@ -1330,9 +1390,10 @@ namespace mdJucePlugin
 		servicePatternWrite(now);
 		servicePatternCopy(now);
 		servicePatternLoad(now);
+		serviceLibraryRead();
 		// A library Kit not answered: skip it (the firmware may drop a request while busy)
 		// A Kit not answered within 2 s, a pattern (a longer dump) within 4 s, is skipped
-		if(m_libraryReading.load(std::memory_order_acquire)
+		if(m_libraryReading.load(std::memory_order_acquire) && !m_libraryRead
 			&& now - m_libraryRequestMs > (m_libraryWaiting < getKitLibrarySize() ? g_dumpRequestRetryMs : 2 * g_dumpRequestRetryMs))
 		{
 			m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);

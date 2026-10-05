@@ -146,12 +146,15 @@ namespace mdJucePlugin
 		// Increments whenever a track output changes or becomes known.
 		uint64_t getRoutingRevision() const { return m_routingRevision.load(std::memory_order_acquire); }
 
-		// BIBLIO: the stored Kits, name and machines (Kit requests, $53), then the
-		// stored patterns, length and Kit (pattern requests, $68), read one by one
-		// once readLibrary is called; a Kit not answered within 2 s, or a pattern
-		// within 4 s, is skipped. What was read stays until the next reading, and any
-		// pattern dump that comes after the first reading began (a copy read back, a
-		// write) replaces its slot's. Reading loads nothing: loadKit and loadPattern below do.
+		// BIBLIO: the stored Kits, name and machines, then the stored patterns, length
+		// and Kit, once readLibrary is called. Where the machine's layout is known
+		// (status librarySupported: Machinedrum OS 1.63) the Device reads them all
+		// from its RAM at its next block; else they are asked for one by one (Kit
+		// requests, $53, then pattern requests, $68), a Kit not answered within 2 s,
+		// or a pattern within 4 s, skipped. What was read stays until the next
+		// reading, and any pattern dump that comes after the first reading began (a
+		// copy read back, a write) replaces its slot's. Reading loads nothing:
+		// loadKit and loadPattern below do.
 		struct LibraryKit
 		{
 			bool read = false;
@@ -443,6 +446,13 @@ namespace mdJucePlugin
 		void storeLfo(uint8_t _track, const md::LfoSettings& _lfo, bool _authoritative);
 		// Asks for one library item, the Kits then the patterns, or ends the reading past the last
 		void requestLibraryItem(size_t _item, uint64_t _now);
+		// Whether the Device reads the whole library from the machine's RAM (Hardware::readLibrary)
+		bool libraryReadable() const;
+		// The RAM reading asked for, once the Device made it: the library filled at once, or read through
+		// requests when the Device gave no Kit
+		void serviceLibraryRead();
+		// Ends a library reading: done, nothing waited for
+		void endLibraryReading();
 		// A pattern dump the library waits for: stores it and asks for the next item
 		void storeLibraryPattern(uint8_t _slot, const LibraryPattern& _pattern);
 		void sendEditorSysex(const md::automation::sysex::Message& _message) const;
@@ -508,6 +518,7 @@ namespace mdJucePlugin
 		std::vector<LibraryPattern> m_libraryPatterns;	// under m_libraryMutex
 		size_t m_libraryWaiting = 0;                // item asked for (Kits, then patterns), under m_synchronizationLock
 		uint64_t m_libraryRequestMs = 0;
+		uint32_t m_libraryRead = 0;					// the RAM reading waited for, 0 for none; under m_synchronizationLock
 		std::atomic<bool> m_libraryReading{false};
 		std::atomic<bool> m_libraryDone{false};
 		std::atomic<size_t> m_libraryProgress{0};

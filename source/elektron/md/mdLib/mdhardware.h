@@ -17,6 +17,7 @@
 #include "mddsp.h"
 #include "mdfrontpanel.h"
 #include "mdhostaudioqueue.h"
+#include "mdlibrary.h"
 #include "mdlivekit.h"
 #include "mdlivepattern.h"
 #include "mdmc.h"
@@ -151,6 +152,13 @@ namespace md
 		// Writes the bytes into the RAM, all of them, when each still holds the value it is expected to hold;
 		// else none. On the emulation thread, or with it paused.
 		bool writeRamIfUnchanged(const std::vector<RamWrite>& _writes);
+		// Whether readLibrary knows where this firmware stores its Kits and patterns (Machinedrum OS 1.63,
+		// Monomachine OS 1.32b)
+		bool canReadLibrary() const;
+		// The stored Kits and patterns, read from the RAM into _library (md::Library): what Kit and pattern
+		// requests would answer with. False, _library unspecified, when the layout is not known. On the
+		// emulation thread, or with it paused.
+		bool readLibrary(Library& _library) const;
 		bool supportsRamRecordingMode() const
 		{
 			return m_model == MachineModel::Machinedrum

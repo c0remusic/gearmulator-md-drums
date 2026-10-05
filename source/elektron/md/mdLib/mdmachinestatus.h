@@ -33,6 +33,8 @@ namespace md
 			// The stored patterns, the one the machine plays among them, can be edited in its RAM
 			// (Hardware::livePatternLayout)
 			bool livePatternSupported = false;
+			// The stored Kits and patterns can be read from its RAM (Hardware::readLibrary)
+			bool librarySupported = false;
 			// The user's SysEx file import (Device::userSysexImportProgress): Idle when none was started
 			MidiSysexTransferState userSysexState = MidiSysexTransferState::Idle;
 			// The sequencer (Hardware::readSequencerPosition): whether it plays and its step, 0 for the
@@ -57,6 +59,7 @@ namespace md
 			values.parallelTransportActive = (flags & ParallelTransportActive) != 0;
 			values.ramRecordingModeSupported = (flags & RamRecordingModeSupported) != 0;
 			values.livePatternSupported = (flags & LivePatternSupported) != 0;
+			values.librarySupported = (flags & LibrarySupported) != 0;
 			values.userSysexState = static_cast<MidiSysexTransferState>((flags >> SysexStateShift) & 0xff);
 			values.sequencerStep = static_cast<uint8_t>((flags >> SequencerStepShift) & 0xff);
 			values.sequencerPlaying = (flags & SequencerPlaying) != 0;
@@ -79,6 +82,7 @@ namespace md
 				| (_values.parallelTransportActive ? ParallelTransportActive : 0u)
 				| (_values.ramRecordingModeSupported ? RamRecordingModeSupported : 0u)
 				| (_values.livePatternSupported ? LivePatternSupported : 0u)
+				| (_values.librarySupported ? LibrarySupported : 0u)
 				| (static_cast<uint32_t>(_values.userSysexState) << SysexStateShift)
 				| (static_cast<uint32_t>(_values.sequencerStep) << SequencerStepShift)
 				| (_values.sequencerPlaying ? SequencerPlaying : 0u);
@@ -103,7 +107,8 @@ namespace md
 			ParallelTransportActive = 1u << 6,
 			RamRecordingModeSupported = 1u << 7,
 			SequencerPlaying = 1u << 24,
-			LivePatternSupported = 1u << 25
+			LivePatternSupported = 1u << 25,
+			LibrarySupported = 1u << 26
 		};
 		static constexpr uint32_t SysexStateShift = 8;	// bits 8 to 15: userSysexState
 		static constexpr uint32_t SequencerStepShift = 16;	// bits 16 to 23: sequencerStep
