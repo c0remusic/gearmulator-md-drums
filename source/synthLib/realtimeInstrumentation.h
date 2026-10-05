@@ -7,12 +7,15 @@
 
 namespace synthLib
 {
-	enum class RealtimeEventKind { PanelInput, PanelInputResult, PanelDelivery, HostTransport };
+	enum class RealtimeEventKind { PanelInput, PanelInputResult, PanelDelivery, HostTransport, DeviceAccess, RenderJob };
 	struct RealtimeEvent
 	{
 		RealtimeEventKind kind = RealtimeEventKind::PanelInput;
 		uint64_t timeNanoseconds = 0, sequence = 0, callbackIndex = 0, inputId = 0;
+		// DeviceAccess: waiting for the device to pause, then holding it. RenderJob: rendering the block.
+		uint64_t waitNanoseconds = 0, holdNanoseconds = 0, durationNanoseconds = 0;
 		uint32_t model = 0, command = 0, argument = 0;
+		uint32_t frames = 0, compilations = 0, deferredCompilations = 0;	// RenderJob
 		bool accepted = false, deferred = false;
 		bool playing = false, offline = false, bypassed = false, transportKnown = false, initial = false;
 	};
@@ -26,6 +29,12 @@ namespace synthLib
 		uint64_t synthNanoseconds = 0, lockWaitNanoseconds = 0;
 		uint64_t resamplerNanoseconds = 0, deviceNanoseconds = 0;
 		uint64_t deferredNanoseconds = 0, liveJitCompilations = 0, deferredJitCompilations = 0;
+		// A device rendering on its own thread: waiting for a block it had not rendered yet, the blocks it
+		// could not take (paused, or every slot busy), and the late ones played as silence rather than
+		// waited for longer.
+		uint64_t renderWaitNanoseconds = 0;
+		uint32_t renderDroppedBlocks = 0;
+		uint32_t renderMissedBlocks = 0;
 		uint32_t frames = 0, outputBuses = 0, outputChannels = 0;
 		uint32_t midiEvents = 0, midiBytes = 0, deviceSampleRate = 0;
 		uint32_t resamplerMode = 0, dspClockPercent = 100;
@@ -76,6 +85,22 @@ namespace synthLib
 		uint32_t maximumActiveOutputBuses = 0;
 		uint32_t latestActiveOutputChannels = 0;
 		uint32_t maximumActiveOutputChannels = 0;
+		// Control accesses to the device (Plugin::withDeviceLocked, state, settings), from any thread:
+		// waiting for a device rendering on its own thread to finish and pause, then holding it.
+		uint64_t deviceAccessCount = 0;
+		uint64_t deviceAccessWaitNanoseconds = 0;
+		uint64_t deviceAccessWaitMaxNanoseconds = 0;
+		uint64_t deviceAccessHoldNanoseconds = 0;
+		uint64_t deviceAccessHoldMaxNanoseconds = 0;
+		// A device rendering on its own thread (RenderScope): its compilations, also counted in
+		// jitCompilationCount, and what the host callbacks waited for it.
+		uint64_t renderJitCompilationCount = 0;
+		uint64_t renderJobsWithJitCompilation = 0;
+		uint64_t renderLateBlockCount = 0;
+		uint64_t renderWaitNanoseconds = 0;
+		uint64_t renderWaitMaxNanoseconds = 0;
+		uint64_t renderDroppedBlockCount = 0;
+		uint64_t renderMissedBlockCount = 0;
 	};
 
 	// Opt-in counters for diagnosing work performed on the host audio callback.
@@ -128,9 +153,33 @@ namespace synthLib
 			uint64_t m_startNanoseconds = 0;
 			uint32_t m_frames = 0;
 			bool m_previousCandidateRole = false;
+			bool m_render = false;	// inside a RenderScope rather than a host callback
+		};
+
+		// A device that renders ahead of the host on a thread of its own (md::AsyncRender) renders
+		// each block inside one: the JIT compilations it makes are counted, as live ones, and a block
+		// that compiled becomes a render_job event. _owner is the instrumentation of the host callback
+		// that handed the block over (current() on that thread); null records nothing.
+		class RenderScope final
+		{
+		public:
+			RenderScope(RealtimeInstrumentation* _owner, uint32_t _frames) noexcept;
+			~RenderScope();
+
+			RenderScope(const RenderScope&) = delete;
+			RenderScope& operator=(const RenderScope&) = delete;
+
+		private:
+			RealtimeInstrumentation* m_owner = nullptr;
+			uint64_t m_startNanoseconds = 0;
+			uint32_t m_frames = 0;
 		};
 
 		RealtimeInstrumentation() noexcept;
+
+		// The instrumentation recording the host callback this thread runs; null outside one, or when
+		// the callback started with recording off.
+		static RealtimeInstrumentation* current() noexcept;
 
 		void setEnabled(bool _enabled) noexcept;
 		bool isEnabled() const noexcept
@@ -163,12 +212,22 @@ namespace synthLib
 			size_t _hostFrames, bool _resamplingActive) noexcept;
 
 		// Called only from the MD DSP JIT's per-block configuration callback. An
-		// event is attributed only when a host callback scope is active on this thread.
+		// event is attributed only when a host callback scope or a RenderScope is
+		// active on this thread.
 		static void recordCurrentCallbackJitCompilation() noexcept;
+
+		// A control access to the device ended (synthLib::Plugin's device pause). Any thread.
+		void recordDeviceAccess(uint64_t _waitNanoseconds, uint64_t _holdNanoseconds) noexcept;
+		// The host callback on this thread waited for a block the device's render thread had not
+		// delivered, or could not hand a block over while the device was paused.
+		static void recordCurrentRenderWait(uint64_t _nanoseconds) noexcept;
+		static void recordCurrentDroppedBlock() noexcept;
+		static void recordCurrentMissedBlock() noexcept;
 
 	private:
 		friend class CallbackScope;
 		friend class DeferredCandidateScope;
+		friend class RenderScope;
 
 		void recordHostCallback(RealtimeSlowCallback _callback) noexcept;
 		friend struct RealtimeInstrumentationTestAccess;
@@ -233,5 +292,17 @@ namespace synthLib
 		std::atomic<uint32_t> m_maximumActiveOutputBuses{0};
 		std::atomic<uint32_t> m_latestActiveOutputChannels{0};
 		std::atomic<uint32_t> m_maximumActiveOutputChannels{0};
+		std::atomic<uint64_t> m_deviceAccessCount{0};
+		std::atomic<uint64_t> m_deviceAccessWaitNanoseconds{0};
+		std::atomic<uint64_t> m_deviceAccessWaitMaxNanoseconds{0};
+		std::atomic<uint64_t> m_deviceAccessHoldNanoseconds{0};
+		std::atomic<uint64_t> m_deviceAccessHoldMaxNanoseconds{0};
+		std::atomic<uint64_t> m_renderJitCompilationCount{0};
+		std::atomic<uint64_t> m_renderJobsWithJitCompilation{0};
+		std::atomic<uint64_t> m_renderLateBlockCount{0};
+		std::atomic<uint64_t> m_renderWaitNanoseconds{0};
+		std::atomic<uint64_t> m_renderWaitMaxNanoseconds{0};
+		std::atomic<uint64_t> m_renderDroppedBlockCount{0};
+		std::atomic<uint64_t> m_renderMissedBlockCount{0};
 	};
 }

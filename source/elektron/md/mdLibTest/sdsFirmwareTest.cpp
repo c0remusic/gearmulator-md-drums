@@ -114,7 +114,7 @@ namespace
 			hardware.readMidiOut(events);
 			for(const auto& event : events)
 				if(event.sysex.size() > 30 && event.sysex[1] == 0 && event.sysex[4] == 2
-					&& event.sysex[6] == 0x52) return event.sysex;
+					&& event.sysex[6] == 0x52) return std::vector<uint8_t>(event.sysex.begin(), event.sysex.end());
 		}
 		return {};
 	}
@@ -335,7 +335,7 @@ namespace
 
 int main(int argc, char** argv)
 {
-	std::setvbuf(stdout, nullptr, _IOLBF, 0);
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	if(argc != 4 && argc != 5)
 	{
 		std::puts("usage: mdSdsFirmwareTest <MD-ROM> <sample.syx|--generated|--generated-bank|--generated-mixed|--generated-cancel> <factory.cache> [none|corrupt-packet|drop-ack|delay-ack|duplicate-ack|wait|silence|drop-header-ack|drop-final-ack|boot:seconds|repeat:seconds|cancel:seconds|probe:seconds|restored:seconds|uncached:seconds|cold:seconds|quiet:seconds|pc:0|metadata-only:seconds|observe:seconds|observe-restored:seconds]");

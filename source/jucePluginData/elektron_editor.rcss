@@ -1,0 +1,521 @@
+/* Editor of mdDefault.rml and mmSfx60.rml. Window 1100 × 606 dp: a 36 dp top bar over either the
+   front panel (570 dp) or the editor; a taller window stacks both (mdViewLayout.cpp).
+   Grid: 16 dp margins, 12 columns of 78 dp, 12 dp gutters. Blocks are placed in dp by the RML.
+   Colours: anthracite chassis, cream text, orange only for active state. */
+
+.mdFrontPanel
+{
+	position: relative;
+	flex: 0 0 570dp;
+	width: 1100dp;
+	height: 570dp;
+}
+
+.mdEdTopBar
+{
+	position: relative;
+	box-sizing: border-box;
+	flex: 0 0 36dp;
+	width: 1100dp;
+	height: 36dp;
+	background-color: #141516;
+	border-bottom: 1dp #2e3034;
+	font-family: Roboto;
+	color: #f4f1ea;
+}
+
+.mdEdRoot
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	width: 1100dp;
+	display: flex;
+	flex-direction: column;
+	background-color: #1c1d1f;
+	font-family: Roboto;
+	color: #f4f1ea;
+}
+
+.mdEdStrip
+{
+	position: relative;
+	box-sizing: border-box;
+	background-color: #141516;
+	border-bottom: 1dp #2e3034;
+}
+
+.mdEdStrip { flex: 0 0 32dp; height: 32dp; }
+
+.mdEdPage
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	display: flex;
+	flex-direction: column;
+}
+
+/* the only scrolling area; its 8 dp scrollbar sits in the right margin */
+.mdEdScroll
+{
+	flex: 1 1 0dp;
+	min-height: 0dp;
+	overflow-y: auto;
+}
+
+.mdEdScroll scrollbarvertical { width: 8dp; }
+.mdEdScroll scrollbarvertical sliderbar { background-color: #3a3d42; border-radius: 4dp; }
+
+/* RCSS has no default styles: a div is inline unless told otherwise */
+.mdEdContent
+{
+	display: block;
+	position: relative;
+	width: 1092dp;
+}
+
+/* SON switches between the track view and MASTER; each view sets its own height */
+.mdEdView
+{
+	display: block;
+	position: relative;
+	width: 1092dp;
+}
+
+/* text */
+
+.mdEdLogo { height: 24dp; line-height: 24dp; font-size: 15dp; font-weight: bold; }
+.mdEdTitle { height: 24dp; line-height: 24dp; font-size: 13dp; font-weight: bold; color: #f4f1ea; }
+.mdEdSub { font-size: 11dp; font-weight: normal; color: #8a8d93; }
+.mdEdValue { height: 14dp; line-height: 14dp; font-size: 12dp; text-align: center; color: #f4f1ea; }
+.mdEdName { height: 14dp; line-height: 14dp; font-size: 10dp; font-weight: bold; text-align: center; color: #8a8d93; }
+.mdEdNote { font-size: 12dp; line-height: 16dp; color: #8a8d93; }
+.mdEdRight { text-align: right; }
+.mdEdLeft { text-align: left; }
+.mdEdMachineName { height: 24dp; line-height: 24dp; font-size: 17dp; font-weight: bold; }
+
+/* inactive: laid out, but the data behind it is not available yet (wireframe board 0b, third state) */
+.mdEdOff { opacity: 0.35; pointer-events: none; }
+/* a synthesis control the track's machine does not use (MachinePicker) */
+.mdEdUnused { opacity: 0.25; pointer-events: none; }
+
+/* header screen: kit and pattern */
+.mdEdScreen
+{
+	height: 28dp;
+	padding: 1dp 12dp 0dp 12dp;
+	box-sizing: border-box;
+	background-color: #101112;
+	border: 1dp #3a3d42;
+	border-radius: 3dp;
+}
+
+/* Selected Kit and pattern */
+.mdEdScreenMain
+{
+	display: block;
+	height: 13dp;
+	line-height: 13dp;
+	font-size: 11dp;
+	font-weight: bold;
+	color: #ffb347;
+	white-space: nowrap;
+}
+
+/* The Kit's name, up to 16 characters */
+.mdEdScreenName
+{
+	display: block;
+	height: 12dp;
+	line-height: 12dp;
+	font-size: 10dp;
+	color: #c98f45;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+
+/* segmented selector and inactive buttons */
+.mdEdSeg
+{
+	box-sizing: border-box;
+	height: 24dp;
+	line-height: 22dp;
+	font-size: 10dp;
+	font-weight: bold;
+	text-align: center;
+	color: #8a8d93;
+	border: 1dp #3a3d42;
+}
+
+/* a segment that is a choice (track output in MIX, mdTrackRoutingView.cpp), or a state (a bus on in the DAW);
+   the chosen or active one in orange */
+.mdEdSegChoice { cursor: pointer; }
+.mdEdSegChoice:hover { color: #f4f1ea; }
+.mdEdSeg.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+
+/* steps: 24 dp high, their width set by the RML. The focus frame is always 2 dp wide, in the step's own colour
+   until it has the focus: changing a border's width lays the whole document out again, changing its colour
+   does not. */
+.mdEdStep
+{
+	box-sizing: border-box;
+	height: 24dp;
+	line-height: 20dp;
+	font-size: 10dp;
+	text-align: center;
+	color: #8a8d93;
+	background-color: #2a2c30;
+	border: 2dp #2a2c30;
+}
+.mdEdStepBeat { background-color: #3a3d42; border-color: #3a3d42; }
+.mdEdStep { cursor: pointer; }
+.mdEdStep:hover { color: #f4f1ea; }
+.mdEdStepTrig, .mdEdStepBeat.mdEdStepTrig { background-color: #f4f1ea; border-color: #f4f1ea; color: #141516; }
+.mdEdStepOut { opacity: 0.3; }
+/* the step the sequencer plays (StepGrid): lit, a trig on it orange; before the focus, whose frame stays orange */
+.mdEdStep.mdEdStepNow { background-color: #4a4d54; border-color: #4a4d54; color: #f4f1ea; }
+.mdEdStepTrig.mdEdStepNow { background-color: #ff6b1f; border-color: #ff6b1f; color: #141516; }
+.mdEdStep.mdEdStepFocus { border-color: #ff6b1f; }
+
+/* JOUER (mdPatternView.cpp, mdMmPatternView.cpp): the steps' numbers over the grid, the first of each beat
+   brighter; a band behind every other beat and a line between the bars; a row per track, the edited
+   track's name in orange; a trig in white, a trig with locks in orange (as a lock in the lane), on the
+   Monomachine a trig that does not start the amp envelope in grey; a legend under the rows. The lane and
+   the piano roll are canvases the views draw on the same columns. */
+.mdPlayHead { height: 14dp; line-height: 14dp; font-size: 9dp; text-align: center; color: #55585e; }
+.mdPlayHead.mdPlayHeadBeat { color: #c9c6bf; font-weight: bold; }
+.mdPlayBand { background-color: #2e3035; border-radius: 3dp; }
+.mdPlayBar { background-color: #55585e; }
+.mdPlayTrack { height: 14dp; line-height: 14dp; font-size: 10dp; font-weight: bold; color: #8a8d93; cursor: pointer; }
+.mdPlayTrack:hover { color: #f4f1ea; }
+.mdPlayTrack.mdEdSelected { color: #ff6b1f; }
+.mdPlayStep { height: 14dp; line-height: 14dp; background-color: #1b1c1f; border-radius: 2dp; }
+.mmPlayTrack { height: 24dp; line-height: 24dp; }
+.mmPlayStep { line-height: 24dp; font-size: 10dp; font-weight: bold; }
+.mdPlayStep.mdEdStepTrig { background-color: #f4f1ea; color: #141516; }
+.mmPlayStep.mmPlaySilent { background-color: #8a8d93; color: #141516; }
+.mdPlayStep.mdPlayLocked { background-color: #ff6b1f; color: #141516; }
+.mdPlayLegend { height: 16dp; line-height: 16dp; }
+/* TOUT EFFACER waiting for its second click */
+.mdEdButton.mdPlayArmed { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdPlayChip { display: inline-block; width: 10dp; height: 10dp; margin-left: 14dp; margin-right: 5dp; border-radius: 2dp; vertical-align: middle; }
+.mdPlayChip:first-child { margin-left: 0dp; }
+.mdPlayChipTrig { background-color: #f4f1ea; }
+.mdPlayChipLock { background-color: #ff6b1f; }
+.mdPlayChipSilent { background-color: #8a8d93; }
+.mdPlayChipOut { background-color: #1b1c1f; border: 1dp #3a3d42; }
+.mdPlayChipFlag { background-color: #ffb347; }
+/* accent, slide and swing under the tracks (mdPatternView.cpp, mdMmPatternView.cpp): a step set in amber; the
+   names smaller, each a menu */
+.mdPlayStep.mdPlayFlagOn { background-color: #ffb347; }
+.mdPlayFlagName { font-size: 9dp; }
+/* the step the sequencer plays (mdPatternView.cpp, mdMmPatternView.cpp): its number in orange, its column
+   lit, a trig on it brighter; colours only, so the column moves without a layout */
+.mdPlayHead.mdPlayNow { color: #ff6b1f; }
+.mdPlayStep.mdPlayNow { background-color: #44474e; }
+.mdPlayStep.mdEdStepTrig.mdPlayNow { background-color: #ffffff; }
+.mmPlayStep.mmPlaySilent.mdPlayNow { background-color: #b3b6bc; }
+.mdPlayStep.mdPlayLocked.mdPlayNow { background-color: #ff9a5c; }
+.mdPlayStep.mdPlayFlagOn.mdPlayNow { background-color: #ffd08a; }
+
+/* BIBLIO (mdLibraryView.cpp): a cell per stored Kit, the loaded one in amber, the chosen one framed */
+.mdLibKit { box-sizing: border-box; height: 22dp; line-height: 20dp; padding-left: 5dp; font-size: 11dp; color: #f4f1ea;
+	border: 1dp transparent; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdLibKit:hover { background-color: #2a2c30; }
+.mdLibKit.mdEdSelected { background-color: #2e3034; border-color: #8a8d93; }
+/* the pattern COPIER took, framed in orange until COLLER */
+.mdLibKit.mdLibSource { border-color: #ff6b1f; }
+.mdLibKit.mdLibCurrent { color: #ffb347; font-weight: bold; }
+/* a pattern read without a trig */
+.mdLibKit.mdLibEmpty { color: #6c6f75; }
+.mdLibInfo { height: 24dp; line-height: 24dp; }
+
+/* JOUER, CHAÎNE (mdChainView.cpp): a slot per entry, pattern then passes and length; the chosen one
+   framed, the one playing in orange, an empty one dimmed */
+.mdChainSlot { box-sizing: border-box; height: 44dp; padding: 3dp 5dp; font-size: 11dp; line-height: 17dp; color: #f4f1ea;
+	background-color: #2a2c30; border: 2dp #33363b; border-radius: 2dp; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.mdChainSlot:hover { border-color: #8a8d93; }
+.mdChainSlot.mdEdUnread { color: #55585e; background-color: transparent; cursor: default; }
+.mdChainSlot.mdEdSelected { border-color: #f4f1ea; }
+.mdChainSlot.mdChainPlaying { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdChainSlot.mdChainPlaying.mdEdSelected { border-color: #f4f1ea; }
+
+/* focused step: locked values in orange over the bound value, the other controls dimmed */
+.mdEdLockValue { color: #ff6b1f; font-weight: bold; }
+/* over a control while a step with a trig has the focus: dragging it writes a lock (mdStepGrid.cpp) */
+.mdEdLockKnob, .mdEdLockFader { box-sizing: border-box; decorator: none; background-color: transparent; box-shadow: none;
+	border: 2dp transparent; cursor: pointer; }
+.mdEdLockKnob { width: 46dp; height: 46dp; border-radius: 23dp; }
+.mdEdLockFader { width: 12dp; height: 46dp; border-radius: 2dp; }
+/* the frame's width is always there: a hover only colours it, without laying the document out */
+.mdEdLockKnob:hover, .mdEdLockFader:hover, .mdEdLockKnob:active, .mdEdLockFader:active { border-color: #ff6b1f; }
+.mdEdHidden { visibility: hidden; }
+.mdEdDim { opacity: 0.35; }
+
+.mdEdPicto { box-sizing: border-box; width: 40dp; height: 24dp; line-height: 22dp; border: 1dp #8a8d93; border-radius: 3dp;
+	font-size: 10dp; font-weight: bold; text-align: center; color: #f4f1ea; }
+
+/* vertical fader: 12 × 46 dp, maximum at the top */
+input.range.mdEdFader { width: 12dp; height: 46dp; }
+.mdEdFader slidertrack { margin: 0dp 4dp; background-color: #3a3d42; border-radius: 2dp; }
+.mdEdFader sliderbar { width: 12dp; height: 6dp; background-color: #f4f1ea; border-radius: 1dp; }
+.mdEdFader sliderarrowdec, .mdEdFader sliderarrowinc { width: 0dp; height: 0dp; }
+
+/* horizontal fader in a list row */
+input.range.mdEdHFader { width: 62dp; height: 12dp; }
+.mdEdHFader slidertrack { height: 4dp; margin-top: 4dp; background-color: #3a3d42; border-radius: 2dp; }
+.mdEdHFader sliderbar { width: 6dp; height: 12dp; background-color: #f4f1ea; border-radius: 1dp; }
+.mdEdHFader sliderarrowdec, .mdEdHFader sliderarrowinc { width: 0dp; height: 0dp; }
+
+/* list rows (MIX) */
+.mdEdRow { border-bottom: 1dp #2e3034; }
+.mdEdRowName { height: 26dp; line-height: 26dp; font-size: 12dp; font-weight: bold; }
+.mdEdMuted { color: #5a5d62; text-decoration: line-through; }
+/* a value you drag like a knob; the knob tag is reset to plain text */
+.mdEdNum { width: 78dp; height: 24dp; line-height: 24dp; font-size: 13dp; font-weight: bold; text-align: center; color: #f4f1ea; cursor: pointer;
+	decorator: none; background-color: transparent; border-width: 0dp; box-shadow: none; }
+.mdEdNum:hover { color: #ff6b1f; }
+
+/* a value the firmware set without telling (machine assigned; mdUnreadValues.cpp): greyed, its number shown as — */
+.mdEdUnread { opacity: 0.4; }
+.mdEdValue.mdEdUnread, .mdEdNum.mdEdUnread { opacity: 1; color: transparent; decorator: text("—" #8a8d93 center center); }
+
+/* output panels (mdOutputMetersView.cpp); the meters are a canvas the view draws */
+.mdEdPanel { background-color: #1c1d1f; border: 1dp #2e3034; border-radius: 3dp; }
+.mdEdBusLevel { height: 16dp; line-height: 16dp; font-size: 12dp; font-weight: bold; color: #f4f1ea; }
+.mdEdWarning { color: #ff6b1f; }
+
+/* blocks */
+
+/* the curve row under SON (mdCurveView.cpp); its canvases fill the areas */
+.mdEdCurves { display: block; }
+.mdEdCurveArea { background-color: #151618; border: 1dp #2e3034; border-radius: 2dp; }
+
+.mdEdBlock
+{
+	background-color: #232427;
+	border: 1dp #2e3034;
+	border-radius: 4dp;
+}
+
+/* buttons */
+
+.mdEdCat, .mdEdTrackTab, .mdEdButton, .mdEdSwitch, .mdEdLed, .mdEdLfoTab
+{
+	border-width: 0dp;
+	box-shadow: none;
+	decorator: none;
+	text-align: center;
+	font-weight: bold;
+	color: #8a8d93;
+	cursor: pointer;
+}
+
+.mdEdCat { top: 4dp; width: 78dp; height: 28dp; line-height: 28dp; font-size: 12dp; border-radius: 3dp; }
+.mdEdCat:hover, .mdEdTrackTab:hover, .mdEdButton:hover, .mdEdSwitch:hover, .mdEdLfoTab:hover { color: #f4f1ea; }
+.mdEdCat:checked { color: #f4f1ea; background-color: #26282b; }
+
+.mdEdTrackTab { top: 4dp; width: 60dp; height: 28dp; line-height: 28dp; font-size: 12dp; border-radius: 3dp 3dp 0dp 0dp; }
+.mdEdTrackTab:checked { color: #f4f1ea; background-color: #1c1d1f; }
+
+.mdEdButton { height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
+.mdEdButton:checked { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+
+/* FACE AVANT / ÉDITEUR in the top bar; hidden while both are shown */
+.mdEdSwitch { top: 6dp; width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; }
+.mdEdSwitch:checked { color: #f4f1ea; background-color: #2e3034; }
+
+/* mute LED in a MIX row: lit while the track plays */
+.mdEdLed { width: 12dp; height: 12dp; border-radius: 6dp; background-color: #3a3d42; }
+.mdEdLed:checked { background-color: #ff6b1f; }
+
+/* MODULATION (Machinedrum, mdLfoView.cpp): a shape's cell, a click opens the shapes' menu; its icon is a
+   canvas the view draws, then its name */
+.mdEdLfoShape { box-sizing: border-box; width: 110dp; height: 24dp; border: 1dp #3a3d42; border-radius: 2dp; cursor: pointer; }
+.mdEdLfoShape:hover { border-color: #8a8d93; }
+.mdEdLfoIcon { width: 28dp; height: 16dp; pointer-events: none; }
+.mdEdLfoShapeName { width: 66dp; height: 22dp; line-height: 22dp; font-size: 11dp; font-weight: bold; color: #f4f1ea; pointer-events: none; }
+
+/* a track's trig LED, in the track strip and in JOUER (mdTrackActivity.cpp): lit for a moment when the
+   sequencer plays a trig on the track; the track's MIX LED brightens then */
+.mdEdTrackLed { width: 6dp; height: 6dp; border-radius: 3dp; background-color: #3a3d42; pointer-events: none; }
+.mdEdTrackLed.mdTrackHit { background-color: #ff6b1f; }
+.mdEdLed.mdTrackHit:checked { background-color: #ffd2a8; }
+
+/* LFO 1-3 tabs inside MODULATION (MM) */
+.mdEdLfoTab { width: 78dp; height: 24dp; line-height: 22dp; font-size: 11dp; border: 1dp #3a3d42; border-radius: 2dp; }
+.mdEdLfoTab:checked { color: #f4f1ea; background-color: #2e3034; }
+.mdEdLfoPage { display: block; }
+
+/* machine picker: opens under MACHINE, over the blocks below (mdMachinePicker.cpp fills it) */
+.mdEdPicker
+{
+	box-sizing: border-box;
+	padding: 12dp 12dp 8dp 12dp;
+	background-color: #1c1d1f;
+	border: 1dp #3a3d42;
+	border-radius: 4dp;
+	z-index: 10;
+}
+.mdEdPickerRow { display: flex; flex-wrap: wrap; margin-bottom: 6dp; }
+.mdEdPickerFamily, .mdEdPickerMachine
+{
+	box-sizing: border-box;
+	height: 28dp;
+	line-height: 26dp;
+	margin: 0dp 6dp 6dp 0dp;
+	font-size: 11dp;
+	font-weight: bold;
+	text-align: center;
+	color: #8a8d93;
+	border: 1dp #3a3d42;
+	border-radius: 2dp;
+	cursor: pointer;
+}
+.mdEdPickerFamily { padding: 0dp 12dp; }
+.mdEdPickerMachine { width: 167dp; background-color: #232427; }
+.mdEdPickerFamily:hover, .mdEdPickerMachine:hover { color: #f4f1ea; border-color: #8a8d93; }
+.mdEdPickerFamily.mdEdSelected { color: #f4f1ea; background-color: #2e3034; }
+.mdEdPickerMachine.mdEdSelected { color: #141516; background-color: #ff6b1f; border-color: #ff6b1f; }
+.mdEdPickerInfo { display: block; font-size: 12dp; line-height: 16dp; color: #8a8d93; }
+
+/* Editor knobs (SON, MIX, MASTER): the value as an orange arc around a dark cap, one frame per MIDI value.
+   .scratch/md-editor/tools/gen_knob_atlas.py draws the atlas and this spritesheet. */
+@spritesheet mdEdKnobSheet
+{
+	mdEdKnob_000: 0px 0px 96px 96px;
+	mdEdKnob_001: 96px 0px 96px 96px;
+	mdEdKnob_002: 192px 0px 96px 96px;
+	mdEdKnob_003: 288px 0px 96px 96px;
+	mdEdKnob_004: 384px 0px 96px 96px;
+	mdEdKnob_005: 480px 0px 96px 96px;
+	mdEdKnob_006: 576px 0px 96px 96px;
+	mdEdKnob_007: 672px 0px 96px 96px;
+	mdEdKnob_008: 768px 0px 96px 96px;
+	mdEdKnob_009: 864px 0px 96px 96px;
+	mdEdKnob_010: 960px 0px 96px 96px;
+	mdEdKnob_011: 1056px 0px 96px 96px;
+	mdEdKnob_012: 1152px 0px 96px 96px;
+	mdEdKnob_013: 1248px 0px 96px 96px;
+	mdEdKnob_014: 1344px 0px 96px 96px;
+	mdEdKnob_015: 1440px 0px 96px 96px;
+	mdEdKnob_016: 0px 96px 96px 96px;
+	mdEdKnob_017: 96px 96px 96px 96px;
+	mdEdKnob_018: 192px 96px 96px 96px;
+	mdEdKnob_019: 288px 96px 96px 96px;
+	mdEdKnob_020: 384px 96px 96px 96px;
+	mdEdKnob_021: 480px 96px 96px 96px;
+	mdEdKnob_022: 576px 96px 96px 96px;
+	mdEdKnob_023: 672px 96px 96px 96px;
+	mdEdKnob_024: 768px 96px 96px 96px;
+	mdEdKnob_025: 864px 96px 96px 96px;
+	mdEdKnob_026: 960px 96px 96px 96px;
+	mdEdKnob_027: 1056px 96px 96px 96px;
+	mdEdKnob_028: 1152px 96px 96px 96px;
+	mdEdKnob_029: 1248px 96px 96px 96px;
+	mdEdKnob_030: 1344px 96px 96px 96px;
+	mdEdKnob_031: 1440px 96px 96px 96px;
+	mdEdKnob_032: 0px 192px 96px 96px;
+	mdEdKnob_033: 96px 192px 96px 96px;
+	mdEdKnob_034: 192px 192px 96px 96px;
+	mdEdKnob_035: 288px 192px 96px 96px;
+	mdEdKnob_036: 384px 192px 96px 96px;
+	mdEdKnob_037: 480px 192px 96px 96px;
+	mdEdKnob_038: 576px 192px 96px 96px;
+	mdEdKnob_039: 672px 192px 96px 96px;
+	mdEdKnob_040: 768px 192px 96px 96px;
+	mdEdKnob_041: 864px 192px 96px 96px;
+	mdEdKnob_042: 960px 192px 96px 96px;
+	mdEdKnob_043: 1056px 192px 96px 96px;
+	mdEdKnob_044: 1152px 192px 96px 96px;
+	mdEdKnob_045: 1248px 192px 96px 96px;
+	mdEdKnob_046: 1344px 192px 96px 96px;
+	mdEdKnob_047: 1440px 192px 96px 96px;
+	mdEdKnob_048: 0px 288px 96px 96px;
+	mdEdKnob_049: 96px 288px 96px 96px;
+	mdEdKnob_050: 192px 288px 96px 96px;
+	mdEdKnob_051: 288px 288px 96px 96px;
+	mdEdKnob_052: 384px 288px 96px 96px;
+	mdEdKnob_053: 480px 288px 96px 96px;
+	mdEdKnob_054: 576px 288px 96px 96px;
+	mdEdKnob_055: 672px 288px 96px 96px;
+	mdEdKnob_056: 768px 288px 96px 96px;
+	mdEdKnob_057: 864px 288px 96px 96px;
+	mdEdKnob_058: 960px 288px 96px 96px;
+	mdEdKnob_059: 1056px 288px 96px 96px;
+	mdEdKnob_060: 1152px 288px 96px 96px;
+	mdEdKnob_061: 1248px 288px 96px 96px;
+	mdEdKnob_062: 1344px 288px 96px 96px;
+	mdEdKnob_063: 1440px 288px 96px 96px;
+	mdEdKnob_064: 0px 384px 96px 96px;
+	mdEdKnob_065: 96px 384px 96px 96px;
+	mdEdKnob_066: 192px 384px 96px 96px;
+	mdEdKnob_067: 288px 384px 96px 96px;
+	mdEdKnob_068: 384px 384px 96px 96px;
+	mdEdKnob_069: 480px 384px 96px 96px;
+	mdEdKnob_070: 576px 384px 96px 96px;
+	mdEdKnob_071: 672px 384px 96px 96px;
+	mdEdKnob_072: 768px 384px 96px 96px;
+	mdEdKnob_073: 864px 384px 96px 96px;
+	mdEdKnob_074: 960px 384px 96px 96px;
+	mdEdKnob_075: 1056px 384px 96px 96px;
+	mdEdKnob_076: 1152px 384px 96px 96px;
+	mdEdKnob_077: 1248px 384px 96px 96px;
+	mdEdKnob_078: 1344px 384px 96px 96px;
+	mdEdKnob_079: 1440px 384px 96px 96px;
+	mdEdKnob_080: 0px 480px 96px 96px;
+	mdEdKnob_081: 96px 480px 96px 96px;
+	mdEdKnob_082: 192px 480px 96px 96px;
+	mdEdKnob_083: 288px 480px 96px 96px;
+	mdEdKnob_084: 384px 480px 96px 96px;
+	mdEdKnob_085: 480px 480px 96px 96px;
+	mdEdKnob_086: 576px 480px 96px 96px;
+	mdEdKnob_087: 672px 480px 96px 96px;
+	mdEdKnob_088: 768px 480px 96px 96px;
+	mdEdKnob_089: 864px 480px 96px 96px;
+	mdEdKnob_090: 960px 480px 96px 96px;
+	mdEdKnob_091: 1056px 480px 96px 96px;
+	mdEdKnob_092: 1152px 480px 96px 96px;
+	mdEdKnob_093: 1248px 480px 96px 96px;
+	mdEdKnob_094: 1344px 480px 96px 96px;
+	mdEdKnob_095: 1440px 480px 96px 96px;
+	mdEdKnob_096: 0px 576px 96px 96px;
+	mdEdKnob_097: 96px 576px 96px 96px;
+	mdEdKnob_098: 192px 576px 96px 96px;
+	mdEdKnob_099: 288px 576px 96px 96px;
+	mdEdKnob_100: 384px 576px 96px 96px;
+	mdEdKnob_101: 480px 576px 96px 96px;
+	mdEdKnob_102: 576px 576px 96px 96px;
+	mdEdKnob_103: 672px 576px 96px 96px;
+	mdEdKnob_104: 768px 576px 96px 96px;
+	mdEdKnob_105: 864px 576px 96px 96px;
+	mdEdKnob_106: 960px 576px 96px 96px;
+	mdEdKnob_107: 1056px 576px 96px 96px;
+	mdEdKnob_108: 1152px 576px 96px 96px;
+	mdEdKnob_109: 1248px 576px 96px 96px;
+	mdEdKnob_110: 1344px 576px 96px 96px;
+	mdEdKnob_111: 1440px 576px 96px 96px;
+	mdEdKnob_112: 0px 672px 96px 96px;
+	mdEdKnob_113: 96px 672px 96px 96px;
+	mdEdKnob_114: 192px 672px 96px 96px;
+	mdEdKnob_115: 288px 672px 96px 96px;
+	mdEdKnob_116: 384px 672px 96px 96px;
+	mdEdKnob_117: 480px 672px 96px 96px;
+	mdEdKnob_118: 576px 672px 96px 96px;
+	mdEdKnob_119: 672px 672px 96px 96px;
+	mdEdKnob_120: 768px 672px 96px 96px;
+	mdEdKnob_121: 864px 672px 96px 96px;
+	mdEdKnob_122: 960px 672px 96px 96px;
+	mdEdKnob_123: 1056px 672px 96px 96px;
+	mdEdKnob_124: 1152px 672px 96px 96px;
+	mdEdKnob_125: 1248px 672px 96px 96px;
+	mdEdKnob_126: 1344px 672px 96px 96px;
+	mdEdKnob_127: 1440px 672px 96px 96px;
+	src: elektronEditorKnobAtlas.png;
+}
+.elektronMasterKnob.mdEdKnob
+{
+	decorator: image(mdEdKnob_000 contain center);
+	frames: 128;
+	spriteprefix: "mdEdKnob_";
+}

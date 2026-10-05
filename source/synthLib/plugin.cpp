@@ -142,6 +142,7 @@ namespace synthLib
 			outputs[i] = _outputs[i] ? _outputs[i]
 				: getDiscardOutputBuffer(i, _count);
 
+		m_device->setHostRealtime(m_hostRealtime);
 		processMidiInEvents();
 		processMidiClock(_bpm, _ppqPos, _isPlaying, _count, _ppqKnown);
 
@@ -180,6 +181,8 @@ namespace synthLib
 	{
 		if(m_device && m_plugin.m_device == m_device)
 			m_device->resumeRendering();
+		if(m_heldSince)
+			m_plugin.m_realtimeInstrumentation.recordDeviceAccess(m_waitNanoseconds, nowNanoseconds() - m_heldSince);
 	}
 
 	Plugin::DevicePause Plugin::pauseDevice(std::unique_lock<std::recursive_mutex>& _lock) const
@@ -187,6 +190,8 @@ namespace synthLib
 		auto* const device = m_device;
 		if(!device)
 			return {*this, nullptr};
+		const auto instrument = m_realtimeInstrumentation.isEnabled();
+		const auto waitStart = instrument ? nowNanoseconds() : 0;
 		// Waiting for an idle device instead could last forever: the audio
 		// thread hands over a block every period, so a device slower than real
 		// time is never idle.
@@ -194,7 +199,10 @@ namespace synthLib
 		device->finishRendering();
 		device->pauseRendering();
 		_lock.lock();
-		return {*this, device};
+		if(!instrument)
+			return {*this, device};
+		const auto heldSince = nowNanoseconds();
+		return {*this, device, heldSince - waitStart, heldSince};
 	}
 
 	void Plugin::getMidiOut(std::vector<SMidiEvent>& _midiOut)
@@ -222,6 +230,7 @@ namespace synthLib
 		delete m_device;
 
 		m_device = _device;
+		m_deviceGeneration.fetch_add(1, std::memory_order_acq_rel);
 
 		configureDeviceAudio();
 		if(!deviceState.empty())

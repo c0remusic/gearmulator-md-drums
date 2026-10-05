@@ -20,6 +20,14 @@ namespace md
 		uint32_t waitFrames = 0;
 	};
 
+	// How long a macro holds a key, then lets the screen redraw, in emulated frames:
+	// by default a quick tap and the time a menu takes to redraw.
+	struct PanelMacroTiming
+	{
+		uint32_t holdFrames = 1024;
+		uint32_t settleFrames = 2048;
+	};
+
 	// Front-panel input that sets the Monomachine's GLOBAL > CONTROL > CONTROL IN
 	// page (TEMPO SYNC, TRANSPORT) to _sync. The Monomachine takes Global dumps only
 	// in its SysEx receive mode, and a received Global does not replace the active
@@ -27,6 +35,13 @@ namespace md
 	// known end, and values stop at the ends of their lists, so the result does not
 	// depend on where the menus were left.
 	std::vector<PanelMacroStep> monomachineSyncMacro(automation::sysex::GlobalSync _sync);
+
+	// Front-panel input from any screen to the Monomachine's GLOBAL > FILE > SYSEX RECV page, its MODE
+	// on ORIG (a dump goes to the slot it names), waiting for dumps: the only way it takes a pattern dump.
+	// The page shows RECV n MSG. n ERR. as they come; the sequencer plays on (mmPatternWriteFirmwareTest).
+	std::vector<PanelMacroStep> monomachineReceiveMacro(PanelMacroTiming _timing = {});
+	// Out of the menus, back to the screen the machine plays on
+	std::vector<PanelMacroStep> monomachineLeaveMenusMacro(PanelMacroTiming _timing = {});
 
 	// Keeps a machine's MIDI sync receive settings on what the plug-in's "Follow
 	// host tempo" option asks for. The owner feeds it every Global dump of the
@@ -70,6 +85,8 @@ namespace md
 		void setTarget(Target _target);
 		Target getTarget() const { return m_target; }
 		State getState() const { return m_state; }
+		// Its macro plays into the front panel: nothing else may drive the panel meanwhile
+		bool isDrivingPanel() const { return m_phase == Phase::RunningMacro; }
 
 		// A Global dump of the active slot, as the firmware sent it. Copied into
 		// storage reserved up front: no allocation on a rendering thread.

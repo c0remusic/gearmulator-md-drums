@@ -162,6 +162,9 @@ namespace jucePluginEditorLib
 		virtual std::unique_ptr<SettingsDeviceSpecific> createDeviceSpecificSettings(const std::string& _templateName, Rml::Element* _root) { return nullptr; }
 		// Resource identity can remain stable when a product's display name changes.
 		virtual std::string getSettingsTemplateSuffix() const;
+		// Frame rate of the RmlUi component with an accelerated renderer (OpenGL, Metal)
+		// when the config sets no "refreshRateLimitHz"; -1 keeps RmlComponent's default.
+		virtual int getAcceleratedRefreshRateHz() const { return -1; }
 
 		juce::Component* createRmlUiComponent(const std::string& _rmlFile);
 

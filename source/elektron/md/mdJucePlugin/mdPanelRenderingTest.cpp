@@ -301,6 +301,30 @@ namespace
 			require(juceRmlUi::RenderingTestAccess::targetFPS(component) == expected,
 				"software fallback did not restore/preserve the configured rate");
 		}
+
+		// A product's rate for accelerated renderers (the MD/MM editor asks 60): the software
+		// renderer keeps its default, and a configured rate still wins over both.
+		for (const auto [configured, accelerated, software, gpu] : {
+			std::tuple{-1, 60, 30.0f, 60.0f}, std::tuple{-1, 301, 30.0f, defaultAcceleratedFPS},
+			std::tuple{47, 60, 47.0f, 47.0f}})
+		{
+			juceRmlUi::RmlComponentConfig config;
+			config.forceSoftwareRenderer = juceRmlUi::SoftwareRendererMode::ForceOn;
+			config.refreshRateLimitHz = configured;
+			config.acceleratedRefreshRateHz = accelerated;
+			juceRmlUi::RmlComponent component(interfaces, resources, "test.rml",
+				1.f, {}, {}, config);
+			require(juceRmlUi::RenderingTestAccess::targetFPS(component) == software,
+				"an accelerated rate changed the software renderer's");
+			juceRmlUi::RenderingTestAccess::useDefaultFrameRateFor(component,
+				juceRmlUi::RmlComponent::Renderer::Gl3);
+			require(juceRmlUi::RenderingTestAccess::targetFPS(component) == gpu,
+				"accelerated renderer did not take the product's rate");
+			juceRmlUi::RenderingTestAccess::useDefaultFrameRateFor(component,
+				juceRmlUi::RmlComponent::Renderer::Software);
+			require(juceRmlUi::RenderingTestAccess::targetFPS(component) == software,
+				"software fallback did not go back to its own rate");
+		}
 	}
 
 #ifdef RMLUI_METAL_RENDERER

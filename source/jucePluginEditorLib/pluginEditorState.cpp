@@ -57,6 +57,12 @@ int PluginEditorState::getHeight() const
 	return m_editor ? m_editor->getDefaultHeight() : 0;
 }
 
+bool PluginEditorState::isHeightResizable() const
+{
+	const auto* component = m_editor ? m_editor->getRmlComponent() : nullptr;
+	return component && component->isHeightResizable();
+}
+
 bool PluginEditorState::resizeEditor(const int _width, const int _height) const
 {
 	if (!m_editor)

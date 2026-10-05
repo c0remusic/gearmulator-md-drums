@@ -1,6 +1,22 @@
 #include "mdEditor.h"
 
 #include "mdController.h"
+#include "mdMachinePicker.h"
+#include "mdStepGrid.h"
+#include "mdViewLayout.h"
+#include "mdCurveView.h"
+#include "mdKitPatternScreen.h"
+#include "mdUnreadValues.h"
+#include "mdMasterEffectsView.h"
+#include "mdTrackRoutingView.h"
+#include "mdOutputMetersView.h"
+#include "mdSystemPage.h"
+#include "mdPatternView.h"
+#include "mdMmPatternView.h"
+#include "mdChainView.h"
+#include "mdLibraryView.h"
+#include "mdTrackActivity.h"
+#include "mdLfoView.h"
 #include "mdPanelAffordances.h"
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
@@ -31,6 +47,7 @@
 #include "juceRmlUi/rmlElemKnob.h"
 #include "juceRmlUi/rmlEventListener.h"
 #include "juceRmlUi/rmlHelper.h"
+#include "juceRmlUi/rmlInterfaces.h"
 #include "juceRmlUi/juceRmlComponent.h"
 
 #include "RmlUi/Core/Element.h"
@@ -39,6 +56,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -140,6 +158,7 @@ namespace mdJucePlugin
 	Editor::Editor(jucePluginEditorLib::Processor& _processor, const jucePluginEditorLib::Skin& _skin)
 		: jucePluginEditorLib::Editor(_processor, _skin)
 		, m_controller(dynamic_cast<Controller&>(_processor.getController()))
+		, m_liveDevice(dynamic_cast<AudioPluginAudioProcessor&>(_processor).getLiveDevice())
 		, m_model(dynamic_cast<const AudioPluginAudioProcessor&>(_processor).getModel())
 	{
 		juce::Desktop::getInstance().addFocusChangeListener(this);
@@ -156,29 +175,16 @@ namespace mdJucePlugin
 
 	std::shared_ptr<md::FrontPanelPublisher> Editor::getFrontPanelPublisher() const
 	{
-		return getProcessor().getPlugin().withDeviceLocked(
-			[](synthLib::Device* const _device)
-			{
-				auto* const device = dynamic_cast<md::Device*>(_device);
-				return device ? device->getFrontPanelPublisher()
-					: std::shared_ptr<md::FrontPanelPublisher>{};
-			});
+		// Every frame: never through the device lock, which pauses the rendering
+		return m_liveDevice.frontPanel();
 	}
 
 	bool Editor::sendPanelEvent(const uint8_t _command, const uint8_t _argument) const
 	{
-		auto& plugin = getProcessor().getPlugin();
-		auto& diagnostics = plugin.getRealtimeInstrumentation();
+		auto& diagnostics = getProcessor().getPlugin().getRealtimeInstrumentation();
 		const auto model = static_cast<uint32_t>(getModel());
 		const auto token = diagnostics.beginPanelInput(model, _command, _argument);
-		const auto accepted = plugin.withDeviceLocked(
-			[&](synthLib::Device* const _device)
-			{
-				auto* const device = dynamic_cast<md::Device*>(_device);
-				if(!device)
-					return false;
-				return device->sendPanelEvent(_command, _argument);
-			});
+		const auto accepted = m_liveDevice.sendPanelEvent(_command, _argument);
 		diagnostics.endPanelInput(token, model, _command, _argument, accepted);
 		return accepted;
 	}
@@ -698,6 +704,144 @@ namespace mdJucePlugin
 				_select();
 			});
 		};
+
+		// Editor track tabs (editTrack0..N) choose the part that the editor's
+		// partCurrent controls edit. They do not change the machine's own track.
+		const int trackCount = getModel() == md::MachineModel::Machinedrum ? 16 : 6;
+		for(int track = 0; track < trackCount; ++track)
+		{
+			auto* element = findChild("editTrack" + std::to_string(track), false);
+			if(!element)
+				continue;
+			juceRmlUi::EventListener::Add(element, Rml::EventId::Click, [this, track](Rml::Event&)
+			{
+				setCurrentPart(static_cast<uint8_t>(track));
+				if(m_machinePicker)
+					m_machinePicker->update();
+				if(m_stepGrid)
+					m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
+				if(m_unreadValues)
+					m_unreadValues->update();
+			});
+		}
+
+		// The top bar shows the front panel or the editor, or both in a tall window.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
+			m_viewLayout = std::make_unique<ViewLayout>(*document);
+
+		// Its screen shows the selected Kit and pattern.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdScreenMain"))
+		{
+			m_kitPatternScreen = std::make_unique<KitPatternScreen>(m_controller, *document);
+			m_kitPatternScreen->update();
+		}
+
+		// Values the firmware set without telling, after a machine assignment, are greyed.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEditor"))
+		{
+			m_unreadValues = std::make_unique<UnreadValues>(m_controller, *document);
+			m_unreadValues->update();
+		}
+
+		// MASTER (Machinedrum): the Kit's master effects.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdFx0_0"))
+		{
+			m_masterEffectsView = std::make_unique<MasterEffectsView>(m_controller, *document);
+			m_masterEffectsView->update();
+		}
+
+		// MIX (Machinedrum): the output of each track.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdOut0_0"))
+		{
+			m_trackRoutingView = std::make_unique<TrackRoutingView>(m_controller, *document);
+			m_trackRoutingView->update();
+		}
+
+		// MIX: the meters of the plug-in's three output buses.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMeters0"))
+			m_outputMetersView = std::make_unique<OutputMetersView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()),
+				m_controller, *document);
+
+		// SYSTÈME, and OPTIONS in the top bar: the plug-in's menu, as a right click opens it.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdSysGlobalState"))
+			m_systemPage = std::make_unique<SystemPage>(*this, static_cast<AudioPluginAudioProcessor&>(getProcessor()),
+				m_controller, *document);
+		if(auto* const document = getDocument())
+		{
+			if(auto* options = document->GetElementById("mdEdOptions"))
+				juceRmlUi::EventListener::Add(options, Rml::EventId::Click, [this](Rml::Event& _event) { openMenu(_event); });
+		}
+
+		// JOUER (Machinedrum): the current pattern and a lane. A track name selects the
+		// track as its tab in SON does.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdPlayStep0_0"))
+		{
+			m_patternView = std::make_unique<PatternView>(m_controller, *document, [document](const uint8_t _track)
+			{
+				if(auto* tab = document->GetElementById("editTrack" + std::to_string(_track)))
+					tab->Click();
+			});
+		}
+
+		// JOUER (Monomachine): the current pattern, a piano roll and a lane.
+		if(auto* const document = getDocument(); document && document->GetElementById("mmPlayStep0_0"))
+		{
+			m_mmPatternView = std::make_unique<MmPatternView>(m_controller, *document, [document](const uint8_t _track)
+			{
+				if(auto* tab = document->GetElementById("editTrack" + std::to_string(_track)))
+					tab->Click();
+			});
+		}
+
+		// JOUER, CHAÎNE: the project's pattern chain.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdChainSlot0"))
+		{
+			m_chainView = std::make_unique<ChainView>(static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl(),
+				m_controller, *document);
+			m_chainView->update();
+		}
+
+		// BIBLIO: the stored Kits.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdLibKit0"))
+		{
+			m_libraryView = std::make_unique<LibraryView>(m_controller, getModel(), *document);
+			m_libraryView->update(juce::Time::getMillisecondCounterHiRes());
+		}
+
+		// The tracks' trig LEDs, lit as the sequencer plays their trigs.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdTrackLed0"))
+			m_trackActivity = std::make_unique<TrackActivity>(m_controller, getModel(), *document);
+
+		// MODULATION (Machinedrum): the edited track's LFO.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdLfoDest"))
+			m_lfoView = std::make_unique<LfoView>(m_controller, *document);
+
+		// The COURBES row under SON, when the window leaves room for it.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdCurves"))
+			m_curveView = std::make_unique<CurveView>(m_controller, getModel(), *document);
+
+		// The MACHINE block shows and assigns the edited track's machine.
+		if(auto* const document = getDocument(); document && document->GetElementById("mdEdMachineName"))
+		{
+			m_machinePicker = std::make_unique<MachinePicker>(m_controller, getModel(), *document);
+			m_machinePicker->update();
+		}
+
+		// The PAS block (Machinedrum) shows the edited track in the current pattern; OUVRIR DANS SON
+		// (JOUER) shows it on the steps JOUER shows.
+		if(auto* const document = getDocument(); document && getModel() == md::MachineModel::Machinedrum
+			&& document->GetElementById("mdEdStep0"))
+		{
+			m_stepGrid = std::make_unique<StepGrid>(m_controller, *document);
+			m_stepGrid->update(juce::Time::getMillisecondCounterHiRes());
+			if(auto* open = document->GetElementById("mdPlayOpen"); open && m_patternView)
+			{
+				juceRmlUi::EventListener::Add(open, Rml::EventId::Click, [this](Rml::Event&)
+				{
+					m_stepGrid->setStepPage(m_patternView->getStepPage());
+				});
+			}
+		}
 
 		if(getModel() == md::MachineModel::Machinedrum)
 		{
@@ -1370,31 +1514,40 @@ namespace mdJucePlugin
 			});
 	}
 
+	std::optional<md::MidiSysexTransferState> Editor::getUserSysexState() const
+	{
+		// The SYSTÈME page asks twice a second: from the published status, not through the device lock
+		const auto status = m_liveDevice.status();
+		if(!status)
+			return std::nullopt;
+		return status->userSysexState;
+	}
+
 	bool Editor::isUserSysexTransferActive() const
 	{
-		const auto progress = getUserSysexProgress();
-		if(!progress)
+		const auto state = getUserSysexState();
+		if(!state)
 			return false;
-		return progress->state == md::MidiSysexTransferState::Queued
-			|| progress->state == md::MidiSysexTransferState::NegotiatingTurbo
-			|| progress->state == md::MidiSysexTransferState::WaitingForDevice
-			|| progress->state == md::MidiSysexTransferState::Retrying
-			|| progress->state == md::MidiSysexTransferState::WaitingForReceiveMode
-			|| progress->state == md::MidiSysexTransferState::Sending
-			|| progress->state == md::MidiSysexTransferState::Cancelling;
+		return *state == md::MidiSysexTransferState::Queued
+			|| *state == md::MidiSysexTransferState::NegotiatingTurbo
+			|| *state == md::MidiSysexTransferState::WaitingForDevice
+			|| *state == md::MidiSysexTransferState::Retrying
+			|| *state == md::MidiSysexTransferState::WaitingForReceiveMode
+			|| *state == md::MidiSysexTransferState::Sending
+			|| *state == md::MidiSysexTransferState::Cancelling;
 	}
 
 	bool Editor::canCancelUserSysexTransfer() const
 	{
-		const auto progress = getUserSysexProgress();
-		if(!progress)
+		const auto state = getUserSysexState();
+		if(!state)
 			return false;
-		return progress->state == md::MidiSysexTransferState::Queued
-			|| progress->state == md::MidiSysexTransferState::NegotiatingTurbo
-			|| progress->state == md::MidiSysexTransferState::WaitingForDevice
-			|| progress->state == md::MidiSysexTransferState::Retrying
-			|| progress->state == md::MidiSysexTransferState::WaitingForReceiveMode
-			|| progress->state == md::MidiSysexTransferState::Sending;
+		return *state == md::MidiSysexTransferState::Queued
+			|| *state == md::MidiSysexTransferState::NegotiatingTurbo
+			|| *state == md::MidiSysexTransferState::WaitingForDevice
+			|| *state == md::MidiSysexTransferState::Retrying
+			|| *state == md::MidiSysexTransferState::WaitingForReceiveMode
+			|| *state == md::MidiSysexTransferState::Sending;
 	}
 
 	std::string Editor::getUserSysexMenuText() const
@@ -1441,8 +1594,8 @@ namespace mdJucePlugin
 
 	bool Editor::canResumeUserSysexTransfer() const
 	{
-		const auto progress = getUserSysexProgress();
-		return progress && progress->state == md::MidiSysexTransferState::WaitingForReceiveMode;
+		const auto state = getUserSysexState();
+		return state && *state == md::MidiSysexTransferState::WaitingForReceiveMode;
 	}
 
 	void Editor::resumeUserSysexTransfer()
@@ -2055,6 +2208,12 @@ namespace mdJucePlugin
 		if(_timerId != g_presentationTimerId)
 			return;
 
+		// The views write the element tree under the access lock, the one the OpenGL thread reads it
+		// under (RmlComponent::renderOpenGL)
+		std::optional<juceRmlUi::RmlInterfaces::ScopedAccess> access;
+		if(auto* rml = getRmlComponent())
+			access.emplace(*rml);
+
 		const auto nowMilliseconds = juce::Time::getMillisecondCounterHiRes();
 		const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
 		if(m_encoderPress.active() && (!modifiers.isAltDown() || !modifiers.isLeftButtonDown()))
@@ -2075,6 +2234,27 @@ namespace mdJucePlugin
 
 		if(m_lcdCanvas && m_lcdChanged)
 			m_lcdCanvas->repaint();
+
+		const bool machineChanged = m_machinePicker && m_machinePicker->update();
+		const bool stepsChanged = m_stepGrid && m_stepGrid->update(nowMilliseconds);
+		const bool curvesChanged = m_curveView && m_curveView->update();
+		const bool screenChanged = m_kitPatternScreen && m_kitPatternScreen->update();
+		const bool unreadChanged = m_unreadValues && m_unreadValues->update();
+		const bool effectsChanged = m_masterEffectsView && m_masterEffectsView->update();
+		const bool routingChanged = m_trackRoutingView && m_trackRoutingView->update();
+		const bool metersChanged = m_outputMetersView && m_outputMetersView->update(nowMilliseconds);
+		const bool systemChanged = m_systemPage && m_systemPage->update(nowMilliseconds);
+		// One of the two, by model
+		const bool patternChanged = (m_patternView && m_patternView->update())
+			|| (m_mmPatternView && m_mmPatternView->update(nowMilliseconds));
+		const bool chainChanged = m_chainView && m_chainView->update();
+		const bool libraryChanged = m_libraryView && m_libraryView->update(nowMilliseconds);
+		const bool activityChanged = m_trackActivity && m_trackActivity->update(nowMilliseconds);
+		const bool lfoChanged = m_lfoView && m_lfoView->update();
+		if(machineChanged || stepsChanged || curvesChanged || screenChanged || unreadChanged || effectsChanged || routingChanged
+			|| metersChanged || systemChanged || patternChanged || chainChanged || libraryChanged || activityChanged || lfoChanged)
+			if(auto* rml = getRmlComponent())
+				rml->enqueueUpdateOnce();
 
 		// SetClass mutates the Rml DOM but does not wake its renderer. Without this,
 		// LED state is correct in the DOM while the pixels on screen can remain stale

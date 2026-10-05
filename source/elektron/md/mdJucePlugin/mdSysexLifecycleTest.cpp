@@ -258,7 +258,9 @@ namespace
 
 int main(int argc, char** argv)
 {
-	std::setvbuf(stdout, nullptr, _IOLBF, 0);
+	// Unbuffered: the Microsoft runtime rejects line buffering of size 0 (it takes _IOLBF as _IOFBF, which needs
+	// at least 2 bytes) and fast-fails before any output
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	if(argc != 5)
 	{
 		std::cout << "usage: mdSysexLifecycleTest <MD-ROM> <MD-factory.cache> <MM-ROM> <MM-patch.bin>\n";

@@ -62,7 +62,9 @@ int main()
 
 		// A blank UW flash exercises the long first-run initialization whose LCD
 		// animation is paced by the firmware's own DSP-HREQ-driven software timer.
-		md::Hardware fresh(rom, path, md::MachineModel::Machinedrum);
+		// On the heap: a Hardware outgrows the default 1 MB stack of Windows' main thread
+		auto freshStorage = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Machinedrum);
+		auto& fresh = *freshStorage;
 		require(fresh.isValid(), "fresh machine was invalid");
 		require(fresh.isFactoryFlashInitializationExpected(),
 			"fresh machine did not enter factory initialization");
@@ -83,8 +85,9 @@ int main()
 
 		// Repeat launch from that exact initialized image. This covers the ordinary
 		// startup path as well as the blank-flash path above.
-		md::Hardware repeat(rom, path, md::MachineModel::Machinedrum,
-			{}, {}, initializedFlash, factoryCache);
+		auto repeatStorage = std::make_unique<md::Hardware>(rom, path, md::MachineModel::Machinedrum,
+			std::vector<uint8_t>{}, std::shared_ptr<md::FrontPanelPublisher>{}, initializedFlash, factoryCache);
+		auto& repeat = *repeatStorage;
 		require(repeat.isValid(), "repeat-launch machine was invalid");
 		require(!repeat.isFactoryFlashInitializationExpected(),
 			"repeat launch unexpectedly entered factory initialization");

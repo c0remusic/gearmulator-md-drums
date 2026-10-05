@@ -7,6 +7,8 @@
 
 #include "dsp56kBase/threadtools.h"
 
+#include "synthLib/realtimeInstrumentation.h"
+
 namespace md
 {
 	namespace
@@ -38,9 +40,10 @@ namespace md
 		stop();
 	}
 
-	void AsyncRender::start(const uint32_t _latency)
+	void AsyncRender::start(const uint32_t _latency, const double _sampleRate)
 	{
 		stop();
+		m_sampleRate = _sampleRate > 0.0 ? _sampleRate : 44100.0;
 		m_submitted.store(0, std::memory_order_relaxed);
 		m_done.store(0, std::memory_order_relaxed);
 		m_harvested = 0;
@@ -133,7 +136,7 @@ namespace md
 
 	void AsyncRender::process(const synthLib::TAudioInputs& _inputs, const synthLib::TAudioOutputs& _outputs,
 		const size_t _frames, const std::vector<synthLib::SMidiEvent>& _midiIn,
-		std::vector<synthLib::SMidiEvent>& _midiOut)
+		std::vector<synthLib::SMidiEvent>& _midiOut, const bool _realtime)
 	{
 		const auto nowNs = []
 		{
@@ -154,14 +157,15 @@ namespace md
 		// Hand this block over. A slot is reused only once its MIDI output was
 		// harvested; all slots busy means the renderer is JobCount blocks late.
 		// If it is paused besides, no slot frees up before the pausing thread
-		// gets the lock this call runs under: the block is dropped then. Its
+		// gets the lock this call runs under; in real time, waiting for one would
+		// hold the host for a block's render: the block is dropped then. Its
 		// MIDI goes with the next block, and the next block's output starts
 		// after as many silent frames, so the audio stays aligned.
 		const uint64_t submitted = m_submitted.load(std::memory_order_relaxed);
 		bool drop = false;
 		while(submitted - m_harvested >= JobCount)
 		{
-			if(m_parked.load(std::memory_order_acquire))
+			if(_realtime || m_parked.load(std::memory_order_acquire))
 			{
 				drop = true;
 				break;
@@ -176,6 +180,7 @@ namespace md
 		if(drop)
 		{
 			m_droppedBlocks.fetch_add(1, std::memory_order_relaxed);
+			synthLib::RealtimeInstrumentation::recordCurrentDroppedBlock();
 			m_gapFrames = std::min(m_gapFrames + _frames, FifoFrames / 2);
 			for(const auto& ev : _midiIn)
 			{
@@ -202,6 +207,7 @@ namespace md
 			m_gapFrames = 0;
 			job.submittedAt = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::steady_clock::now().time_since_epoch()).count();
+			job.instrumentation = synthLib::RealtimeInstrumentation::current();
 			m_submitted.store(submitted + 1, std::memory_order_release);
 			m_jobSignal.notify();
 		}
@@ -217,10 +223,38 @@ namespace md
 			{
 				return fifoAvailable() >= _frames || m_parked.load(std::memory_order_acquire);
 			};
-			while(!ready())
-				m_doneSignal.waitFor(std::chrono::milliseconds(10), ready);
-			m_statWaitNs.fetch_add(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
-				std::chrono::steady_clock::now() - waitStart).count()), std::memory_order_relaxed);
+			if(!_realtime)
+			{
+				while(!ready())
+					m_doneSignal.waitFor(std::chrono::milliseconds(10), ready);
+			}
+			else
+			{
+				// In real time, only for the block the render thread is on (the frames missing fit in one
+				// block), and half a block's time at most (see the declaration)
+				const uint64_t needed = m_fifoRead.load(std::memory_order_relaxed) + _frames;
+				const uint64_t written = m_fifoWrite.load(std::memory_order_acquire);
+				if(needed <= written + _frames)
+				{
+					const auto deadline = waitStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+						std::chrono::duration<double>(0.5 * static_cast<double>(_frames) / m_sampleRate));
+					// Spinning: a kernel wait this short can sleep a whole timer tick (15.6 ms on Windows)
+					while(!ready() && std::chrono::steady_clock::now() < deadline)
+					{
+						for(int i = 0; i < 64 && !ready(); ++i)
+							TransportSignal::cpuPause();
+					}
+				}
+				if(!ready())
+				{
+					m_missedBlocks.fetch_add(1, std::memory_order_relaxed);
+					synthLib::RealtimeInstrumentation::recordCurrentMissedBlock();
+				}
+			}
+			const auto waitNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::steady_clock::now() - waitStart).count());
+			m_statWaitNs.fetch_add(waitNs, std::memory_order_relaxed);
+			synthLib::RealtimeInstrumentation::recordCurrentRenderWait(waitNs);
 		}
 		timeline.hostResume = nowNs();
 		const uint64_t read = m_fifoRead.load(std::memory_order_relaxed);
@@ -300,7 +334,11 @@ namespace md
 			m_statQueueNs.fetch_add(static_cast<uint64_t>(std::max<int64_t>(0,
 				std::chrono::duration_cast<std::chrono::nanoseconds>(renderStart.time_since_epoch()).count()
 				- job.submittedAt)), std::memory_order_relaxed);
-			m_render(ins, outs, job.frames, job.midiIn, job.midiOut);
+			{
+				synthLib::RealtimeInstrumentation::RenderScope instrumentation(job.instrumentation,
+					static_cast<uint32_t>(job.frames));
+				m_render(ins, outs, job.frames, job.midiIn, job.midiOut);
+			}
 			const auto renderEnd = std::chrono::steady_clock::now();
 			const auto renderNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
 				renderEnd - renderStart).count());

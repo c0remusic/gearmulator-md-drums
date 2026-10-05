@@ -8,9 +8,25 @@
 		<link type="text/rcss" href="mmKnobs.rcss"/>
 		<link type="text/rcss" href="mmSfx60.rcss"/>
 		<link type="text/rcss" href="elektron_materials.rcss"/>
+		<link type="text/rcss" href="elektron_editor.rcss"/>
 	</head>
-	<body id="Root" class="elektronPanel elektronPanel--mm" style="left: 0dp; top: 0dp; width: 1100dp; height: 570dp;">
+	<body id="Root" class="elektronPanel elektronPanel--mm" resizableheight="1" style="left: 0dp; top: 0dp; width: 1100dp; height: 606dp; display: flex; flex-direction: column;">
 
+		<!-- ===== Top bar: name, the FACE AVANT / ÉDITEUR switch, kit/pattern screen, categories, options. ===== -->
+		<div id="mdTopBar" class="mdEdTopBar">
+			<div class="jucePos juceLabel mdEdLogo" style="left: 16dp; top: 6dp; width: 168dp;">GEARMULATOR MM</div>
+			<button id="mdViewPanel" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 196dp;">FACE AVANT</button>
+			<button id="mdViewEditor" class="jucePos juceButton mdEdSwitch" isToggle="1" style="left: 286dp;">ÉDITEUR</button>
+			<div id="mdEdScreen" class="jucePos mdEdScreen" style="left: 376dp; top: 4dp; width: 168dp;"><div id="mdEdScreenMain" class="mdEdScreenMain">KIT — · PATTERN —</div><div id="mdEdScreenName" class="mdEdScreenName"></div></div>
+			<button id="mdEdCat2" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="2" style="left: 556dp;">JOUER</button>
+			<button id="mdEdCat0" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="0" style="left: 646dp;">SON</button>
+			<button id="mdEdCat1" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="1" style="left: 736dp;">MIX</button>
+			<button id="mdEdCat3" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="3" style="left: 826dp;">BIBLIO</button>
+			<button id="mdEdCat4" class="jucePos juceButton mdEdCat" tabgroup="mdEdit" tabbutton="4" style="left: 916dp;">SYSTÈME</button>
+			<button id="mdEdOptions" class="jucePos juceButton mdEdSwitch" isToggle="0" style="left: 1006dp;">OPTIONS</button>
+		</div>
+		<!-- The front panel, unchanged, 1100 × 570 dp. ViewLayout (mdViewLayout.cpp) shows it or the editor, or both when the window is tall enough. -->
+		<div id="mdFrontPanel" class="mdFrontPanel">
 		<!-- Existing panel geometry, with branding positions intentionally left blank. -->
 
 		<div class="jucePos elektronAluminumPanel mmChassis" style="left: 0dp; top: 0dp; width: 1100dp; height: 570dp;"/>
@@ -427,6 +443,1141 @@
 			</div>
 			<button id="btScale" class="juceButton elektronButton elektronKey elektronScaleButton mmScaleButton" isToggle="0"/>
 			<div id="altScaleSetup" class="juceLabel elektronButtonCaption elektronScaleSetup elektronSecondary compact mmAffordance" title="FUNCTION + SCALE: Scale setup">SCALE SETUP</div>
+		</div>
+		</div>
+
+		<!-- ===== Editor: shown instead of the front panel, or below it when the window is tall enough. ===== -->
+		<div id="mdEditor" class="mdEdRoot">
+			<!-- SON: the selected track. Its controls are bound to partCurrent, which the track tabs set. -->
+			<div id="mdEdPageSound" class="mdEdPage" tabgroup="mdEdit" tabpage="0">
+				<div class="mdEdStrip">
+					<button id="editTrack0" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="0" style="left: 16dp; width: 168dp;">PISTE 01</button>
+					<div id="mdEdTrackLed0" class="jucePos mdEdTrackLed" style="left: 166dp; top: 15dp;"/>
+					<button id="editTrack1" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="1" style="left: 196dp; width: 168dp;">PISTE 02</button>
+					<div id="mdEdTrackLed1" class="jucePos mdEdTrackLed" style="left: 346dp; top: 15dp;"/>
+					<button id="editTrack2" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="2" style="left: 376dp; width: 168dp;">PISTE 03</button>
+					<div id="mdEdTrackLed2" class="jucePos mdEdTrackLed" style="left: 526dp; top: 15dp;"/>
+					<button id="editTrack3" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="3" style="left: 556dp; width: 168dp;">PISTE 04</button>
+					<div id="mdEdTrackLed3" class="jucePos mdEdTrackLed" style="left: 706dp; top: 15dp;"/>
+					<button id="editTrack4" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="4" style="left: 736dp; width: 168dp;">PISTE 05</button>
+					<div id="mdEdTrackLed4" class="jucePos mdEdTrackLed" style="left: 886dp; top: 15dp;"/>
+					<button id="editTrack5" class="jucePos juceButton mdEdTrackTab" isToggle="1" tabgroup="mdTrack" tabbutton="5" style="left: 916dp; width: 168dp;">PISTE 06</button>
+					<div id="mdEdTrackLed5" class="jucePos mdEdTrackLed" style="left: 1066dp; top: 15dp;"/>
+				</div>
+				<div class="mdEdScroll">
+					<div class="mdEdContent" data-model="tabgroup_mdTrack">
+						<div id="mdEdTrackView" class="mdEdView" roomyheight="668" style="height: 528dp;">
+							<div id="mdEdMachine" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 64dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">MACHINE</div>
+								<button id="mdEdMachineChange" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 902dp; top: 4dp; width: 150dp;">CHANGER DE MACHINE</button>
+								<div id="mdEdMachineFamily" class="jucePos mdEdPicto" style="left: 16dp; top: 32dp;">—</div>
+								<div id="mdEdMachineName" class="jucePos juceLabel mdEdMachineName" style="left: 64dp; top: 32dp; width: 100dp;">—</div>
+								<div id="mdEdMachineInfo" class="jucePos juceLabel mdEdSub" style="left: 166dp; top: 38dp; width: 886dp;">machine inconnue : en attente du kit</div>
+							</div>
+							<div id="mdEdOsc" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 88dp; width: 348dp; height: 208dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">OSCILLATEUR</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">synthèse de la machine</div>
+								<knob id="mdEdCtl_SynthesisA" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisA" style="left: 16dp; top: 32dp;"/>
+								<div id="mdEdVal_SynthesisA" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{SynthesisA_text}}</div>
+								<div id="mdEdName_SynthesisA" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">SYN A</div>
+								<knob id="mdEdCtl_SynthesisB" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisB" style="left: 106dp; top: 32dp;"/>
+								<div id="mdEdVal_SynthesisB" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{SynthesisB_text}}</div>
+								<div id="mdEdName_SynthesisB" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">SYN B</div>
+								<knob id="mdEdCtl_SynthesisC" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisC" style="left: 196dp; top: 32dp;"/>
+								<div id="mdEdVal_SynthesisC" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{SynthesisC_text}}</div>
+								<div id="mdEdName_SynthesisC" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">SYN C</div>
+								<knob id="mdEdCtl_SynthesisD" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisD" style="left: 286dp; top: 32dp;"/>
+								<div id="mdEdVal_SynthesisD" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 78dp; width: 78dp;">{{SynthesisD_text}}</div>
+								<div id="mdEdName_SynthesisD" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 92dp; width: 78dp;">SYN D</div>
+								<knob id="mdEdCtl_SynthesisE" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisE" style="left: 16dp; top: 116dp;"/>
+								<div id="mdEdVal_SynthesisE" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 162dp; width: 78dp;">{{SynthesisE_text}}</div>
+								<div id="mdEdName_SynthesisE" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 78dp;">SYN E</div>
+								<knob id="mdEdCtl_SynthesisF" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisF" style="left: 106dp; top: 116dp;"/>
+								<div id="mdEdVal_SynthesisF" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 162dp; width: 78dp;">{{SynthesisF_text}}</div>
+								<div id="mdEdName_SynthesisF" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 176dp; width: 78dp;">SYN F</div>
+								<knob id="mdEdCtl_SynthesisG" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisG" style="left: 196dp; top: 116dp;"/>
+								<div id="mdEdVal_SynthesisG" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 162dp; width: 78dp;">{{SynthesisG_text}}</div>
+								<div id="mdEdName_SynthesisG" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 176dp; width: 78dp;">SYN G</div>
+								<knob id="mdEdCtl_SynthesisH" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="SynthesisH" style="left: 286dp; top: 116dp;"/>
+								<div id="mdEdVal_SynthesisH" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 162dp; width: 78dp;">{{SynthesisH_text}}</div>
+								<div id="mdEdName_SynthesisH" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 176dp; width: 78dp;">SYN H</div>
+							</div>
+							<div id="mdEdAmp" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 376dp; top: 88dp; width: 348dp; height: 208dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">AMPLI</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">ADHR</div>
+								<knob id="mdEdCtl_AmpAttack" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpAttack" style="left: 16dp; top: 32dp;"/>
+								<div id="mdEdVal_AmpAttack" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{AmpAttack_text}}</div>
+								<div id="mdEdName_AmpAttack" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">ATK</div>
+								<knob id="mdEdCtl_AmpHold" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpHold" style="left: 106dp; top: 32dp;"/>
+								<div id="mdEdVal_AmpHold" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{AmpHold_text}}</div>
+								<div id="mdEdName_AmpHold" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">HOLD</div>
+								<knob id="mdEdCtl_AmpDecay" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDecay" style="left: 196dp; top: 32dp;"/>
+								<div id="mdEdVal_AmpDecay" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{AmpDecay_text}}</div>
+								<div id="mdEdName_AmpDecay" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">DEC</div>
+								<knob id="mdEdCtl_AmpRelease" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpRelease" style="left: 286dp; top: 32dp;"/>
+								<div id="mdEdVal_AmpRelease" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 78dp; width: 78dp;">{{AmpRelease_text}}</div>
+								<div id="mdEdName_AmpRelease" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 92dp; width: 78dp;">REL</div>
+								<knob id="mdEdCtl_AmpDistortion" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpDistortion" style="left: 16dp; top: 116dp;"/>
+								<div id="mdEdVal_AmpDistortion" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 162dp; width: 78dp;">{{AmpDistortion_text}}</div>
+								<div id="mdEdName_AmpDistortion" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 78dp;">DIST</div>
+								<input id="mdEdCtl_AmpVolume" type="range" orientation="vertical" class="jucePos mdEdFader" param="AmpVolume" style="left: 123dp; top: 116dp;"/>
+								<div id="mdEdVal_AmpVolume" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 162dp; width: 78dp;">{{AmpVolume_text}}</div>
+								<div id="mdEdName_AmpVolume" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 176dp; width: 78dp;">VOL</div>
+								<knob id="mdEdCtl_AmpPan" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPan" style="left: 196dp; top: 116dp;"/>
+								<div id="mdEdVal_AmpPan" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 162dp; width: 78dp;">{{AmpPan_text}}</div>
+								<div id="mdEdName_AmpPan" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 176dp; width: 78dp;">PAN</div>
+								<knob id="mdEdCtl_AmpPortamento" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="AmpPortamento" style="left: 286dp; top: 116dp;"/>
+								<div id="mdEdVal_AmpPortamento" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 162dp; width: 78dp;">{{AmpPortamento_text}}</div>
+								<div id="mdEdName_AmpPortamento" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 176dp; width: 78dp;">PORT</div>
+							</div>
+							<div id="mdEdFilter" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 736dp; top: 88dp; width: 348dp; height: 208dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">FILTRE</div>
+								<knob id="mdEdCtl_FilterBase" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBase" style="left: 16dp; top: 32dp;"/>
+								<div id="mdEdVal_FilterBase" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{FilterBase_text}}</div>
+								<div id="mdEdName_FilterBase" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">BASE</div>
+								<knob id="mdEdCtl_FilterWidth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidth" style="left: 106dp; top: 32dp;"/>
+								<div id="mdEdVal_FilterWidth" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{FilterWidth_text}}</div>
+								<div id="mdEdName_FilterWidth" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">WDTH</div>
+								<knob id="mdEdCtl_FilterHighpassQ" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterHighpassQ" style="left: 196dp; top: 32dp;"/>
+								<div id="mdEdVal_FilterHighpassQ" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{FilterHighpassQ_text}}</div>
+								<div id="mdEdName_FilterHighpassQ" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">HPQ</div>
+								<knob id="mdEdCtl_FilterLowpassQ" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterLowpassQ" style="left: 286dp; top: 32dp;"/>
+								<div id="mdEdVal_FilterLowpassQ" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 78dp; width: 78dp;">{{FilterLowpassQ_text}}</div>
+								<div id="mdEdName_FilterLowpassQ" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 92dp; width: 78dp;">LPQ</div>
+								<knob id="mdEdCtl_FilterAttack" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterAttack" style="left: 16dp; top: 116dp;"/>
+								<div id="mdEdVal_FilterAttack" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 162dp; width: 78dp;">{{FilterAttack_text}}</div>
+								<div id="mdEdName_FilterAttack" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 78dp;">ATK</div>
+								<knob id="mdEdCtl_FilterDecay" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterDecay" style="left: 106dp; top: 116dp;"/>
+								<div id="mdEdVal_FilterDecay" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 162dp; width: 78dp;">{{FilterDecay_text}}</div>
+								<div id="mdEdName_FilterDecay" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 176dp; width: 78dp;">DEC</div>
+								<knob id="mdEdCtl_FilterBaseOffset" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterBaseOffset" style="left: 196dp; top: 116dp;"/>
+								<div id="mdEdVal_FilterBaseOffset" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 162dp; width: 78dp;">{{FilterBaseOffset_text}}</div>
+								<div id="mdEdName_FilterBaseOffset" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 176dp; width: 78dp;">BOFS</div>
+								<knob id="mdEdCtl_FilterWidthOffset" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="FilterWidthOffset" style="left: 286dp; top: 116dp;"/>
+								<div id="mdEdVal_FilterWidthOffset" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 162dp; width: 78dp;">{{FilterWidthOffset_text}}</div>
+								<div id="mdEdName_FilterWidthOffset" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 176dp; width: 78dp;">WOFS</div>
+							</div>
+							<div id="mdEdEffects" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 16dp; top: 308dp; width: 348dp; height: 208dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">EFFETS</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">EQ, lo-fi, delay</div>
+								<knob id="mdEdCtl_EffectsDelayTime" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayTime" style="left: 16dp; top: 32dp;"/>
+								<div id="mdEdVal_EffectsDelayTime" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 78dp; width: 78dp;">{{EffectsDelayTime_text}}</div>
+								<div id="mdEdName_EffectsDelayTime" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 92dp; width: 78dp;">DTIM</div>
+								<input id="mdEdCtl_EffectsDelaySend" type="range" orientation="vertical" class="jucePos mdEdFader" param="EffectsDelaySend" style="left: 123dp; top: 32dp;"/>
+								<div id="mdEdVal_EffectsDelaySend" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 78dp; width: 78dp;">{{EffectsDelaySend_text}}</div>
+								<div id="mdEdName_EffectsDelaySend" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 92dp; width: 78dp;">DSND</div>
+								<knob id="mdEdCtl_EffectsDelayFeedback" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayFeedback" style="left: 196dp; top: 32dp;"/>
+								<div id="mdEdVal_EffectsDelayFeedback" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 78dp; width: 78dp;">{{EffectsDelayFeedback_text}}</div>
+								<div id="mdEdName_EffectsDelayFeedback" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 92dp; width: 78dp;">DFB</div>
+								<knob id="mdEdCtl_EffectsSampleRate" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsSampleRate" style="left: 286dp; top: 32dp;"/>
+								<div id="mdEdVal_EffectsSampleRate" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 78dp; width: 78dp;">{{EffectsSampleRate_text}}</div>
+								<div id="mdEdName_EffectsSampleRate" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 92dp; width: 78dp;">SRR</div>
+								<knob id="mdEdCtl_EffectsEqGain" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqGain" style="left: 16dp; top: 116dp;"/>
+								<div id="mdEdVal_EffectsEqGain" class="jucePos juceLabel mdEdValue" style="left: 0dp; top: 162dp; width: 78dp;">{{EffectsEqGain_text}}</div>
+								<div id="mdEdName_EffectsEqGain" class="jucePos juceLabel mdEdName" style="left: 0dp; top: 176dp; width: 78dp;">EQG</div>
+								<knob id="mdEdCtl_EffectsEqFrequency" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsEqFrequency" style="left: 106dp; top: 116dp;"/>
+								<div id="mdEdVal_EffectsEqFrequency" class="jucePos juceLabel mdEdValue" style="left: 90dp; top: 162dp; width: 78dp;">{{EffectsEqFrequency_text}}</div>
+								<div id="mdEdName_EffectsEqFrequency" class="jucePos juceLabel mdEdName" style="left: 90dp; top: 176dp; width: 78dp;">EQF</div>
+								<knob id="mdEdCtl_EffectsDelayBase" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayBase" style="left: 196dp; top: 116dp;"/>
+								<div id="mdEdVal_EffectsDelayBase" class="jucePos juceLabel mdEdValue" style="left: 180dp; top: 162dp; width: 78dp;">{{EffectsDelayBase_text}}</div>
+								<div id="mdEdName_EffectsDelayBase" class="jucePos juceLabel mdEdName" style="left: 180dp; top: 176dp; width: 78dp;">DBAS</div>
+								<knob id="mdEdCtl_EffectsDelayWidth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="EffectsDelayWidth" style="left: 286dp; top: 116dp;"/>
+								<div id="mdEdVal_EffectsDelayWidth" class="jucePos juceLabel mdEdValue" style="left: 270dp; top: 162dp; width: 78dp;">{{EffectsDelayWidth_text}}</div>
+								<div id="mdEdName_EffectsDelayWidth" class="jucePos juceLabel mdEdName" style="left: 270dp; top: 176dp; width: 78dp;">DWID</div>
+							</div>
+							<div id="mdEdLfo" class="jucePos mdEdBlock" data-model="partCurrent" style="left: 376dp; top: 308dp; width: 708dp; height: 208dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 676dp;">MODULATION</div>
+								<button id="mmLfoTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmLfo" tabbutton="0" style="left: 360dp; top: 4dp;">LFO 1</button>
+								<button id="mmLfoTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmLfo" tabbutton="1" style="left: 444dp; top: 4dp;">LFO 2</button>
+								<button id="mmLfoTab2" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmLfo" tabbutton="2" style="left: 528dp; top: 4dp;">LFO 3</button>
+								<div id="mmLfoPage0" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="0" style="left: 0dp; top: 32dp; width: 708dp; height: 168dp;">
+									<div class="jucePos juceLabel mdEdNote" data-unread="Lfo1Page Lfo1Destination Lfo1Waveform Lfo1Trigger" style="left: 16dp; top: 8dp; width: 316dp;">LFO 1 : page {{Lfo1Page_text}}, destination {{Lfo1Destination_text}}, forme {{Lfo1Waveform_text}}, déclenchement {{Lfo1Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo1Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Page" style="left: 376dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo1Page" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 46dp; width: 78dp;">{{Lfo1Page_text}}</div>
+									<div id="mdEdName_Lfo1Page" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 60dp; width: 78dp;">PAGE</div>
+									<knob id="mdEdCtl_Lfo1Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Destination" style="left: 466dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo1Destination" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 46dp; width: 78dp;">{{Lfo1Destination_text}}</div>
+									<div id="mdEdName_Lfo1Destination" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 60dp; width: 78dp;">DEST</div>
+									<knob id="mdEdCtl_Lfo1Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Trigger" style="left: 556dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo1Trigger" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 46dp; width: 78dp;">{{Lfo1Trigger_text}}</div>
+									<div id="mdEdName_Lfo1Trigger" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 60dp; width: 78dp;">TRIG</div>
+									<knob id="mdEdCtl_Lfo1Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Waveform" style="left: 646dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo1Waveform" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 46dp; width: 78dp;">{{Lfo1Waveform_text}}</div>
+									<div id="mdEdName_Lfo1Waveform" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 60dp; width: 78dp;">WAVE</div>
+									<knob id="mdEdCtl_Lfo1Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Multiplier" style="left: 376dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo1Multiplier" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 130dp; width: 78dp;">{{Lfo1Multiplier_text}}</div>
+									<div id="mdEdName_Lfo1Multiplier" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 144dp; width: 78dp;">MULT</div>
+									<knob id="mdEdCtl_Lfo1Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Speed" style="left: 466dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo1Speed" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 130dp; width: 78dp;">{{Lfo1Speed_text}}</div>
+									<div id="mdEdName_Lfo1Speed" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 144dp; width: 78dp;">SPD</div>
+									<knob id="mdEdCtl_Lfo1Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Interlace" style="left: 556dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo1Interlace" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 130dp; width: 78dp;">{{Lfo1Interlace_text}}</div>
+									<div id="mdEdName_Lfo1Interlace" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 144dp; width: 78dp;">INTL</div>
+									<knob id="mdEdCtl_Lfo1Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo1Depth" style="left: 646dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo1Depth" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 130dp; width: 78dp;">{{Lfo1Depth_text}}</div>
+									<div id="mdEdName_Lfo1Depth" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 144dp; width: 78dp;">DEP</div>
+								</div>
+								<div id="mmLfoPage1" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="1" style="left: 0dp; top: 32dp; width: 708dp; height: 168dp;">
+									<div class="jucePos juceLabel mdEdNote" data-unread="Lfo2Page Lfo2Destination Lfo2Waveform Lfo2Trigger" style="left: 16dp; top: 8dp; width: 316dp;">LFO 2 : page {{Lfo2Page_text}}, destination {{Lfo2Destination_text}}, forme {{Lfo2Waveform_text}}, déclenchement {{Lfo2Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo2Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Page" style="left: 376dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo2Page" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 46dp; width: 78dp;">{{Lfo2Page_text}}</div>
+									<div id="mdEdName_Lfo2Page" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 60dp; width: 78dp;">PAGE</div>
+									<knob id="mdEdCtl_Lfo2Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Destination" style="left: 466dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo2Destination" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 46dp; width: 78dp;">{{Lfo2Destination_text}}</div>
+									<div id="mdEdName_Lfo2Destination" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 60dp; width: 78dp;">DEST</div>
+									<knob id="mdEdCtl_Lfo2Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Trigger" style="left: 556dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo2Trigger" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 46dp; width: 78dp;">{{Lfo2Trigger_text}}</div>
+									<div id="mdEdName_Lfo2Trigger" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 60dp; width: 78dp;">TRIG</div>
+									<knob id="mdEdCtl_Lfo2Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Waveform" style="left: 646dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo2Waveform" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 46dp; width: 78dp;">{{Lfo2Waveform_text}}</div>
+									<div id="mdEdName_Lfo2Waveform" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 60dp; width: 78dp;">WAVE</div>
+									<knob id="mdEdCtl_Lfo2Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Multiplier" style="left: 376dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo2Multiplier" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 130dp; width: 78dp;">{{Lfo2Multiplier_text}}</div>
+									<div id="mdEdName_Lfo2Multiplier" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 144dp; width: 78dp;">MULT</div>
+									<knob id="mdEdCtl_Lfo2Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Speed" style="left: 466dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo2Speed" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 130dp; width: 78dp;">{{Lfo2Speed_text}}</div>
+									<div id="mdEdName_Lfo2Speed" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 144dp; width: 78dp;">SPD</div>
+									<knob id="mdEdCtl_Lfo2Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Interlace" style="left: 556dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo2Interlace" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 130dp; width: 78dp;">{{Lfo2Interlace_text}}</div>
+									<div id="mdEdName_Lfo2Interlace" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 144dp; width: 78dp;">INTL</div>
+									<knob id="mdEdCtl_Lfo2Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo2Depth" style="left: 646dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo2Depth" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 130dp; width: 78dp;">{{Lfo2Depth_text}}</div>
+									<div id="mdEdName_Lfo2Depth" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 144dp; width: 78dp;">DEP</div>
+								</div>
+								<div id="mmLfoPage2" class="jucePos mdEdLfoPage" tabgroup="mmLfo" tabpage="2" style="left: 0dp; top: 32dp; width: 708dp; height: 168dp;">
+									<div class="jucePos juceLabel mdEdNote" data-unread="Lfo3Page Lfo3Destination Lfo3Waveform Lfo3Trigger" style="left: 16dp; top: 8dp; width: 316dp;">LFO 3 : page {{Lfo3Page_text}}, destination {{Lfo3Destination_text}}, forme {{Lfo3Waveform_text}}, déclenchement {{Lfo3Trigger_text}}</div>
+									<knob id="mdEdCtl_Lfo3Page" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Page" style="left: 376dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo3Page" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 46dp; width: 78dp;">{{Lfo3Page_text}}</div>
+									<div id="mdEdName_Lfo3Page" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 60dp; width: 78dp;">PAGE</div>
+									<knob id="mdEdCtl_Lfo3Destination" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Destination" style="left: 466dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo3Destination" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 46dp; width: 78dp;">{{Lfo3Destination_text}}</div>
+									<div id="mdEdName_Lfo3Destination" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 60dp; width: 78dp;">DEST</div>
+									<knob id="mdEdCtl_Lfo3Trigger" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Trigger" style="left: 556dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo3Trigger" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 46dp; width: 78dp;">{{Lfo3Trigger_text}}</div>
+									<div id="mdEdName_Lfo3Trigger" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 60dp; width: 78dp;">TRIG</div>
+									<knob id="mdEdCtl_Lfo3Waveform" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Waveform" style="left: 646dp; top: 0dp;"/>
+									<div id="mdEdVal_Lfo3Waveform" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 46dp; width: 78dp;">{{Lfo3Waveform_text}}</div>
+									<div id="mdEdName_Lfo3Waveform" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 60dp; width: 78dp;">WAVE</div>
+									<knob id="mdEdCtl_Lfo3Multiplier" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Multiplier" style="left: 376dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo3Multiplier" class="jucePos juceLabel mdEdValue" style="left: 360dp; top: 130dp; width: 78dp;">{{Lfo3Multiplier_text}}</div>
+									<div id="mdEdName_Lfo3Multiplier" class="jucePos juceLabel mdEdName" style="left: 360dp; top: 144dp; width: 78dp;">MULT</div>
+									<knob id="mdEdCtl_Lfo3Speed" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Speed" style="left: 466dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo3Speed" class="jucePos juceLabel mdEdValue" style="left: 450dp; top: 130dp; width: 78dp;">{{Lfo3Speed_text}}</div>
+									<div id="mdEdName_Lfo3Speed" class="jucePos juceLabel mdEdName" style="left: 450dp; top: 144dp; width: 78dp;">SPD</div>
+									<knob id="mdEdCtl_Lfo3Interlace" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Interlace" style="left: 556dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo3Interlace" class="jucePos juceLabel mdEdValue" style="left: 540dp; top: 130dp; width: 78dp;">{{Lfo3Interlace_text}}</div>
+									<div id="mdEdName_Lfo3Interlace" class="jucePos juceLabel mdEdName" style="left: 540dp; top: 144dp; width: 78dp;">INTL</div>
+									<knob id="mdEdCtl_Lfo3Depth" class="jucePos juceRotary elektronKnob elektronMasterKnob mdEdKnob" param="Lfo3Depth" style="left: 646dp; top: 84dp;"/>
+									<div id="mdEdVal_Lfo3Depth" class="jucePos juceLabel mdEdValue" style="left: 630dp; top: 130dp; width: 78dp;">{{Lfo3Depth_text}}</div>
+									<div id="mdEdName_Lfo3Depth" class="jucePos juceLabel mdEdName" style="left: 630dp; top: 144dp; width: 78dp;">DEP</div>
+								</div>
+							</div>
+							<div id="mdEdCurves" class="mdEdCurves" style="display: none;">
+								<div id="mdEdCurvesAmp" class="jucePos mdEdBlock" style="left: 16dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">AMPLI</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">ATK, HOLD, DEC · proportions</div>
+									<div id="mdEdCurveAmp" class="jucePos mdEdCurveArea" data-unread="AmpAttack AmpHold AmpDecay" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
+								</div>
+								<div id="mdEdCurvesFilter" class="jucePos mdEdBlock" style="left: 376dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">FILTRE</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">BASE, WDTH, HPQ, LPQ · allure</div>
+									<div id="mdEdCurveFilter" class="jucePos mdEdCurveArea" data-unread="FilterBase FilterWidth FilterHighpassQ FilterLowpassQ" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
+								</div>
+								<div id="mdEdCurvesEq" class="jucePos mdEdBlock" style="left: 736dp; top: 528dp; width: 348dp; height: 128dp;">
+									<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">EQ</div>
+									<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">EQF, EQG · allure</div>
+									<div id="mdEdCurveEq" class="jucePos mdEdCurveArea" data-unread="EffectsEqFrequency EffectsEqGain" style="left: 16dp; top: 32dp; width: 316dp; height: 88dp;"/>
+								</div>
+							</div>
+							<div id="mdEdMachinePicker" class="jucePos mdEdPicker" style="left: 16dp; top: 80dp; width: 1068dp; display: none;">
+								<div id="mdEdPickerFamilies" class="mdEdPickerRow"/>
+								<div id="mdEdPickerMachines" class="mdEdPickerRow"/>
+								<div id="mdEdPickerInfo" class="mdEdPickerInfo"/>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- MIX: one row per track, each bound to its own part; outputs on the right. -->
+			<div id="mdEdPageMix" class="mdEdPage" tabgroup="mdEdit" tabpage="1">
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 368dp;">
+						<div id="mdEdLevels" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 708dp; height: 344dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 676dp;">NIVEAUX</div>
+							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 676dp;">une colonne par champ</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 16dp; top: 32dp; width: 70dp;">PISTE</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 106dp; top: 32dp; width: 70dp;">NIVEAU</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 196dp; top: 32dp; width: 70dp;">VOL</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 286dp; top: 32dp; width: 70dp;">PAN</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 376dp; top: 32dp; width: 70dp;">DEL</div>
+							<div class="jucePos juceLabel mdEdName mdEdLeft" style="left: 466dp; top: 32dp; width: 70dp;">BUS</div>
+							<div id="mdEdLevelRow0" class="jucePos mdEdRow" data-model="part0" style="left: 0dp; top: 48dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">01</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div id="mdEdLevelRow1" class="jucePos mdEdRow" data-model="part1" style="left: 0dp; top: 74dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">02</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div id="mdEdLevelRow2" class="jucePos mdEdRow" data-model="part2" style="left: 0dp; top: 100dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">03</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div id="mdEdLevelRow3" class="jucePos mdEdRow" data-model="part3" style="left: 0dp; top: 126dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">04</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div id="mdEdLevelRow4" class="jucePos mdEdRow" data-model="part4" style="left: 0dp; top: 152dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">05</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div id="mdEdLevelRow5" class="jucePos mdEdRow" data-model="part5" style="left: 0dp; top: 178dp; width: 708dp; height: 26dp;">
+								<button class="jucePos juceButton mdEdLed" isToggle="1" param="Mute" valueOn="0" valueOff="1" style="left: 16dp; top: 7dp;"/>
+								<div class="jucePos juceLabel mdEdRowName" data-class-mdEdMuted="Mute_value == 1" style="left: 34dp; top: 0dp; width: 60dp;">06</div>
+								<input type="range" class="jucePos mdEdHFader" param="Level" style="left: 98dp; top: 7dp;"/>
+								<knob class="jucePos mdEdNum" param="AmpVolume" style="left: 180dp; top: 1dp;">{{AmpVolume_text}}</knob>
+								<knob class="jucePos mdEdNum" param="AmpPan" style="left: 270dp; top: 1dp;">{{AmpPan_text}}</knob>
+								<knob class="jucePos mdEdNum" param="EffectsDelaySend" style="left: 360dp; top: 1dp;">{{EffectsDelaySend_text}}</knob>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 466dp; top: 1dp; width: 30dp;">AB</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 496dp; top: 1dp; width: 30dp;">CD</div>
+								<div class="jucePos mdEdSeg mdEdOff" style="left: 526dp; top: 1dp; width: 30dp;">EF</div>
+								</div>
+							<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 320dp; width: 676dp;">MM : bus AB, CD, EF cumulables ; la piste garde son pan. Choix des bus : à venir.</div>
+						</div>
+						<div id="mdEdOutputs" class="jucePos mdEdBlock" style="left: 736dp; top: 12dp; width: 348dp; height: 344dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 316dp;">SORTIES</div>
+							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 316dp;">bus du plug-in</div>
+							<div class="jucePos mdEdPanel" style="left: 16dp; top: 32dp; width: 316dp; height: 96dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">MAIN A/B</div>
+								<div id="mdEdBusActive0" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div id="mdEdMeters0" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
+								<div id="mdEdBusLevel0" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks0" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning0" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
+							</div>
+							<div class="jucePos mdEdPanel" style="left: 16dp; top: 136dp; width: 316dp; height: 96dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT C/D</div>
+								<div id="mdEdBusActive1" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div id="mdEdMeters1" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
+								<div id="mdEdBusLevel1" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks1" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning1" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
+							</div>
+							<div class="jucePos mdEdPanel" style="left: 16dp; top: 240dp; width: 316dp; height: 96dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 12dp; top: 4dp; width: 120dp;">OUT E/F</div>
+								<div id="mdEdBusActive2" class="jucePos mdEdSeg" style="left: 154dp; top: 6dp; width: 150dp;">ACTIF DANS LE DAW</div>
+								<div id="mdEdMeters2" class="jucePos" style="left: 12dp; top: 34dp; width: 20dp; height: 54dp;"/>
+								<div id="mdEdBusLevel2" class="jucePos juceLabel mdEdBusLevel" style="left: 44dp; top: 34dp; width: 80dp;">—</div>
+								<div id="mdEdBusTracks2" class="jucePos juceLabel mdEdNote" style="left: 44dp; top: 52dp; width: 260dp;">—</div>
+								<div id="mdEdBusWarning2" class="jucePos juceLabel mdEdNote mdEdWarning" style="left: 44dp; top: 70dp; width: 260dp;"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- JOUER: the current pattern, then a lane and the chain (MD), or a piano roll, a lane and the chain (MM). -->
+			<div id="mdEdPagePlay" class="mdEdPage" tabgroup="mdEdit" tabpage="2">
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 538dp;">
+						<div id="mmPlayGrid" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 262dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERN</div>
+							<div id="mmPlayPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 110dp; top: 4dp; width: 84dp;">PAS 1–32</div>
+							<div id="mmPlayPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 194dp; top: 4dp; width: 84dp;">PAS 33–64</div>
+							<button id="mmPlayLength" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 286dp; top: 4dp; width: 110dp;">LONGUEUR —</button>
+							<div id="mmPlayInfo" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 408dp; top: 4dp; width: 304dp;">pattern : en attente du firmware</div>
+							<button id="mmPlayCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 724dp; top: 4dp; width: 130dp;">COPIER VERS…</button>
+							<button id="mmPlayClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 862dp; top: 4dp; width: 120dp;">TOUT EFFACER</button>
+							<button id="mmPlayRefresh" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 990dp; top: 4dp; width: 62dp;">RELIRE</button>
+							<div class="jucePos mdPlayBand" style="left: 225dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 457dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 689dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBand" style="left: 921dp; top: 30dp; width: 117dp; height: 206dp;"/>
+							<div class="jucePos mdPlayBar" style="left: 572dp; top: 30dp; width: 2dp; height: 206dp;"/>
+							<div id="mmPlayHead0" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 112dp; top: 32dp; width: 24dp;">1</div>
+							<div id="mmPlayHead1" class="jucePos juceLabel mdPlayHead" style="left: 141dp; top: 32dp; width: 24dp;">2</div>
+							<div id="mmPlayHead2" class="jucePos juceLabel mdPlayHead" style="left: 170dp; top: 32dp; width: 24dp;">3</div>
+							<div id="mmPlayHead3" class="jucePos juceLabel mdPlayHead" style="left: 199dp; top: 32dp; width: 24dp;">4</div>
+							<div id="mmPlayHead4" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 228dp; top: 32dp; width: 24dp;">5</div>
+							<div id="mmPlayHead5" class="jucePos juceLabel mdPlayHead" style="left: 257dp; top: 32dp; width: 24dp;">6</div>
+							<div id="mmPlayHead6" class="jucePos juceLabel mdPlayHead" style="left: 286dp; top: 32dp; width: 24dp;">7</div>
+							<div id="mmPlayHead7" class="jucePos juceLabel mdPlayHead" style="left: 315dp; top: 32dp; width: 24dp;">8</div>
+							<div id="mmPlayHead8" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 344dp; top: 32dp; width: 24dp;">9</div>
+							<div id="mmPlayHead9" class="jucePos juceLabel mdPlayHead" style="left: 373dp; top: 32dp; width: 24dp;">10</div>
+							<div id="mmPlayHead10" class="jucePos juceLabel mdPlayHead" style="left: 402dp; top: 32dp; width: 24dp;">11</div>
+							<div id="mmPlayHead11" class="jucePos juceLabel mdPlayHead" style="left: 431dp; top: 32dp; width: 24dp;">12</div>
+							<div id="mmPlayHead12" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 460dp; top: 32dp; width: 24dp;">13</div>
+							<div id="mmPlayHead13" class="jucePos juceLabel mdPlayHead" style="left: 489dp; top: 32dp; width: 24dp;">14</div>
+							<div id="mmPlayHead14" class="jucePos juceLabel mdPlayHead" style="left: 518dp; top: 32dp; width: 24dp;">15</div>
+							<div id="mmPlayHead15" class="jucePos juceLabel mdPlayHead" style="left: 547dp; top: 32dp; width: 24dp;">16</div>
+							<div id="mmPlayHead16" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 576dp; top: 32dp; width: 24dp;">17</div>
+							<div id="mmPlayHead17" class="jucePos juceLabel mdPlayHead" style="left: 605dp; top: 32dp; width: 24dp;">18</div>
+							<div id="mmPlayHead18" class="jucePos juceLabel mdPlayHead" style="left: 634dp; top: 32dp; width: 24dp;">19</div>
+							<div id="mmPlayHead19" class="jucePos juceLabel mdPlayHead" style="left: 663dp; top: 32dp; width: 24dp;">20</div>
+							<div id="mmPlayHead20" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 692dp; top: 32dp; width: 24dp;">21</div>
+							<div id="mmPlayHead21" class="jucePos juceLabel mdPlayHead" style="left: 721dp; top: 32dp; width: 24dp;">22</div>
+							<div id="mmPlayHead22" class="jucePos juceLabel mdPlayHead" style="left: 750dp; top: 32dp; width: 24dp;">23</div>
+							<div id="mmPlayHead23" class="jucePos juceLabel mdPlayHead" style="left: 779dp; top: 32dp; width: 24dp;">24</div>
+							<div id="mmPlayHead24" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 808dp; top: 32dp; width: 24dp;">25</div>
+							<div id="mmPlayHead25" class="jucePos juceLabel mdPlayHead" style="left: 837dp; top: 32dp; width: 24dp;">26</div>
+							<div id="mmPlayHead26" class="jucePos juceLabel mdPlayHead" style="left: 866dp; top: 32dp; width: 24dp;">27</div>
+							<div id="mmPlayHead27" class="jucePos juceLabel mdPlayHead" style="left: 895dp; top: 32dp; width: 24dp;">28</div>
+							<div id="mmPlayHead28" class="jucePos juceLabel mdPlayHead mdPlayHeadBeat" style="left: 924dp; top: 32dp; width: 24dp;">29</div>
+							<div id="mmPlayHead29" class="jucePos juceLabel mdPlayHead" style="left: 953dp; top: 32dp; width: 24dp;">30</div>
+							<div id="mmPlayHead30" class="jucePos juceLabel mdPlayHead" style="left: 982dp; top: 32dp; width: 24dp;">31</div>
+							<div id="mmPlayHead31" class="jucePos juceLabel mdPlayHead" style="left: 1011dp; top: 32dp; width: 24dp;">32</div>
+							<div id="mmPlayTrack0" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 48dp; width: 90dp;">01 —</div>
+							<div id="mmPlayLed0" class="jucePos mdEdTrackLed" style="left: 102dp; top: 57dp;"/>
+							<div id="mmPlayStep0_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep0_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 48dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayTrack1" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 74dp; width: 90dp;">02 —</div>
+							<div id="mmPlayLed1" class="jucePos mdEdTrackLed" style="left: 102dp; top: 83dp;"/>
+							<div id="mmPlayStep1_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep1_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 74dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayTrack2" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 100dp; width: 90dp;">03 —</div>
+							<div id="mmPlayLed2" class="jucePos mdEdTrackLed" style="left: 102dp; top: 109dp;"/>
+							<div id="mmPlayStep2_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep2_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 100dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayTrack3" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 126dp; width: 90dp;">04 —</div>
+							<div id="mmPlayLed3" class="jucePos mdEdTrackLed" style="left: 102dp; top: 135dp;"/>
+							<div id="mmPlayStep3_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep3_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 126dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayTrack4" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 152dp; width: 90dp;">05 —</div>
+							<div id="mmPlayLed4" class="jucePos mdEdTrackLed" style="left: 102dp; top: 161dp;"/>
+							<div id="mmPlayStep4_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep4_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 152dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayTrack5" class="jucePos juceLabel mdPlayTrack mmPlayTrack" style="left: 16dp; top: 178dp; width: 90dp;">06 —</div>
+							<div id="mmPlayLed5" class="jucePos mdEdTrackLed" style="left: 102dp; top: 187dp;"/>
+							<div id="mmPlayStep5_0" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 112dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_1" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 141dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_2" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 170dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_3" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 199dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_4" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 228dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_5" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 257dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_6" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 286dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_7" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 315dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_8" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 344dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_9" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 373dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_10" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 402dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_11" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 431dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_12" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 460dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_13" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 489dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_14" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 518dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_15" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 547dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_16" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 576dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_17" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 605dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_18" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 634dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_19" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 663dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_20" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 692dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_21" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 721dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_22" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 750dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_23" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 779dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_24" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 808dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_25" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 837dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_26" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 866dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_27" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 895dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_28" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 924dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_29" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 953dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_30" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 982dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayStep5_31" class="jucePos mdEdStep mdPlayStep mmPlayStep" style="left: 1011dp; top: 178dp; width: 24dp; height: 24dp;"/>
+							<div id="mmPlayFlagName0" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 208dp; width: 90dp;">SLIDE</div>
+							<div id="mmPlayFlag0_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag0_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 208dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlagName1" class="jucePos juceLabel mdPlayTrack mdPlayFlagName" style="left: 16dp; top: 222dp; width: 90dp;">SWING</div>
+							<div id="mmPlayFlag1_0" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 112dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_1" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 141dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_2" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 170dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_3" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 199dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_4" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 228dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_5" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 257dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_6" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 286dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_7" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 315dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_8" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 344dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_9" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 373dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_10" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 402dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_11" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 431dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_12" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 460dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_13" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 489dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_14" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 518dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_15" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 547dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_16" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 576dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_17" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 605dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_18" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 634dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_19" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 663dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_20" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 692dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_21" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 721dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_22" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 750dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_23" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 779dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_24" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 808dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_25" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 837dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_26" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 866dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_27" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 895dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_28" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 924dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_29" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 953dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_30" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 982dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div id="mmPlayFlag1_31" class="jucePos mdEdStep mdPlayStep mdPlayFlag" style="left: 1011dp; top: 222dp; width: 24dp; height: 12dp;"/>
+							<div class="jucePos juceLabel mdEdSub mdPlayLegend" style="left: 16dp; top: 240dp; width: 1036dp;"><span class="mdPlayChip mdPlayChipTrig"/>trig et sa note<span class="mdPlayChip mdPlayChipLock"/>trig avec locks<span class="mdPlayChip mdPlayChipSilent"/>trig sans enveloppe d'ampli<span class="mdPlayChip mdPlayChipFlag"/>slide, swing<span class="mdPlayChip mdPlayChipOut"/>au-delà de la longueur · clic sur un pas : trig · piano roll : la note · sur un nom : sa piste · SWING : la quantité</div>
+						</div>
+						<div id="mmPlayBottom" class="jucePos mdEdBlock" style="left: 16dp; top: 286dp; width: 1068dp; height: 240dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;"></div>
+							<button id="mmPlayTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="0" style="left: 16dp; top: 4dp; width: 90dp;">PIANO ROLL</button>
+							<button id="mmPlayTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="1" style="left: 112dp; top: 4dp; width: 90dp;">LANE</button>
+							<button id="mmPlayTab2" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mmPlayBottom" tabbutton="2" style="left: 208dp; top: 4dp; width: 90dp;">CHAÎNE</button>
+							<div id="mmPlayRollPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="0" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
+								<div id="mmPlayRollInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 560dp;">—</div>
+								<button id="mmPlayRollDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 888dp; top: 4dp; width: 80dp;">OCTAVE –</button>
+								<button id="mmPlayRollUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 972dp; top: 4dp; width: 80dp;">OCTAVE +</button>
+								<div id="mmPlayRollKeys" class="jucePos mdEdCurveArea" style="left: 16dp; top: 32dp; width: 90dp; height: 200dp;"/>
+								<div id="mmPlayRollArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 32dp; width: 928dp; height: 200dp;"/>
+							</div>
+							<div id="mmPlayLanePage" class="jucePos" tabgroup="mmPlayBottom" tabpage="1" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
+								<div id="mmPlayLaneInfo" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 736dp;">—</div>
+								<div id="mmPlayParamPage0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 32dp; width: 80dp;">SYN</div>
+								<div id="mmPlayParamPage1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 96dp; top: 32dp; width: 80dp;">AMP</div>
+								<div id="mmPlayParamPage2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 176dp; top: 32dp; width: 80dp;">FILT</div>
+								<div id="mmPlayParamPage3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 256dp; top: 32dp; width: 80dp;">EFX</div>
+								<div id="mmPlayParamPage4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 336dp; top: 32dp; width: 80dp;">LFO 1</div>
+								<div id="mmPlayParamPage5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 416dp; top: 32dp; width: 80dp;">LFO 2</div>
+								<div id="mmPlayParamPage6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 496dp; top: 32dp; width: 80dp;">LFO 3</div>
+								<div id="mmPlayParam0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 592dp; top: 32dp; width: 57dp;">ATK</div>
+								<div id="mmPlayParam1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 649dp; top: 32dp; width: 57dp;">HOLD</div>
+								<div id="mmPlayParam2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 706dp; top: 32dp; width: 57dp;">DEC</div>
+								<div id="mmPlayParam3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 763dp; top: 32dp; width: 57dp;">REL</div>
+								<div id="mmPlayParam4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 820dp; top: 32dp; width: 57dp;">DIST</div>
+								<div id="mmPlayParam5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 877dp; top: 32dp; width: 57dp;">VOL</div>
+								<div id="mmPlayParam6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 934dp; top: 32dp; width: 57dp;">PAN</div>
+								<div id="mmPlayParam7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 991dp; top: 32dp; width: 57dp;">PORT</div>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 64dp; width: 90dp;">gris : kit<br/>orange : lock<br/><br/>glisser : lock<br/>double-clic :<br/>l'effacer</div>
+								<div id="mmPlayLaneArea" class="jucePos mdEdCurveArea" style="left: 112dp; top: 64dp; width: 928dp; height: 168dp;"/>
+							</div>
+							<div id="mdPlayChainPage" class="jucePos" tabgroup="mmPlayBottom" tabpage="2" style="left: 0dp; top: 0dp; width: 1068dp; height: 240dp;">
+								<div id="mdChainState" class="jucePos juceLabel mdEdSub" style="left: 316dp; top: 4dp; width: 586dp;">chaîne inactive</div>
+								<button id="mdChainEnable" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 912dp; top: 4dp; width: 140dp;">CHAÎNE ACTIVE</button>
+								<div id="mdChainSlot0" class="jucePos mdChainSlot mdEdUnread" style="left: 16dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot1" class="jucePos mdChainSlot mdEdUnread" style="left: 80dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot2" class="jucePos mdChainSlot mdEdUnread" style="left: 144dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot3" class="jucePos mdChainSlot mdEdUnread" style="left: 208dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot4" class="jucePos mdChainSlot mdEdUnread" style="left: 272dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot5" class="jucePos mdChainSlot mdEdUnread" style="left: 336dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot6" class="jucePos mdChainSlot mdEdUnread" style="left: 400dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot7" class="jucePos mdChainSlot mdEdUnread" style="left: 464dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot8" class="jucePos mdChainSlot mdEdUnread" style="left: 528dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot9" class="jucePos mdChainSlot mdEdUnread" style="left: 592dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot10" class="jucePos mdChainSlot mdEdUnread" style="left: 656dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot11" class="jucePos mdChainSlot mdEdUnread" style="left: 720dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot12" class="jucePos mdChainSlot mdEdUnread" style="left: 784dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot13" class="jucePos mdChainSlot mdEdUnread" style="left: 848dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot14" class="jucePos mdChainSlot mdEdUnread" style="left: 912dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainSlot15" class="jucePos mdChainSlot mdEdUnread" style="left: 976dp; top: 32dp; width: 60dp;">—</div>
+								<div id="mdChainBank0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 16dp; top: 86dp; width: 42dp;">A</div>
+								<div id="mdChainBank1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 58dp; top: 86dp; width: 42dp;">B</div>
+								<div id="mdChainBank2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 100dp; top: 86dp; width: 42dp;">C</div>
+								<div id="mdChainBank3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 142dp; top: 86dp; width: 42dp;">D</div>
+								<div id="mdChainBank4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 184dp; top: 86dp; width: 42dp;">E</div>
+								<div id="mdChainBank5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 226dp; top: 86dp; width: 42dp;">F</div>
+								<div id="mdChainBank6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 268dp; top: 86dp; width: 42dp;">G</div>
+								<div id="mdChainBank7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 310dp; top: 86dp; width: 42dp;">H</div>
+								<div id="mdChainNumber0" class="jucePos mdEdSeg mdEdSegChoice" style="left: 380dp; top: 86dp; width: 42dp;">01</div>
+								<div id="mdChainNumber1" class="jucePos mdEdSeg mdEdSegChoice" style="left: 422dp; top: 86dp; width: 42dp;">02</div>
+								<div id="mdChainNumber2" class="jucePos mdEdSeg mdEdSegChoice" style="left: 464dp; top: 86dp; width: 42dp;">03</div>
+								<div id="mdChainNumber3" class="jucePos mdEdSeg mdEdSegChoice" style="left: 506dp; top: 86dp; width: 42dp;">04</div>
+								<div id="mdChainNumber4" class="jucePos mdEdSeg mdEdSegChoice" style="left: 548dp; top: 86dp; width: 42dp;">05</div>
+								<div id="mdChainNumber5" class="jucePos mdEdSeg mdEdSegChoice" style="left: 590dp; top: 86dp; width: 42dp;">06</div>
+								<div id="mdChainNumber6" class="jucePos mdEdSeg mdEdSegChoice" style="left: 632dp; top: 86dp; width: 42dp;">07</div>
+								<div id="mdChainNumber7" class="jucePos mdEdSeg mdEdSegChoice" style="left: 674dp; top: 86dp; width: 42dp;">08</div>
+								<div id="mdChainNumber8" class="jucePos mdEdSeg mdEdSegChoice" style="left: 716dp; top: 86dp; width: 42dp;">09</div>
+								<div id="mdChainNumber9" class="jucePos mdEdSeg mdEdSegChoice" style="left: 758dp; top: 86dp; width: 42dp;">10</div>
+								<div id="mdChainNumber10" class="jucePos mdEdSeg mdEdSegChoice" style="left: 800dp; top: 86dp; width: 42dp;">11</div>
+								<div id="mdChainNumber11" class="jucePos mdEdSeg mdEdSegChoice" style="left: 842dp; top: 86dp; width: 42dp;">12</div>
+								<div id="mdChainNumber12" class="jucePos mdEdSeg mdEdSegChoice" style="left: 884dp; top: 86dp; width: 42dp;">13</div>
+								<div id="mdChainNumber13" class="jucePos mdEdSeg mdEdSegChoice" style="left: 926dp; top: 86dp; width: 42dp;">14</div>
+								<div id="mdChainNumber14" class="jucePos mdEdSeg mdEdSegChoice" style="left: 968dp; top: 86dp; width: 42dp;">15</div>
+								<div id="mdChainNumber15" class="jucePos mdEdSeg mdEdSegChoice" style="left: 1010dp; top: 86dp; width: 42dp;">16</div>
+								<button id="mdChainAdd" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 16dp; top: 118dp; width: 142dp;">AJOUTER</button>
+								<button id="mdChainPassesDown" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 164dp; top: 118dp; width: 142dp;">PASSAGES −</button>
+								<button id="mdChainPassesUp" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 312dp; top: 118dp; width: 142dp;">PASSAGES +</button>
+								<button id="mdChainMoveLeft" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 460dp; top: 118dp; width: 142dp;">‹ DÉPLACER</button>
+								<button id="mdChainMoveRight" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 608dp; top: 118dp; width: 142dp;">DÉPLACER ›</button>
+								<button id="mdChainRemove" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 756dp; top: 118dp; width: 142dp;">RETIRER</button>
+								<button id="mdChainClear" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 904dp; top: 118dp; width: 142dp;">VIDER</button>
+								<div class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 150dp; width: 1036dp;">Joue avec le transport de l'hôte (SYSTÈME, SUIVRE L'HÔTE). AJOUTER prend le pattern de la machine ; A–H et 01–16 changent celui de la case choisie.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- BIBLIO: the stored Kits, read on request, and the machines of one. -->
+			<div id="mdEdPageLibrary" class="mdEdPage" tabgroup="mdEdit" tabpage="3">
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 538dp;">
+						<button id="mdLibTab0" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdLib" tabbutton="0" style="left: 16dp; top: 12dp; width: 90dp;">KITS</button>
+						<button id="mdLibTab1" class="jucePos juceButton mdEdLfoTab" isToggle="1" tabgroup="mdLib" tabbutton="1" style="left: 112dp; top: 12dp; width: 90dp;">PATTERNS</button>
+						<div id="mdLibInfo" class="jucePos juceLabel mdEdSub mdLibInfo" style="left: 220dp; top: 12dp; width: 712dp;">bibliothèque non lue</div>
+						<button id="mdLibRead" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 944dp; top: 12dp; width: 140dp;">RELIRE</button>
+						<div id="mdLibKitsPage" class="jucePos" tabgroup="mdLib" tabpage="0" style="left: 0dp; top: 0dp; width: 1100dp; height: 538dp;">
+							<div id="mdLibKits" class="jucePos mdEdBlock" style="left: 16dp; top: 44dp; width: 1068dp; height: 420dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">KITS</div>
+								<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 1036dp;">clic : ses machines · en ambre : le kit chargé</div>
+								<button id="mdLibKitLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 150dp;">CHARGER</button>
+								<button id="mdLibKitSave" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 268dp; top: 4dp; width: 150dp;">SAUVER</button>
+								<div id="mdLibKit0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 123dp;">01  —</div>
+								<div id="mdLibKit1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 123dp;">02  —</div>
+								<div id="mdLibKit2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 123dp;">03  —</div>
+								<div id="mdLibKit3" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 102dp; width: 123dp;">04  —</div>
+								<div id="mdLibKit4" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 124dp; width: 123dp;">05  —</div>
+								<div id="mdLibKit5" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 146dp; width: 123dp;">06  —</div>
+								<div id="mdLibKit6" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 168dp; width: 123dp;">07  —</div>
+								<div id="mdLibKit7" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 190dp; width: 123dp;">08  —</div>
+								<div id="mdLibKit8" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 212dp; width: 123dp;">09  —</div>
+								<div id="mdLibKit9" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 234dp; width: 123dp;">10  —</div>
+								<div id="mdLibKit10" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 256dp; width: 123dp;">11  —</div>
+								<div id="mdLibKit11" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 278dp; width: 123dp;">12  —</div>
+								<div id="mdLibKit12" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 300dp; width: 123dp;">13  —</div>
+								<div id="mdLibKit13" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 322dp; width: 123dp;">14  —</div>
+								<div id="mdLibKit14" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 344dp; width: 123dp;">15  —</div>
+								<div id="mdLibKit15" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 366dp; width: 123dp;">16  —</div>
+								<div id="mdLibKit16" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 36dp; width: 123dp;">17  —</div>
+								<div id="mdLibKit17" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 58dp; width: 123dp;">18  —</div>
+								<div id="mdLibKit18" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 80dp; width: 123dp;">19  —</div>
+								<div id="mdLibKit19" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 102dp; width: 123dp;">20  —</div>
+								<div id="mdLibKit20" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 124dp; width: 123dp;">21  —</div>
+								<div id="mdLibKit21" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 146dp; width: 123dp;">22  —</div>
+								<div id="mdLibKit22" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 168dp; width: 123dp;">23  —</div>
+								<div id="mdLibKit23" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 190dp; width: 123dp;">24  —</div>
+								<div id="mdLibKit24" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 212dp; width: 123dp;">25  —</div>
+								<div id="mdLibKit25" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 234dp; width: 123dp;">26  —</div>
+								<div id="mdLibKit26" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 256dp; width: 123dp;">27  —</div>
+								<div id="mdLibKit27" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 278dp; width: 123dp;">28  —</div>
+								<div id="mdLibKit28" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 300dp; width: 123dp;">29  —</div>
+								<div id="mdLibKit29" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 322dp; width: 123dp;">30  —</div>
+								<div id="mdLibKit30" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 344dp; width: 123dp;">31  —</div>
+								<div id="mdLibKit31" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 366dp; width: 123dp;">32  —</div>
+								<div id="mdLibKit32" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 36dp; width: 123dp;">33  —</div>
+								<div id="mdLibKit33" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 58dp; width: 123dp;">34  —</div>
+								<div id="mdLibKit34" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 80dp; width: 123dp;">35  —</div>
+								<div id="mdLibKit35" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 102dp; width: 123dp;">36  —</div>
+								<div id="mdLibKit36" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 124dp; width: 123dp;">37  —</div>
+								<div id="mdLibKit37" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 146dp; width: 123dp;">38  —</div>
+								<div id="mdLibKit38" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 168dp; width: 123dp;">39  —</div>
+								<div id="mdLibKit39" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 190dp; width: 123dp;">40  —</div>
+								<div id="mdLibKit40" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 212dp; width: 123dp;">41  —</div>
+								<div id="mdLibKit41" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 234dp; width: 123dp;">42  —</div>
+								<div id="mdLibKit42" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 256dp; width: 123dp;">43  —</div>
+								<div id="mdLibKit43" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 278dp; width: 123dp;">44  —</div>
+								<div id="mdLibKit44" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 300dp; width: 123dp;">45  —</div>
+								<div id="mdLibKit45" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 322dp; width: 123dp;">46  —</div>
+								<div id="mdLibKit46" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 344dp; width: 123dp;">47  —</div>
+								<div id="mdLibKit47" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 366dp; width: 123dp;">48  —</div>
+								<div id="mdLibKit48" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 36dp; width: 123dp;">49  —</div>
+								<div id="mdLibKit49" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 58dp; width: 123dp;">50  —</div>
+								<div id="mdLibKit50" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 80dp; width: 123dp;">51  —</div>
+								<div id="mdLibKit51" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 102dp; width: 123dp;">52  —</div>
+								<div id="mdLibKit52" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 124dp; width: 123dp;">53  —</div>
+								<div id="mdLibKit53" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 146dp; width: 123dp;">54  —</div>
+								<div id="mdLibKit54" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 168dp; width: 123dp;">55  —</div>
+								<div id="mdLibKit55" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 190dp; width: 123dp;">56  —</div>
+								<div id="mdLibKit56" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 212dp; width: 123dp;">57  —</div>
+								<div id="mdLibKit57" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 234dp; width: 123dp;">58  —</div>
+								<div id="mdLibKit58" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 256dp; width: 123dp;">59  —</div>
+								<div id="mdLibKit59" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 278dp; width: 123dp;">60  —</div>
+								<div id="mdLibKit60" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 300dp; width: 123dp;">61  —</div>
+								<div id="mdLibKit61" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 322dp; width: 123dp;">62  —</div>
+								<div id="mdLibKit62" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 344dp; width: 123dp;">63  —</div>
+								<div id="mdLibKit63" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 366dp; width: 123dp;">64  —</div>
+								<div id="mdLibKit64" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 36dp; width: 123dp;">65  —</div>
+								<div id="mdLibKit65" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 58dp; width: 123dp;">66  —</div>
+								<div id="mdLibKit66" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 80dp; width: 123dp;">67  —</div>
+								<div id="mdLibKit67" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 102dp; width: 123dp;">68  —</div>
+								<div id="mdLibKit68" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 124dp; width: 123dp;">69  —</div>
+								<div id="mdLibKit69" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 146dp; width: 123dp;">70  —</div>
+								<div id="mdLibKit70" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 168dp; width: 123dp;">71  —</div>
+								<div id="mdLibKit71" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 190dp; width: 123dp;">72  —</div>
+								<div id="mdLibKit72" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 212dp; width: 123dp;">73  —</div>
+								<div id="mdLibKit73" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 234dp; width: 123dp;">74  —</div>
+								<div id="mdLibKit74" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 256dp; width: 123dp;">75  —</div>
+								<div id="mdLibKit75" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 278dp; width: 123dp;">76  —</div>
+								<div id="mdLibKit76" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 300dp; width: 123dp;">77  —</div>
+								<div id="mdLibKit77" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 322dp; width: 123dp;">78  —</div>
+								<div id="mdLibKit78" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 344dp; width: 123dp;">79  —</div>
+								<div id="mdLibKit79" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 366dp; width: 123dp;">80  —</div>
+								<div id="mdLibKit80" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 36dp; width: 123dp;">81  —</div>
+								<div id="mdLibKit81" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 58dp; width: 123dp;">82  —</div>
+								<div id="mdLibKit82" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 80dp; width: 123dp;">83  —</div>
+								<div id="mdLibKit83" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 102dp; width: 123dp;">84  —</div>
+								<div id="mdLibKit84" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 124dp; width: 123dp;">85  —</div>
+								<div id="mdLibKit85" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 146dp; width: 123dp;">86  —</div>
+								<div id="mdLibKit86" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 168dp; width: 123dp;">87  —</div>
+								<div id="mdLibKit87" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 190dp; width: 123dp;">88  —</div>
+								<div id="mdLibKit88" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 212dp; width: 123dp;">89  —</div>
+								<div id="mdLibKit89" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 234dp; width: 123dp;">90  —</div>
+								<div id="mdLibKit90" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 256dp; width: 123dp;">91  —</div>
+								<div id="mdLibKit91" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 278dp; width: 123dp;">92  —</div>
+								<div id="mdLibKit92" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 300dp; width: 123dp;">93  —</div>
+								<div id="mdLibKit93" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 322dp; width: 123dp;">94  —</div>
+								<div id="mdLibKit94" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 344dp; width: 123dp;">95  —</div>
+								<div id="mdLibKit95" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 366dp; width: 123dp;">96  —</div>
+								<div id="mdLibKit96" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 36dp; width: 123dp;">97  —</div>
+								<div id="mdLibKit97" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 58dp; width: 123dp;">98  —</div>
+								<div id="mdLibKit98" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 80dp; width: 123dp;">99  —</div>
+								<div id="mdLibKit99" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 102dp; width: 123dp;">100  —</div>
+								<div id="mdLibKit100" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 124dp; width: 123dp;">101  —</div>
+								<div id="mdLibKit101" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 146dp; width: 123dp;">102  —</div>
+								<div id="mdLibKit102" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 168dp; width: 123dp;">103  —</div>
+								<div id="mdLibKit103" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 190dp; width: 123dp;">104  —</div>
+								<div id="mdLibKit104" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 212dp; width: 123dp;">105  —</div>
+								<div id="mdLibKit105" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 234dp; width: 123dp;">106  —</div>
+								<div id="mdLibKit106" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 256dp; width: 123dp;">107  —</div>
+								<div id="mdLibKit107" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 278dp; width: 123dp;">108  —</div>
+								<div id="mdLibKit108" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 300dp; width: 123dp;">109  —</div>
+								<div id="mdLibKit109" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 322dp; width: 123dp;">110  —</div>
+								<div id="mdLibKit110" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 344dp; width: 123dp;">111  —</div>
+								<div id="mdLibKit111" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 366dp; width: 123dp;">112  —</div>
+								<div id="mdLibKit112" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 36dp; width: 123dp;">113  —</div>
+								<div id="mdLibKit113" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 58dp; width: 123dp;">114  —</div>
+								<div id="mdLibKit114" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 80dp; width: 123dp;">115  —</div>
+								<div id="mdLibKit115" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 102dp; width: 123dp;">116  —</div>
+								<div id="mdLibKit116" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 124dp; width: 123dp;">117  —</div>
+								<div id="mdLibKit117" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 146dp; width: 123dp;">118  —</div>
+								<div id="mdLibKit118" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 168dp; width: 123dp;">119  —</div>
+								<div id="mdLibKit119" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 190dp; width: 123dp;">120  —</div>
+								<div id="mdLibKit120" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 212dp; width: 123dp;">121  —</div>
+								<div id="mdLibKit121" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 234dp; width: 123dp;">122  —</div>
+								<div id="mdLibKit122" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 256dp; width: 123dp;">123  —</div>
+								<div id="mdLibKit123" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 278dp; width: 123dp;">124  —</div>
+								<div id="mdLibKit124" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 300dp; width: 123dp;">125  —</div>
+								<div id="mdLibKit125" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 322dp; width: 123dp;">126  —</div>
+								<div id="mdLibKit126" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 344dp; width: 123dp;">127  —</div>
+								<div id="mdLibKit127" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 366dp; width: 123dp;">128  —</div>
+							</div>
+							<div id="mdLibMachines" class="jucePos mdEdBlock" style="left: 16dp; top: 476dp; width: 1068dp; height: 50dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">MACHINES</div>
+								<div id="mdLibDetail" class="jucePos juceLabel mdEdSub" style="left: 120dp; top: 4dp; width: 600dp;">KIT —</div>
+								<div id="mdLibMachine0" class="jucePos juceLabel mdEdNote" style="left: 16dp; top: 28dp; width: 164dp;">01  —</div>
+								<div id="mdLibMachine1" class="jucePos juceLabel mdEdNote" style="left: 186dp; top: 28dp; width: 164dp;">02  —</div>
+								<div id="mdLibMachine2" class="jucePos juceLabel mdEdNote" style="left: 356dp; top: 28dp; width: 164dp;">03  —</div>
+								<div id="mdLibMachine3" class="jucePos juceLabel mdEdNote" style="left: 526dp; top: 28dp; width: 164dp;">04  —</div>
+								<div id="mdLibMachine4" class="jucePos juceLabel mdEdNote" style="left: 696dp; top: 28dp; width: 164dp;">05  —</div>
+								<div id="mdLibMachine5" class="jucePos juceLabel mdEdNote" style="left: 866dp; top: 28dp; width: 164dp;">06  —</div>
+							</div>
+						</div>
+						<div id="mdLibPatternsPage" class="jucePos" tabgroup="mdLib" tabpage="1" style="left: 0dp; top: 0dp; width: 1100dp; height: 538dp;">
+							<div id="mdLibPatterns" class="jucePos mdEdBlock" style="left: 16dp; top: 44dp; width: 1068dp; height: 420dp;">
+								<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">PATTERNS</div>
+								<button id="mdLibCopy" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 110dp; top: 4dp; width: 80dp;">COPIER</button>
+								<button id="mdLibPaste" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 198dp; top: 4dp; width: 140dp;">COLLER</button>
+								<button id="mdLibPatternLoad" class="jucePos juceButton mdEdButton mdEdOff" isToggle="0" style="left: 346dp; top: 4dp; width: 150dp;">CHARGER</button>
+								<div id="mdLibPatternDetail" class="jucePos juceLabel mdEdSub mdEdRight" style="left: 508dp; top: 4dp; width: 544dp;">—</div>
+								<div id="mdLibPattern0" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 36dp; width: 123dp;">A01  —</div>
+								<div id="mdLibPattern1" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 58dp; width: 123dp;">A02  —</div>
+								<div id="mdLibPattern2" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 80dp; width: 123dp;">A03  —</div>
+								<div id="mdLibPattern3" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 102dp; width: 123dp;">A04  —</div>
+								<div id="mdLibPattern4" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 124dp; width: 123dp;">A05  —</div>
+								<div id="mdLibPattern5" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 146dp; width: 123dp;">A06  —</div>
+								<div id="mdLibPattern6" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 168dp; width: 123dp;">A07  —</div>
+								<div id="mdLibPattern7" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 190dp; width: 123dp;">A08  —</div>
+								<div id="mdLibPattern8" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 212dp; width: 123dp;">A09  —</div>
+								<div id="mdLibPattern9" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 234dp; width: 123dp;">A10  —</div>
+								<div id="mdLibPattern10" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 256dp; width: 123dp;">A11  —</div>
+								<div id="mdLibPattern11" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 278dp; width: 123dp;">A12  —</div>
+								<div id="mdLibPattern12" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 300dp; width: 123dp;">A13  —</div>
+								<div id="mdLibPattern13" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 322dp; width: 123dp;">A14  —</div>
+								<div id="mdLibPattern14" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 344dp; width: 123dp;">A15  —</div>
+								<div id="mdLibPattern15" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 16dp; top: 366dp; width: 123dp;">A16  —</div>
+								<div id="mdLibPattern16" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 36dp; width: 123dp;">B01  —</div>
+								<div id="mdLibPattern17" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 58dp; width: 123dp;">B02  —</div>
+								<div id="mdLibPattern18" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 80dp; width: 123dp;">B03  —</div>
+								<div id="mdLibPattern19" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 102dp; width: 123dp;">B04  —</div>
+								<div id="mdLibPattern20" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 124dp; width: 123dp;">B05  —</div>
+								<div id="mdLibPattern21" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 146dp; width: 123dp;">B06  —</div>
+								<div id="mdLibPattern22" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 168dp; width: 123dp;">B07  —</div>
+								<div id="mdLibPattern23" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 190dp; width: 123dp;">B08  —</div>
+								<div id="mdLibPattern24" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 212dp; width: 123dp;">B09  —</div>
+								<div id="mdLibPattern25" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 234dp; width: 123dp;">B10  —</div>
+								<div id="mdLibPattern26" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 256dp; width: 123dp;">B11  —</div>
+								<div id="mdLibPattern27" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 278dp; width: 123dp;">B12  —</div>
+								<div id="mdLibPattern28" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 300dp; width: 123dp;">B13  —</div>
+								<div id="mdLibPattern29" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 322dp; width: 123dp;">B14  —</div>
+								<div id="mdLibPattern30" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 344dp; width: 123dp;">B15  —</div>
+								<div id="mdLibPattern31" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 145dp; top: 366dp; width: 123dp;">B16  —</div>
+								<div id="mdLibPattern32" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 36dp; width: 123dp;">C01  —</div>
+								<div id="mdLibPattern33" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 58dp; width: 123dp;">C02  —</div>
+								<div id="mdLibPattern34" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 80dp; width: 123dp;">C03  —</div>
+								<div id="mdLibPattern35" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 102dp; width: 123dp;">C04  —</div>
+								<div id="mdLibPattern36" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 124dp; width: 123dp;">C05  —</div>
+								<div id="mdLibPattern37" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 146dp; width: 123dp;">C06  —</div>
+								<div id="mdLibPattern38" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 168dp; width: 123dp;">C07  —</div>
+								<div id="mdLibPattern39" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 190dp; width: 123dp;">C08  —</div>
+								<div id="mdLibPattern40" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 212dp; width: 123dp;">C09  —</div>
+								<div id="mdLibPattern41" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 234dp; width: 123dp;">C10  —</div>
+								<div id="mdLibPattern42" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 256dp; width: 123dp;">C11  —</div>
+								<div id="mdLibPattern43" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 278dp; width: 123dp;">C12  —</div>
+								<div id="mdLibPattern44" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 300dp; width: 123dp;">C13  —</div>
+								<div id="mdLibPattern45" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 322dp; width: 123dp;">C14  —</div>
+								<div id="mdLibPattern46" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 344dp; width: 123dp;">C15  —</div>
+								<div id="mdLibPattern47" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 274dp; top: 366dp; width: 123dp;">C16  —</div>
+								<div id="mdLibPattern48" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 36dp; width: 123dp;">D01  —</div>
+								<div id="mdLibPattern49" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 58dp; width: 123dp;">D02  —</div>
+								<div id="mdLibPattern50" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 80dp; width: 123dp;">D03  —</div>
+								<div id="mdLibPattern51" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 102dp; width: 123dp;">D04  —</div>
+								<div id="mdLibPattern52" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 124dp; width: 123dp;">D05  —</div>
+								<div id="mdLibPattern53" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 146dp; width: 123dp;">D06  —</div>
+								<div id="mdLibPattern54" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 168dp; width: 123dp;">D07  —</div>
+								<div id="mdLibPattern55" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 190dp; width: 123dp;">D08  —</div>
+								<div id="mdLibPattern56" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 212dp; width: 123dp;">D09  —</div>
+								<div id="mdLibPattern57" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 234dp; width: 123dp;">D10  —</div>
+								<div id="mdLibPattern58" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 256dp; width: 123dp;">D11  —</div>
+								<div id="mdLibPattern59" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 278dp; width: 123dp;">D12  —</div>
+								<div id="mdLibPattern60" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 300dp; width: 123dp;">D13  —</div>
+								<div id="mdLibPattern61" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 322dp; width: 123dp;">D14  —</div>
+								<div id="mdLibPattern62" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 344dp; width: 123dp;">D15  —</div>
+								<div id="mdLibPattern63" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 403dp; top: 366dp; width: 123dp;">D16  —</div>
+								<div id="mdLibPattern64" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 36dp; width: 123dp;">E01  —</div>
+								<div id="mdLibPattern65" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 58dp; width: 123dp;">E02  —</div>
+								<div id="mdLibPattern66" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 80dp; width: 123dp;">E03  —</div>
+								<div id="mdLibPattern67" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 102dp; width: 123dp;">E04  —</div>
+								<div id="mdLibPattern68" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 124dp; width: 123dp;">E05  —</div>
+								<div id="mdLibPattern69" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 146dp; width: 123dp;">E06  —</div>
+								<div id="mdLibPattern70" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 168dp; width: 123dp;">E07  —</div>
+								<div id="mdLibPattern71" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 190dp; width: 123dp;">E08  —</div>
+								<div id="mdLibPattern72" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 212dp; width: 123dp;">E09  —</div>
+								<div id="mdLibPattern73" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 234dp; width: 123dp;">E10  —</div>
+								<div id="mdLibPattern74" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 256dp; width: 123dp;">E11  —</div>
+								<div id="mdLibPattern75" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 278dp; width: 123dp;">E12  —</div>
+								<div id="mdLibPattern76" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 300dp; width: 123dp;">E13  —</div>
+								<div id="mdLibPattern77" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 322dp; width: 123dp;">E14  —</div>
+								<div id="mdLibPattern78" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 344dp; width: 123dp;">E15  —</div>
+								<div id="mdLibPattern79" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 532dp; top: 366dp; width: 123dp;">E16  —</div>
+								<div id="mdLibPattern80" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 36dp; width: 123dp;">F01  —</div>
+								<div id="mdLibPattern81" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 58dp; width: 123dp;">F02  —</div>
+								<div id="mdLibPattern82" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 80dp; width: 123dp;">F03  —</div>
+								<div id="mdLibPattern83" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 102dp; width: 123dp;">F04  —</div>
+								<div id="mdLibPattern84" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 124dp; width: 123dp;">F05  —</div>
+								<div id="mdLibPattern85" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 146dp; width: 123dp;">F06  —</div>
+								<div id="mdLibPattern86" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 168dp; width: 123dp;">F07  —</div>
+								<div id="mdLibPattern87" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 190dp; width: 123dp;">F08  —</div>
+								<div id="mdLibPattern88" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 212dp; width: 123dp;">F09  —</div>
+								<div id="mdLibPattern89" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 234dp; width: 123dp;">F10  —</div>
+								<div id="mdLibPattern90" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 256dp; width: 123dp;">F11  —</div>
+								<div id="mdLibPattern91" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 278dp; width: 123dp;">F12  —</div>
+								<div id="mdLibPattern92" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 300dp; width: 123dp;">F13  —</div>
+								<div id="mdLibPattern93" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 322dp; width: 123dp;">F14  —</div>
+								<div id="mdLibPattern94" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 344dp; width: 123dp;">F15  —</div>
+								<div id="mdLibPattern95" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 661dp; top: 366dp; width: 123dp;">F16  —</div>
+								<div id="mdLibPattern96" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 36dp; width: 123dp;">G01  —</div>
+								<div id="mdLibPattern97" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 58dp; width: 123dp;">G02  —</div>
+								<div id="mdLibPattern98" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 80dp; width: 123dp;">G03  —</div>
+								<div id="mdLibPattern99" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 102dp; width: 123dp;">G04  —</div>
+								<div id="mdLibPattern100" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 124dp; width: 123dp;">G05  —</div>
+								<div id="mdLibPattern101" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 146dp; width: 123dp;">G06  —</div>
+								<div id="mdLibPattern102" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 168dp; width: 123dp;">G07  —</div>
+								<div id="mdLibPattern103" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 190dp; width: 123dp;">G08  —</div>
+								<div id="mdLibPattern104" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 212dp; width: 123dp;">G09  —</div>
+								<div id="mdLibPattern105" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 234dp; width: 123dp;">G10  —</div>
+								<div id="mdLibPattern106" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 256dp; width: 123dp;">G11  —</div>
+								<div id="mdLibPattern107" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 278dp; width: 123dp;">G12  —</div>
+								<div id="mdLibPattern108" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 300dp; width: 123dp;">G13  —</div>
+								<div id="mdLibPattern109" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 322dp; width: 123dp;">G14  —</div>
+								<div id="mdLibPattern110" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 344dp; width: 123dp;">G15  —</div>
+								<div id="mdLibPattern111" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 790dp; top: 366dp; width: 123dp;">G16  —</div>
+								<div id="mdLibPattern112" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 36dp; width: 123dp;">H01  —</div>
+								<div id="mdLibPattern113" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 58dp; width: 123dp;">H02  —</div>
+								<div id="mdLibPattern114" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 80dp; width: 123dp;">H03  —</div>
+								<div id="mdLibPattern115" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 102dp; width: 123dp;">H04  —</div>
+								<div id="mdLibPattern116" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 124dp; width: 123dp;">H05  —</div>
+								<div id="mdLibPattern117" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 146dp; width: 123dp;">H06  —</div>
+								<div id="mdLibPattern118" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 168dp; width: 123dp;">H07  —</div>
+								<div id="mdLibPattern119" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 190dp; width: 123dp;">H08  —</div>
+								<div id="mdLibPattern120" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 212dp; width: 123dp;">H09  —</div>
+								<div id="mdLibPattern121" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 234dp; width: 123dp;">H10  —</div>
+								<div id="mdLibPattern122" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 256dp; width: 123dp;">H11  —</div>
+								<div id="mdLibPattern123" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 278dp; width: 123dp;">H12  —</div>
+								<div id="mdLibPattern124" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 300dp; width: 123dp;">H13  —</div>
+								<div id="mdLibPattern125" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 322dp; width: 123dp;">H14  —</div>
+								<div id="mdLibPattern126" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 344dp; width: 123dp;">H15  —</div>
+								<div id="mdLibPattern127" class="jucePos juceLabel mdLibKit mdEdUnread" style="left: 919dp; top: 366dp; width: 123dp;">H16  —</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- SYSTÈME: the machine and the plug-in, one row per subject. -->
+			<div id="mdEdPageSystem" class="mdEdPage" tabgroup="mdEdit" tabpage="4">
+				<div class="mdEdScroll">
+					<div class="mdEdContent" style="height: 412dp;">
+						<div id="mdSysList" class="jucePos mdEdBlock" style="left: 16dp; top: 12dp; width: 1068dp; height: 360dp;">
+							<div class="jucePos juceLabel mdEdTitle" style="left: 16dp; top: 4dp; width: 1036dp;">SYSTÈME</div>
+							<div class="jucePos juceLabel mdEdSub mdEdRight" style="left: 16dp; top: 4dp; width: 1036dp;">machine entière et plug-in</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 32dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">RÉGLAGES GLOBAUX</div>
+								<div id="mdSysGlobalState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<div class="jucePos juceLabel mdEdNote mdEdRight" style="left: 884dp; top: 12dp; width: 152dp;">face avant</div>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 72dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">SYNCHRO DAW</div>
+								<div id="mdSysFollowState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysFollowTempo" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">SUIVRE L'HÔTE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 112dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">TRANSPORT PARALLÈLE</div>
+								<div id="mdSysParallelState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysParallel" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">PARALLÈLE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 152dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">TRANSFERT SYSEX</div>
+								<div id="mdSysSysexState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">—</div>
+								<button id="mdSysSysex" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">FICHIER…</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 192dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">STOCKAGE MACHINE</div>
+								<div id="mdSysStorageState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">remplace toute la mémoire de la machine (kits, patterns, samples) ; confirmation demandée</div>
+								<button id="mdSysStorage" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">CHARGER…</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 232dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">ÉCHELLE DE L'INTERFACE</div>
+								<div id="mdSysScale50" class="jucePos mdEdSeg mdEdSegChoice" style="left: 254dp; top: 8dp; width: 51dp;">50 %</div>
+								<div id="mdSysScale65" class="jucePos mdEdSeg mdEdSegChoice" style="left: 305dp; top: 8dp; width: 51dp;">65 %</div>
+								<div id="mdSysScale75" class="jucePos mdEdSeg mdEdSegChoice" style="left: 356dp; top: 8dp; width: 51dp;">75 %</div>
+								<div id="mdSysScale85" class="jucePos mdEdSeg mdEdSegChoice" style="left: 407dp; top: 8dp; width: 51dp;">85 %</div>
+								<div id="mdSysScale100" class="jucePos mdEdSeg mdEdSegChoice" style="left: 458dp; top: 8dp; width: 51dp;">100 %</div>
+								<div id="mdSysScale125" class="jucePos mdEdSeg mdEdSegChoice" style="left: 509dp; top: 8dp; width: 51dp;">125 %</div>
+								<div id="mdSysScale130" class="jucePos mdEdSeg mdEdSegChoice" style="left: 560dp; top: 8dp; width: 51dp;">130 %</div>
+								<div id="mdSysScale150" class="jucePos mdEdSeg mdEdSegChoice" style="left: 611dp; top: 8dp; width: 51dp;">150 %</div>
+								<div id="mdSysScale175" class="jucePos mdEdSeg mdEdSegChoice" style="left: 662dp; top: 8dp; width: 51dp;">175 %</div>
+								<div id="mdSysScale200" class="jucePos mdEdSeg mdEdSegChoice" style="left: 713dp; top: 8dp; width: 51dp;">200 %</div>
+								<div id="mdSysScale250" class="jucePos mdEdSeg mdEdSegChoice" style="left: 764dp; top: 8dp; width: 51dp;">250 %</div>
+								<div id="mdSysScale300" class="jucePos mdEdSeg mdEdSegChoice" style="left: 815dp; top: 8dp; width: 51dp;">300 %</div>
+								<div id="mdSysScaleState" class="jucePos juceLabel mdEdNote mdEdRight" style="left: 884dp; top: 12dp; width: 152dp;">—</div>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 272dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">DIAGNOSTICS</div>
+								<div id="mdSysDiagnosticsState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 438dp;">—</div>
+								<button id="mdSysLogs" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 704dp; top: 8dp; width: 152dp;">JOURNAUX…</button>
+								<button id="mdSysCapture" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">CAPTURE</button>
+							</div>
+							<div class="jucePos mdEdRow" style="left: 16dp; top: 312dp; width: 1036dp; height: 40dp;">
+								<div class="jucePos juceLabel mdEdRowName" style="left: 0dp; top: 7dp; width: 258dp;">PLUG-IN</div>
+								<div id="mdSysPluginState" class="jucePos juceLabel mdEdNote" style="left: 254dp; top: 12dp; width: 618dp;">skin, rendu, ports MIDI, MIDI Learn, entrée audio ; le même menu dans OPTIONS ou au clic droit</div>
+								<button id="mdSysSettings" class="jucePos juceButton mdEdButton" isToggle="0" style="left: 884dp; top: 8dp; width: 152dp;">RÉGLAGES…</button>
+							</div>
+						</div>
+						<div class="jucePos juceLabel mdEdNote" style="left: 32dp; top: 384dp; width: 1036dp;">Les réglages de la machine (canaux MIDI, sync) se font sur sa face avant, menu GLOBAL.</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</body>
 </rml>

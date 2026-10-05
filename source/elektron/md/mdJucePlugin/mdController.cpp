@@ -6,6 +6,7 @@
 #include "mdLib/mdsysexautomation.h"
 
 #include <algorithm>
+#include <bitset>
 #include <chrono>
 #include <set>
 
@@ -13,6 +14,19 @@ namespace mdJucePlugin
 {
 	namespace
 	{
+		// What the step grid shows of a pattern: trigs, lock rows and length.
+		bool samePattern(const md::automation::sysex::PatternDump& _a, const md::automation::sysex::PatternDump& _b)
+		{
+			return _a.length == _b.length && _a.trigs == _b.trigs && _a.lockMasks == _b.lockMasks && _a.lockRows == _b.lockRows;
+		}
+
+		// The Monomachine encodes a dump its own way (a byte more or less): the pattern, not the bytes
+		bool sameMmPattern(const md::automation::sysex::MmPatternDump& _a, const md::automation::sysex::MmPatternDump& _b)
+		{
+			return _a.length == _b.length && _a.kit == _b.kit && _a.trigs == _b.trigs && _a.ampTrigs == _b.ampTrigs
+				&& _a.notes == _b.notes && _a.lockMasks == _b.lockMasks && _a.lockRows == _b.lockRows;
+		}
+
 		constexpr uint64_t g_dumpRequestRetryMs = 2000;
 		constexpr uint8_t g_snapshotVersion = 2;
 		constexpr uint8_t g_snapshotComplete = 1u << 0;
@@ -39,6 +53,12 @@ namespace mdJucePlugin
 			? "parameterDescriptions_mm.json" : "parameterDescriptions_md.json")
 		, m_model(_p.getModel())
 	{
+		for(auto& machine : m_trackMachines)
+			machine.store(md::machines::g_unknown, std::memory_order_relaxed);
+		for(auto& value : m_masterEffects)
+			value.store(0xff, std::memory_order_relaxed);
+		for(auto& output : m_trackOutputs)
+			output.store(0xff, std::memory_order_relaxed);
 		registerParams(_p, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
 			return _nonPartSensitive ? juce::String("Global")
@@ -111,13 +131,14 @@ namespace mdJucePlugin
 	std::vector<uint8_t> Controller::createAutomationSnapshot() const
 	{
 		const auto epoch = m_synchronizationEpoch.load(std::memory_order_acquire);
-		const auto complete = m_automationReady.load(std::memory_order_acquire)
+		const auto synchronized = m_automationReady.load(std::memory_order_acquire)
 			&& m_haveGlobal.load(std::memory_order_acquire)
 			&& m_haveKit.load(std::memory_order_acquire)
 			&& m_currentKit.load(std::memory_order_acquire) != 0xff;
 		std::vector<uint64_t> publications;
 		publications.reserve(getExposedParameters().size());
 		bool hasPendingIntent = false;
+		bool hasUnknownValue = false;
 		for(const auto& [address, parameters] : getExposedParameters())
 		{
 			if(parameters.empty())
@@ -129,7 +150,11 @@ namespace mdJucePlugin
 			const auto publication = slot->publication.load(std::memory_order_acquire);
 			publications.push_back(publication);
 			hasPendingIntent |= publicationIsDirty(publication);
+			hasUnknownValue |= slot->valueUnknown.load(std::memory_order_acquire);
 		}
+		// A value the firmware changed unseen is no baseline: restoring the cached
+		// one would overwrite what the firmware holds.
+		const auto complete = synchronized && !hasUnknownValue;
 		// Before the first coherent firmware snapshot, persist only meaningful host/UI
 		// intent. This avoids turning constructor defaults into writes merely because a
 		// host saved while the machine was still booting.
@@ -271,6 +296,947 @@ namespace mdJucePlugin
 		sendMissingSynchronizationRequests();
 	}
 
+	uint16_t Controller::getTrackMachine(const uint8_t _part) const
+	{
+		return _part < getPartCount() ? m_trackMachines[_part].load(std::memory_order_acquire)
+			: md::machines::g_unknown;
+	}
+
+	void Controller::storeKitMachines(const std::vector<uint16_t>& _machines,
+		const bool _authoritative)
+	{
+		const auto count = std::min<size_t>(_machines.size(), getPartCount());
+		for(size_t track = 0; track < count; ++track)
+		{
+			auto& stored = m_trackMachines[track];
+			const auto previous = stored.load(std::memory_order_acquire);
+			if(!_authoritative && previous != md::machines::g_unknown)
+				continue;
+			if(previous == _machines[track])
+				continue;
+			stored.store(_machines[track], std::memory_order_release);
+			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		}
+	}
+
+	bool Controller::assignMachine(const uint8_t _part, const uint16_t _machine)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_part >= getPartCount())
+			return false;
+		const auto message = md::automation::sysex::assignMachine(m_model, _part, _machine);
+		if(!message)
+			return false;
+
+		sendEditorSysex(*message);
+
+		// What the firmware does to the track's values (mdEditorFirmwareTest): the
+		// Machinedrum loads the new machine's defaults on its synthesis, effects and
+		// routing pages and keeps the level; the Monomachine, told not to initialise,
+		// keeps its pages but adapts some synthesis values to the new machine. A value
+		// not delivered yet reaches the firmware after the assignment and stays known.
+		const auto lastChangedPage = m_model == md::MachineModel::Monomachine
+			? md::automation::monomachine::Synthesis : md::automation::machinedrum::Routing;
+		bool changed = false;
+		for(auto& slot : m_automationSlots)
+		{
+			if(slot.address.track != _part || slot.address.page > lastChangedPage
+				|| publicationIsDirty(slot.publication.load(std::memory_order_acquire)))
+				continue;
+			changed |= !slot.valueUnknown.exchange(true, std::memory_order_acq_rel);
+		}
+		if(changed)
+			m_valueStateRevision.fetch_add(1, std::memory_order_acq_rel);
+
+		if(m_trackMachines[_part].exchange(_machine, std::memory_order_acq_rel) != _machine)
+			m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+		// Until the live Kit shows it, the machine it still shows is not taken for a front panel change
+		m_assignmentMs[_part] = std::max<uint64_t>(milliseconds(), 1);
+		return true;
+	}
+
+	void Controller::storeMasterEffects(const md::automation::sysex::MasterEffects& _effects, const bool _authoritative)
+	{
+		bool changed = false;
+		for(uint8_t effect = 0; effect < _effects.size(); ++effect)
+		{
+			for(uint8_t parameter = 0; parameter < _effects[effect].size(); ++parameter)
+			{
+				auto& stored = m_masterEffects[effect * md::automation::sysex::MasterEffectParameters + parameter];
+				const auto previous = stored.load(std::memory_order_acquire);
+				if((!_authoritative && previous != 0xff) || previous == _effects[effect][parameter])
+					continue;
+				stored.store(_effects[effect][parameter], std::memory_order_release);
+				changed = true;
+			}
+		}
+		if(changed)
+			m_masterEffectRevision.fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	std::optional<uint8_t> Controller::getMasterEffect(const md::automation::sysex::MasterEffect _effect,
+		const uint8_t _parameter) const
+	{
+		const auto effect = static_cast<uint8_t>(_effect);
+		if(effect >= md::automation::sysex::MasterEffectCount || _parameter >= md::automation::sysex::MasterEffectParameters)
+			return std::nullopt;
+		const auto value = m_masterEffects[effect * md::automation::sysex::MasterEffectParameters + _parameter]
+			.load(std::memory_order_acquire);
+		return value <= 0x7f ? std::optional<uint8_t>(value) : std::nullopt;
+	}
+
+	bool Controller::setMasterEffect(const md::automation::sysex::MasterEffect _effect, const uint8_t _parameter,
+		const uint8_t _value)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::masterEffectChange(_effect, _parameter, _value);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		m_masterEffectEditMs = milliseconds();
+		auto& stored = m_masterEffects[static_cast<uint8_t>(_effect) * md::automation::sysex::MasterEffectParameters + _parameter];
+		if(stored.exchange(_value, std::memory_order_acq_rel) != _value)
+			m_masterEffectRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	namespace
+	{
+		constexpr uint64_t g_lfoKnown = uint64_t{1} << 40;
+
+		uint64_t packLfo(const md::LfoSettings& _lfo)
+		{
+			return g_lfoKnown | _lfo.track | uint64_t{_lfo.parameter} << 8 | uint64_t{_lfo.shape1} << 16
+				| uint64_t{_lfo.shape2} << 24 | uint64_t{_lfo.update} << 32;
+		}
+
+		md::LfoSettings unpackLfo(const uint64_t _packed)
+		{
+			return {static_cast<uint8_t>(_packed), static_cast<uint8_t>(_packed >> 8), static_cast<uint8_t>(_packed >> 16),
+				static_cast<uint8_t>(_packed >> 24), static_cast<uint8_t>(_packed >> 32)};
+		}
+	}
+
+	void Controller::storeLfo(const uint8_t _track, const md::LfoSettings& _lfo, const bool _authoritative)
+	{
+		if(_track >= m_trackLfos.size())
+			return;
+		auto& stored = m_trackLfos[_track];
+		const auto previous = stored.load(std::memory_order_acquire);
+		if((!_authoritative && previous) || previous == packLfo(_lfo))
+			return;
+		stored.store(packLfo(_lfo), std::memory_order_release);
+		m_lfoRevision.fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	std::optional<md::LfoSettings> Controller::getTrackLfo(const uint8_t _part) const
+	{
+		if(_part >= m_trackLfos.size())
+			return std::nullopt;
+		const auto packed = m_trackLfos[_part].load(std::memory_order_acquire);
+		return packed ? std::optional<md::LfoSettings>(unpackLfo(packed)) : std::nullopt;
+	}
+
+	bool Controller::setTrackLfo(const uint8_t _part, const uint8_t _field, const uint8_t _value)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::lfoChange(_part, _field, _value);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		m_lfoEditMs[_part] = milliseconds();
+		// A field of an LFO still unknown is sent, not kept: the others are not known
+		if(auto lfo = getTrackLfo(_part))
+		{
+			uint8_t* fields[] = {&lfo->track, &lfo->parameter, &lfo->shape1, &lfo->shape2, &lfo->update};
+			*fields[_field] = _value;
+			storeLfo(_part, *lfo, true);
+		}
+		return true;
+	}
+
+	bool Controller::readLibrary()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(!firmwareReadyForAutomation())
+			return false;
+		{
+			const std::lock_guard lock(m_libraryMutex);
+			m_library.assign(getKitLibrarySize(), LibraryKit{});
+			m_libraryPatterns.assign(PatternLibrarySize, LibraryPattern{});
+		}
+		m_libraryProgress.store(0, std::memory_order_release);
+		m_libraryReading.store(true, std::memory_order_release);
+		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+		requestLibraryItem(0, milliseconds());
+		return true;
+	}
+
+	void Controller::requestLibraryItem(const size_t _item, const uint64_t _now)
+	{
+		// One request at a time: a Kit dump takes the MIDI line about 0.4 s, a pattern dump up to 1.8 s
+		const auto kits = getKitLibrarySize();
+		if(_item >= kits + PatternLibrarySize)
+		{
+			m_libraryReading.store(false, std::memory_order_release);
+			m_libraryDone.store(true, std::memory_order_release);
+			m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+			return;
+		}
+		m_libraryWaiting = _item;
+		m_libraryRequestMs = _now;
+		if(_item < kits)
+			sendEditorSysex(md::automation::sysex::kitRequest(m_model, static_cast<uint8_t>(_item)));
+		else
+			sendEditorSysex(md::automation::sysex::patternRequest(m_model, static_cast<uint8_t>(_item - kits)));
+	}
+
+	void Controller::storeLibraryPattern(const uint8_t _slot, const LibraryPattern& _pattern)
+	{
+		// Any dump keeps the library up to date once a reading began: a copy read back, a write
+		{
+			const std::lock_guard lock(m_libraryMutex);
+			if(_slot >= m_libraryPatterns.size())
+				return;
+			m_libraryPatterns[_slot] = _pattern;
+		}
+		m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+		const auto kits = getKitLibrarySize();
+		if(!m_libraryReading.load(std::memory_order_acquire) || m_libraryWaiting < kits || _slot != m_libraryWaiting - kits)
+			return;
+		m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+		requestLibraryItem(m_libraryWaiting + 1, milliseconds());
+	}
+
+	std::optional<Controller::LibraryKit> Controller::getLibraryKit(const uint8_t _slot) const
+	{
+		const std::lock_guard lock(m_libraryMutex);
+		if(_slot >= m_library.size())
+			return std::nullopt;
+		return m_library[_slot];
+	}
+
+	std::optional<Controller::LibraryPattern> Controller::getLibraryPattern(const uint8_t _slot) const
+	{
+		const std::lock_guard lock(m_libraryMutex);
+		if(_slot >= m_libraryPatterns.size())
+			return std::nullopt;
+		return m_libraryPatterns[_slot];
+	}
+
+	std::optional<md::automation::sysex::TrackOutput> Controller::getTrackOutput(const uint8_t _track) const
+	{
+		if(_track >= m_trackOutputs.size())
+			return std::nullopt;
+		const auto output = m_trackOutputs[_track].load(std::memory_order_acquire);
+		return output <= static_cast<uint8_t>(md::automation::sysex::TrackOutput::Main)
+			? std::optional<md::automation::sysex::TrackOutput>(static_cast<md::automation::sysex::TrackOutput>(output))
+			: std::nullopt;
+	}
+
+	bool Controller::setTrackOutput(const uint8_t _track, const md::automation::sysex::TrackOutput _output)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(m_model != md::MachineModel::Machinedrum || !firmwareReadyForAutomation())
+			return false;
+		const auto message = md::automation::sysex::trackRouting(_track, _output);
+		if(!message)
+			return false;
+		sendEditorSysex(*message);
+		++m_routingWrites;
+		if(m_trackOutputs[_track].exchange(static_cast<uint8_t>(_output), std::memory_order_acq_rel) != static_cast<uint8_t>(_output))
+			m_routingRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	bool Controller::isValueKnown(const uint8_t _page, const uint8_t _part, const uint8_t _index) const
+	{
+		const auto* const slot = findAutomationSlot({_page, _part, _index});
+		return slot == nullptr || !slot->valueUnknown.load(std::memory_order_acquire);
+	}
+
+	void Controller::markValueKnown(AutomationSlot& _slot)
+	{
+		// Lock-free: host automation calls this from the audio thread.
+		if(_slot.valueUnknown.load(std::memory_order_acquire)
+			&& _slot.valueUnknown.exchange(false, std::memory_order_acq_rel))
+			m_valueStateRevision.fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	void Controller::sendEditorSysex(const md::automation::sysex::Message& _message) const
+	{
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex = toPluginSysex(_message);
+		sendMidiEvent(event);
+	}
+
+	bool Controller::requestPattern()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(!firmwareReadyForAutomation())
+			return false;
+		m_patternWanted.store(true, std::memory_order_release);
+		sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+			md::automation::sysex::StatusParameter::Pattern));
+		return true;
+	}
+
+	bool Controller::requestPatternDump(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_slot >= 128 || !firmwareReadyForAutomation())
+			return false;
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, _slot));
+		return true;
+	}
+
+	std::optional<md::automation::sysex::PatternDump> Controller::getPattern() const
+	{
+		const std::lock_guard lock(m_patternMutex);
+		return m_pattern;
+	}
+
+	std::optional<md::automation::sysex::MmPatternDump> Controller::getMmPattern() const
+	{
+		const std::lock_guard lock(m_patternMutex);
+		return m_mmPattern;
+	}
+
+	std::string Controller::getKitName() const
+	{
+		const std::lock_guard lock(m_kitNameMutex);
+		return m_kitName;
+	}
+
+	bool Controller::editPattern(const std::function<bool(md::automation::sysex::MdPatternEditor&)>& _edit)
+	{
+		if(m_model != md::MachineModel::Machinedrum)
+			return false;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternDump.empty())
+				return false;
+			auto editor = md::automation::sysex::MdPatternEditor::fromDump(m_patternDump);
+			if(!editor || !_edit(*editor))
+				return false;
+			auto dump = editor->toDump();
+			auto pattern = md::automation::sysex::parseMdPatternDump(dump);
+			if(!pattern)
+				return false;
+			m_patternDump = std::move(dump);
+			m_pattern = std::move(*pattern);
+			m_patternEdited = true;
+		}
+		m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	bool Controller::editMmPattern(const std::function<bool(md::automation::sysex::MmPatternEditor&)>& _edit)
+	{
+		if(m_model != md::MachineModel::Monomachine)
+			return false;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternDump.empty() || !m_mmPattern)
+				return false;
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(m_patternDump);
+			if(!editor || !_edit(*editor))
+				return false;
+			auto dump = editor->toDump();
+			auto pattern = md::automation::sysex::parseMmPatternDump(dump);
+			if(!pattern)
+				return false;
+			m_patternDump = std::move(dump);
+			m_mmPattern = std::move(*pattern);
+			m_patternEdited = true;
+		}
+		m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+		return true;
+	}
+
+	bool Controller::setMmPatternTrig(const uint8_t _track, const uint8_t _step, const std::optional<uint8_t> _note)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setTrig(_track, _step, _note);
+		});
+	}
+
+	bool Controller::setMmPatternLock(const uint8_t _track, const uint8_t _bit, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setLock(_track, _bit, _step, _value);
+		});
+	}
+
+	bool Controller::setPatternTrig(const uint8_t _track, const uint8_t _step, const bool _on)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setTrig(_track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternLock(const uint8_t _track, const uint8_t _parameter, const uint8_t _step,
+		const std::optional<uint8_t> _value)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setLock(_track, _parameter, _step, _value);
+		});
+	}
+
+	bool Controller::setPatternFlag(const md::automation::sysex::StepFlag _flag, const std::optional<uint8_t> _track,
+		const uint8_t _step, const bool _on)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setFlag(_flag, _track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternFlagPerTrack(const md::automation::sysex::StepFlag _flag, const bool _perTrack)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setFlagPerTrack(_flag, _perTrack);
+		});
+	}
+
+	bool Controller::setPatternAccentAmount(const uint8_t _amount)
+	{
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setAccentAmount(_amount);
+		});
+	}
+
+	bool Controller::setMmPatternFlag(const md::automation::sysex::StepFlag _flag, const uint8_t _track,
+		const uint8_t _step, const bool _on)
+	{
+		return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+		{
+			return _editor.setFlag(_flag, _track, _step, _on);
+		});
+	}
+
+	bool Controller::setPatternSwingAmount(const uint8_t _percent)
+	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([&](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				return _editor.setSwingAmount(_percent);
+			});
+		}
+		return editPattern([&](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setSwingAmount(_percent);
+		});
+	}
+
+	bool Controller::clearPattern()
+	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				_editor.clear();
+				return true;
+			});
+		}
+		return editPattern([](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			_editor.clear();
+			return true;
+		});
+	}
+
+	bool Controller::setPatternLength(const uint8_t _length)
+	{
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			return editMmPattern([_length](md::automation::sysex::MmPatternEditor& _editor)
+			{
+				return _editor.setLength(_length);
+			});
+		}
+		return editPattern([_length](md::automation::sysex::MdPatternEditor& _editor)
+		{
+			return _editor.setLength(_length);
+		});
+	}
+
+	void Controller::sendPatternSoon()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto now = milliseconds();
+		if(!m_patternWriteFirstMs)
+			m_patternWriteFirstMs = now;
+		m_patternWriteLastMs = now;
+	}
+
+	void Controller::servicePatternWrite(const uint64_t _now)
+	{
+		// A Monomachine write not read back in time (its machine replaced, say): the next one may go
+		if(m_model == md::MachineModel::Monomachine && _now - m_mmWriteMs > MmWriteTimeoutMilliseconds)
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(m_patternWritesInFlight > 0)
+			{
+				m_patternWritesInFlight = 0;
+				m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+			}
+		}
+		if(m_livePatternWrite)
+			serviceLivePatternWrite();
+		if(!m_patternWriteFirstMs)
+		{
+			if(m_model != md::MachineModel::Monomachine)
+				verifyPatternWrite(_now);
+			return;
+		}
+		// Written in the RAM, an edit costs the machine nothing: at once, as a grid edit
+		if(!livePatternWritable() && _now - m_patternWriteLastMs < PatternWritePauseMilliseconds
+			&& _now - m_patternWriteFirstMs < PatternWriteMaxDelayMilliseconds)
+			return;
+		(void)sendPattern();
+	}
+
+	bool Controller::livePatternWritable() const
+	{
+		if(m_model != md::MachineModel::Machinedrum)
+			return false;
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		return status && status->livePatternSupported;
+	}
+
+	void Controller::serviceLivePatternWrite()
+	{
+		const auto& control = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLivePatternControl();
+		if(control.getDone() < m_livePatternWrite)
+			return;
+		const bool refused = control.getRefused() >= m_livePatternWrite;
+		m_livePatternWrite = 0;
+		if(!refused)
+		{
+			// Edits made since wait for their own write
+			if(!m_patternWriteFirstMs)
+				m_patternWrite.store(PatternWrite::Written, std::memory_order_release);
+			return;
+		}
+		// The machine's pattern changed under the edit (edited on the machine, another pattern selected): read
+		// again, and the next edit goes as a dump
+		{
+			const std::lock_guard lock(m_patternMutex);
+			m_patternMachineDump.clear();
+			m_patternMachineSlot = NoPattern;
+		}
+		m_patternWrite.store(PatternWrite::Refused, std::memory_order_release);
+		(void)requestPattern();
+	}
+
+	void Controller::verifyPatternWrite(const uint64_t _now)
+	{
+		uint8_t slot = 0;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(!m_patternVerifyDueMs || _now < m_patternVerifyDueMs || !m_patternSent)
+				return;
+			m_patternVerifyDueMs = 0;
+			slot = m_patternSent->slot;
+			++m_patternWritesInFlight;
+		}
+		m_patternRequestedSlot.store(slot, std::memory_order_release);
+		m_patternWanted.store(true, std::memory_order_release);
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
+	}
+
+	void Controller::writeMmDump(const md::automation::sysex::Message& _dump, const uint8_t _slot)
+	{
+		// The Monomachine reloads the Kit of the selected pattern when it takes it, as the Machinedrum does:
+		// the live Kit is saved first (mmPatternWriteFirmwareTest)
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(_slot == m_currentPattern.load(std::memory_order_acquire) && kit < getKitLibrarySize())
+			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		static_cast<AudioPluginAudioProcessor&>(getProcessor()).getMmPatternWriteControl().request({_dump},
+			{md::automation::sysex::patternRequest(m_model, _slot)});
+		m_mmWriteMs = milliseconds();
+	}
+
+	bool Controller::sendPattern()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(!firmwareReadyForAutomation())
+			return false;
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			// A write at a time: the edits wait for the one under way, the controller timer sends them after it
+			md::automation::sysex::Message dump;
+			uint8_t slot = 0;
+			{
+				const std::lock_guard lock(m_patternMutex);
+				// Nothing left to write (the edits gave way to another pattern's dump, say): no write waits
+				if(!m_patternEdited || !m_mmPattern)
+				{
+					m_patternWriteFirstMs = 0;
+					return false;
+				}
+				if(m_patternWritesInFlight > 0)
+				{
+					if(!m_patternWriteFirstMs)
+						m_patternWriteFirstMs = m_patternWriteLastMs = milliseconds();
+					return false;
+				}
+				linkCurrentKit();
+				dump = m_patternDump;
+				slot = m_mmPattern->slot;
+				m_patternEdited = false;
+				m_mmPatternSent = m_mmPattern;
+				++m_patternWritesInFlight;
+			}
+			m_patternWriteFirstMs = 0;
+			m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
+			m_patternRequestedSlot.store(slot, std::memory_order_release);
+			m_patternWanted.store(true, std::memory_order_release);
+			writeMmDump(dump, slot);
+			return true;
+		}
+		// This write carries the edits a sendPatternSoon() waits with
+		m_patternWriteFirstMs = 0;
+		md::automation::sysex::Message dump;
+		md::automation::sysex::Message from;
+		uint8_t slot = 0;
+		// A copy onto the pattern shown ends with its read-back: asked for at once. An edit's waits for the
+		// writes to pause (verifyPatternWrite).
+		const bool readBack = m_patternCopyShown && getPatternCopy().state == PatternCopy::Writing;
+		const bool writable = !readBack && livePatternWritable();
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(!m_patternEdited || !m_pattern)
+				return false;
+			linkCurrentKit();
+			dump = m_patternDump;
+			slot = m_pattern->slot;
+			m_patternEdited = false;
+			m_patternSent = m_pattern;
+			// The pattern playing, its Kit the live one, edited from what its RAM holds: the bytes the edits
+			// changed go there, as a grid edit (md::LivePatternControl). Nothing reloads, nothing is read back.
+			if(writable && slot == m_currentPattern.load(std::memory_order_acquire) && m_patternMachineSlot == slot
+				&& m_pattern->kit == m_currentKit.load(std::memory_order_acquire))
+			{
+				from = std::move(m_patternMachineDump);
+				m_patternVerifyDueMs = 0;
+			}
+			else
+			{
+				if(readBack)
+					++m_patternWritesInFlight;
+				m_patternVerifyDueMs = readBack ? 0 : milliseconds() + PatternVerifyMilliseconds;
+			}
+			// What the machine holds once it takes the write
+			m_patternMachineDump = dump;
+			m_patternMachineSlot = slot;
+		}
+		m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
+		if(!from.empty())
+		{
+			m_livePatternWrite = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLivePatternControl()
+				.request(std::move(from), std::move(dump));
+			return true;
+		}
+		if(readBack)
+		{
+			m_patternRequestedSlot.store(slot, std::memory_order_release);
+			m_patternWanted.store(true, std::memory_order_release);
+		}
+		// The Machinedrum reloads the pattern's Kit as stored when it takes the pattern, stopped or playing:
+		// values changed since the Kit was saved (SON) would go back. Saving the live Kit first keeps them
+		// (mdEditorFirmwareTest, checkLiveKitAcrossPatternWrite).
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(kit < 64)
+			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		sendEditorSysex(dump);
+		if(readBack)
+			sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
+		return true;
+	}
+
+	bool Controller::copyPattern(const uint8_t _from, const uint8_t _to)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto copy = getPatternCopy();
+		if(_from >= PatternLibrarySize || _to >= PatternLibrarySize || _from == _to
+			|| copy.state == PatternCopy::Reading || copy.state == PatternCopy::Writing || !firmwareReadyForAutomation())
+			return false;
+		m_patternCopy.store(uint64_t{static_cast<uint8_t>(PatternCopy::Reading)} | uint64_t{_from} << 8 | uint64_t{_to} << 16
+			| uint64_t{copy.serial + 1} << 24, std::memory_order_release);
+		m_patternCopyMs = milliseconds();
+		// The pattern shown is its own source, its edits not written yet included
+		md::automation::sysex::Message shown;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if((m_pattern && m_pattern->slot == _from) || (m_mmPattern && m_mmPattern->slot == _from))
+				shown = m_patternDump;
+		}
+		if(shown.empty())
+			sendEditorSysex(md::automation::sysex::patternRequest(m_model, _from));
+		else
+			writePatternCopy(shown);
+		return true;
+	}
+
+	Controller::PatternCopyState Controller::getPatternCopy() const
+	{
+		const auto packed = m_patternCopy.load(std::memory_order_acquire);
+		return {static_cast<PatternCopy>(packed & 0xff), static_cast<uint8_t>(packed >> 8), static_cast<uint8_t>(packed >> 16),
+			static_cast<uint32_t>(packed >> 24)};
+	}
+
+	void Controller::setPatternCopyState(const PatternCopy _state)
+	{
+		const auto packed = m_patternCopy.load(std::memory_order_acquire);
+		m_patternCopy.store((packed & ~uint64_t{0xff}) | static_cast<uint8_t>(_state), std::memory_order_release);
+	}
+
+	void Controller::writePatternCopy(const md::automation::sysex::Message& _source)
+	{
+		const auto to = getPatternCopy().to;
+		// Onto the current pattern, the copy plays the live Kit, as an edit of it does (linkCurrentKit): with the
+		// source's, the machine would load that Kit, unknown to the controller
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		const bool keepKit = to == m_currentPattern.load(std::memory_order_acquire) && kit < getKitLibrarySize();
+		if(m_model == md::MachineModel::Monomachine)
+		{
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(_source);
+			md::automation::sysex::Message dump;
+			std::optional<md::automation::sysex::MmPatternDump> copy;
+			if(editor && editor->setSlot(to) && (!keepKit || editor->setKit(kit)))
+			{
+				dump = editor->toDump();
+				copy = md::automation::sysex::parseMmPatternDump(dump);
+			}
+			if(!copy)
+			{
+				setPatternCopyState(PatternCopy::Failed);
+				return;
+			}
+			setPatternCopyState(PatternCopy::Writing);
+			m_patternCopyMs = milliseconds();
+			m_patternCopyShown = false;
+			{
+				const std::lock_guard lock(m_patternMutex);
+				m_mmPatternCopySent = std::move(copy);
+				// Onto the pattern shown: the copy replaces it, its edits not written yet dropped; the copy
+				// read back shows
+				if(m_mmPattern && m_mmPattern->slot == to)
+				{
+					m_patternEdited = false;
+					m_patternWriteFirstMs = 0;
+				}
+			}
+			writeMmDump(dump, to);
+			return;
+		}
+		auto editor = md::automation::sysex::MdPatternEditor::fromDump(_source);
+		md::automation::sysex::Message dump;
+		std::optional<md::automation::sysex::PatternDump> copy;
+		if(editor && editor->setSlot(to) && (!keepKit || editor->setKit(kit)))
+		{
+			dump = editor->toDump();
+			copy = md::automation::sysex::parseMdPatternDump(dump);
+		}
+		if(!copy)
+		{
+			setPatternCopyState(PatternCopy::Failed);
+			return;
+		}
+		setPatternCopyState(PatternCopy::Writing);
+		m_patternCopyMs = milliseconds();
+		// Onto the pattern shown: it replaces it as an edit does, and is written as one
+		{
+			const std::lock_guard lock(m_patternMutex);
+			m_patternCopyShown = m_pattern && m_pattern->slot == to;
+			if(m_patternCopyShown)
+			{
+				m_patternDump = dump;
+				m_pattern = *copy;
+				m_patternEdited = true;
+			}
+		}
+		if(m_patternCopyShown)
+		{
+			m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+			if(!sendPattern())
+				setPatternCopyState(PatternCopy::Failed);
+			return;
+		}
+		m_patternCopySent = std::move(copy);
+		// The selected pattern reloads its Kit as stored when it is written (see sendPattern)
+		if(keepKit)
+			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		sendEditorSysex(dump);
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, to));
+	}
+
+	void Controller::servicePatternCopy(const uint64_t _now)
+	{
+		const auto state = getPatternCopy().state;
+		const auto timeout = m_model == md::MachineModel::Monomachine ? MmWriteTimeoutMilliseconds : PatternCopyTimeoutMilliseconds;
+		if((state == PatternCopy::Reading || state == PatternCopy::Writing) && _now - m_patternCopyMs > timeout)
+			setPatternCopyState(PatternCopy::Failed);
+	}
+
+	void Controller::linkCurrentKit()
+	{
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		const auto current = m_currentPattern.load(std::memory_order_acquire);
+		if(kit >= getKitLibrarySize())
+			return;
+		if(m_mmPattern && m_mmPattern->slot == current && m_mmPattern->kit != kit)
+		{
+			auto editor = md::automation::sysex::MmPatternEditor::fromDump(m_patternDump);
+			if(!editor || !editor->setKit(kit))
+				return;
+			auto dump = editor->toDump();
+			if(auto pattern = md::automation::sysex::parseMmPatternDump(dump))
+			{
+				m_patternDump = std::move(dump);
+				m_mmPattern = std::move(*pattern);
+			}
+		}
+		else if(m_pattern && m_pattern->slot == current && m_pattern->kit != kit)
+		{
+			auto editor = md::automation::sysex::MdPatternEditor::fromDump(m_patternDump);
+			if(!editor || !editor->setKit(kit))
+				return;
+			auto dump = editor->toDump();
+			if(auto pattern = md::automation::sysex::parseMdPatternDump(dump))
+			{
+				m_patternDump = std::move(dump);
+				m_pattern = std::move(*pattern);
+			}
+		}
+	}
+
+	bool Controller::isPatternBusy()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto copy = getPatternCopy().state;
+		if(copy == PatternCopy::Reading || copy == PatternCopy::Writing)
+			return true;
+		if(m_model != md::MachineModel::Monomachine)
+			return false;
+		const std::lock_guard lock(m_patternMutex);
+		return m_patternWriteFirstMs != 0 || m_patternWritesInFlight > 0;
+	}
+
+	bool Controller::loadKit(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_slot >= getKitLibrarySize() || !firmwareReadyForAutomation() || isPatternBusy()
+			|| m_patternLoad.load(std::memory_order_acquire) < PatternLibrarySize)
+			return false;
+		// Edits waiting go first, saved with the Kit they were made with (sendPattern)
+		if(m_patternWriteFirstMs)
+			(void)sendPattern();
+		sendEditorSysex(md::automation::sysex::kitLoad(m_model, _slot));
+		// The machine plays the Kit from here on, a SAVE KIT sent after goes to its slot; its name comes with its
+		// dump, which requestKitState applies
+		if(m_currentKit.exchange(_slot, std::memory_order_acq_rel) != _slot)
+		{
+			{
+				const std::lock_guard lock(m_kitNameMutex);
+				m_kitName.clear();
+			}
+			m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+		}
+		requestKitState();
+		// The current pattern plays it too: read again, the pattern shown says so
+		if(m_patternRevision.load(std::memory_order_acquire) > 0)
+			requestPattern();
+		return true;
+	}
+
+	bool Controller::loadPattern(const uint8_t _slot)
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_slot >= PatternLibrarySize || !firmwareReadyForAutomation() || isPatternBusy())
+			return false;
+		if(m_patternWriteFirstMs)
+			(void)sendPattern();
+		sendEditorSysex(md::automation::sysex::patternSelect(m_model, _slot));
+		const auto now = milliseconds();
+		m_patternLoad.store(_slot, std::memory_order_release);
+		m_patternLoadMs = m_patternLoadPollMs = now;
+		m_patternLoadSeenMs = 0;
+		// Stopped, the machine takes it at once: the status answers with it, and the pattern shown follows (the
+		// status handler); playing, servicePatternLoad asks until it does
+		if(!getPlayingStep())
+			requestPattern();
+		return true;
+	}
+
+	void Controller::servicePatternLoad(const uint64_t _now)
+	{
+		const auto slot = m_patternLoad.load(std::memory_order_acquire);
+		if(slot >= PatternLibrarySize)
+			return;
+		// The pattern is the current one: its Kit is the live one once the pattern plays, which the status
+		// answers before (PatternLoadSettleMilliseconds); stopped, at once
+		if(m_currentPattern.load(std::memory_order_acquire) == slot)
+		{
+			if(!m_patternLoadSeenMs)
+				m_patternLoadSeenMs = _now;
+			if(getPlayingStep() && _now - m_patternLoadSeenMs < PatternLoadSettleMilliseconds)
+				return;
+			m_patternLoad.store(0xff, std::memory_order_release);
+			requestKitState();
+			return;
+		}
+		if(_now - m_patternLoadMs > PatternLoadTimeoutMilliseconds)
+		{
+			m_patternLoad.store(0xff, std::memory_order_release);
+			return;
+		}
+		// Playing: the machine takes it at the end of the pattern playing
+		if(_now - m_patternLoadPollMs >= PatternLoadPollMilliseconds)
+		{
+			m_patternLoadPollMs = _now;
+			sendEditorSysex(md::automation::sysex::statusRequest(m_model, md::automation::sysex::StatusParameter::Pattern));
+		}
+	}
+
+	bool Controller::saveKit()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(kit >= getKitLibrarySize() || !firmwareReadyForAutomation() || isPatternBusy()
+			|| m_patternLoad.load(std::memory_order_acquire) < PatternLibrarySize)
+			return false;
+		sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
+		// The stored Kit is the live one now: the library shows it so
+		{
+			std::vector<uint16_t> machines;
+			for(uint8_t track = 0; track < getPartCount(); ++track)
+				machines.push_back(getTrackMachine(track));
+			const auto name = getKitName();
+			const std::lock_guard lock(m_libraryMutex);
+			if(kit < m_library.size())
+			{
+				m_library[kit] = LibraryKit{true, name.empty() && m_library[kit].read ? m_library[kit].name : name, machines};
+				m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
+		}
+		return true;
+	}
+
 	void Controller::requestKitState()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
@@ -323,6 +1289,10 @@ namespace mdJucePlugin
 			m_kitSynchronization.statusRequestSent(now);
 			sendSynchronizationRequest(toPluginSysex(md::automation::sysex::statusRequest(m_model,
 				md::automation::sysex::StatusParameter::Kit)));
+			// The pattern number with it, so the screen does not wait for the first poll
+			if(m_currentPattern.load(std::memory_order_acquire) == 0xff)
+				sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+					md::automation::sysex::StatusParameter::Pattern));
 		}
 	}
 
@@ -357,6 +1327,22 @@ namespace mdJucePlugin
 		drainRealtimeParameterChanges(RealtimeAutomationCapacity, false);
 		completeSynchronizationIfReady();
 		const auto now = milliseconds();
+		servicePatternWrite(now);
+		servicePatternCopy(now);
+		servicePatternLoad(now);
+		// A library Kit not answered: skip it (the firmware may drop a request while busy)
+		// A Kit not answered within 2 s, a pattern (a longer dump) within 4 s, is skipped
+		if(m_libraryReading.load(std::memory_order_acquire)
+			&& now - m_libraryRequestMs > (m_libraryWaiting < getKitLibrarySize() ? g_dumpRequestRetryMs : 2 * g_dumpRequestRetryMs))
+		{
+			m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+			requestLibraryItem(m_libraryWaiting + 1, now);
+		}
+		// The live Kit only once synchronized; a read from before a resynchronization is forgotten
+		if(m_automationReady.load(std::memory_order_acquire))
+			serviceLiveKit(now);
+		else
+			m_previousLiveKit.reset();
 		if(m_automationReady.load(std::memory_order_acquire))
 		{
 			// Firmware Global is authoritative for the MIDI channel, and a front-panel
@@ -389,6 +1375,10 @@ namespace mdJucePlugin
 					md::automation::sysex::statusRequest(m_model,
 						md::automation::sysex::StatusParameter::Kit)));
 			}
+			// The pattern number for the editor's screen; once a pattern is shown,
+			// another one selected on the front panel is read again.
+			sendEditorSysex(md::automation::sysex::statusRequest(m_model,
+				md::automation::sysex::StatusParameter::Pattern));
 			return;
 		}
 		sendMissingSynchronizationRequests();
@@ -450,6 +1440,7 @@ namespace mdJucePlugin
 		const auto publication = createPublication(_change.value, true);
 		auto& slot = m_automationSlots[found->second];
 		slot.publication.exchange(publication, std::memory_order_acq_rel);
+		markValueKnown(slot);
 		const auto advanceDeliveryFloor = [&slot](const uint64_t _revision)
 		{
 			// Keep the realtime producer strictly bounded: a fixed number of strong
@@ -513,6 +1504,8 @@ namespace mdJucePlugin
 		auto* const slot = findAutomationSlot(_address);
 		if(slot == nullptr)
 			return _value;
+		// Either the firmware's value or a newer intent the firmware gets next
+		markValueKnown(*slot);
 
 		const auto desired = createPublication(_value, false);
 		auto observed = slot->publication.load(std::memory_order_acquire);
@@ -549,6 +1542,8 @@ namespace mdJucePlugin
 			}
 			m_transmittedAutomationDigest.store(digest, std::memory_order_release);
 			m_transmittedAutomationChanges.fetch_add(1, std::memory_order_release);
+			if(_change.track < m_trackDeliveries.size())
+				m_trackDeliveries[_change.track].fetch_add(1, std::memory_order_relaxed);
 			sendMidiEvent((*message)[0], (*message)[1], (*message)[2]);
 		}
 	}
@@ -573,6 +1568,8 @@ namespace mdJucePlugin
 		}
 		m_transmittedAutomationDigest.store(digest, std::memory_order_release);
 		m_transmittedAutomationChanges.fetch_add(1, std::memory_order_release);
+		if(_change.track < m_trackDeliveries.size())
+			m_trackDeliveries[_change.track].fetch_add(1, std::memory_order_relaxed);
 		return true;
 	}
 
@@ -771,19 +1768,125 @@ namespace mdJucePlugin
 			RealtimeAutomationCapacity + m_automationSlots.size(), false);
 	}
 
+	std::optional<uint8_t> Controller::getPlayingStep() const
+	{
+		if(m_syntheticPlayingStepForTests)
+			return *m_syntheticPlayingStepForTests;
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		if(!status || !status->sequencerPlaying || status->sequencerStep == md::MachineStatus::Values::NoStep)
+			return std::nullopt;
+		return status->sequencerStep;
+	}
+
+	std::optional<md::LiveKit> Controller::readLiveKit() const
+	{
+		if(m_syntheticLiveKitForTests)
+			return *m_syntheticLiveKitForTests;
+		return static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().liveKit();
+	}
+
+	void Controller::serviceLiveKit(const uint64_t _now)
+	{
+		if(_now - m_liveKitPollMs < LiveKitPollMilliseconds)
+			return;
+		m_liveKitPollMs = _now;
+
+		// The tracks no CC went to during the last two reads: one sent before may already show
+		for(size_t track = 0; track < m_trackDeliveries.size(); ++track)
+		{
+			const auto deliveries = m_trackDeliveries[track].load(std::memory_order_relaxed);
+			if(deliveries != m_seenDeliveries[track])
+			{
+				m_seenDeliveries[track] = deliveries;
+				m_quietReads[track] = 0;
+			}
+			else if(m_quietReads[track] < 2)
+				++m_quietReads[track];
+		}
+
+		auto kit = readLiveKit();
+		if(!kit || kit->tracks != getPartCount())
+		{
+			m_previousLiveKit.reset();
+			return;
+		}
+		// A read not 50 ms of emulation newer than the last (the host not calling, the machine busy) waits
+		// for one that is; one older comes from another machine
+		if(m_previousLiveKit && kit->frame >= m_previousLiveKit->frame
+			&& kit->frame - m_previousLiveKit->frame < md::g_samplerate / 20)
+			return;
+		const auto previous = std::exchange(m_previousLiveKit, kit);
+		if(!previous || kit->frame < previous->frame)
+			return;
+
+		// The Machinedrum's LFOs and master effects, once two reads agree and the editor's last change to
+		// them is old enough for the firmware to show it
+		if(kit->machinedrum && previous->machinedrum)
+		{
+			const auto settled = [&](const uint64_t _editMs) { return _now - _editMs >= 3 * LiveKitPollMilliseconds; };
+			for(uint8_t track = 0; track < kit->tracks; ++track)
+			{
+				if(kit->lfos[track] == previous->lfos[track] && settled(m_lfoEditMs[track]))
+					storeLfo(track, kit->lfos[track], true);
+			}
+			if(kit->masterEffects == previous->masterEffects && settled(m_masterEffectEditMs))
+				storeMasterEffects(md::automation::sysex::masterEffectsFromKit(kit->masterEffects.data()), true);
+		}
+
+		const bool mm = m_model == md::MachineModel::Monomachine;
+		// The pages an assignment gives the machine's values (assignMachine), and the last page the live
+		// Kit holds (the level's)
+		const auto lastMachinePage = mm ? md::automation::monomachine::Synthesis : md::automation::machinedrum::Routing;
+		const auto lastLivePage = mm ? md::automation::monomachine::Level : md::automation::machinedrum::Level;
+		for(uint8_t track = 0; track < kit->tracks; ++track)
+		{
+			if(m_quietReads[track] < 2 || !kit->sameTrack(*previous, track, static_cast<uint8_t>(lastMachinePage + 1)))
+				continue;
+			const uint16_t machine = kit->machines[track];
+			const auto stored = m_trackMachines[track].load(std::memory_order_acquire);
+			// The editor's assignment: no read taken before the firmware applied it, even the same machine
+			// again, and its machine expected until it shows or the firmware gave up on it
+			if(m_assignmentMs[track])
+			{
+				const auto age = _now - m_assignmentMs[track];
+				if(age < 3 * LiveKitPollMilliseconds || (machine != stored && age < AssignmentGraceMilliseconds))
+					continue;
+				m_assignmentMs[track] = 0;
+			}
+			// A machine changed on the front panel, or by a Kit loaded there: taken with its pages' values.
+			// The first machine seen is only stored: the values the plug-in restores may still be on their way.
+			const bool changed = machine != stored;
+			if(changed)
+			{
+				m_trackMachines[track].store(machine, std::memory_order_release);
+				m_machineRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
+			const bool adopted = changed && stored != md::machines::g_unknown;
+			for(auto& slot : m_automationSlots)
+			{
+				const auto& address = slot.address;
+				if(address.track != track || address.page > lastLivePage)
+					continue;
+				if(!slot.valueUnknown.load(std::memory_order_acquire) && !(adopted && address.page <= lastMachinePage))
+					continue;
+				// An edit on its way to the firmware wins
+				if(publicationIsDirty(slot.publication.load(std::memory_order_acquire)))
+					continue;
+				const auto value = publishFirmwareValue(address, kit->value(track, address.page, address.index));
+				for(auto* const parameter : findSynthParam(track, address.page, address.index))
+					parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			}
+		}
+	}
+
 	bool Controller::firmwareReadyForAutomation() const
 	{
 		if(m_syntheticFirmwareReadyForTests)
 			return true;
-		bool ready = true;
-		getProcessor().getPlugin().withDeviceLocked(
-			[&ready](synthLib::Device* const _device)
-			{
-				if(const auto* const device = dynamic_cast<md::Device*>(_device))
-					ready = !device->isProjectStateRestorePending()
-						&& device->getHardware().isFirmwareMidiReady();
-			});
-		return ready;
+		// Every request asks: through the device lock, each one paused the rendering. Another kind of
+		// device (remote) is taken as ready.
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		return !status || status->firmwareReady;
 	}
 
 	bool Controller::parseSysexMessage(const pluginLib::SysEx& _message,
@@ -809,6 +1912,7 @@ namespace mdJucePlugin
 					m_synchronizationEpoch.fetch_add(1, std::memory_order_acq_rel);
 					m_haveGlobal.store(false, std::memory_order_release);
 					m_globalSynchronization.dumpRequestSent(now);
+					m_routingWritesAtGlobalRequest = m_routingWrites;
 					sendSynchronizationRequest(toPluginSysex(
 						md::automation::sysex::globalRequest(m_model, status->value)));
 				}
@@ -823,6 +1927,15 @@ namespace mdJucePlugin
 					return true;
 				const auto previousKit = m_currentKit.exchange(status->value,
 					std::memory_order_acq_rel);
+				if(previousKit != status->value)
+				{
+					// The name follows with the new Kit's dump
+					{
+						const std::lock_guard lock(m_kitNameMutex);
+						m_kitName.clear();
+					}
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
 				if(observation.requestDump)
 				{
 					const auto forceApply = m_forceApplyRequestedKitDump.exchange(
@@ -856,6 +1969,32 @@ namespace mdJucePlugin
 				return true;
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
+				// Edits waiting to be written belong to the pattern shown: written before another one replaces it
+				if(m_patternWriteFirstMs)
+				{
+					bool otherSlot = false;
+					{
+						const std::lock_guard lock(m_patternMutex);
+						otherSlot = m_pattern && m_pattern->slot != status->value;
+					}
+					if(otherSlot)
+						(void)sendPattern();
+				}
+				if(m_currentPattern.exchange(status->value, std::memory_order_acq_rel) != status->value)
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+				// A status reply leads to a dump when requestPattern asked for one, or
+				// when the pattern shown is no longer the current one.
+				if(!m_patternWanted.load(std::memory_order_acquire))
+				{
+					const std::lock_guard lock(m_patternMutex);
+					if((m_pattern && m_pattern->slot != status->value) || (m_mmPattern && m_mmPattern->slot != status->value))
+						m_patternWanted.store(true, std::memory_order_release);
+				}
+				if(m_patternWanted.load(std::memory_order_acquire))
+				{
+					m_patternRequestedSlot.store(status->value, std::memory_order_release);
+					sendEditorSysex(md::automation::sysex::patternRequest(m_model, status->value));
+				}
 				return true;
 			}
 		}
@@ -872,6 +2011,19 @@ namespace mdJucePlugin
 			m_synchronizationEpoch.fetch_add(1, std::memory_order_acq_rel);
 			m_baseChannel.store(global->baseChannel, std::memory_order_release);
 			m_haveGlobal.store(true, std::memory_order_release);
+			// The Global is live: its routing replaces what was known, unless a routing
+			// write went out after this dump was requested.
+			if(global->trackOutputs && m_routingWrites == m_routingWritesAtGlobalRequest)
+			{
+				bool changed = false;
+				for(size_t track = 0; track < m_trackOutputs.size(); ++track)
+				{
+					const auto output = static_cast<uint8_t>((*global->trackOutputs)[track]);
+					changed |= m_trackOutputs[track].exchange(output, std::memory_order_acq_rel) != output;
+				}
+				if(changed)
+					m_routingRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
 			completeSynchronizationIfReady();
 			return true;
 		}
@@ -879,12 +2031,51 @@ namespace mdJucePlugin
 		if(const auto kit = md::automation::sysex::parseKitDump(
 			m_model, _message))
 		{
+			// The library's Kit, read whatever the synchronization makes of the same dump
+			if(m_libraryReading.load(std::memory_order_acquire) && m_libraryWaiting < getKitLibrarySize()
+				&& kit->slot == m_libraryWaiting)
+			{
+				{
+					const std::lock_guard lock(m_libraryMutex);
+					if(kit->slot < m_library.size())
+						m_library[kit->slot] = LibraryKit{true, kit->name, kit->machines};
+				}
+				m_libraryProgress.fetch_add(1, std::memory_order_acq_rel);
+				m_libraryRevision.fetch_add(1, std::memory_order_acq_rel);
+				requestLibraryItem(m_libraryWaiting + 1, milliseconds());
+			}
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
+			if(kit->slot == m_currentKit.load(std::memory_order_acquire))
+			{
+				const std::lock_guard lock(m_kitNameMutex);
+				if(m_kitName != kit->name)
+				{
+					m_kitName = kit->name;
+					m_selectionRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
+			}
+			const auto storeLfos = [&](const bool _authoritative)
+			{
+				if(!kit->lfos)
+					return;
+				for(uint8_t track = 0; track < kit->lfos->size(); ++track)
+					storeLfo(track, (*kit->lfos)[track], _authoritative);
+			};
 			if(m_applyRequestedKitDump.exchange(false, std::memory_order_acq_rel))
+			{
 				applyKitParameters(kit->parameters);
+				storeKitMachines(kit->machines, true);
+				if(kit->masterEffects)
+					storeMasterEffects(*kit->masterEffects, true);
+				storeLfos(true);
+			}
 			else
 			{
+				storeKitMachines(kit->machines, false);
+				if(kit->masterEffects)
+					storeMasterEffects(*kit->masterEffects, false);
+				storeLfos(false);
 				// Even when the stored dump must not replace the live cache, retain its
 				// raw values for firmware-backed diagnostics.
 				for(const auto& change : kit->parameters)
@@ -898,6 +2089,141 @@ namespace mdJucePlugin
 			m_haveKit.store(true, std::memory_order_release);
 			m_kitDumpRequestRevision.store(0, std::memory_order_release);
 			completeSynchronizationIfReady();
+			return true;
+		}
+
+		if(m_model == md::MachineModel::Machinedrum)
+		{
+			if(auto pattern = md::automation::sysex::parseMdPatternDump(_message))
+			{
+				// Any pattern's length, for the chain
+				static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+				// The library's pattern and its trigs within its length: the dump holds them all, 64 steps
+				// in its long form
+				LibraryPattern stored{true, pattern->length, pattern->kit, std::nullopt};
+				const auto inLength = pattern->length >= 64 ? ~uint64_t{0} : (uint64_t{1} << pattern->length) - 1;
+				uint16_t trigs = 0;
+				for(const auto mask : pattern->trigs)
+					trigs += static_cast<uint16_t>(std::bitset<64>(mask & inLength).count());
+				stored.trigs = trigs;
+				storeLibraryPattern(pattern->slot, stored);
+				// A copy's source, or the copy read back from its slot
+				const auto copy = getPatternCopy();
+				if(copy.state == PatternCopy::Reading && pattern->slot == copy.from)
+					writePatternCopy(md::automation::sysex::Message(_message.begin(), _message.end()));
+				else if(copy.state == PatternCopy::Writing && !m_patternCopyShown && pattern->slot == copy.to)
+				{
+					setPatternCopyState(m_patternCopySent && samePattern(*pattern, *m_patternCopySent)
+						&& pattern->kit == m_patternCopySent->kit ? PatternCopy::Copied : PatternCopy::Refused);
+				}
+				if(m_patternWanted.load(std::memory_order_acquire)
+					&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
+				{
+					{
+						const std::lock_guard lock(m_patternMutex);
+						// Writes are read back; only the reply to the last read-back asked
+						// for tells what the firmware kept. Another pattern's dump ends the
+						// wait: what was written is no longer the pattern shown.
+						if((m_patternWritesInFlight > 0 || m_patternVerifyDueMs) && m_patternSent
+							&& m_patternSent->slot != pattern->slot)
+						{
+							m_patternWritesInFlight = 0;
+							m_patternVerifyDueMs = 0;
+							m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+						}
+						if(m_patternWritesInFlight > 0)
+						{
+							if(--m_patternWritesInFlight > 0)
+								return true;
+							// Written again since this read-back was asked for: the next one tells, and
+							// this one, older than the write, must not replace the pattern shown
+							if(m_patternVerifyDueMs)
+								return true;
+							m_patternWrite.store(m_patternSent && samePattern(*pattern, *m_patternSent)
+								? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
+						}
+						// Edits not sent yet stay on top of the same pattern, and so does what they started from.
+						if(!m_patternEdited || !m_pattern || m_pattern->slot != pattern->slot)
+						{
+							m_patternMachineSlot = pattern->slot;
+							m_pattern = std::move(*pattern);
+							m_patternDump.assign(_message.begin(), _message.end());
+							m_patternMachineDump = m_patternDump;
+							m_patternEdited = false;
+						}
+					}
+					// A copy onto the pattern shown ends with its write
+					const auto write = m_patternWrite.load(std::memory_order_acquire);
+					if(m_patternCopyShown && getPatternCopy().state == PatternCopy::Writing
+						&& (write == PatternWrite::Written || write == PatternWrite::Refused))
+						setPatternCopyState(write == PatternWrite::Written ? PatternCopy::Copied : PatternCopy::Refused);
+					m_patternWanted.store(false, std::memory_order_release);
+					m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+				}
+				return true;
+			}
+		}
+		else if(auto pattern = md::automation::sysex::parseMmPatternDump(_message))
+		{
+			// Any pattern's length, for the chain
+			static_cast<AudioPluginAudioProcessor&>(getProcessor()).getChainControl().setLength(pattern->slot, pattern->length);
+			// The library's pattern
+			uint16_t trigs = 0;
+			for(uint8_t track = 0; track < md::automation::sysex::MmPatternDump::TrackCount; ++track)
+			{
+				for(uint8_t step = 0; step < pattern->length; ++step)
+					trigs += pattern->hasTrig(track, step) ? 1 : 0;
+			}
+			storeLibraryPattern(pattern->slot, LibraryPattern{true, pattern->length, pattern->kit, trigs});
+			// A copy's source, or the copy read back from its slot; onto the pattern shown, the copy shows
+			const auto copy = getPatternCopy();
+			if(copy.state == PatternCopy::Reading && pattern->slot == copy.from)
+				writePatternCopy(md::automation::sysex::Message(_message.begin(), _message.end()));
+			else if(copy.state == PatternCopy::Writing && pattern->slot == copy.to)
+			{
+				bool shown = false;
+				{
+					const std::lock_guard lock(m_patternMutex);
+					setPatternCopyState(m_mmPatternCopySent && sameMmPattern(*pattern, *m_mmPatternCopySent)
+						? PatternCopy::Copied : PatternCopy::Refused);
+					if(m_mmPattern && m_mmPattern->slot == pattern->slot && !m_patternEdited)
+					{
+						m_mmPattern = *pattern;
+						m_patternDump.assign(_message.begin(), _message.end());
+						shown = true;
+					}
+				}
+				if(shown)
+					m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
+			if(m_patternWanted.load(std::memory_order_acquire)
+				&& pattern->slot == m_patternRequestedSlot.load(std::memory_order_acquire))
+			{
+				{
+					const std::lock_guard lock(m_patternMutex);
+					// A write read back, as on the Machinedrum: another pattern's dump ends the wait
+					if(m_patternWritesInFlight > 0 && m_mmPatternSent && m_mmPatternSent->slot != pattern->slot)
+					{
+						m_patternWritesInFlight = 0;
+						m_patternWrite.store(PatternWrite::None, std::memory_order_release);
+					}
+					if(m_patternWritesInFlight > 0)
+					{
+						--m_patternWritesInFlight;
+						m_patternWrite.store(m_mmPatternSent && sameMmPattern(*pattern, *m_mmPatternSent)
+							? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
+					}
+					// Edits not sent yet stay on top of the same pattern
+					if(!m_patternEdited || !m_mmPattern || m_mmPattern->slot != pattern->slot)
+					{
+						m_mmPattern = std::move(*pattern);
+						m_patternDump.assign(_message.begin(), _message.end());
+						m_patternEdited = false;
+					}
+				}
+				m_patternWanted.store(false, std::memory_order_release);
+				m_patternRevision.fetch_add(1, std::memory_order_acq_rel);
+			}
 			return true;
 		}
 
@@ -918,6 +2244,10 @@ namespace mdJucePlugin
 				|| status->parameter == md::automation::sysex::StatusParameter::Pattern)
 			{
 				requestKitState();
+				// A pattern already shown follows the new selection.
+				if(status->parameter == md::automation::sysex::StatusParameter::Pattern
+					&& m_patternRevision.load(std::memory_order_acquire) > 0)
+					requestPattern();
 			}
 		}
 		return false;

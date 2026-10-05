@@ -15,12 +15,34 @@ endif()
 add_compile_definitions(MDMM_DIAGNOSTICS_REVISION="${MDMM_DIAGNOSTICS_REVISION}")
 
 set(SOURCES
+	mdChainControl.cpp mdChainControl.h
 	mdController.cpp mdController.h
+	mdCurveView.cpp mdCurveView.h
+	mdKitPatternScreen.cpp mdKitPatternScreen.h
+	mdLiveDevice.cpp mdLiveDevice.h
+	mdUnreadValues.cpp mdUnreadValues.h
+	mdMasterEffectsView.cpp mdMasterEffectsView.h
+	mdTrackRoutingView.cpp mdTrackRoutingView.h
+	mdOutputMeters.h
+	mdOutputMetersView.cpp mdOutputMetersView.h
+	mdSystemPage.cpp mdSystemPage.h
+	mdLaneInput.cpp mdLaneInput.h
+	mdPatternCommands.cpp mdPatternCommands.h
+	mdPatternView.cpp mdPatternView.h
+	mdMmPatternView.cpp mdMmPatternView.h
+	mdStepColumns.cpp mdStepColumns.h
+	mdChainView.cpp mdChainView.h
+	mdLibraryView.cpp mdLibraryView.h
+	mdTrackActivity.cpp mdTrackActivity.h
+	mdLfoView.cpp mdLfoView.h
 	mdEditor.cpp mdEditor.h
 	mdFrontPanelPresentation.h
 	mdLcdGesture.h
 	mdLcdInteractionModel.cpp mdLcdInteractionModel.h
 	mdLcdViewport.h
+	mdMachinePicker.cpp mdMachinePicker.h
+	mdStepGrid.cpp mdStepGrid.h
+	mdViewLayout.cpp mdViewLayout.h
 	mdPixelPerfectPanel.cpp mdPixelPerfectPanel.h
 	mdPanelAffordances.h
 	mdPluginEditorState.cpp mdPluginEditorState.h
@@ -46,6 +68,7 @@ set(SOURCES
 set(COMMON_ASSETS
 	"../../../jucePluginData/elektronKnobBlankAtlas.png"
 	"../../../jucePluginData/elektronMasterKnobAtlas.png"
+	"../../../jucePluginData/elektronEditorKnobAtlas.png"
 	"../../../jucePluginData/elektronButtonBevelAtlas.png"
 	"../../../jucePluginData/elektronLedLens.png"
 	"../../../jucePluginData/elektronLedLensSoft.png"
@@ -53,7 +76,8 @@ set(COMMON_ASSETS
 	"parameterDescriptions_md.json"
 	"parameterDescriptions_mm.json"
 	"../../../jucePluginData/elektron_panel.rcss"
-	"../../../jucePluginData/elektron_materials.rcss")
+	"../../../jucePluginData/elektron_materials.rcss"
+	"../../../jucePluginData/elektron_editor.rcss")
 file(GLOB MD_SKIN_ASSETS CONFIGURE_DEPENDS
 	"skins/mdDefault/*.png" "skins/mdDefault/*.rml" "skins/mdDefault/*.rcss"
 	"skins/mdDefault/*.ttf" "skins/mdDefault/*.lua")
@@ -147,6 +171,13 @@ if(BUILD_TESTING)
 		endif()
 	endforeach()
 
+	# The project's pattern chain: states, lengths and the saved chunk, without firmware
+	add_executable(mdChainControlTest mdChainControlTest.cpp mdChainControl.cpp)
+	target_link_libraries(mdChainControlTest PRIVATE mdLib)
+	add_test(NAME mdChainControlTest COMMAND mdChainControlTest)
+	set_tests_properties(mdChainControlTest PROPERTIES LABELS "UnitTest")
+	set_property(TARGET mdChainControlTest PROPERTY FOLDER "Elektron/test")
+
 	add_executable(mdLcdInteractionModelTest
 		mdLcdInteractionModelTest.cpp mdLcdInteractionModel.cpp)
 	target_link_libraries(mdLcdInteractionModelTest PRIVATE mdLib)
@@ -185,6 +216,46 @@ if(BUILD_TESTING)
 	set_tests_properties(mdLcdEditorPointerTest PROPERTIES
 		LABELS "IntegrationTest;LcdInteraction;PointerInput")
 	set_property(TARGET mdLcdEditorPointerTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mdEditorSectionTest mdEditorSectionTest.cpp)
+	target_include_directories(mdEditorSectionTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mdEditorSectionTest PRIVATE mdJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mdEditorSectionTest COMMAND mdEditorSectionTest)
+	set_tests_properties(mdEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
+	set_property(TARGET mdEditorSectionTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mmEditorSectionTest mdEditorSectionTest.cpp)
+	target_compile_definitions(mmEditorSectionTest PRIVATE MD_EDITOR_SECTION_TEST_MM=1)
+	target_include_directories(mmEditorSectionTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mmEditorSectionTest PRIVATE mmJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mmEditorSectionTest COMMAND mmEditorSectionTest)
+	set_tests_properties(mmEditorSectionTest PROPERTIES LABELS "IntegrationTest;Editor")
+	set_property(TARGET mmEditorSectionTest PROPERTY FOLDER "Elektron/test")
+
+	# How fast the editor draws: the cost of a frame with the software renderer, and with
+	# --window the frames a real window delivers while the machine runs
+	add_executable(mdEditorFluidityTest mdEditorFluidityTest.cpp)
+	target_include_directories(mdEditorFluidityTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mdEditorFluidityTest PRIVATE mdJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mdEditorFluidityTest COMMAND mdEditorFluidityTest)
+	set_tests_properties(mdEditorFluidityTest PROPERTIES LABELS "IntegrationTest;Editor;Performance")
+	set_property(TARGET mdEditorFluidityTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mmEditorFluidityTest mdEditorFluidityTest.cpp)
+	target_compile_definitions(mmEditorFluidityTest PRIVATE MD_EDITOR_FLUIDITY_TEST_MM=1)
+	target_include_directories(mmEditorFluidityTest PRIVATE
+		"${CMAKE_SOURCE_DIR}/source" "${CMAKE_SOURCE_DIR}/source/elektron/md")
+	target_link_libraries(mmEditorFluidityTest PRIVATE mmJucePlugin
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules mdLib)
+	add_test(NAME mmEditorFluidityTest COMMAND mmEditorFluidityTest)
+	set_tests_properties(mmEditorFluidityTest PROPERTIES LABELS "IntegrationTest;Editor;Performance")
+	set_property(TARGET mmEditorFluidityTest PROPERTY FOLDER "Elektron/test")
 
 	add_executable(mmLcdEditorPointerTest mdLcdEditorPointerTest.cpp)
 	target_compile_definitions(mmLcdEditorPointerTest PRIVATE MD_LCD_POINTER_TEST_MM=1)
@@ -319,6 +390,13 @@ if(BUILD_TESTING)
 		mdProgramChangeFirmwareTest.cpp)
 	add_test(NAME mdProgramChangeFirmwareTest COMMAND mdProgramChangeFirmwareTest)
 	set_tests_properties(mdProgramChangeFirmwareTest PROPERTIES
+		LABELS "Integration;FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 300)
+
+	# The project's pattern chain through the whole plug-in, the host playing
+	add_md_automation_firmware_test(mdChainPluginFirmwareTest
+		mdChainPluginFirmwareTest.cpp)
+	add_test(NAME mdChainPluginFirmwareTest COMMAND mdChainPluginFirmwareTest)
+	set_tests_properties(mdChainPluginFirmwareTest PROPERTIES
 		LABELS "Integration;FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 	add_md_automation_firmware_test(mdAutomationRobustnessTest

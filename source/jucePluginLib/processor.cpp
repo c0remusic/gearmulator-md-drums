@@ -61,8 +61,10 @@ namespace pluginLib
 		cancelPendingUpdate();
 		m_midiPorts.close();
 		destroyController();
-		m_plugin.reset();
+		// The device first: a device rendering on threads of its own stops them in its destructor,
+		// and they may still record into the plugin's performance capture until then.
 		m_device.reset();
+		m_plugin.reset();
 	}
 
 	void Processor::addMidiEvent(const synthLib::SMidiEvent& _ev)
@@ -897,6 +899,7 @@ namespace pluginLib
 
 		instrumentation.setHostState(isPlaying, isNonRealtime(), transportKnown);
 		instrumentation.setMidiInputSummary(diagnosticMidiEvents, diagnosticMidiBytes);
+		getPlugin().setHostRealtime(!isNonRealtime());
 		getPlugin().process(inputs, outputs, numSamples, bpm, ppqPos, isPlaying, ppqKnown);
 
 		applyOutputGain(outputs, numSamples);

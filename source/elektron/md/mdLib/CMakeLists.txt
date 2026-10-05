@@ -11,6 +11,7 @@ set(SOURCES
 	mdasyncrender.cpp mdasyncrender.h
 	mdautomation.cpp mdautomation.h
 	mdautomationsync.cpp mdautomationsync.h
+	mdchainplayer.cpp mdchainplayer.h
 	mddevice.cpp mddevice.h
 	mddsp.cpp mddsp.h
 	mdenv.h
@@ -19,12 +20,17 @@ set(SOURCES
 	mdhardware.cpp mdhardware.h
 	mdhostclock.h
 	mdhostsync.cpp mdhostsync.h
+	mdlivepattern.cpp mdlivepattern.h
+	mdmachines.cpp mdmachines.h
+	mdmmpatternwriter.cpp mdmmpatternwriter.h
+	mdmachinestatus.h
 	mdmc.cpp mdmc.h
 	mdmemorymap.h
 	mdmidiprotocol.h
 	mdsysexautomation.cpp mdsysexautomation.h
 	mdrealtimemidiqueue.h
 	mdpanel.cpp mdpanel.h
+	mdpatternchain.cpp mdpatternchain.h
 	mdrampacking.h
 	mdsim.cpp mdsim.h
 	mdrom.cpp mdrom.h

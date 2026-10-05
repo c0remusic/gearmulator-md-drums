@@ -8,10 +8,6 @@ namespace md
 	{
 		using automation::sysex::GlobalSync;
 
-		// A press as long as a quick tap, then time for the menu to redraw.
-		constexpr uint32_t g_holdFrames = 1024;
-		constexpr uint32_t g_settleFrames = 2048;
-
 		// Nothing is changed before the machine has been up this long. The
 		// Monomachine answers SysEx a second after power-on but shows its boot
 		// logo, ignoring the front panel, for about eight more seconds (measured
@@ -27,15 +23,18 @@ namespace md
 		class MacroBuilder
 		{
 		public:
-			explicit MacroBuilder(const MachineModel _model) : m_model(_model) {}
+			explicit MacroBuilder(const MachineModel _model, const PanelMacroTiming _timing = {})
+				: m_model(_model), m_timing(_timing)
+			{
+			}
 
 			MacroBuilder& tap(const PanelControl _control, const uint32_t _count = 1)
 			{
 				const auto packet = panelPacket(m_model, _control);
 				for(uint32_t i = 0; packet && i < _count; ++i)
 				{
-					m_steps.push_back({m_rows.press(*packet), g_holdFrames});
-					m_steps.push_back({m_rows.release(*packet), g_settleFrames});
+					m_steps.push_back({m_rows.press(*packet), m_timing.holdFrames});
+					m_steps.push_back({m_rows.release(*packet), m_timing.settleFrames});
 				}
 				return *this;
 			}
@@ -46,10 +45,10 @@ namespace md
 				const auto packet = panelPacket(m_model, _control);
 				if(!held || !packet)
 					return *this;
-				m_steps.push_back({m_rows.press(*held), g_holdFrames});
-				m_steps.push_back({m_rows.press(*packet), g_holdFrames});
-				m_steps.push_back({m_rows.release(*packet), g_holdFrames});
-				m_steps.push_back({m_rows.release(*held), g_settleFrames});
+				m_steps.push_back({m_rows.press(*held), m_timing.holdFrames});
+				m_steps.push_back({m_rows.press(*packet), m_timing.holdFrames});
+				m_steps.push_back({m_rows.release(*packet), m_timing.holdFrames});
+				m_steps.push_back({m_rows.release(*held), m_timing.settleFrames});
 				return *this;
 			}
 
@@ -57,6 +56,7 @@ namespace md
 
 		private:
 			const MachineModel m_model;
+			const PanelMacroTiming m_timing;
 			PanelRowState m_rows;
 			std::vector<PanelMacroStep> m_steps;
 		};
@@ -79,6 +79,30 @@ namespace md
 			.tap(C::Down)								// TRANSPORT
 			.tap(_sync.transportIn ? C::Right : C::Left, 2)	// ACCEPT or IGNORE
 			.tap(C::Exit, 4);
+		return macro.take();
+	}
+
+	std::vector<PanelMacroStep> monomachineReceiveMacro(const PanelMacroTiming _timing)
+	{
+		using C = PanelControl;
+		MacroBuilder macro(MachineModel::Monomachine, _timing);
+		macro.tap(C::Exit, 4)							// out of any menu
+			.chord(C::Function, C::Kit)					// GLOBAL, on the active slot
+			.tap(C::Enter)								// GLOBAL n EDIT
+			.tap(C::Left).tap(C::Up, 4)					// first category: AUDIO
+			.tap(C::Down, 2)							// FILE
+			.tap(C::Right).tap(C::Up, 3)				// its first item: SYSEX SEND
+			.tap(C::Down)								// SYSEX RECV
+			.tap(C::Enter)								// the SYSEX RECEIVE page
+			.tap(C::Up, 3)								// MODE: ORIG, the first of ORIG, SPEC, VERF
+			.tap(C::Right).tap(C::Enter);				// WAITING...
+		return macro.take();
+	}
+
+	std::vector<PanelMacroStep> monomachineLeaveMenusMacro(const PanelMacroTiming _timing)
+	{
+		MacroBuilder macro(MachineModel::Monomachine, _timing);
+		macro.tap(PanelControl::Exit, 4);
 		return macro.take();
 	}
 

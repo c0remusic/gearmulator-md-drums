@@ -9,6 +9,8 @@
 
 #include "juce_events/juce_events.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstdint>
 #include <iostream>
@@ -319,31 +321,142 @@ namespace mdAutomationTest
 		// firmware's absolute base-channel offset 0xad maps to payload offset 0xa3.
 		std::vector<uint8_t> decoded(0xa6, 0);
 		decoded[0xa3] = _base;
+		// Every track on MAIN (6), as in the factory Global; the routing sits at 0x0a
+		std::fill_n(decoded.begin(), md::automation::machinedrum::TrackCount, uint8_t{6});
 		return makeDump(_model, 0x50, _slot, decoded);
 	}
 
+	// A 32-step Machinedrum pattern dump: _trigs[track] as bits, one lock value
+	// _lock for track 1 parameter 0 on step 1 when given, everything else empty.
+	// The same over 64 steps: a length over 32 gives the long form, steps 33 to 64 after the 32-step
+	// sections (MCL's MDPattern), their trigs from the high halves of _trigs, without locks
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint64_t, 16>& _trigs, const int _lock = -1);
+
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint32_t, 16>& _trigs, const int _lock = -1)
+	{
+		std::array<uint64_t, 16> trigs{};
+		std::copy(_trigs.begin(), _trigs.end(), trigs.begin());
+		return makeMdPatternDump(_slot, _length, trigs, _lock);
+	}
+
+	inline pluginLib::SysEx makeMdPatternDump(const uint8_t _slot, const uint8_t _length,
+		const std::array<uint64_t, 16>& _trigs, const int _lock)
+	{
+		const auto pack = [](md::automation::sysex::Message& _out, const std::vector<uint8_t>& _data)
+		{
+			for(size_t group = 0; group < _data.size(); group += 7)
+			{
+				const auto count = std::min<size_t>(7, _data.size() - group);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+					if(_data[group + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				_out.push_back(highBits);
+				for(size_t bit = 0; bit < count; ++bit)
+					_out.push_back(_data[group + bit] & 0x7f);
+			}
+		};
+		std::vector<uint8_t> trigs, masks, highTrigs;
+		for(size_t track = 0; track < 16; ++track)
+		{
+			for(const auto shift : {24, 16, 8, 0})
+			{
+				trigs.push_back(static_cast<uint8_t>(_trigs[track] >> shift));
+				highTrigs.push_back(static_cast<uint8_t>(_trigs[track] >> (32 + shift)));
+				masks.push_back(static_cast<uint8_t>(track == 0 && _lock >= 0 && shift == 0 ? 1 : 0));
+			}
+		}
+		std::vector<uint8_t> locks(64 * 32, 0xff);
+		if(_lock >= 0)
+			locks[0] = static_cast<uint8_t>(_lock);
+		md::automation::sysex::Message result{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x67, 0x03, 0x01, _slot};
+		pack(result, trigs);
+		pack(result, masks);
+		pack(result, std::vector<uint8_t>(16, 0));
+		result.insert(result.end(), {0, _length, 0, 0, 0, static_cast<uint8_t>(_lock >= 0 ? 1 : 0)});
+		pack(result, locks);
+		pack(result, std::vector<uint8_t>(204, 0));
+		if(_length > 32)
+		{
+			// Trigs, accent, slide and swing, lock rows and per-track patterns of steps 33 to 64
+			auto extension = highTrigs;
+			extension.resize(extension.size() + 12, 0);
+			extension.resize(extension.size() + 64 * 32, 0xff);
+			extension.resize(extension.size() + 192, 0);
+			pack(result, extension);
+		}
+		finishDump(result);
+		return {result.begin(), result.end()};
+	}
+
+	// An empty Monomachine pattern dump of _length steps, laid out as MCL's MNMPattern: no trig, no
+	// note (from byte 676), no lock row (from 1367); the length at 1060. Edit it with MmPatternEditor.
+	inline pluginLib::SysEx makeMmPatternDump(const uint8_t _slot, const uint8_t _length)
+	{
+		std::vector<uint8_t> decoded(6520, 0);
+		std::fill_n(decoded.begin() + 676, 6 * 64, uint8_t{0xff});
+		decoded[1060] = _length;
+		std::fill_n(decoded.begin() + 1367, 62 * 64, uint8_t{0xff});
+		return makeDump(md::MachineModel::Monomachine, 0x67, _slot, decoded);
+	}
+
+	// _machines, when given, holds one machine id per track; _name is the Kit's name.
 	inline pluginLib::SysEx makeKitDump(
-		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value)
+		const md::MachineModel _model, const uint8_t _slot, const uint8_t _value,
+		const std::vector<uint16_t>& _machines = {}, const std::string& _name = {})
 	{
 		if(_model == md::MachineModel::Monomachine)
 		{
 			std::vector<uint8_t> decoded(698, 0);
+			// The name: the first 11 decoded bytes
+			std::copy_n(_name.begin(), std::min<size_t>(_name.size(), 11), decoded.begin());
 			for(uint8_t track = 0; track < md::automation::monomachine::TrackCount;
 				++track)
 			{
 				decoded[0x0b + track] = _value;
 				for(uint8_t parameter = 0; parameter < 56; ++parameter)
 					decoded[0x11 + track * 72 + parameter] = _value;
+				if(track < _machines.size())
+					decoded[0x11 + 6 * 72 + track] = static_cast<uint8_t>(_machines[track]);
 			}
 			return makeDump(_model, 0x52, _slot, decoded);
 		}
 		std::vector<uint8_t> decoded(1218, 0);
+		// The name: 16 bytes right after the ten-byte header makeDump adds (0x0a of the message)
+		std::copy_n(_name.begin(), std::min<size_t>(_name.size(), 16), decoded.begin());
+		// Master effects, 32 bytes at 0x487 of the message (reverb, echo, EQ, dynamix): _value + n
+		for(uint8_t index = 0; index < 32; ++index)
+			decoded[0x487 - 0x0a + index] = static_cast<uint8_t>((_value + index) & 0x7f);
 		for(uint8_t track = 0; track < md::automation::machinedrum::TrackCount;
 			++track)
 		{
 			for(uint8_t parameter = 0; parameter < 24; ++parameter)
 				decoded[0x10 + track * 24 + parameter] = _value;
 			decoded[0x190 + track] = _value;
+		}
+		if(!_machines.empty())
+		{
+			// 16 big-endian 32-bit values in 7-bit groups, at 0x1aa of the message.
+			std::vector<uint8_t> raw;
+			for(uint8_t track = 0; track < md::automation::machinedrum::TrackCount; ++track)
+			{
+				raw.insert(raw.end(), {0, 0, 0});
+				raw.push_back(track < _machines.size() ? static_cast<uint8_t>(_machines[track]) : 0);
+			}
+			size_t position = 0x1a0;
+			for(size_t group = 0; group < raw.size(); group += 7)
+			{
+				const auto count = std::min<size_t>(7, raw.size() - group);
+				uint8_t highBits = 0;
+				for(size_t bit = 0; bit < count; ++bit)
+					if(raw[group + bit] & 0x80)
+						highBits |= static_cast<uint8_t>(1u << (6u - bit));
+				decoded[position++] = highBits;
+				for(size_t bit = 0; bit < count; ++bit)
+					decoded[position++] = raw[group + bit] & 0x7f;
+			}
 		}
 		return makeDump(_model, 0x52, _slot, decoded);
 	}

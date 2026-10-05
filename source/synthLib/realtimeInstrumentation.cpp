@@ -35,6 +35,17 @@ namespace
 
 	thread_local CallbackContext g_callbackContext;
 
+	// A device's own render thread, inside a RenderScope
+	struct RenderContext
+	{
+		synthLib::RealtimeInstrumentation* owner = nullptr;
+		uint32_t compilations = 0;
+		uint32_t deferredCompilations = 0;
+		bool candidateRole = false;
+	};
+
+	thread_local RenderContext g_renderContext;
+
 	bool enabledFromEnvironment() noexcept
 	{
 		const auto* const value = std::getenv("GEARMULATOR_RT_INSTRUMENTATION");
@@ -96,6 +107,18 @@ namespace synthLib
 		m_maximumActiveOutputBuses.store(0, std::memory_order_relaxed);
 		m_latestActiveOutputChannels.store(0, std::memory_order_relaxed);
 		m_maximumActiveOutputChannels.store(0, std::memory_order_relaxed);
+		m_deviceAccessCount.store(0, std::memory_order_relaxed);
+		m_deviceAccessWaitNanoseconds.store(0, std::memory_order_relaxed);
+		m_deviceAccessWaitMaxNanoseconds.store(0, std::memory_order_relaxed);
+		m_deviceAccessHoldNanoseconds.store(0, std::memory_order_relaxed);
+		m_deviceAccessHoldMaxNanoseconds.store(0, std::memory_order_relaxed);
+		m_renderJitCompilationCount.store(0, std::memory_order_relaxed);
+		m_renderJobsWithJitCompilation.store(0, std::memory_order_relaxed);
+		m_renderLateBlockCount.store(0, std::memory_order_relaxed);
+		m_renderWaitNanoseconds.store(0, std::memory_order_relaxed);
+		m_renderWaitMaxNanoseconds.store(0, std::memory_order_relaxed);
+		m_renderDroppedBlockCount.store(0, std::memory_order_relaxed);
+		m_renderMissedBlockCount.store(0, std::memory_order_relaxed);
 	}
 
 	RealtimeInstrumentationSnapshot RealtimeInstrumentation::snapshot() const noexcept
@@ -140,7 +163,24 @@ namespace synthLib
 		result.maximumActiveOutputBuses = m_maximumActiveOutputBuses.load(std::memory_order_relaxed);
 		result.latestActiveOutputChannels = m_latestActiveOutputChannels.load(std::memory_order_relaxed);
 		result.maximumActiveOutputChannels = m_maximumActiveOutputChannels.load(std::memory_order_relaxed);
+		result.deviceAccessCount = m_deviceAccessCount.load(std::memory_order_relaxed);
+		result.deviceAccessWaitNanoseconds = m_deviceAccessWaitNanoseconds.load(std::memory_order_relaxed);
+		result.deviceAccessWaitMaxNanoseconds = m_deviceAccessWaitMaxNanoseconds.load(std::memory_order_relaxed);
+		result.deviceAccessHoldNanoseconds = m_deviceAccessHoldNanoseconds.load(std::memory_order_relaxed);
+		result.deviceAccessHoldMaxNanoseconds = m_deviceAccessHoldMaxNanoseconds.load(std::memory_order_relaxed);
+		result.renderJitCompilationCount = m_renderJitCompilationCount.load(std::memory_order_relaxed);
+		result.renderJobsWithJitCompilation = m_renderJobsWithJitCompilation.load(std::memory_order_relaxed);
+		result.renderLateBlockCount = m_renderLateBlockCount.load(std::memory_order_relaxed);
+		result.renderWaitNanoseconds = m_renderWaitNanoseconds.load(std::memory_order_relaxed);
+		result.renderWaitMaxNanoseconds = m_renderWaitMaxNanoseconds.load(std::memory_order_relaxed);
+		result.renderDroppedBlockCount = m_renderDroppedBlockCount.load(std::memory_order_relaxed);
+		result.renderMissedBlockCount = m_renderMissedBlockCount.load(std::memory_order_relaxed);
 		return result;
+	}
+
+	RealtimeInstrumentation* RealtimeInstrumentation::current() noexcept
+	{
+		return g_callbackContext.owner;
 	}
 
 	RealtimeInstrumentation::CallbackScope::CallbackScope(
@@ -195,12 +235,22 @@ namespace synthLib
 		const uint32_t _frames) noexcept
 		: m_frames(_frames)
 	{
-		if(!g_callbackContext.owner || !g_callbackContext.owner->isEnabled())
+		if(g_callbackContext.owner && g_callbackContext.owner->isEnabled())
+		{
+			m_owner = g_callbackContext.owner;
+			m_previousCandidateRole = g_callbackContext.candidateRole;
+			g_callbackContext.dualMachine = true;
+			g_callbackContext.candidateRole = true;
+		}
+		else if(g_renderContext.owner && g_renderContext.owner->isEnabled())
+		{
+			m_owner = g_renderContext.owner;
+			m_render = true;
+			m_previousCandidateRole = g_renderContext.candidateRole;
+			g_renderContext.candidateRole = true;
+		}
+		else
 			return;
-		m_owner = g_callbackContext.owner;
-		m_previousCandidateRole = g_callbackContext.candidateRole;
-		g_callbackContext.dualMachine = true;
-		g_callbackContext.candidateRole = true;
 		m_startNanoseconds = nowNanoseconds();
 	}
 
@@ -209,8 +259,43 @@ namespace synthLib
 		if(!m_owner)
 			return;
 		const auto duration = nowNanoseconds() - m_startNanoseconds;
-		g_callbackContext.candidateRole = m_previousCandidateRole;
+		if(m_render)
+			g_renderContext.candidateRole = m_previousCandidateRole;
+		else
+			g_callbackContext.candidateRole = m_previousCandidateRole;
 		m_owner->recordDeferredCandidate(m_frames, duration);
+	}
+
+	RealtimeInstrumentation::RenderScope::RenderScope(RealtimeInstrumentation* const _owner,
+		const uint32_t _frames) noexcept
+	{
+		if(!_owner || !_owner->isEnabled() || g_renderContext.owner)
+			return;
+		m_owner = _owner;
+		m_frames = _frames;
+		m_startNanoseconds = nowNanoseconds();
+		g_renderContext = {};
+		g_renderContext.owner = _owner;
+	}
+
+	RealtimeInstrumentation::RenderScope::~RenderScope()
+	{
+		if(!m_owner)
+			return;
+		const auto context = g_renderContext;
+		g_renderContext = {};
+		if(!context.compilations && !context.deferredCompilations)
+			return;
+		m_owner->m_renderJobsWithJitCompilation.fetch_add(1, std::memory_order_relaxed);
+		RealtimeEvent event;
+		event.kind = RealtimeEventKind::RenderJob;
+		event.timeNanoseconds = m_startNanoseconds;
+		event.callbackIndex = m_owner->m_outerHostCallbackCount.load(std::memory_order_relaxed) + 1;
+		event.durationNanoseconds = nowNanoseconds() - m_startNanoseconds;
+		event.frames = m_frames;
+		event.compilations = context.compilations;
+		event.deferredCompilations = context.deferredCompilations;
+		m_owner->recordTimelineEvent(event);
 	}
 
 	void RealtimeInstrumentation::recordHostCallback(RealtimeSlowCallback _callback) noexcept
@@ -253,7 +338,9 @@ namespace synthLib
 			|| (!_callback.offline && _callback.budgetNanoseconds > 0
 				&& _callback.durationNanoseconds >= _callback.budgetNanoseconds * 3 / 4)
 			|| _callback.lockWaitNanoseconds >= 100'000 || _callback.dualMachine
-			|| _callback.liveJitCompilations || _callback.deferredJitCompilations;
+			|| _callback.liveJitCompilations || _callback.deferredJitCompilations
+			|| _callback.renderWaitNanoseconds >= 100'000 || _callback.renderDroppedBlocks
+			|| _callback.renderMissedBlocks;
 		if(!interesting) return;
 		auto& slot = m_slowCallbacks[m_writePosition % SlowCallbackCapacity];
 		if(slot.ready.load(std::memory_order_acquire))
@@ -439,7 +526,26 @@ namespace synthLib
 	void RealtimeInstrumentation::recordCurrentCallbackJitCompilation() noexcept
 	{
 		auto* const owner = g_callbackContext.owner;
-		if(!owner || !owner->isEnabled())
+		if(!owner)
+		{
+			auto* const renderOwner = g_renderContext.owner;
+			if(!renderOwner || !renderOwner->isEnabled())
+				return;
+			renderOwner->m_jitCompilationCount.fetch_add(1, std::memory_order_relaxed);
+			renderOwner->m_renderJitCompilationCount.fetch_add(1, std::memory_order_relaxed);
+			if(g_renderContext.candidateRole)
+			{
+				++g_renderContext.deferredCompilations;
+				renderOwner->m_deferredCandidateJitCompilationCount.fetch_add(1, std::memory_order_relaxed);
+			}
+			else
+			{
+				++g_renderContext.compilations;
+				renderOwner->m_liveJitCompilationCount.fetch_add(1, std::memory_order_relaxed);
+			}
+			return;
+		}
+		if(!owner->isEnabled())
 			return;
 		if(g_callbackContext.candidateRole) ++g_callbackContext.callback.deferredJitCompilations;
 		else ++g_callbackContext.callback.liveJitCompilations;
@@ -449,6 +555,53 @@ namespace synthLib
 				1, std::memory_order_relaxed);
 		else
 			owner->m_liveJitCompilationCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void RealtimeInstrumentation::recordDeviceAccess(const uint64_t _waitNanoseconds,
+		const uint64_t _holdNanoseconds) noexcept
+	{
+		if(!isEnabled())
+			return;
+		m_deviceAccessCount.fetch_add(1, std::memory_order_relaxed);
+		m_deviceAccessWaitNanoseconds.fetch_add(_waitNanoseconds, std::memory_order_relaxed);
+		m_deviceAccessHoldNanoseconds.fetch_add(_holdNanoseconds, std::memory_order_relaxed);
+		updateMaximum(m_deviceAccessWaitMaxNanoseconds, _waitNanoseconds);
+		updateMaximum(m_deviceAccessHoldMaxNanoseconds, _holdNanoseconds);
+		RealtimeEvent event;
+		event.kind = RealtimeEventKind::DeviceAccess;
+		event.callbackIndex = m_outerHostCallbackCount.load(std::memory_order_relaxed) + 1;
+		event.waitNanoseconds = _waitNanoseconds;
+		event.holdNanoseconds = _holdNanoseconds;
+		recordTimelineEvent(event);
+	}
+
+	void RealtimeInstrumentation::recordCurrentRenderWait(const uint64_t _nanoseconds) noexcept
+	{
+		auto* const owner = g_callbackContext.owner;
+		if(!owner || !owner->isEnabled())
+			return;
+		g_callbackContext.callback.renderWaitNanoseconds += _nanoseconds;
+		owner->m_renderLateBlockCount.fetch_add(1, std::memory_order_relaxed);
+		owner->m_renderWaitNanoseconds.fetch_add(_nanoseconds, std::memory_order_relaxed);
+		updateMaximum(owner->m_renderWaitMaxNanoseconds, _nanoseconds);
+	}
+
+	void RealtimeInstrumentation::recordCurrentDroppedBlock() noexcept
+	{
+		auto* const owner = g_callbackContext.owner;
+		if(!owner || !owner->isEnabled())
+			return;
+		++g_callbackContext.callback.renderDroppedBlocks;
+		owner->m_renderDroppedBlockCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void RealtimeInstrumentation::recordCurrentMissedBlock() noexcept
+	{
+		auto* const owner = g_callbackContext.owner;
+		if(!owner || !owner->isEnabled())
+			return;
+		++g_callbackContext.callback.renderMissedBlocks;
+		owner->m_renderMissedBlockCount.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void RealtimeInstrumentation::recordDeferredCandidate(

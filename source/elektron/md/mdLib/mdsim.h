@@ -20,9 +20,10 @@ namespace md
 	//   * Parallel port PPDDR/PPDAT (UM Section 10) - PPDAT reads return input pins
 	//     idle-HIGH, output-driven bits reflect the last written value.
 	//   * UART1 ($140, MIDI) and UART2 ($180, panel) status register (USR, +$04).
-	//     UART2 uses its programmed mode/baud registers to pace a holding register
-	//     and shift register; UART1 retains legacy immediate delivery. RxRDY is set
-	//     only while a byte is queued via queueRx().
+	//     Each uses its programmed mode/baud registers to pace a holding register
+	//     and shift register once on its internal baud generator (MIDI: 31250
+	//     baud); before that, a byte is delivered at once. RxRDY is set only while
+	//     a byte is queued via queueRx(); received bytes are not paced.
 	//   * Chip-select, timer and interrupt-controller registers are stored so reads
 	//     return what was written (they define the memory map, hard-coded elsewhere).
 	//
@@ -306,10 +307,11 @@ namespace md
 		void    pushTransmitBuffer(unsigned _uart, uint8_t _value);
 		void    writeUartMode(unsigned _uart, uint8_t _value);
 		void    writeUartCommand(unsigned _uart, uint8_t _value);
-		bool    panelTransmitTimingActive() const;
-		uint32_t panelCharacterCycles() const;
-		void    startPanelShiftRegister();
-		void    stepPanelTransmitter(uint32_t _cycles);
+		// A UART transmits at its configured rate once on its internal baud generator
+		bool    transmitTimingActive(unsigned _uart) const;
+		uint32_t characterCycles(unsigned _uart) const;
+		void    startShiftRegister(unsigned _uart);
+		void    stepTransmitter(unsigned _uart, uint32_t _cycles);
 		void    armTransmitReady(unsigned _uart);
 
 		// --- Timer internals ------------------------------------------------------

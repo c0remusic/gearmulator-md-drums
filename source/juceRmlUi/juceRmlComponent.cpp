@@ -97,6 +97,8 @@ namespace juceRmlUi
 			m_targetFPS = static_cast<float>(_config.refreshRateLimitHz);
 		else
 			m_targetFPS = g_defaultSoftwareFPS;
+		m_defaultAcceleratedFPS = _config.acceleratedRefreshRateHz > 0 && _config.acceleratedRefreshRateHz <= 300
+			? static_cast<float>(_config.acceleratedRefreshRateHz) : g_defaultAcceleratedFPS;
 
 		m_renderProxy.reset(new RendererProxy(m_coreInstance, m_dataProvider));
 
@@ -239,7 +241,7 @@ namespace juceRmlUi
 		const bool haveCustomFPS = m_hasCustomFPS;
 
 		if (!haveCustomFPS)
-			m_targetFPS = g_defaultAcceleratedFPS;
+			m_targetFPS = m_defaultAcceleratedFPS;
 		int major = 0, minor = 0;
 
 #if JUCE_MAC
@@ -277,7 +279,7 @@ namespace juceRmlUi
 						vendorStr.find("amd") != std::string::npos ||
 						vendorStr.find("advanced micro devices") != std::string::npos
 						)
-						m_targetFPS = 60;
+						m_targetFPS = std::max(m_targetFPS, 60.0f);
 				}
 			}
 			m_renderProxy->setTextureParameters(static_cast<uint32_t>(maxSize), true);
@@ -303,7 +305,9 @@ namespace juceRmlUi
 			startNextFrameTimer();
 		}
 
-		dsp56k::ThreadTools::setCurrentThreadPriority(dsp56k::ThreadPriority::Lowest);
+		// Normal, not lowest: an emulation running its threads time critical starved a lowest priority
+		// renderer, and the frames came late and unevenly
+		dsp56k::ThreadTools::setCurrentThreadPriority(dsp56k::ThreadPriority::Normal);
 		dsp56k::ThreadTools::setCurrentThreadName("RmlUI-Renderer");
 	}
 
@@ -313,12 +317,27 @@ namespace juceRmlUi
 			// although we set that we render only manually, juce still calls this function eventhough we didn't
 			// request a repaint, for example when the window is resized.
 			// This results in massive flickering if the render queue is empty so we ask RmlUi to just do a
-			// render for us from the OpenGL thread
+			// render for us from the OpenGL thread.
+			// That render reads the element tree, which the message thread changes under the access lock:
+			// read it only with that lock, and never wait for it here, as the message thread holds it when
+			// it stops this thread (detaching the context). Without it, a new frame is asked for instead.
 			std::scoped_lock lock(m_contextRenderMutex);
 			if (!m_renderProxy->hasRenderFunctions())
 			{
-				m_rmlContext->Render();
-				m_renderProxy->finishFrame();
+				if (m_rmlInterfaces.tryAttach())
+				{
+					m_rmlContext->Render();
+					m_renderProxy->finishFrame();
+					m_rmlInterfaces.detach();
+				}
+				else
+				{
+					juce::MessageManager::callAsync([safe = juce::Component::SafePointer<RmlComponent>(this)]
+					{
+						if (safe)
+							safe->enqueueUpdateOnce();
+					});
+				}
 			}
 		}
 
@@ -510,6 +529,10 @@ namespace juceRmlUi
 	void RmlComponent::visibilityChanged()
 	{
 		Component::visibilityChanged();
+
+		// Nothing is drawn off screen (update()): draw as soon as it shows, not at the next scheduled frame
+		if (isVisible())
+			enqueueUpdate();
 
 		if (isVisible() && m_openGLContext && !m_openGLContext->isAttached())
 			m_openGLContext->attachTo(*this);
@@ -925,6 +948,14 @@ namespace juceRmlUi
 		return static_cast<RmlComponent*>(p);
 	}
 
+	bool RmlComponent::isOnScreen() const
+	{
+		const auto* peer = getPeer();
+		if (!peer)
+			return true;
+		return isShowing() && !peer->isMinimised();
+	}
+
 	void RmlComponent::update()
 	{
 		RmlInterfaces::ScopedAccess access(*this);
@@ -955,6 +986,10 @@ namespace juceRmlUi
 		m_updating = true;
 		m_renderDone = false;
 
+		// No frame for a window that shows nothing (hidden, minimized): RmlUi still updates, so the
+		// document is current when it shows again, and visibilityChanged() asks for that frame
+		const bool onScreen = isOnScreen() || m_screenshotState == ScreenshotState::RequestScreenshot;
+
 		{
 			std::scoped_lock lock(m_contextRenderMutex);
 
@@ -975,12 +1010,15 @@ namespace juceRmlUi
 			evPreUpdate(this);
 
 			m_rmlContext->Update();
-			// The queued geometry must retain its own scale until it is painted,
-			// even if a setting or the display density changes in between.
-			m_softwareFrameScale = getOpenGLRenderingScale();
-			m_rmlContext->Render();
+			if (onScreen)
+			{
+				// The queued geometry must retain its own scale until it is painted,
+				// even if a setting or the display density changes in between.
+				m_softwareFrameScale = getOpenGLRenderingScale();
+				m_rmlContext->Render();
 
-			m_renderProxy->finishFrame();
+				m_renderProxy->finishFrame();
+			}
 
 			evPostUpdate(this);
 		}
@@ -995,8 +1033,11 @@ namespace juceRmlUi
 
 //		LOG("FPS: " << m_fps << " avg, " << fps << " current, next update delay " << m_rmlContext->GetNextUpdateDelay());
 
-		// we get a more stable timing by doing increments, but if we are too far off, we just set the next frame time to now + delta instead
-		if ((std::abs(m_nextFrameTime) - t) > 0.5f)
+		// we get a more stable timing by doing increments, but if we are too far off, we just set the next frame time to now + delta instead.
+		// Behind by more than a frame (updates slower than the frame rate, or a pause) counts as too far
+		// off as well: catching up would draw frame after frame with no pause, as fast as they come.
+		const double period = m_targetFPS > 0 ? 1.0 / m_targetFPS : 0.0;
+		if (m_nextFrameTime - t > 0.5 || m_nextFrameTime < t - period)
 			m_nextFrameTime = t;
 
 		if (m_targetFPS > 0)
@@ -1024,7 +1065,12 @@ namespace juceRmlUi
 		m_updating = false;
 
 		// trigger a repaint and wait for OpenGL to be done with it
-		if (m_renderType == Renderer::Software)
+		if (!onScreen)
+		{
+			// no frame was produced: nothing to wait for
+			m_renderDone = true;
+		}
+		else if (m_renderType == Renderer::Software)
 		{
 			// get rid of opengl context if we switched to software rendering
 			if (m_openGLContext)
@@ -1090,7 +1136,7 @@ namespace juceRmlUi
 		if (m_hasCustomFPS)
 			return;
 		m_targetFPS = _renderer == Renderer::Software
-			? g_defaultSoftwareFPS : g_defaultAcceleratedFPS;
+			? g_defaultSoftwareFPS : m_defaultAcceleratedFPS;
 	}
 
 	void RmlComponent::enableDebugger(const bool _enable)
@@ -1273,6 +1319,7 @@ namespace juceRmlUi
 				{
 					m_documentSize.x = static_cast<int>(s.x);
 					m_documentSize.y = static_cast<int>(s.y);
+					m_heightResizable = m_document->HasAttribute("resizableheight");
 				}
 				else
 					throw std::runtime_error("RMLUI document '" + m_rootRmlFilename + "' has no valid size, explicit default size needs to be specified on the <body> element.");
@@ -1333,6 +1380,20 @@ namespace juceRmlUi
 			m_currentRenderScale = renderScale;
 			m_rmlContext->SetDensityIndependentPixelRatio(renderScale * m_contentScale);
 			m_rmlContext->SetDimensions({ size.x, size.y });
+		}
+
+		// The body's default height is its minimum; below it, the document keeps
+		// that height and the bottom is cut off.
+		if (m_heightResizable && m_document && renderScale > 0.0f)
+		{
+			const auto ratio = renderScale * m_contentScale;
+			const auto height = std::max(static_cast<float>(size.y) / ratio, static_cast<float>(m_documentSize.y));
+			// This runs every frame; a property set again would lay the document out again.
+			if (height != m_documentHeight)
+			{
+				m_documentHeight = height;
+				m_document->SetProperty(Rml::PropertyId::Height, Rml::Property(height, Rml::Unit::DP));
+			}
 		}
 	}
 

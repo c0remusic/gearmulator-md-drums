@@ -200,7 +200,9 @@ int main(const int _argc, char** _argv)
 		return 2;
 	}
 
-	md::Hardware hardware(rom, _argv[2], model, patchRam);
+	// On the heap: a Hardware outgrows the default 1 MB stack of Windows' main thread
+	auto hardwareStorage = std::make_unique<md::Hardware>(rom, _argv[2], model, patchRam);
+	auto& hardware = *hardwareStorage;
 	if(!hardware.isValid())
 	{
 		std::fputs("firmware did not construct a valid machine\n", stderr);
@@ -384,9 +386,10 @@ int main(const int _argc, char** _argv)
 			std::fputs("DigiPRO project-state persistence failed\n", stderr);
 			return 1;
 		}
-		md::Hardware restored(rom, _argv[2], model, decoded.patchRam,
+		auto restoredStorage = std::make_unique<md::Hardware>(rom, _argv[2], model, decoded.patchRam,
 			std::shared_ptr<md::FrontPanelPublisher>{}, std::vector<uint8_t>{},
 			std::vector<uint8_t>{}, md::FlashSectorOverlay{}, decoded.userFlash);
+		auto& restored = *restoredStorage;
 		if(!restored.isValid() || restored.copyUserFlash() != userFlash
 			|| !md::test::verifyDigiProContents(fileBytes, restored.copyFlashData()))
 		{
@@ -402,7 +405,8 @@ int main(const int _argc, char** _argv)
 		if(!md::encodeState(state, patchAfter, model, synthLib::StateTypeGlobal)
 			|| !md::decodeState(decoded, state, {}, model, synthLib::StateTypeGlobal)
 			|| decoded.patchRam != patchAfter) return 1;
-		md::Hardware restored(rom, _argv[2], model, decoded.patchRam);
+		auto restoredStorage = std::make_unique<md::Hardware>(rom, _argv[2], model, decoded.patchRam);
+		auto& restored = *restoredStorage;
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(180);
 		while(!restored.isFirmwareMidiReady() && std::chrono::steady_clock::now() < deadline) restored.advance(64);
 		// MIDI-ready precedes the end of the firmware's boot/loading work.

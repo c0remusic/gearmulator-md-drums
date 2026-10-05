@@ -28,7 +28,8 @@ namespace
 	synthLib::PerformanceReport::Context panelEventDetails(const synthLib::RealtimeEvent& _event)
 	{
 		using Kind = synthLib::RealtimeEventKind;
-		if(_event.kind == Kind::HostTransport) return {};
+		if(_event.kind == Kind::HostTransport || _event.kind == Kind::DeviceAccess || _event.kind == Kind::RenderJob)
+			return {};
 		const auto model = static_cast<md::MachineModel>(_event.model);
 		if(_event.command >= 0x20 && _event.command <= 0x25)
 		{
@@ -122,6 +123,10 @@ namespace mdJucePlugin
 			baseLib::ChunkWriter chunk(_stream, "AUTO", 1);
 			_stream.write(snapshot);
 		}
+		{
+			baseLib::ChunkWriter chunk(_stream, "CHAN", 1);
+			m_chainControl.save(_stream);
+		}
 	}
 
 	void AudioPluginAudioProcessor::loadChunkData(baseLib::ChunkReader& _reader)
@@ -133,6 +138,10 @@ namespace mdJucePlugin
 			_stream.read(snapshot);
 			auto& controller = dynamic_cast<Controller&>(getController());
 			(void)controller.restoreAutomationSnapshot(snapshot);
+		});
+		_reader.add("CHAN", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		{
+			(void)m_chainControl.load(_stream);
 		});
 		_reader.add("RAMF", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
@@ -396,14 +405,15 @@ namespace mdJucePlugin
 		getController();
 		setRamRecordingMode(getRamRecordingMode());
 		applyFollowHostTempoSetting(false);
-		// A new configuration gets two blocks of latency on the Machinedrum:
-		// the machine then renders ahead on its own threads and the host's
-		// audio callback only exchanges buffers. A saved choice is kept, and
-		// MDMM_LATENCY_BLOCKS (the device default) wins for tests and A/B runs.
+		// A new configuration gets two blocks of latency: the machine then
+		// renders ahead on its own threads and the host's audio callback only
+		// exchanges buffers (the Monomachine too: on the host's thread it costs
+		// most of a core, and one block did not survive a disk scan in Live).
+		// A saved choice is kept, and MDMM_LATENCY_BLOCKS (the device default)
+		// wins for tests and A/B runs.
 		const bool latencyFromEnvironment = md::Device::latencyBlocksFromEnvironment().has_value();
 		const auto latencyBlocks = getConfig().getIntValue("latencyBlocks",
-			m_model == md::MachineModel::Machinedrum && !latencyFromEnvironment ? DefaultLatencyBlocks
-				: static_cast<int>(getPlugin().getLatencyBlocks()));
+			!latencyFromEnvironment ? DefaultLatencyBlocks : static_cast<int>(getPlugin().getLatencyBlocks()));
 		Processor::setLatencyBlocks(latencyBlocks);
 		m_startupDiagnosticsEnabled = !_ephemeralConfig
 			&& juce::JUCEApplicationBase::isStandaloneApp();
@@ -424,8 +434,9 @@ namespace mdJucePlugin
 			else
 				m_startupDiagnosticsEnabled = false;
 		}
-		if(m_model == md::MachineModel::Machinedrum || m_startupDiagnosticsEnabled)
-			startTimer(250);
+		// The factory initialisation and state restore (Machinedrum), the startup diagnostics and
+		// the pattern chain (both machines)
+		startTimer(250);
 		m_performanceReport = std::make_unique<synthLib::PerformanceReport>(
 			getPlugin().getRealtimeInstrumentation(), panelEventDetails);
 		// The environment switch is also useful in hosts without an open editor.
@@ -446,6 +457,21 @@ namespace mdJucePlugin
 			.withOutput("Out E/F", juce::AudioChannelSet::stereo(), false);
 	}
 
+	void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages)
+	{
+		jucePluginEditorLib::Processor::processBlock(_buffer, _midiMessages);
+		// The editor's meters: each enabled output bus as the host receives it
+		for(int bus = 0; bus < getBusCount(false) && bus < 3; ++bus)
+		{
+			const auto busBuffer = getBusBuffer(_buffer, false, bus);
+			for(int channel = 0; channel < busBuffer.getNumChannels() && channel < 2; ++channel)
+			{
+				m_outputMeters.measure(static_cast<size_t>(bus * 2 + channel), busBuffer.getReadPointer(channel),
+					busBuffer.getNumSamples());
+			}
+		}
+	}
+
 	AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 	{
 		stopTimer();
@@ -464,6 +490,12 @@ namespace mdJucePlugin
 		const auto status = m_performanceReport->status();
 		return status == synthLib::PerformanceReport::Status::Starting
 			|| status == synthLib::PerformanceReport::Status::Recording;
+	}
+
+	std::optional<synthLib::PerformanceReport::Status> AudioPluginAudioProcessor::performanceDiagnosticsState() const
+	{
+		if(!m_performanceReport) return std::nullopt;
+		return m_performanceReport->status();
 	}
 
 	std::string AudioPluginAudioProcessor::performanceDiagnosticsStatus() const
@@ -550,6 +582,19 @@ namespace mdJucePlugin
 			return false;
 
 		enum class State { Waiting, Ready, NotNeeded };
+		// The status first: only a machine ready to reboot is worth pausing the rendering for
+		const auto status = m_liveDevice.status();
+		if(status && (status->restorePending
+			|| (status->factoryInitializationExpected && !status->factoryReadyForReboot)))
+		{
+			startTimer(250);
+			return false;
+		}
+		if(!status || !status->factoryInitializationExpected)
+		{
+			startTimer(1000);
+			return false;
+		}
 		auto state = State::NotNeeded;
 		md::Device* liveDevice = nullptr;
 		uint64_t liveEpoch = 0;
@@ -651,6 +696,8 @@ namespace mdJucePlugin
 	{
 		if(m_model != md::MachineModel::Machinedrum)
 			return false;
+		if(const auto status = m_liveDevice.status(); !status || !status->deferredStateReady)
+			return false;
 		md::Device* liveDevice = nullptr;
 		uint64_t liveEpoch = 0;
 		uint64_t generation = 0;
@@ -727,6 +774,9 @@ namespace mdJucePlugin
 
 	bool AudioPluginAudioProcessor::serviceStateRestoreFailure()
 	{
+		const auto status = m_liveDevice.status();
+		if(!status || !status->restoreFailed || status->restoreGeneration == m_reportedRestoreFailureGeneration)
+			return false;
 		uint64_t generation = 0;
 		std::string error;
 		getPlugin().withDeviceLocked([&](synthLib::Device* const _device)
@@ -819,9 +869,26 @@ namespace mdJucePlugin
 		m_startupDiagnosticsFile.appendText(line);
 	}
 
+	void AudioPluginAudioProcessor::serviceChain()
+	{
+		m_chainControl.update(getHostSyncState() == md::HostSync::State::Following);
+		// A pattern of the chain whose length is not known: its dump, one pattern at a time,
+		// asked for again after three seconds without an answer
+		const auto missing = m_chainControl.getMissingLength();
+		const auto now = juce::Time::getMillisecondCounterHiRes();
+		if(!missing || !hasController() || (m_chainLengthAsked == missing && now - m_chainLengthAskedAt < 3000.0))
+			return;
+		if(dynamic_cast<Controller&>(getController()).requestPatternDump(*missing))
+		{
+			m_chainLengthAsked = missing;
+			m_chainLengthAskedAt = now;
+		}
+	}
+
 	void AudioPluginAudioProcessor::timerCallback()
 	{
 		recordStandaloneStartupDiagnostics();
+		serviceChain();
 		if(serviceProjectStateRestore())
 			return;
 		(void)serviceFactoryInitialization();
@@ -848,6 +915,9 @@ namespace mdJucePlugin
 		d->setRamRecordingMode(getRamRecordingMode());
 		d->setParallelTransport(getParallelTransportSetting());
 		d->setHostSyncControl(m_hostSyncControl);
+		d->setChainPlayer(m_chainControl.getPlayer());
+		d->setMmPatternWriteControl(m_mmPatternWriteControl);
+		d->setLivePatternControl(m_livePatternControl);
 		return d.release();
 	}
 
@@ -882,11 +952,8 @@ namespace mdJucePlugin
 
 	bool AudioPluginAudioProcessor::isParallelTransportActive()
 	{
-		return getPlugin().withDeviceLocked([](synthLib::Device* const _device)
-		{
-			const auto* const device = dynamic_cast<const md::Device*>(_device);
-			return device && device->isParallelTransportActive();
-		});
+		const auto status = m_liveDevice.status();
+		return status && status->parallelTransportActive;
 	}
 
 	void AudioPluginAudioProcessor::setRamRecordingMode(md::RamRecordingMode _mode)
@@ -905,11 +972,8 @@ namespace mdJucePlugin
 	{
 		if(m_model != md::MachineModel::Machinedrum)
 			return false;
-		return getPlugin().withDeviceLocked([](synthLib::Device* const _device)
-		{
-			const auto* const device = dynamic_cast<const md::Device*>(_device);
-			return device && device->supportsRamRecordingMode();
-		});
+		const auto status = m_liveDevice.status();
+		return status && status->ramRecordingModeSupported;
 	}
 
 	void AudioPluginAudioProcessor::getRemoteDeviceParams(synthLib::DeviceCreateParams& _params) const

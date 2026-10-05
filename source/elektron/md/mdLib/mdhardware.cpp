@@ -1328,25 +1328,128 @@ namespace md
 		m_mdLink.awaitFresh.store(true, std::memory_order_release);
 	}
 
+	std::optional<Hardware::SequencerPosition> Hardware::readSequencerPosition()
+	{
+		// Found with mdPlayheadProbe: a byte that counts 0 to 11 through a pattern of 12 steps, and the
+		// sequencer's tick, 0 to 5 through each step, which holds still while the sequencer is stopped
+		// (the machine's other tick counters run on: its clock serves the LFOs and delays too). No byte
+		// was found that tells running from stopped both when started from the front panel and by MIDI
+		// START with clock (the machine following the host): the sequencer plays while its tick moves.
+		uint32_t stepAddress = 0;
+		uint32_t tickAddress = 0;
+		if(m_firmwareFingerprint == g_mdOs163Fingerprint)
+		{
+			stepAddress = 0x00261aa7;
+			tickAddress = 0x01001f33;
+		}
+		else if(m_firmwareFingerprint == g_mmOs132bFingerprint)
+		{
+			stepAddress = 0x002bc287;
+			tickAddress = 0x002bc29f;
+		}
+		else
+			return std::nullopt;
+		const auto tick = m_uc.read8(tickAddress);
+		const auto now = getEmulatedFrames();
+		if(!m_sequencerTickKnown || tick != m_sequencerTick)
+		{
+			// The first value seen is no tick
+			m_sequencerTickFrame = m_sequencerTickKnown ? now : 0;
+			m_sequencerTick = tick;
+			m_sequencerTickKnown = true;
+		}
+		// A tick lasts 83 ms at the slowest tempo, 30 BPM: a quarter of a second without one is stopped
+		const bool playing = m_sequencerTickFrame && now - m_sequencerTickFrame < g_samplerate / 4;
+		return SequencerPosition{m_uc.read8(stepAddress), playing};
+	}
+
+	std::optional<LiveKit> Hardware::readLiveKit()
+	{
+		// Found with mdPlayheadProbe --livekit: bytes that follow ASSIGN MACHINE and a parameter's CC at
+		// once. The Machinedrum keeps the Kit from $100000 as its dump lays it out (name at $0a, parameters
+		// at $1a, 24 a track, levels at $19a, machines at $1aa, a 32-bit word a track whose low byte is the
+		// id); the Monomachine from $100028 as its dump's decoded payload (name, levels at $0b, parameters
+		// at $11, 72 a track with pages synthesis to LFO 3 first, then a machine id byte a track).
+		LiveKit kit;
+		kit.frame = getEmulatedFrames();
+		if(m_firmwareFingerprint == g_mdOs163Fingerprint)
+		{
+			// Then, raw where the dump packs them in 7 bits: the LFOs from $1ea, 36 bytes a track (the five
+			// fields $62 sets, then the LFO's state), and the master effects from $42a
+			kit.tracks = automation::machinedrum::TrackCount;
+			kit.machinedrum = true;
+			for(uint8_t track = 0; track < kit.tracks; ++track)
+			{
+				for(uint8_t parameter = 0; parameter < 24; ++parameter)
+					kit.values[track][parameter] = m_uc.read8(0x0010001a + track * 24u + parameter);
+				kit.values[track][automation::machinedrum::Level * 8u] = m_uc.read8(0x0010019a + track);
+				kit.machines[track] = m_uc.read8(0x001001ad + track * 4u);
+				const uint32_t lfo = 0x001001ea + track * 36u;
+				kit.lfos[track] = {m_uc.read8(lfo), m_uc.read8(lfo + 1), m_uc.read8(lfo + 2), m_uc.read8(lfo + 3),
+					m_uc.read8(lfo + 4)};
+			}
+			for(uint32_t i = 0; i < kit.masterEffects.size(); ++i)
+				kit.masterEffects[i] = m_uc.read8(0x0010042a + i);
+			return kit;
+		}
+		if(m_firmwareFingerprint == g_mmOs132bFingerprint)
+		{
+			kit.tracks = automation::monomachine::TrackCount;
+			for(uint8_t track = 0; track < kit.tracks; ++track)
+			{
+				for(uint8_t parameter = 0; parameter < (automation::monomachine::Lfo3 + 1) * 8; ++parameter)
+					kit.values[track][parameter] = m_uc.read8(0x00100039 + track * 72u + parameter);
+				kit.values[track][automation::monomachine::Level * 8u] = m_uc.read8(0x00100033 + track);
+				kit.machines[track] = m_uc.read8(0x001001e9 + track);
+			}
+			return kit;
+		}
+		return std::nullopt;
+	}
+
+	std::optional<LivePatternLayout> Hardware::livePatternLayout() const
+	{
+		// Found with mdPlayheadProbe --pattern-ram and --pattern-ext: the pattern as its dump's payload unpacks,
+		// in three blocks; the second copy of steps 33 to 64 the firmware keeps at $262560 does not play
+		if(m_model == MachineModel::Machinedrum && m_firmwareFingerprint == g_mdOs163Fingerprint)
+			return LivePatternLayout{0x001272c0, 0x0016bdc0, 0x00180000};
+		return std::nullopt;
+	}
+
+	bool Hardware::writeRamIfUnchanged(const std::vector<RamWrite>& _writes)
+	{
+		for(const auto& write : _writes)
+		{
+			if(write.expected && m_uc.read8(write.address) != *write.expected)
+				return false;
+		}
+		if(_writes.empty())
+			return true;
+		registerExternalInteraction();
+		for(const auto& write : _writes)
+			m_uc.write8(write.address, write.value);
+		return true;
+	}
+
 	bool Hardware::trySendPanelEvent(const uint8_t _cmd, const uint8_t _arg)
 	{
 		registerExternalInteraction();
-		return m_panelIn.tryPush(_cmd, _arg);
+		return m_panelIn->tryPush(_cmd, _arg);
 	}
 
 	size_t Hardware::getPendingPanelInputBytes() const
 	{
-		return m_panelIn.size();
+		return m_panelIn->size();
 	}
 
 	size_t Hardware::getPanelInputOverflowCount() const
 	{
-		return m_panelIn.overflowCount();
+		return m_panelIn->overflowCount();
 	}
 
 	PanelInputQueueStatus Hardware::getPanelInputStatus() const
 	{
-		return m_panelIn.status();
+		return m_panelIn->status();
 	}
 
 	void Hardware::processUC()
@@ -1361,11 +1464,14 @@ namespace md
 			m_pendingFlashRestoreActive.load(std::memory_order_acquire);
 		if(!projectRestorePending)
 			pumpScheduledMidi();
-		if(!projectRestorePending && m_panelIn.hasPending())
+		if(!projectRestorePending && m_panelIn->hasPending())
 		{
 			PanelInputQueue::DrainBuffer panelInput;
 			const auto availablePackets = m_uc.availablePanelRxBytes() / 2;
-			const auto panelInputCount = m_panelIn.drain(panelInput, availablePackets);
+			const auto panelInputCount = m_panelIn->drain(panelInput, availablePackets);
+			// Packets pushed to the queue directly (getPanelInput) did not go through trySendPanelEvent
+			if(panelInputCount)
+				registerExternalInteraction();
 			for(size_t i = 0; i < panelInputCount; ++i)
 			{
 				const auto& packet = panelInput[i];
@@ -1419,7 +1525,7 @@ namespace md
 		constexpr uint64_t minCycles = 16;
 		if(_maxCycles < minCycles)
 			return 0;
-		if(m_pendingFlashRestoreActive.load(std::memory_order_acquire) || m_panelIn.hasPending()
+		if(m_pendingFlashRestoreActive.load(std::memory_order_acquire) || m_panelIn->hasPending()
 			|| m_midiSysexTransfer.ownsMidiWire() || m_midiInByteCursor != 0
 			|| !m_midiIn.empty() || m_realtimeMidiIn.size() != 0)
 			return 0;
@@ -1994,7 +2100,7 @@ namespace md
 						// Keep external input polling at each omitted instruction
 						// boundary; a producer still wakes the ordinary path.
 						for(; instructions < limit; ++instructions)
-							if(m_panelIn.hasPending() || !m_midiIn.empty()
+							if(m_panelIn->hasPending() || !m_midiIn.empty()
 								|| m_realtimeMidiIn.size() != 0
 								|| m_midiSysexTransfer.ownsMidiWire())
 								break;

@@ -179,6 +179,75 @@ add_test(NAME mdAutomationMidiTest COMMAND mdAutomationMidiTest)
 set_tests_properties(mdAutomationMidiTest PROPERTIES LABELS "UnitTest")
 set_property(TARGET mdAutomationMidiTest PROPERTY FOLDER "Elektron")
 
+# The editor's machine assignment and pattern dump against the real firmware
+add_executable(mdEditorFirmwareTest mdEditorFirmwareTest.cpp)
+target_link_libraries(mdEditorFirmwareTest PRIVATE mdLib)
+add_test(NAME mdEditorFirmwareTest COMMAND mdEditorFirmwareTest)
+set_tests_properties(mdEditorFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mdEditorFirmwareTest PROPERTY FOLDER "Elektron")
+
+# Probe, run by hand: what shows the playing step (front panel step LEDs, MIDI clock out)
+add_executable(mdPlayheadProbe mdPlayheadProbe.cpp)
+target_link_libraries(mdPlayheadProbe PRIVATE mdLib)
+set_property(TARGET mdPlayheadProbe PROPERTY FOLDER "Elektron")
+
+# PatternChain's positions and ChainPlayer's MIDI, without firmware
+add_executable(patternChainTest patternChainTest.cpp)
+target_link_libraries(patternChainTest PRIVATE mdLib)
+add_test(NAME patternChainTest COMMAND patternChainTest)
+set_tests_properties(patternChainTest PROPERTIES LABELS "UnitTest")
+set_property(TARGET patternChainTest PROPERTY FOLDER "Elektron")
+
+# A pattern selected while the sequencer plays, as a chain the plug-in plays relies on
+add_executable(patternChainFirmwareTest patternChainFirmwareTest.cpp)
+target_link_libraries(patternChainFirmwareTest PRIVATE mdLib)
+add_test(NAME patternChainFirmwareTest COMMAND patternChainFirmwareTest)
+set_tests_properties(patternChainFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET patternChainFirmwareTest PROPERTY FOLDER "Elektron")
+
+# The Monomachine side: pattern lengths from the dump, and when the machine takes the next pattern
+add_executable(mmPatternChainFirmwareTest mmPatternChainFirmwareTest.cpp)
+target_link_libraries(mmPatternChainFirmwareTest PRIVATE mdLib)
+add_test(NAME mmPatternChainFirmwareTest COMMAND mmPatternChainFirmwareTest)
+set_tests_properties(mmPatternChainFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mmPatternChainFirmwareTest PROPERTY FOLDER "Elektron")
+
+add_executable(mmPatternFirmwareTest mmPatternFirmwareTest.cpp)
+target_link_libraries(mmPatternFirmwareTest PRIVATE mdLib)
+add_test(NAME mmPatternFirmwareTest COMMAND mmPatternFirmwareTest)
+set_tests_properties(mmPatternFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mmPatternFirmwareTest PROPERTY FOLDER "Elektron")
+
+add_executable(mmPatternWriteFirmwareTest mmPatternWriteFirmwareTest.cpp)
+target_link_libraries(mmPatternWriteFirmwareTest PRIVATE mdLib)
+add_test(NAME mmPatternWriteFirmwareTest COMMAND mmPatternWriteFirmwareTest)
+set_tests_properties(mmPatternWriteFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mmPatternWriteFirmwareTest PROPERTY FOLDER "Elektron")
+
+add_executable(mdLivePatternFirmwareTest livePatternFirmwareTest.cpp)
+target_link_libraries(mdLivePatternFirmwareTest PRIVATE mdLib)
+add_test(NAME mdLivePatternFirmwareTest COMMAND mdLivePatternFirmwareTest)
+set_tests_properties(mdLivePatternFirmwareTest PROPERTIES
+	LABELS "Integration;FirmwareTest;Midi"
+	SKIP_RETURN_CODE 77
+	TIMEOUT 600)
+set_property(TARGET mdLivePatternFirmwareTest PROPERTY FOLDER "Elektron")
+
 add_executable(mdUwFirmwareTest mdUwFirmwareTest.cpp)
 target_link_libraries(mdUwFirmwareTest PRIVATE mdLib)
 # The audio oracle must detect NaN/Inf even in builds using -Ofast or /fp:fast.

@@ -156,6 +156,10 @@ namespace md
 			if(m_hostSyncSlot < 8)
 				sendSysex(automation::sysex::globalRequest(m_model, m_hostSyncSlot));
 		};
+		m_mmPatternWriterActions.sendSysex = sendSysex;
+		m_mmPatternWriterActions.sendPanel = m_hostSyncActions.sendPanel;
+		// The SYSEX RECEIVE page's last line, LCD pages 6 and 7: WAITING..., then RECV n MSG.
+		m_mmPatternWriterActions.screenDigest = [this] { return m_hardware->lcdPagesDigest(6, 7); };
 	}
 
 	bool Device::captureFactoryFlashCachePersistence(std::string& _filename,
@@ -695,7 +699,51 @@ namespace md
 	{
 		const auto first = _midiOut.size();
 		m_hardware->readMidiOut(_midiOut);
+		if(m_chainPlayer)
+		{
+			for(size_t index = first; index < _midiOut.size(); ++index)
+				m_chainPlayer->observe(_midiOut[index]);
+		}
 		serviceHostSync(_midiOut, first);
+		serviceMmPatternWriter();
+		serviceLivePattern();
+	}
+
+	void Device::serviceLivePattern()
+	{
+		if(!m_livePatternControl || isProjectStateRestorePending() || !m_hardware->isFirmwareMidiReady())
+			return;
+		const auto layout = m_hardware->livePatternLayout();
+		if(!layout)
+			return;
+		// Every edit waiting, in order, between two blocks: the firmware is paused. Each only writes what it
+		// changed, where the RAM still holds what the edit started from.
+		while(auto edit = m_livePatternControl->take())
+		{
+			const auto writes = livePatternWrites(*layout, edit->from, edit->to);
+			if(!writes || !m_hardware->writeRamIfUnchanged(*writes))
+				m_livePatternControl->publishRefused(edit->id);
+			m_livePatternControl->publishDone(edit->id);
+		}
+	}
+
+	void Device::serviceMmPatternWriter()
+	{
+		if(!m_mmPatternWriteControl || m_model != MachineModel::Monomachine)
+			return;
+		// Hands off as the host sync: a user SysEx import owns the MIDI input, a project state is
+		// restored, or the factory image is still being learned; and while the host sync's macro
+		// drives the panel
+		if(m_hardware->isMidiSysexTransferActive() || isProjectStateRestorePending()
+			|| !m_hardware->isFirmwareMidiReady() || m_hardware->isFactoryFlashInitializationExpected())
+			return;
+		if(!m_mmPatternWriter.isBusy() && !m_hostSync.isDrivingPanel())
+		{
+			if(auto write = m_mmPatternWriteControl->take())
+				m_mmPatternWriter.start(std::move(*write));
+		}
+		m_mmPatternWriter.service(m_hardware->getEmulatedFrames(), m_hardwareEpoch, m_mmPatternWriterActions);
+		m_mmPatternWriteControl->publishDone(m_mmPatternWriter.getDone());
 	}
 
 	void Device::serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, const size_t _first)
@@ -735,6 +783,9 @@ namespace md
 			|| !m_hardware->isFirmwareMidiReady() || m_hardware->isFactoryFlashInitializationExpected())
 			return;
 
+		// The panel is the editor's pattern write's until it is done
+		if(m_mmPatternWriter.isBusy())
+			return;
 		// Another machine or another active Global slot starts over from a fresh read.
 		const auto epoch = (m_hardwareEpoch << 8) | m_hostSyncSlot;
 		m_hostSync.service(m_hardware->getEmulatedFrames(), epoch, m_hostSyncActions);
@@ -792,7 +843,7 @@ namespace md
 		std::vector<synthLib::SMidiEvent>& _midiOut)
 	{
 		if(isRenderingAsync())
-			m_async->process(_inputs, _outputs, _size, _midiIn, _midiOut);
+			m_async->process(_inputs, _outputs, _size, _midiIn, _midiOut, isHostRealtime());
 		else
 		{
 			// The host's thread: not ours to pin to a core
@@ -813,6 +864,45 @@ namespace md
 			m_deferredPreparedState->m_hardware->advance(
 				static_cast<uint32_t>(_samples));
 		}
+		publishStatus();
+
+		// The live Kit, twenty times a second: about 450 bytes read from the machine's RAM
+		const auto frames = m_hardware->getEmulatedFrames();
+		if(frames - m_liveKitFrame >= g_samplerate / 20 || frames < m_liveKitFrame)
+		{
+			m_liveKitFrame = frames;
+			if(!isProjectStateRestorePending() && m_hardware->isFirmwareMidiReady())
+			{
+				if(const auto kit = m_hardware->readLiveKit())
+					m_liveKit->publish(*kit);
+			}
+		}
+	}
+
+	void Device::publishStatus()
+	{
+		MachineStatus::Values values;
+		values.restorePending = isProjectStateRestorePending();
+		values.firmwareReady = !values.restorePending && m_hardware->isFirmwareMidiReady();
+		values.restoreFailed = m_restoreStatus == ProjectStateRestoreStatus::Failed;
+		// What takeFinishedDeferredState takes
+		values.deferredStateReady = m_deferredPreparedState && m_deferredPreparedState->m_hardware
+			&& m_restoreStatus == ProjectStateRestoreStatus::Initializing
+			&& !m_deferredPreparedState->m_hardware->isProjectStateRestorePending();
+		values.factoryInitializationExpected = m_hardware->isFactoryFlashInitializationExpected();
+		values.factoryReadyForReboot = m_hardware->isFactoryFlashReadyForReboot();
+		values.parallelTransportActive = m_hardware->isProducerThreaded();
+		values.ramRecordingModeSupported = m_hardware->supportsRamRecordingMode();
+		values.livePatternSupported = m_hardware->livePatternLayout().has_value();
+		values.userSysexState = userSysexImportProgress().state;
+		if(const auto position = m_hardware->readSequencerPosition())
+		{
+			values.sequencerPlaying = position->playing;
+			values.sequencerStep = position->step;
+		}
+		values.hardwareEpoch = m_hardwareEpoch;
+		values.restoreGeneration = m_deferredStateGeneration;
+		m_status->publish(values);
 	}
 
 	void Device::extraLatencyChanged()
@@ -837,7 +927,7 @@ namespace md
 					m_hardware->setPairPlacementAllowed(true);
 					synthLib::Device::process(_ins, _outs, _frames, _midiIn, _midiOut);
 				});
-			m_async->start(latency);
+			m_async->start(latency, getSamplerate());
 		}
 		m_hardware->retimeMidi(hardwareLatency());
 	}
@@ -857,6 +947,14 @@ namespace md
 				return true;
 		}
 
-		return m_hardware->scheduleMidi(_ev, hardwareLatency());
+		if(!m_chainPlayer)
+			return m_hardware->scheduleMidi(_ev, hardwareLatency());
+		// The chain selects patterns around the transport and moves the song position
+		m_chainEvents.clear();
+		m_chainPlayer->process(_ev, m_chainEvents);
+		bool scheduled = true;
+		for(const auto& event : m_chainEvents)
+			scheduled &= m_hardware->scheduleMidi(event, hardwareLatency());
+		return scheduled;
 	}
 }

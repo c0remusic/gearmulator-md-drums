@@ -7,6 +7,7 @@
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -243,6 +244,77 @@ namespace
 		}
 	}
 
+	// A device rendering on its own thread: the host callback's waits and dropped blocks, the
+	// render thread's compilations, and the control accesses that pause the device.
+	void checkRenderThreadAndDeviceAccess()
+	{
+		using Kind = synthLib::RealtimeEventKind;
+		RI ri;
+		ri.setEnabled(true);
+		ri.reset();
+		RI* owner = nullptr;
+		{
+			RI::CallbackScope scope(ri, 64, 48000);
+			owner = RI::current();
+			RI::recordCurrentRenderWait(250'000);
+			RI::recordCurrentDroppedBlock();
+			RI::recordCurrentMissedBlock();
+		}
+		require(owner == &ri && RI::current() == nullptr, "current() did not name the recording callback");
+		synthLib::RealtimeSlowCallback callback;
+		require(ri.popSlowCallback(callback) && callback.renderWaitNanoseconds == 250'000
+			&& callback.renderDroppedBlocks == 1 && callback.renderMissedBlocks == 1,
+			"render wait, dropped or missed block missing from the callback");
+		std::thread render([owner]
+		{
+			{
+				RI::RenderScope scope(owner, 64);
+				RI::recordCurrentCallbackJitCompilation();
+				RI::recordCurrentCallbackJitCompilation();
+				RI::DeferredCandidateScope candidate(64);
+				RI::recordCurrentCallbackJitCompilation();
+			}
+			RI::RenderScope quiet(owner, 64);
+			RI::RenderScope nested(owner, 64);
+		});
+		render.join();
+		synthLib::RealtimeEvent event;
+		require(ri.popTimelineEvent(event) && event.kind == Kind::RenderJob && event.compilations == 2
+			&& event.deferredCompilations == 1 && event.frames == 64, "render job compilations missing");
+		require(!ri.popTimelineEvent(event), "a render job without compilations made an event");
+		auto summary = ri.snapshot();
+		require(summary.renderJitCompilationCount == 3 && summary.renderJobsWithJitCompilation == 1
+			&& summary.jitCompilationCount == 3 && summary.liveJitCompilationCount == 2
+			&& summary.deferredCandidateJitCompilationCount == 1 && summary.renderLateBlockCount == 1
+			&& summary.renderWaitNanoseconds == 250'000 && summary.renderDroppedBlockCount == 1
+			&& summary.renderMissedBlockCount == 1,
+			"render thread work missing from the summary");
+
+		// Plugin::setDevice deletes the device it replaces; the last one stays the caller's
+		auto* const initial = new synthLib::test::SyntheticAudioDevice(2, 6, 0);
+		auto replacement = std::make_unique<synthLib::test::SyntheticAudioDevice>(2, 6, 0);
+		synthLib::Plugin plugin(initial, [](synthLib::Device*) {});
+		auto& pluginRi = plugin.getRealtimeInstrumentation();
+		pluginRi.setEnabled(true);
+		pluginRi.reset();
+		while(pluginRi.popTimelineEvent(event)) {}
+		require(plugin.withDeviceLocked([](synthLib::Device* _device) { return _device != nullptr; }),
+			"device access lost its device");
+		require(pluginRi.snapshot().deviceAccessCount == 1, "device access was not counted");
+		require(pluginRi.popTimelineEvent(event) && event.kind == Kind::DeviceAccess,
+			"device access event missing");
+		const auto line = Report::formatTimelineEvent(event);
+		require(line.find("\"event\":\"device_access\"") != std::string::npos
+			&& line.find("\"holdNanoseconds\":") != std::string::npos, "device access event badly formatted");
+		pluginRi.setEnabled(false);
+		const auto counted = pluginRi.snapshot().deviceAccessCount;
+		(void)plugin.withDeviceLocked([](synthLib::Device*) { return true; });
+		require(pluginRi.snapshot().deviceAccessCount == counted, "a disabled capture recorded a device access");
+		const auto generation = plugin.getDeviceGeneration();
+		plugin.setDevice(replacement.get());
+		require(plugin.getDeviceGeneration() == generation + 1, "a new device did not change the generation");
+	}
+
 	void waitFor(Report& report, Report::Status target)
 	{
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -385,6 +457,7 @@ int main(int argc, char** argv)
 		checkEventTimeline();
 		checkConcurrentEventProducers();
 		checkProcessingIntegration();
+		checkRenderThreadAndDeviceAccess();
 		checkStopDuringDrain(std::string(argv[1]) + ".stop-drain");
 		checkReport(argv[1]);
 		std::cout << "performance report: PASS\n";

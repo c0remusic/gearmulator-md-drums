@@ -1,5 +1,6 @@
 #include "mdsim.h"
 
+#include <algorithm>
 #include <utility>
 
 // md::Sim - MCF5206e SIM peripheral model. See mdsim.h for the register map and
@@ -161,10 +162,13 @@ namespace md
 		// subsequent read returns what was written.
 		m_mem[_offset] = _value;
 
-		if(_offset == g_uart2Base + g_uartMr)
-			writeUartMode(g_uartPanel, _value);
-		else if(_offset == g_uart2Base + g_uartCr)
-			writeUartCommand(g_uartPanel, _value);
+		for(const auto [uart, base] : {std::pair{g_uartMidi, g_uart1Base}, std::pair{g_uartPanel, g_uart2Base}})
+		{
+			if(_offset == base + g_uartMr)
+				writeUartMode(uart, _value);
+			else if(_offset == base + g_uartCr)
+				writeUartCommand(uart, _value);
+		}
 
 		const auto refreshIfTimerConfig = [this, _offset](const unsigned _index,
 			const uint32_t _base)
@@ -179,8 +183,8 @@ namespace md
 		refreshIfTimerConfig(0, g_timer1Base);
 		refreshIfTimerConfig(1, g_timer2Base);
 
-		// UART transmit buffer (UM 12.4.1.5 UTB): capture the byte for later routing.
-		// The transmitter is always modelled ready, so writes are accepted unthrottled.
+		// UART transmit buffer (UM 12.4.1.5 UTB): the holding register of a UART on its
+		// internal baud generator, else delivered at once (see pushTransmitBuffer).
 		if(_offset == g_uart1Base + g_uartRxTx)		pushTransmitBuffer(g_uartMidi, _value);
 		else if(_offset == g_uart2Base + g_uartRxTx)	pushTransmitBuffer(g_uartPanel, _value);
 	}
@@ -226,15 +230,15 @@ namespace md
 
 	uint8_t Sim::computeUartStatus(const unsigned _uart) const
 	{
-		// UM 12.4.1.3 Status Register. UART1 retains immediate legacy delivery.
-		// Once UART2 uses its internal baud generator, TxRDY describes the holding
-		// register and TxEMP additionally requires an idle shift register.
+		// UM 12.4.1.3 Status Register. Once a UART uses its internal baud generator,
+		// TxRDY describes the holding register and TxEMP additionally requires an
+		// idle shift register; before that, a transmitter is always ready.
 		uint8_t usr = 0;
 
 		if(_uart < g_uartCount)
 		{
 			const auto& uart = m_uart[_uart];
-			if(_uart != g_uartPanel || !panelTransmitTimingActive())
+			if(!transmitTimingActive(_uart))
 				usr |= g_usrTxEmp | g_usrTxRdy;
 			else if(uart.txEnabled)
 			{
@@ -290,15 +294,17 @@ namespace md
 			return;
 
 		auto& u = m_uart[_uart];
-		if(_uart == g_uartPanel && panelTransmitTimingActive())
+		if(transmitTimingActive(_uart))
 		{
 			// UTB ignores writes while disabled or while its one-byte holding register
-			// is occupied (UM 12.4.1.7).
+			// is occupied (UM 12.4.1.7). The byte leaves once shifted out at the
+			// configured rate: MIDI at 31250 baud spreads the firmware's sending
+			// over the time a cable takes, as on the hardware.
 			if(!u.txEnabled || u.txHoldingFull)
 				return;
 			u.txHolding = _value;
 			u.txHoldingFull = true;
-			startPanelShiftRegister();
+			startShiftRegister(_uart);
 			return;
 		}
 
@@ -363,20 +369,24 @@ namespace md
 		}
 	}
 
-	bool Sim::panelTransmitTimingActive() const
+	bool Sim::transmitTimingActive(const unsigned _uart) const
 	{
+		if(_uart >= g_uartCount)
+			return false;
+		const auto base = _uart == g_uartPanel ? g_uart2Base : g_uart1Base;
 		const auto divisor = static_cast<uint16_t>(
-			(static_cast<uint16_t>(m_mem[g_uart2Base + g_uartBg1]) << 8)
-			| m_mem[g_uart2Base + g_uartBg2]);
-		return (m_mem[g_uart2Base + g_uartUsr] & 0x0f) == 0x0d && divisor >= 2;
+			(static_cast<uint16_t>(m_mem[base + g_uartBg1]) << 8)
+			| m_mem[base + g_uartBg2]);
+		return (m_mem[base + g_uartUsr] & 0x0f) == 0x0d && divisor >= 2;
 	}
 
-	uint32_t Sim::panelCharacterCycles() const
+	uint32_t Sim::characterCycles(const unsigned _uart) const
 	{
-		const auto& uart = m_uart[g_uartPanel];
+		const auto& uart = m_uart[_uart];
+		const auto base = _uart == g_uartPanel ? g_uart2Base : g_uart1Base;
 		const uint32_t divisor =
-			(static_cast<uint32_t>(m_mem[g_uart2Base + g_uartBg1]) << 8)
-			| m_mem[g_uart2Base + g_uartBg2];
+			(static_cast<uint32_t>(m_mem[base + g_uartBg1]) << 8)
+			| m_mem[base + g_uartBg2];
 		const uint32_t dataBits = 5 + (uart.mode[0] & 3);
 		const uint32_t parityBits = ((uart.mode[0] >> 3) & 3) == 2 ? 0 : 1;
 		const uint32_t stopSixteenths = 9 + (uart.mode[1] & 0x0f);
@@ -396,21 +406,21 @@ namespace md
 		}
 	}
 
-	void Sim::startPanelShiftRegister()
+	void Sim::startShiftRegister(const unsigned _uart)
 	{
-		auto& uart = m_uart[g_uartPanel];
+		auto& uart = m_uart[_uart];
 		if(!uart.txEnabled || uart.txShiftBusy || !uart.txHoldingFull)
 			return;
 		uart.txShift = uart.txHolding;
 		uart.txHoldingFull = false;
 		uart.txShiftBusy = true;
-		uart.txCyclesRemaining = panelCharacterCycles();
-		armTransmitReady(g_uartPanel);
+		uart.txCyclesRemaining = characterCycles(_uart);
+		armTransmitReady(_uart);
 	}
 
-	void Sim::stepPanelTransmitter(uint32_t _cycles)
+	void Sim::stepTransmitter(const unsigned _uart, uint32_t _cycles)
 	{
-		auto& uart = m_uart[g_uartPanel];
+		auto& uart = m_uart[_uart];
 		while(uart.txShiftBusy && _cycles >= uart.txCyclesRemaining)
 		{
 			_cycles -= uart.txCyclesRemaining;
@@ -418,7 +428,7 @@ namespace md
 			uart.txShiftBusy = false;
 			if(uart.txCallback)
 				uart.txCallback(uart.txShift);
-			startPanelShiftRegister();
+			startShiftRegister(_uart);
 		}
 		if(uart.txShiftBusy)
 			uart.txCyclesRemaining -= _cycles;
@@ -522,13 +532,19 @@ namespace md
 	{
 		stepTimer(0, g_timer1Base, _cycles);
 		stepTimer(1, g_timer2Base, _cycles);
-		stepPanelTransmitter(_cycles);
+		stepTransmitter(g_uartMidi, _cycles);
+		stepTransmitter(g_uartPanel, _cycles);
 	}
 
 	uint32_t Sim::cyclesUntilNextUartTransmit() const
 	{
-		const auto& uart = m_uart[g_uartPanel];
-		return uart.txShiftBusy ? uart.txCyclesRemaining : g_noTimerInterruptDeadline;
+		uint32_t cycles = g_noTimerInterruptDeadline;
+		for(const auto& uart : m_uart)
+		{
+			if(uart.txShiftBusy)
+				cycles = std::min(cycles, uart.txCyclesRemaining);
+		}
+		return cycles;
 	}
 
 	uint32_t Sim::cyclesUntilNextTimerInterrupt() const

@@ -1,7 +1,12 @@
 #pragma once
 
 #include "jucePluginEditorLib/pluginProcessor.h"
+#include "mdChainControl.h"
+#include "mdLiveDevice.h"
+#include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
+#include "mdLib/mdlivepattern.h"
+#include "mdLib/mdmmpatternwriter.h"
 #include "mdLib/mdtypes.h"
 #include "synthLib/performanceReport.h"
 
@@ -48,6 +53,9 @@ namespace mdJucePlugin
 		void setPerformanceDiagnosticsEnabled(bool _enabled);
 		bool performanceDiagnosticsActive() const;
 		std::string performanceDiagnosticsStatus() const;
+		// The capture's state for the editor's own text; nullopt without a report
+		std::optional<synthLib::PerformanceReport::Status> performanceDiagnosticsState() const;
+		bool performanceDiagnosticsFolderError() const { return m_performanceFolderError; }
 		juce::File performanceDiagnosticsFolder() const;
 		juce::File performanceDiagnosticsFile() const { return m_performanceReportFile; }
 		void setRamRecordingMode(md::RamRecordingMode _mode);
@@ -67,8 +75,11 @@ namespace mdJucePlugin
 		// The device follows the setting now, or will after a reload.
 		bool isParallelTransportActive();
 		// Default plug-in latency for a new configuration: two blocks let the
-		// Machinedrum render ahead on its own threads (see md::AsyncRender).
+		// machine render ahead on its own threads (see md::AsyncRender).
 		static constexpr int DefaultLatencyBlocks = 2;
+
+		// The device without its lock, for the editor, the controller and the timers here
+		LiveDevice& getLiveDevice() { return m_liveDevice; }
 
 		// "Follow host tempo" (off by default): the machine takes its tempo and
 		// start/stop from the host's MIDI clock (see md::HostSync). On, it is kept
@@ -78,6 +89,19 @@ namespace mdJucePlugin
 		bool getFollowHostTempoSetting();
 		void applyFollowHostTempoSetting(bool _changedByUser);
 		md::HostSync::State getHostSyncState() const { return m_hostSyncControl->getState(); }
+
+		// Levels of the three output buses after each block, for the editor's meters
+		OutputMeters& getOutputMeters() { return m_outputMeters; }
+
+		// The project's pattern chain, played while the machine follows the host
+		ChainControl& getChainControl() { return m_chainControl; }
+
+		// The editor's Monomachine pattern writes, which the Device drives through SYSEX RECV
+		md::MmPatternWriteControl& getMmPatternWriteControl() { return *m_mmPatternWriteControl; }
+		// The editor's edits of the pattern the Machinedrum plays, which the Device writes into its RAM
+		md::LivePatternControl& getLivePatternControl() { return *m_livePatternControl; }
+		using jucePluginEditorLib::Processor::processBlock;
+		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
 
 	    jucePluginEditorLib::PluginEditorState* createEditorState() override;
 	    synthLib::Device* createDevice() override;
@@ -99,6 +123,8 @@ namespace mdJucePlugin
 		bool serviceStateRestoreFailure();
 		void recordStandaloneStartupDiagnostics();
 		void reportProjectStateRestoreFailure(const std::string& _error);
+		// Hands the chain to the device as the host sync allows, and reads the lengths it lacks
+		void serviceChain();
 		void timerCallback() override;
 
 		std::unique_ptr<synthLib::PerformanceReport> m_performanceReport;
@@ -116,6 +142,13 @@ namespace mdJucePlugin
 			static_cast<uint8_t>(md::RamRecordingMode::Original)};
 		bool m_ramRecordingModeChunkSeen = false;
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
+		const std::shared_ptr<md::MmPatternWriteControl> m_mmPatternWriteControl = std::make_shared<md::MmPatternWriteControl>();
+		const std::shared_ptr<md::LivePatternControl> m_livePatternControl = std::make_shared<md::LivePatternControl>();
+		LiveDevice m_liveDevice{*this};
+		OutputMeters m_outputMeters;
+		ChainControl m_chainControl{m_model};
+		std::optional<uint8_t> m_chainLengthAsked;	// the pattern whose dump was asked for, and when
+		double m_chainLengthAskedAt = 0.0;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 	};
 }

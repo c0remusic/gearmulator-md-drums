@@ -66,7 +66,7 @@ namespace synthLib
 
 	std::string PerformanceReport::formatContext(const Context& _context)
 	{
-		std::string out = "{\"type\":\"session\",\"schema\":2,\"duration_unit\":\"ns\"";
+		std::string out = "{\"type\":\"session\",\"schema\":3,\"duration_unit\":\"ns\"";
 		for(const auto& field : _context) out += ',' + quote(field.first) + ':' + quote(field.second);
 		return out + "}\n";
 	}
@@ -92,6 +92,11 @@ namespace synthLib
 		FIELD(callbacksWithAuxOutputBuses); FIELD(latestActiveOutputBuses); FIELD(latestActiveOutputChannels);
 		FIELD(maximumActiveOutputBuses); FIELD(maximumActiveOutputChannels); FIELD(slowCallbacksDropped);
 		FIELD(timelineEvents); FIELD(timelineEventsDropped);
+		FIELD(deviceAccessCount); FIELD(deviceAccessWaitNanoseconds); FIELD(deviceAccessWaitMaxNanoseconds);
+		FIELD(deviceAccessHoldNanoseconds); FIELD(deviceAccessHoldMaxNanoseconds);
+		FIELD(renderJitCompilationCount); FIELD(renderJobsWithJitCompilation); FIELD(renderLateBlockCount);
+		FIELD(renderWaitNanoseconds); FIELD(renderWaitMaxNanoseconds); FIELD(renderDroppedBlockCount);
+		FIELD(renderMissedBlockCount);
 #undef FIELD
 		out << ",\"realtimeBudgetHistogram\":[";
 		for(size_t i = 0; i < s.realtimeBudgetHistogram.size(); ++i)
@@ -111,6 +116,7 @@ namespace synthLib
 		FIELD(liveJitCompilations); FIELD(deferredJitCompilations); FIELD(frames); FIELD(sampleRate);
 		FIELD(deviceSampleRate); FIELD(resamplerMode); FIELD(dspClockPercent);
 		FIELD(outputBuses); FIELD(outputChannels); FIELD(midiEvents); FIELD(midiBytes);
+		FIELD(renderWaitNanoseconds); FIELD(renderDroppedBlocks); FIELD(renderMissedBlocks);
 		out << std::boolalpha;
 		FIELD(bypassed); FIELD(playing); FIELD(offline); FIELD(resamplingActive); FIELD(dualMachine);
 #undef FIELD
@@ -128,6 +134,13 @@ namespace synthLib
 			out << ",\"event\":\"host_transport\",\"known\":" << e.transportKnown
 				<< ",\"initial\":" << e.initial << ",\"playing\":" << e.playing
 				<< ",\"offline\":" << e.offline << ",\"bypassed\":" << e.bypassed;
+		else if(e.kind == RealtimeEventKind::DeviceAccess)
+			out << ",\"event\":\"device_access\",\"waitNanoseconds\":" << e.waitNanoseconds
+				<< ",\"holdNanoseconds\":" << e.holdNanoseconds;
+		else if(e.kind == RealtimeEventKind::RenderJob)
+			out << ",\"event\":\"render_job\",\"durationNanoseconds\":" << e.durationNanoseconds
+				<< ",\"frames\":" << e.frames << ",\"compilations\":" << e.compilations
+				<< ",\"deferredCompilations\":" << e.deferredCompilations;
 		else
 		{
 			const auto* phase = e.kind == RealtimeEventKind::PanelInput ? "submitted"

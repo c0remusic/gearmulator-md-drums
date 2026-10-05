@@ -125,7 +125,14 @@ namespace juceRmlUi
 		float getOpenGLRenderingScale() const;
 		void setUseNativePixelDensity(bool _enabled);
 
+		// False while the window shows nothing of the component: hidden or minimized. A component without a
+		// window (offscreen rendering) counts as on screen.
+		bool isOnScreen() const;
+
 		Rml::Vector2i getDocumentSize() const { return m_documentSize; }
+		// A <body> with the resizableheight attribute keeps its width and scale
+		// from the window width and takes the window height, whatever it is.
+		bool isHeightResizable() const { return m_heightResizable; }
 
 		void resize(int _width, int _height);
 
@@ -212,6 +219,8 @@ namespace juceRmlUi
 		bool m_updating = true;
 
 		Rml::Vector2i m_documentSize{0,0};
+		bool m_heightResizable = false;
+		float m_documentHeight = 0.0f;   // dp, last height given to a resizable-height body
 
 		JUCE_DECLARE_NON_COPYABLE(RmlComponent)
 		JUCE_DECLARE_NON_MOVEABLE(RmlComponent)
@@ -219,6 +228,7 @@ namespace juceRmlUi
 		double m_time = 0;
 		float m_fps = 0;
 		float m_targetFPS = 30;
+		float m_defaultAcceleratedFPS = 30;
 		bool m_hasCustomFPS = false;
 
 		uint32_t m_pendingUpdates = 0;

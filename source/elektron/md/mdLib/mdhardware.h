@@ -17,6 +17,8 @@
 #include "mddsp.h"
 #include "mdfrontpanel.h"
 #include "mdhostaudioqueue.h"
+#include "mdlivekit.h"
+#include "mdlivepattern.h"
 #include "mdmc.h"
 #include "mdpanel.h"
 #include "mdrealtimemidiqueue.h"
@@ -128,6 +130,27 @@ namespace md
 				&& m_uc.isMidiReceiveReady();
 		}
 		uint64_t firmwareFingerprint() const { return m_firmwareFingerprint; }
+		// The sequencer's step (0 for the pattern's first) and whether it plays, as the firmware keeps
+		// them in its RAM; none for an image whose addresses are not known (mdPlayheadProbe finds them).
+		// Whether it plays comes from its tick moving between two calls: call it at least every quarter
+		// of a second of emulated time (Device does after every block). On the emulation thread, or with
+		// it paused.
+		struct SequencerPosition
+		{
+			uint8_t step = 0;
+			bool playing = false;
+		};
+		std::optional<SequencerPosition> readSequencerPosition();
+		// The Kit the machine plays, from its RAM (md::LiveKit); none for a firmware whose layout is not
+		// known (Machinedrum OS 1.63 and Monomachine OS 1.32b are). On the emulation thread, or with it
+		// paused.
+		std::optional<LiveKit> readLiveKit();
+		// Where the pattern the machine plays lies in its RAM (md::LivePatternLayout); none for a firmware whose
+		// layout is not known (Machinedrum OS 1.63 is)
+		std::optional<LivePatternLayout> livePatternLayout() const;
+		// Writes the bytes into the RAM, all of them, when each still holds the value it is expected to hold;
+		// else none. On the emulation thread, or with it paused.
+		bool writeRamIfUnchanged(const std::vector<RamWrite>& _writes);
 		bool supportsRamRecordingMode() const
 		{
 			return m_model == MachineModel::Machinedrum
@@ -434,6 +457,9 @@ namespace md
 		{
 			(void)trySendPanelEvent(_cmd, _arg);
 		}
+		// The queue trySendPanelEvent pushes to, for pushing to it from threads that do not hold the
+		// device lock. A packet it delivers registers external interaction as trySendPanelEvent does.
+		std::shared_ptr<PanelInputQueue> getPanelInput() const { return m_panelIn; }
 		size_t getPendingPanelInputBytes() const;
 		size_t getPanelInputOverflowCount() const;
 		PanelInputQueueStatus getPanelInputStatus() const;
@@ -446,6 +472,23 @@ namespace md
 
 		const auto& getAudioOutputs() const { return m_audioOutputs; }
 		const std::string& getRomFilename() const { return m_rom.getFilename(); }
+
+		// A digest of LCD pages _firstPage to _lastPage (8 rows each, 0 on top) as the
+		// emulation has drawn them: it changes when what they show does. The emulation's
+		// thread only (a Device's rendering), as it reads the live decoder.
+		uint64_t lcdPagesDigest(uint32_t _firstPage, uint32_t _lastPage) const
+		{
+			uint64_t digest = 14695981039346656037ull;
+			for(uint32_t page = _firstPage; page <= _lastPage && page < 8; ++page)
+			{
+				for(uint32_t half = 0; half < 2; ++half)
+				{
+					for(uint32_t column = 0; column < 64; ++column)
+						digest = (digest ^ m_frontPanel.getLcdVram(half, page, column)) * 1099511628211ull;
+				}
+			}
+			return digest;
+		}
 
 		// Last complete front-panel value published by the emulation thread. Returning
 		// by value prevents consumers from retaining a reference to live decoder state.
@@ -818,8 +861,15 @@ namespace md
 		size_t m_midiInByteCursor = 0;
 		RealtimeMidiByteQueue<64> m_realtimeMidiIn;
 
-		// Panel input events pending delivery to UART2 RX.
-		PanelInputQueue m_panelIn;
+		// readSequencerPosition(): the sequencer's tick as last seen, and the emulated frame it last moved
+		// at (0: not since the first look)
+		uint8_t m_sequencerTick = 0;
+		bool m_sequencerTickKnown = false;
+		uint64_t m_sequencerTickFrame = 0;
+
+		// Panel input events pending delivery to UART2 RX. Shared with whoever pushes to it without the
+		// device lock (getPanelInput); this machine is its only consumer.
+		std::shared_ptr<PanelInputQueue> m_panelIn = std::make_shared<PanelInputQueue>();
 
 	};
 }

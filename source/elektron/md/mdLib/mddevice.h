@@ -6,8 +6,12 @@
 #include <utility>
 
 #include "mdasyncrender.h"
+#include "mdchainplayer.h"
 #include "mdhardware.h"
 #include "mdhostsync.h"
+#include "mdlivekit.h"
+#include "mdmachinestatus.h"
+#include "mdmmpatternwriter.h"
 #include "mdsyseximport.h"
 
 #include "synthLib/device.h"
@@ -108,6 +112,8 @@ namespace md
 		}
 		void resumeRendering() override
 		{
+			// The access that paused the rendering may have changed what the status shows
+			publishStatus();
 			if(m_async)
 				m_async->resume();
 		}
@@ -214,6 +220,22 @@ namespace md
 		{
 			m_hostSyncControl = std::move(_control);
 		}
+		// The pattern chain the plug-in plays (Machinedrum): the Device runs it on its MIDI
+		// on the rendering thread. Set before the Device renders.
+		void setChainPlayer(std::shared_ptr<ChainPlayer> _player) { m_chainPlayer = std::move(_player); }
+		// The editor's Monomachine pattern writes: the Device drives the SYSEX RECV menu for them on
+		// its rendering thread (MmPatternWriter), one write at a time, never while the host sync's
+		// macro drives the panel. Set before the Device renders.
+		void setMmPatternWriteControl(std::shared_ptr<MmPatternWriteControl> _control)
+		{
+			m_mmPatternWriteControl = std::move(_control);
+		}
+		// The editor's edits of the pattern the Machinedrum plays: the Device writes them into its RAM
+		// (Hardware::livePatternLayout) on its rendering thread. Set before the Device renders.
+		void setLivePatternControl(std::shared_ptr<LivePatternControl> _control)
+		{
+			m_livePatternControl = std::move(_control);
+		}
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -227,6 +249,14 @@ namespace md
 		{
 			return m_hardware->trySendPanelEvent(_command, _argument);
 		}
+		// The live machine's panel input queue, which any thread may push to without the device
+		// lock. A committed machine (hardwareEpoch) brings a new queue: the old one is no longer read.
+		std::shared_ptr<PanelInputQueue> getPanelInput() const { return m_hardware->getPanelInput(); }
+		// Read by any thread without the device lock; the same for the Device's lifetime.
+		std::shared_ptr<const MachineStatus> getStatus() const { return m_status; }
+		// The Kit the live machine plays (Hardware::readLiveKit), twenty times a second of emulated
+		// time; read by any thread without the device lock, the same for the Device's lifetime.
+		std::shared_ptr<const LiveKitSnapshot> getLiveKit() const { return m_liveKit; }
 		PanelInputQueueStatus getPanelInputStatus() const
 		{
 			return m_hardware->getPanelInputStatus();
@@ -296,7 +326,11 @@ namespace md
 
 		void clearProjectStateRestore();
 		void failProjectStateRestore(std::string _error);
+		// On the rendering thread, or with the rendering paused
+		void publishStatus();
 		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
+		void serviceMmPatternWriter();
+		void serviceLivePattern();
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
 		uint32_t hardwareLatency() const { return isRenderingAsync() ? 0 : getExtraLatencySamples(); }
@@ -304,6 +338,9 @@ namespace md
 
 		const MachineModel m_model;
 		std::shared_ptr<FrontPanelPublisher> m_frontPanelPublisher;
+		std::shared_ptr<MachineStatus> m_status = std::make_shared<MachineStatus>();
+		std::shared_ptr<LiveKitSnapshot> m_liveKit = std::make_shared<LiveKitSnapshot>();
+		uint64_t m_liveKitFrame = 0;	// the emulated frame of the last kit read
 		std::shared_ptr<const PreparationContext> m_preparationContext;
 		std::unique_ptr<Hardware> m_hardware;
 		std::unique_ptr<PreparedState> m_deferredPreparedState;
@@ -328,6 +365,12 @@ namespace md
 		std::shared_ptr<HostSyncControl> m_hostSyncControl;
 		uint32_t m_hostSyncRequest = 0;		// the last request handed to m_hostSync
 		uint8_t m_hostSyncSlot = 0xff;		// active Global slot, from status answers
+		MmPatternWriter m_mmPatternWriter;
+		MmPatternWriter::Actions m_mmPatternWriterActions;
+		std::shared_ptr<MmPatternWriteControl> m_mmPatternWriteControl;
+		std::shared_ptr<LivePatternControl> m_livePatternControl;
+		std::shared_ptr<ChainPlayer> m_chainPlayer;
+		std::vector<synthLib::SMidiEvent> m_chainEvents;	// what the chain forwards for one event
 		// Last member: destroyed (render thread stopped) before everything it renders.
 		std::unique_ptr<AsyncRender> m_async;
 	};

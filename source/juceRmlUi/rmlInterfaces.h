@@ -43,6 +43,10 @@ namespace juceRmlUi
 
 		void attach(RmlComponent* _component);
 		void detach();
+		// Takes the access lock only if no other thread holds it; detach() releases it. For a thread that
+		// must never wait for the message thread (the OpenGL thread: the message thread holds the lock
+		// while it stops that thread).
+		bool tryAttach();
 
 		auto& getCoreInstance() { return m_coreInstance; }
 		SystemInterface& getSystemInterface() { return m_systemInterface; }

@@ -45,6 +45,23 @@ namespace md
 namespace mdJucePlugin
 {
 	class Controller;
+	class LiveDevice;
+	class MachinePicker;
+	class StepGrid;
+	class ViewLayout;
+	class CurveView;
+	class KitPatternScreen;
+	class UnreadValues;
+	class MasterEffectsView;
+	class TrackRoutingView;
+	class OutputMetersView;
+	class SystemPage;
+	class PatternView;
+	class MmPatternView;
+	class ChainView;
+	class LibraryView;
+	class TrackActivity;
+	class LfoView;
 	class PixelPerfectPanel;
 	struct EditorIdentityTestAccess;
 
@@ -67,6 +84,11 @@ namespace mdJucePlugin
 		std::unique_ptr<jucePluginEditorLib::SettingsDeviceSpecific> createDeviceSpecificSettings(
 			const std::string& _templateName, Rml::Element* _root) override;
 		std::string getSettingsTemplateSuffix() const override;
+		// 60 Hz with OpenGL or Metal, whatever the GPU: meters, LEDs and the LCD move with the
+		// sound, and a frame costs the message thread about 2 ms (mdEditorFluidityTest). The
+		// software renderer keeps 30: it rasterizes the whole frame in 9 to 35 ms. A
+		// "refreshRateLimitHz" in the config still wins.
+		int getAcceleratedRefreshRateHz() const override { return 60; }
 
 		// Reapplies the configured wheel/encoder drag-speed percentages to the
 		// panel knobs. Called on create and from the settings page.
@@ -152,6 +174,7 @@ namespace mdJucePlugin
 			StorageImageBookmark _bookmark);
 		void showStorageOperationResult(bool _success, const juce::String& _message);
 		std::optional<md::SysexImportProgress> getUserSysexProgress() const;
+		std::optional<md::MidiSysexTransferState> getUserSysexState() const;
 		void sendUserSysexFile(const juce::File& _file, const md::SysexImportTicket& _ticket);
 		void startUserSysexTransfer(const std::shared_ptr<md::PreparedMidiSysexTransfer>& _prepared,
 			const juce::File& _file, const md::SysexImportTicket& _ticket, bool _receiveModeConfirmed);
@@ -167,8 +190,25 @@ namespace mdJucePlugin
 		};
 
 		Controller& m_controller;
+		LiveDevice& m_liveDevice;
 		const md::MachineModel m_model;
 		juceRmlUi::ElemCanvas* m_lcdCanvas = nullptr;
+		std::unique_ptr<MachinePicker> m_machinePicker;
+		std::unique_ptr<StepGrid> m_stepGrid;
+		std::unique_ptr<ViewLayout> m_viewLayout;
+		std::unique_ptr<CurveView> m_curveView;
+		std::unique_ptr<KitPatternScreen> m_kitPatternScreen;
+		std::unique_ptr<UnreadValues> m_unreadValues;
+		std::unique_ptr<MasterEffectsView> m_masterEffectsView;
+		std::unique_ptr<TrackRoutingView> m_trackRoutingView;
+		std::unique_ptr<OutputMetersView> m_outputMetersView;
+		std::unique_ptr<SystemPage> m_systemPage;
+		std::unique_ptr<PatternView> m_patternView;
+		std::unique_ptr<MmPatternView> m_mmPatternView;
+		std::unique_ptr<ChainView> m_chainView;
+		std::unique_ptr<LibraryView> m_libraryView;
+		std::unique_ptr<TrackActivity> m_trackActivity;
+		std::unique_ptr<LfoView> m_lfoView;
 		std::unique_ptr<PixelPerfectPanel> m_pixelPerfectPanel;
 		md::FrontPanel m_frontPanelSnapshot;
 		bool m_frontPanelSnapshotValid = false;
