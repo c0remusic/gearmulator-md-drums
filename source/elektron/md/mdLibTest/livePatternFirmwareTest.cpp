@@ -1,5 +1,7 @@
 // The Machinedrum's pattern edited in its RAM (md::LivePatternLayout, md::livePatternWrites), as the editor's
-// JOUER does: a trig and its lock written there are what the next pattern request answers with, the trig plays
+// JOUER does, on B09: the machine plays a stored pattern from its own blocks, A01's first, so an edit of any
+// other pattern shows whether its blocks were found. A trig and its lock written there are what the next
+// pattern request answers with, the trig plays
 // from the next pass, it is kept when another pattern is selected, an edit made from a pattern the RAM no
 // longer holds is refused without a byte written, and the edits are in the state a project saves, the last
 // one too when no pattern was selected after it.
@@ -30,6 +32,7 @@ namespace
 {
 	namespace sysex = md::automation::sysex;
 	constexpr auto g_model = md::MachineModel::Machinedrum;
+	constexpr uint8_t g_slot = 40;	// B09
 
 	void require(const bool _condition, const std::string& _message)
 	{
@@ -137,9 +140,12 @@ namespace
 		const auto layout = hardware->livePatternLayout();
 		require(layout.has_value(), "no pattern RAM layout for Machinedrum OS 1.63");
 
+		// B09: the RAM holds every stored pattern, A01 first, and the machine plays the one selected from there
+		send(*hardware, sysex::patternSelect(g_model, g_slot));
+		advance(*hardware, md::g_samplerate);
 		const auto status = sysex::parseStatusResponse(g_model,
 			exchange(*hardware, sysex::statusRequest(g_model, sysex::StatusParameter::Pattern), 0x72));
-		require(status.has_value(), "no pattern status");
+		require(status.has_value() && status->value == g_slot, "pattern B09 not selected");
 		const auto slot = status->value;
 		const auto readPattern = [&]
 		{

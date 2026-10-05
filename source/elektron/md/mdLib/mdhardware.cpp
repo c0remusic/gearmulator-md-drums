@@ -1409,8 +1409,9 @@ namespace md
 
 	std::optional<LivePatternLayout> Hardware::livePatternLayout() const
 	{
-		// Found with mdPlayheadProbe --pattern-ram and --pattern-ext: the pattern as its dump's payload unpacks,
-		// in three blocks; the second copy of steps 33 to 64 the firmware keeps at $262560 does not play
+		// Found with mdPlayheadProbe --pattern-ram, --pattern-ext and --library-ram: the 128 patterns as their
+		// dumps' payload unpacks, in three blocks of 128, A01's first. The copy of steps 33 to 64 at $262560 is the
+		// last dump received, and does not play.
 		if(m_model == MachineModel::Machinedrum && m_firmwareFingerprint == g_mdOs163Fingerprint)
 			return LivePatternLayout{0x001272c0, 0x0016bdc0, 0x00180000};
 		return std::nullopt;

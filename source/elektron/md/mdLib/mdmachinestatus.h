@@ -30,7 +30,8 @@ namespace md
 			bool factoryReadyForReboot = false;
 			bool parallelTransportActive = false;
 			bool ramRecordingModeSupported = false;
-			// The pattern the machine plays can be edited in its RAM (Hardware::livePatternLayout)
+			// The stored patterns, the one the machine plays among them, can be edited in its RAM
+			// (Hardware::livePatternLayout)
 			bool livePatternSupported = false;
 			// The user's SysEx file import (Device::userSysexImportProgress): Idle when none was started
 			MidiSysexTransferState userSysexState = MidiSysexTransferState::Idle;

@@ -145,8 +145,8 @@ namespace md
 		// known (Machinedrum OS 1.63 and Monomachine OS 1.32b are). On the emulation thread, or with it
 		// paused.
 		std::optional<LiveKit> readLiveKit();
-		// Where the pattern the machine plays lies in its RAM (md::LivePatternLayout); none for a firmware whose
-		// layout is not known (Machinedrum OS 1.63 is)
+		// Where the machine stores its patterns in its RAM, the one it plays among them (md::LivePatternLayout);
+		// none for a firmware whose layout is not known (Machinedrum OS 1.63 is)
 		std::optional<LivePatternLayout> livePatternLayout() const;
 		// Writes the bytes into the RAM, all of them, when each still holds the value it is expected to hold;
 		// else none. On the emulation thread, or with it paused.

@@ -58,8 +58,10 @@ namespace md
 	{
 		const auto fromPattern = automation::sysex::parseMdPatternDump(_from);
 		const auto toPattern = automation::sysex::parseMdPatternDump(_to);
-		if(!fromPattern || !toPattern || fromPattern->slot != toPattern->slot)
+		if(!fromPattern || !toPattern || fromPattern->slot != toPattern->slot
+			|| toPattern->slot >= LivePatternLayout::PatternCount)
 			return std::nullopt;
+		const auto slot = toPattern->slot;
 		const auto from = unpackMdPatternPayload(_from);
 		const auto to = unpackMdPatternPayload(_to);
 		if(!from || !to)
@@ -79,11 +81,11 @@ namespace md
 		};
 		constexpr size_t tailOffset = LivePatternLayout::MainSize;
 		constexpr size_t extensionOffset = tailOffset + LivePatternLayout::TailSize;
-		write(0, LivePatternLayout::MainSize, _layout.main, false);
-		write(tailOffset, LivePatternLayout::TailSize, _layout.tail, false);
+		write(0, LivePatternLayout::MainSize, _layout.mainOf(slot), false);
+		write(tailOffset, LivePatternLayout::TailSize, _layout.tailOf(slot), false);
 		// Steps 33 to 64: what the RAM holds there is not known when _from has none
 		if(to->size() > extensionOffset)
-			write(extensionOffset, LivePatternLayout::ExtensionSize, _layout.extension, from->size() <= extensionOffset);
+			write(extensionOffset, LivePatternLayout::ExtensionSize, _layout.extensionOf(slot), from->size() <= extensionOffset);
 		return writes;
 	}
 

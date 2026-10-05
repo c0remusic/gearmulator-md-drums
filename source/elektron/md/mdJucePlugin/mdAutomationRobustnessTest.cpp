@@ -1405,19 +1405,22 @@ namespace
 	}
 
 	// md::livePatternWrites, what the Device writes into the Machinedrum's RAM for an edit of the pattern playing:
-	// only the bytes the edit changed, each expected to hold its value from before the edit
+	// only the bytes the edit changed, in that pattern's blocks, each expected to hold its value from before the edit
 	void verifyLivePatternWrites()
 	{
-		const md::LivePatternLayout layout{0x1000, 0x10000, 0x20000};
+		const md::LivePatternLayout layout{0x100000, 0x200000, 0x300000};
 		std::array<uint32_t, 16> trigs{};
 		trigs[0] = 0x11;
 		const auto from = makeMdPatternDump(20, 16, trigs);
+		const auto main = layout.main + 20 * md::LivePatternLayout::MainSize;
+		const auto extensionBegin = layout.extension + 20 * md::LivePatternLayout::ExtensionSize;
 
-		// A trig: one byte of track 1's big-endian word, steps 9 to 16 in its third byte
+		// A trig: one byte of track 1's big-endian word, steps 9 to 16 in its third byte, in pattern 21's (B05) block,
+		// 20 blocks after A01's
 		auto editor = md::automation::sysex::MdPatternEditor::fromDump(from);
 		require(editor.has_value() && editor->setTrig(0, 9, true), "test pattern not editable");
 		const auto trig = md::livePatternWrites(layout, from, editor->toDump());
-		require(trig && trig->size() == 1 && (*trig)[0].address == 0x1002 && (*trig)[0].value == 0x02
+		require(trig && trig->size() == 1 && (*trig)[0].address == main + 2 && (*trig)[0].value == 0x02
 			&& (*trig)[0].expected == std::optional<uint8_t>{0}, "a trig is not the one byte it changes");
 
 		// Another pattern's dump is not an edit of this one
@@ -1433,12 +1436,12 @@ namespace
 		bool length = false;
 		for(const auto& write : *grown)
 		{
-			if(write.address >= layout.extension)
+			if(write.address >= extensionBegin && write.address < extensionBegin + md::LivePatternLayout::ExtensionSize)
 			{
 				++extension;
 				require(!write.expected, "steps 33 to 64 were expected to hold something");
 			}
-			length |= write.address == layout.main + 64 + 64 + 16 + 1 && write.value == 64
+			length |= write.address == main + 64 + 64 + 16 + 1 && write.value == 64
 				&& write.expected == std::optional<uint8_t>{16};
 		}
 		require(extension == md::LivePatternLayout::ExtensionSize && length,

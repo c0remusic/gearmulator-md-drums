@@ -20,29 +20,37 @@ namespace md
 		std::optional<uint8_t> expected;
 	};
 
-	// Where the Machinedrum keeps the pattern it plays, laid out as a pattern dump's ($67) unpacked payload
-	// (mdPlayheadProbe --pattern-ram, --pattern-ext). The firmware plays what is written there from the next
-	// step, keeps it when another pattern is selected, and answers a pattern request with it: a grid edit,
-	// without the reload of the pattern and its Kit a dump costs.
+	// Where the Machinedrum stores its 128 patterns, each laid out as a pattern dump's ($67) unpacked payload in
+	// three blocks, A01's first and every next pattern's right after it (mdPlayheadProbe --pattern-ram,
+	// --pattern-ext, --library-ram). The machine plays the selected pattern from there: what is written plays
+	// from the next step, stays when another pattern is selected, and is what a pattern request answers with. A
+	// grid edit, without the reload of the pattern and its Kit a dump costs.
 	struct LivePatternLayout
 	{
 		static constexpr uint32_t MainSize = 2198;		// trigs, lock masks, accent/slide/swing, plain bytes, lock rows
 		static constexpr uint32_t TailSize = 204;		// EDIT ALL words, the tracks' own accent, slide and swing
 		static constexpr uint32_t ExtensionSize = 2316;	// steps 33 to 64 of all of the above
+		static constexpr uint8_t PatternCount = 128;
 
+		// A01's blocks
 		uint32_t main = 0;
 		uint32_t tail = 0;
 		uint32_t extension = 0;
+
+		// Pattern _slot's blocks, 0 (A01) to 127 (H16)
+		uint32_t mainOf(const uint8_t _slot) const { return main + _slot * MainSize; }
+		uint32_t tailOf(const uint8_t _slot) const { return tail + _slot * TailSize; }
+		uint32_t extensionOf(const uint8_t _slot) const { return extension + _slot * ExtensionSize; }
 	};
 
 	// The payload of a Machinedrum pattern dump, unpacked: MainSize bytes, TailSize, then ExtensionSize for the
 	// 64-step form; nullopt for anything else
 	std::optional<std::vector<uint8_t>> unpackMdPatternPayload(automation::sysex::MessageView _dump);
 
-	// The bytes that make the live pattern _to where it holds _from, two dumps of the same pattern: only those
-	// that differ, each expected to hold _from's value (an edit made on the machine meanwhile elsewhere in the
-	// pattern stays). A _from without steps 33 to 64 has them all written, whatever they hold. Nullopt when
-	// either is not a Machinedrum pattern dump, or they name different patterns.
+	// The bytes that make the stored pattern _to where it holds _from, two dumps of the same pattern: only those
+	// that differ, at that pattern's blocks, each expected to hold _from's value (an edit made on the machine
+	// meanwhile elsewhere in the pattern stays). A _from without steps 33 to 64 has them all written, whatever
+	// they hold. Nullopt when either is not a Machinedrum pattern dump, or they name different patterns.
 	std::optional<std::vector<RamWrite>> livePatternWrites(const LivePatternLayout& _layout,
 		automation::sysex::MessageView _from, automation::sysex::MessageView _to);
 
