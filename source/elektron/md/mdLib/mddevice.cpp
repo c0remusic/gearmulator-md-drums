@@ -706,6 +706,25 @@ namespace md
 		}
 		serviceHostSync(_midiOut, first);
 		serviceMmPatternWriter();
+		serviceLivePattern();
+	}
+
+	void Device::serviceLivePattern()
+	{
+		if(!m_livePatternControl || isProjectStateRestorePending() || !m_hardware->isFirmwareMidiReady())
+			return;
+		const auto layout = m_hardware->livePatternLayout();
+		if(!layout)
+			return;
+		// Every edit waiting, in order, between two blocks: the firmware is paused. Each only writes what it
+		// changed, where the RAM still holds what the edit started from.
+		while(auto edit = m_livePatternControl->take())
+		{
+			const auto writes = livePatternWrites(*layout, edit->from, edit->to);
+			if(!writes || !m_hardware->writeRamIfUnchanged(*writes))
+				m_livePatternControl->publishRefused(edit->id);
+			m_livePatternControl->publishDone(edit->id);
+		}
 	}
 
 	void Device::serviceMmPatternWriter()
@@ -874,6 +893,7 @@ namespace md
 		values.factoryReadyForReboot = m_hardware->isFactoryFlashReadyForReboot();
 		values.parallelTransportActive = m_hardware->isProducerThreaded();
 		values.ramRecordingModeSupported = m_hardware->supportsRamRecordingMode();
+		values.livePatternSupported = m_hardware->livePatternLayout().has_value();
 		values.userSysexState = userSysexImportProgress().state;
 		if(const auto position = m_hardware->readSequencerPosition())
 		{

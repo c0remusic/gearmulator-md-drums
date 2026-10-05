@@ -230,6 +230,12 @@ namespace md
 		{
 			m_mmPatternWriteControl = std::move(_control);
 		}
+		// The editor's edits of the pattern the Machinedrum plays: the Device writes them into its RAM
+		// (Hardware::livePatternLayout) on its rendering thread. Set before the Device renders.
+		void setLivePatternControl(std::shared_ptr<LivePatternControl> _control)
+		{
+			m_livePatternControl = std::move(_control);
+		}
 		bool isProjectStateRestorePending() const
 		{
 			return m_restoreStatus == ProjectStateRestoreStatus::Preparing
@@ -324,6 +330,7 @@ namespace md
 		void publishStatus();
 		void serviceHostSync(const std::vector<synthLib::SMidiEvent>& _midiOut, size_t _first);
 		void serviceMmPatternWriter();
+		void serviceLivePattern();
 		// Latency the machine applies itself: none while AsyncRender's queue
 		// already delays the output by the plug-in latency.
 		uint32_t hardwareLatency() const { return isRenderingAsync() ? 0 : getExtraLatencySamples(); }
@@ -361,6 +368,7 @@ namespace md
 		MmPatternWriter m_mmPatternWriter;
 		MmPatternWriter::Actions m_mmPatternWriterActions;
 		std::shared_ptr<MmPatternWriteControl> m_mmPatternWriteControl;
+		std::shared_ptr<LivePatternControl> m_livePatternControl;
 		std::shared_ptr<ChainPlayer> m_chainPlayer;
 		std::vector<synthLib::SMidiEvent> m_chainEvents;	// what the chain forwards for one event
 		// Last member: destroyed (render thread stopped) before everything it renders.

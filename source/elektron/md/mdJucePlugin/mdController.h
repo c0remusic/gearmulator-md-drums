@@ -333,6 +333,10 @@ namespace mdJucePlugin
 		// paused (verifyPatternWrite); under m_synchronizationLock
 		void servicePatternWrite(uint64_t _now);
 		void verifyPatternWrite(uint64_t _now);
+		// Machinedrum: the pattern playing can be edited in the machine's RAM (MachineStatus)
+		bool livePatternWritable() const;
+		// The RAM write under way, once the Device took it or refused it; under m_synchronizationLock
+		void serviceLivePatternWrite();
 		// The copy copyPattern() started, once its source is there: sent with the destination's number, or
 		// made the pattern shown and written; under m_synchronizationLock
 		void writePatternCopy(const md::automation::sysex::Message& _source);
@@ -522,6 +526,14 @@ namespace mdJucePlugin
 		// Machinedrum: the read-back of the writes made since the last one asked for is due then; 0 for none.
 		// Under m_patternMutex.
 		uint64_t m_patternVerifyDueMs = 0;
+		// Machinedrum: the pattern its RAM holds as far as the editor knows, the dump m_patternDump's edits
+		// started from, and its number (NoPattern: none). An edit of the pattern playing is written there,
+		// only the bytes it changed (md::LivePatternControl). Under m_patternMutex.
+		static constexpr uint8_t NoPattern = 0xff;
+		md::automation::sysex::Message m_patternMachineDump;
+		uint8_t m_patternMachineSlot = NoPattern;
+		// The RAM write under way (md::LivePatternControl's id), 0 for none; under m_synchronizationLock
+		uint32_t m_livePatternWrite = 0;
 		// sendPatternSoon(), under m_synchronizationLock: the first and last edit waiting, 0 for none
 		uint64_t m_patternWriteFirstMs = 0;
 		uint64_t m_patternWriteLastMs = 0;

@@ -1404,6 +1404,48 @@ namespace
 			"another current pattern was not read");
 	}
 
+	// md::livePatternWrites, what the Device writes into the Machinedrum's RAM for an edit of the pattern playing:
+	// only the bytes the edit changed, each expected to hold its value from before the edit
+	void verifyLivePatternWrites()
+	{
+		const md::LivePatternLayout layout{0x1000, 0x10000, 0x20000};
+		std::array<uint32_t, 16> trigs{};
+		trigs[0] = 0x11;
+		const auto from = makeMdPatternDump(20, 16, trigs);
+
+		// A trig: one byte of track 1's big-endian word, steps 9 to 16 in its third byte
+		auto editor = md::automation::sysex::MdPatternEditor::fromDump(from);
+		require(editor.has_value() && editor->setTrig(0, 9, true), "test pattern not editable");
+		const auto trig = md::livePatternWrites(layout, from, editor->toDump());
+		require(trig && trig->size() == 1 && (*trig)[0].address == 0x1002 && (*trig)[0].value == 0x02
+			&& (*trig)[0].expected == std::optional<uint8_t>{0}, "a trig is not the one byte it changes");
+
+		// Another pattern's dump is not an edit of this one
+		require(!md::livePatternWrites(layout, from, makeMdPatternDump(21, 16, trigs)),
+			"an edit across two patterns gave bytes");
+
+		// 64 steps from 16: the length byte, expected 16, and steps 33 to 64 written whole, whatever they held
+		auto longer = md::automation::sysex::MdPatternEditor::fromDump(from);
+		require(longer.has_value() && longer->setLength(64) && longer->setTrig(0, 40, true), "pattern not made 64 steps");
+		const auto grown = md::livePatternWrites(layout, from, longer->toDump());
+		require(grown.has_value(), "a pattern made 64 steps gave no bytes");
+		size_t extension = 0;
+		bool length = false;
+		for(const auto& write : *grown)
+		{
+			if(write.address >= layout.extension)
+			{
+				++extension;
+				require(!write.expected, "steps 33 to 64 were expected to hold something");
+			}
+			length |= write.address == layout.main + 64 + 64 + 16 + 1 && write.value == 64
+				&& write.expected == std::optional<uint8_t>{16};
+		}
+		require(extension == md::LivePatternLayout::ExtensionSize && length,
+			"a pattern made 64 steps did not write its length and its steps 33 to 64");
+		std::cout << "mdAutomationRobustnessTest: live pattern writes PASS\n";
+	}
+
 	// Runs after verifyPatternReading, with pattern 20 (16 steps, trigs on steps 1 and 5 of track 1) shown.
 	void verifyPatternWriting(Harness& _harness)
 	{
@@ -1502,6 +1544,8 @@ namespace
 		verifyMachineAssignment(harness);
 		verifyPatternReading(harness);
 		verifyPatternWriting(harness);
+		if(_model == md::MachineModel::Machinedrum)
+			verifyLivePatternWrites();
 		verifyOrderedIntentArchitecture(harness);
 		verifyAdversarialRestoreSynchronization(harness);
 		verifyConcurrentPublicationArchitecture(harness);

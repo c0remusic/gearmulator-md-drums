@@ -917,6 +917,7 @@ namespace mdJucePlugin
 		d->setHostSyncControl(m_hostSyncControl);
 		d->setChainPlayer(m_chainControl.getPlayer());
 		d->setMmPatternWriteControl(m_mmPatternWriteControl);
+		d->setLivePatternControl(m_livePatternControl);
 		return d.release();
 	}
 

@@ -794,16 +794,52 @@ namespace mdJucePlugin
 				m_patternWrite.store(PatternWrite::None, std::memory_order_release);
 			}
 		}
+		if(m_livePatternWrite)
+			serviceLivePatternWrite();
 		if(!m_patternWriteFirstMs)
 		{
 			if(m_model != md::MachineModel::Monomachine)
 				verifyPatternWrite(_now);
 			return;
 		}
-		if(_now - m_patternWriteLastMs < PatternWritePauseMilliseconds
+		// Written in the RAM, an edit costs the machine nothing: at once, as a grid edit
+		if(!livePatternWritable() && _now - m_patternWriteLastMs < PatternWritePauseMilliseconds
 			&& _now - m_patternWriteFirstMs < PatternWriteMaxDelayMilliseconds)
 			return;
 		(void)sendPattern();
+	}
+
+	bool Controller::livePatternWritable() const
+	{
+		if(m_model != md::MachineModel::Machinedrum)
+			return false;
+		const auto status = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLiveDevice().status();
+		return status && status->livePatternSupported;
+	}
+
+	void Controller::serviceLivePatternWrite()
+	{
+		const auto& control = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLivePatternControl();
+		if(control.getDone() < m_livePatternWrite)
+			return;
+		const bool refused = control.getRefused() >= m_livePatternWrite;
+		m_livePatternWrite = 0;
+		if(!refused)
+		{
+			// Edits made since wait for their own write
+			if(!m_patternWriteFirstMs)
+				m_patternWrite.store(PatternWrite::Written, std::memory_order_release);
+			return;
+		}
+		// The machine's pattern changed under the edit (edited on the machine, another pattern selected): read
+		// again, and the next edit goes as a dump
+		{
+			const std::lock_guard lock(m_patternMutex);
+			m_patternMachineDump.clear();
+			m_patternMachineSlot = NoPattern;
+		}
+		m_patternWrite.store(PatternWrite::Refused, std::memory_order_release);
+		(void)requestPattern();
 	}
 
 	void Controller::verifyPatternWrite(const uint64_t _now)
@@ -875,10 +911,12 @@ namespace mdJucePlugin
 		// This write carries the edits a sendPatternSoon() waits with
 		m_patternWriteFirstMs = 0;
 		md::automation::sysex::Message dump;
+		md::automation::sysex::Message from;
 		uint8_t slot = 0;
 		// A copy onto the pattern shown ends with its read-back: asked for at once. An edit's waits for the
 		// writes to pause (verifyPatternWrite).
 		const bool readBack = m_patternCopyShown && getPatternCopy().state == PatternCopy::Writing;
+		const bool writable = !readBack && livePatternWritable();
 		{
 			const std::lock_guard lock(m_patternMutex);
 			if(!m_patternEdited || !m_pattern)
@@ -888,11 +926,31 @@ namespace mdJucePlugin
 			slot = m_pattern->slot;
 			m_patternEdited = false;
 			m_patternSent = m_pattern;
-			if(readBack)
-				++m_patternWritesInFlight;
-			m_patternVerifyDueMs = readBack ? 0 : milliseconds() + PatternVerifyMilliseconds;
+			// The pattern playing, its Kit the live one, edited from what its RAM holds: the bytes the edits
+			// changed go there, as a grid edit (md::LivePatternControl). Nothing reloads, nothing is read back.
+			if(writable && slot == m_currentPattern.load(std::memory_order_acquire) && m_patternMachineSlot == slot
+				&& m_pattern->kit == m_currentKit.load(std::memory_order_acquire))
+			{
+				from = std::move(m_patternMachineDump);
+				m_patternVerifyDueMs = 0;
+			}
+			else
+			{
+				if(readBack)
+					++m_patternWritesInFlight;
+				m_patternVerifyDueMs = readBack ? 0 : milliseconds() + PatternVerifyMilliseconds;
+			}
+			// What the machine holds once it takes the write
+			m_patternMachineDump = dump;
+			m_patternMachineSlot = slot;
 		}
 		m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
+		if(!from.empty())
+		{
+			m_livePatternWrite = static_cast<AudioPluginAudioProcessor&>(getProcessor()).getLivePatternControl()
+				.request(std::move(from), std::move(dump));
+			return true;
+		}
 		if(readBack)
 		{
 			m_patternRequestedSlot.store(slot, std::memory_order_release);
@@ -2084,11 +2142,13 @@ namespace mdJucePlugin
 							m_patternWrite.store(m_patternSent && samePattern(*pattern, *m_patternSent)
 								? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
 						}
-						// Edits not sent yet stay on top of the same pattern.
+						// Edits not sent yet stay on top of the same pattern, and so does what they started from.
 						if(!m_patternEdited || !m_pattern || m_pattern->slot != pattern->slot)
 						{
+							m_patternMachineSlot = pattern->slot;
 							m_pattern = std::move(*pattern);
 							m_patternDump.assign(_message.begin(), _message.end());
+							m_patternMachineDump = m_patternDump;
 							m_patternEdited = false;
 						}
 					}

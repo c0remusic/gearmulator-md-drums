@@ -5,6 +5,7 @@
 #include "mdLiveDevice.h"
 #include "mdOutputMeters.h"
 #include "mdLib/mdhostsync.h"
+#include "mdLib/mdlivepattern.h"
 #include "mdLib/mdmmpatternwriter.h"
 #include "mdLib/mdtypes.h"
 #include "synthLib/performanceReport.h"
@@ -97,6 +98,8 @@ namespace mdJucePlugin
 
 		// The editor's Monomachine pattern writes, which the Device drives through SYSEX RECV
 		md::MmPatternWriteControl& getMmPatternWriteControl() { return *m_mmPatternWriteControl; }
+		// The editor's edits of the pattern the Machinedrum plays, which the Device writes into its RAM
+		md::LivePatternControl& getLivePatternControl() { return *m_livePatternControl; }
 		using jucePluginEditorLib::Processor::processBlock;
 		void processBlock(juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midiMessages) override;
 
@@ -140,6 +143,7 @@ namespace mdJucePlugin
 		bool m_ramRecordingModeChunkSeen = false;
 		const std::shared_ptr<md::HostSyncControl> m_hostSyncControl = std::make_shared<md::HostSyncControl>();
 		const std::shared_ptr<md::MmPatternWriteControl> m_mmPatternWriteControl = std::make_shared<md::MmPatternWriteControl>();
+		const std::shared_ptr<md::LivePatternControl> m_livePatternControl = std::make_shared<md::LivePatternControl>();
 		LiveDevice m_liveDevice{*this};
 		OutputMeters m_outputMeters;
 		ChainControl m_chainControl{m_model};

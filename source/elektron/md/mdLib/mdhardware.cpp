@@ -1407,6 +1407,30 @@ namespace md
 		return std::nullopt;
 	}
 
+	std::optional<LivePatternLayout> Hardware::livePatternLayout() const
+	{
+		// Found with mdPlayheadProbe --pattern-ram and --pattern-ext: the pattern as its dump's payload unpacks,
+		// in three blocks; the second copy of steps 33 to 64 the firmware keeps at $262560 does not play
+		if(m_model == MachineModel::Machinedrum && m_firmwareFingerprint == g_mdOs163Fingerprint)
+			return LivePatternLayout{0x001272c0, 0x0016bdc0, 0x00180000};
+		return std::nullopt;
+	}
+
+	bool Hardware::writeRamIfUnchanged(const std::vector<RamWrite>& _writes)
+	{
+		for(const auto& write : _writes)
+		{
+			if(write.expected && m_uc.read8(write.address) != *write.expected)
+				return false;
+		}
+		if(_writes.empty())
+			return true;
+		registerExternalInteraction();
+		for(const auto& write : _writes)
+			m_uc.write8(write.address, write.value);
+		return true;
+	}
+
 	bool Hardware::trySendPanelEvent(const uint8_t _cmd, const uint8_t _arg)
 	{
 		registerExternalInteraction();
