@@ -95,6 +95,13 @@ namespace mdJucePlugin
 		{
 			_controller.onControllerTimer();
 		}
+
+		// The writes have paused long enough: the controller timer asks for the Machinedrum's read-back
+		static void writesPaused(Controller& _controller)
+		{
+			const std::lock_guard lock(_controller.m_synchronizationLock);
+			_controller.servicePatternWrite(Controller::milliseconds() + Controller::PatternVerifyMilliseconds);
+		}
 	};
 }
 
@@ -1423,8 +1430,9 @@ namespace
 		{
 			controller.parseSysexMessage(_dump, synthLib::MidiEventSource::Device);
 		};
+		using Access = mdJucePlugin::ControllerAutomationTestAccess;
 
-		// Edits show at once and are sent together.
+		// Edits show at once and are sent together; the write is read back once the writes pause.
 		require(!controller.sendPattern(), "an unedited pattern was sent");
 		const auto revision = controller.getPatternRevision();
 		require(controller.setPatternTrig(0, 1, true) && controller.setPatternLock(0, 3, 1, 55), "pattern edit refused");
@@ -1436,22 +1444,35 @@ namespace
 		require(!controller.sendPattern(), "the same edits were sent twice");
 		const auto kept = firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 55); });
 		reply(kept);
+		require(controller.getPatternWrite() == Write::Pending, "a dump nobody asked for decided the write");
+		Access::writesPaused(controller);
+		reply(kept);
 		require(controller.getPatternWrite() == Write::Written && controller.getPattern()->lock(0, 3, 1) == uint8_t{55},
 			"read-back as sent not reported as written");
 
 		// A read-back that differs is reported, and the firmware's pattern is shown.
 		require(controller.setPatternLock(0, 3, 1, 60) && controller.sendPattern(), "second edit not sent");
+		Access::writesPaused(controller);
 		reply(kept);
 		require(controller.getPatternWrite() == Write::Refused && controller.getPattern()->lock(0, 3, 1) == uint8_t{55},
 			"read-back without the edit not reported as refused");
 
-		// Two writes in flight: only the second read-back decides.
+		// Two writes before the pause: one read-back, of the last.
 		require(controller.setPatternLock(0, 3, 1, 61) && controller.sendPattern(), "first of two writes not sent");
 		require(controller.setPatternLock(0, 3, 1, 62) && controller.sendPattern(), "second of two writes not sent");
-		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 61); }));
-		require(controller.getPatternWrite() == Write::Pending && controller.getPattern()->lock(0, 3, 1) == uint8_t{62},
-			"the first read-back replaced a newer edit");
+		Access::writesPaused(controller);
 		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 62); }));
+		require(controller.getPatternWrite() == Write::Written, "the read-back of the last write did not decide");
+
+		// A write after a read-back was asked for: that read-back, older, neither decides nor replaces the edit.
+		require(controller.setPatternLock(0, 3, 1, 63) && controller.sendPattern(), "third write not sent");
+		Access::writesPaused(controller);
+		require(controller.setPatternLock(0, 3, 1, 64) && controller.sendPattern(), "fourth write not sent");
+		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 63); }));
+		require(controller.getPatternWrite() == Write::Pending && controller.getPattern()->lock(0, 3, 1) == uint8_t{64},
+			"an older read-back replaced a newer edit");
+		Access::writesPaused(controller);
+		reply(firmwareDump([](auto& _e) { _e.setTrig(0, 1, true); _e.setLock(0, 3, 1, 64); }));
 		require(controller.getPatternWrite() == Write::Written, "the last read-back did not decide");
 
 		// An edit not sent yet stays over a read of the same pattern.

@@ -795,11 +795,31 @@ namespace mdJucePlugin
 			}
 		}
 		if(!m_patternWriteFirstMs)
+		{
+			if(m_model != md::MachineModel::Monomachine)
+				verifyPatternWrite(_now);
 			return;
+		}
 		if(_now - m_patternWriteLastMs < PatternWritePauseMilliseconds
 			&& _now - m_patternWriteFirstMs < PatternWriteMaxDelayMilliseconds)
 			return;
 		(void)sendPattern();
+	}
+
+	void Controller::verifyPatternWrite(const uint64_t _now)
+	{
+		uint8_t slot = 0;
+		{
+			const std::lock_guard lock(m_patternMutex);
+			if(!m_patternVerifyDueMs || _now < m_patternVerifyDueMs || !m_patternSent)
+				return;
+			m_patternVerifyDueMs = 0;
+			slot = m_patternSent->slot;
+			++m_patternWritesInFlight;
+		}
+		m_patternRequestedSlot.store(slot, std::memory_order_release);
+		m_patternWanted.store(true, std::memory_order_release);
+		sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
 	}
 
 	void Controller::writeMmDump(const md::automation::sysex::Message& _dump, const uint8_t _slot)
@@ -856,6 +876,9 @@ namespace mdJucePlugin
 		m_patternWriteFirstMs = 0;
 		md::automation::sysex::Message dump;
 		uint8_t slot = 0;
+		// A copy onto the pattern shown ends with its read-back: asked for at once. An edit's waits for the
+		// writes to pause (verifyPatternWrite).
+		const bool readBack = m_patternCopyShown && getPatternCopy().state == PatternCopy::Writing;
 		{
 			const std::lock_guard lock(m_patternMutex);
 			if(!m_patternEdited || !m_pattern)
@@ -865,11 +888,16 @@ namespace mdJucePlugin
 			slot = m_pattern->slot;
 			m_patternEdited = false;
 			m_patternSent = m_pattern;
-			++m_patternWritesInFlight;
+			if(readBack)
+				++m_patternWritesInFlight;
+			m_patternVerifyDueMs = readBack ? 0 : milliseconds() + PatternVerifyMilliseconds;
 		}
 		m_patternWrite.store(PatternWrite::Pending, std::memory_order_release);
-		m_patternRequestedSlot.store(slot, std::memory_order_release);
-		m_patternWanted.store(true, std::memory_order_release);
+		if(readBack)
+		{
+			m_patternRequestedSlot.store(slot, std::memory_order_release);
+			m_patternWanted.store(true, std::memory_order_release);
+		}
 		// The Machinedrum reloads the pattern's Kit as stored when it takes the pattern, stopped or playing:
 		// values changed since the Kit was saved (SON) would go back. Saving the live Kit first keeps them
 		// (mdEditorFirmwareTest, checkLiveKitAcrossPatternWrite).
@@ -877,7 +905,8 @@ namespace mdJucePlugin
 		if(kit < 64)
 			sendEditorSysex(md::automation::sysex::kitSave(m_model, kit));
 		sendEditorSysex(dump);
-		sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
+		if(readBack)
+			sendEditorSysex(md::automation::sysex::patternRequest(m_model, slot));
 		return true;
 	}
 
@@ -2034,17 +2063,23 @@ namespace mdJucePlugin
 				{
 					{
 						const std::lock_guard lock(m_patternMutex);
-						// Each write is read back; only the reply to the last one tells
-						// what the firmware kept. Another pattern's dump ends the wait:
-						// what was written is no longer the pattern shown.
-						if(m_patternWritesInFlight > 0 && m_patternSent && m_patternSent->slot != pattern->slot)
+						// Writes are read back; only the reply to the last read-back asked
+						// for tells what the firmware kept. Another pattern's dump ends the
+						// wait: what was written is no longer the pattern shown.
+						if((m_patternWritesInFlight > 0 || m_patternVerifyDueMs) && m_patternSent
+							&& m_patternSent->slot != pattern->slot)
 						{
 							m_patternWritesInFlight = 0;
+							m_patternVerifyDueMs = 0;
 							m_patternWrite.store(PatternWrite::None, std::memory_order_release);
 						}
 						if(m_patternWritesInFlight > 0)
 						{
 							if(--m_patternWritesInFlight > 0)
+								return true;
+							// Written again since this read-back was asked for: the next one tells, and
+							// this one, older than the write, must not replace the pattern shown
+							if(m_patternVerifyDueMs)
 								return true;
 							m_patternWrite.store(m_patternSent && samePattern(*pattern, *m_patternSent)
 								? PatternWrite::Written : PatternWrite::Refused, std::memory_order_release);
