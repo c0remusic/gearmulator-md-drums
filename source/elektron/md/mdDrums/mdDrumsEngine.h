@@ -53,7 +53,16 @@ namespace mdDrums
 		void setTempo(double _bpm);
 		void trigger(int _track, int _velocity);			// 1-127
 
-		// _count samples of the dry main mix (no master effects), full scale 1.0.
+		// Outputs: the dry main mix (no master effects) left and right, then each track alone (after its effects
+		// and VOL, before PAN: the MD's individual-output formula).
+		static constexpr int OutputCount = 2 + TrackCount;
+
+		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only.
+		void setSeparateOutputs(uint32_t _tracks);
+
+		// _count samples of each output, full scale 1.0; _outputs holds OutputCount pointers, nullptr for an output
+		// not wanted.
+		void render(float* const* _outputs, size_t _count);
 		void render(float* _left, float* _right, size_t _count);
 
 	private:

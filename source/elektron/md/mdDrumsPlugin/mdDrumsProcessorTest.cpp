@@ -20,15 +20,16 @@ namespace
 	struct Result
 	{
 		int first = -1;		// host samples from the note to the first one at or above -60 dBFS
-		float peak = 0;
+		float peak = 0;		// main output
 		double energy = 0;
+		float ownPeak = 0;	// the third channel, track 1's own output when the host enables it
 	};
 
 	// A second of silence, then _note at sample _offset of a 512-sample block, and a second after it.
 	Result play(mdDrums::Processor& _processor, const int _note, const int _offset, const double _rate)
 	{
 		constexpr int block = 512;
-		juce::AudioBuffer<float> buffer(2, block);
+		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), block);
 		juce::MidiBuffer midi;
 		const auto blocks = static_cast<int>(_rate / block);
 		for(int i = 0; i < blocks; ++i)
@@ -51,6 +52,8 @@ namespace
 					result.first = position + s - _offset;
 				result.peak = std::max(result.peak, value);
 				result.energy += double(value) * value;
+				if(buffer.getNumChannels() > 2)
+					result.ownPeak = std::max(result.ownPeak, std::abs(buffer.getSample(2, s)));
 			}
 			position += block;
 		}
@@ -94,6 +97,27 @@ int main()
 			std::printf("%.0f Hz: track 1 TRX-BD energy %.3f, EFM-BD energy %.3f (%s)\n", rate, before.energy,
 				after.energy, machine->getCurrentValueAsText().toRawUTF8());
 			require(std::abs(after.energy - before.energy) > before.energy * 0.05, "the machine parameter did nothing");
+
+			// SYN1 shows its name on the track's machine.
+			const auto syn1 = processor.getParameters()[1]->getCurrentValueAsText();
+			std::printf("%.0f Hz: T1 SYN1 on EFM-BD reads \"%s\"\n", rate, syn1.toRawUTF8());
+			require(syn1.containsAnyOf("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), "SYN1 does not show its name");
+
+			// Track 1's own output: the host enables it, track 1 leaves the main mix and plays there.
+			{
+				auto layout = processor.getBusesLayout();
+				layout.outputBuses.getReference(1) = juce::AudioChannelSet::mono();
+				require(processor.setBusesLayout(layout), "the host cannot enable track 1's output");
+				processor.prepareToPlay(rate, 512);
+				const auto separated = play(processor, 36, 0, rate);
+				std::printf("%.0f Hz: track 1 on its own output: main peak %.4f, own output peak %.4f\n", rate,
+					separated.peak, separated.ownPeak);
+				require(separated.peak == 0.0f, "track 1 still plays in the main mix");
+				require(separated.ownPeak > 0.01f, "track 1 is silent on its own output");
+				layout.outputBuses.getReference(1) = juce::AudioChannelSet::disabled();
+				require(processor.setBusesLayout(layout), "the host cannot disable track 1's output");
+				processor.prepareToPlay(rate, 512);
+			}
 
 			juce::MemoryBlock state;
 			processor.getStateInformation(state);

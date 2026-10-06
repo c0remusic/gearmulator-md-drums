@@ -13,8 +13,10 @@
 namespace mdDrums
 {
 	// MD Drums: the Machinedrum's 16 tracks as an instrument. Host notes 36-51 trigger tracks 1-16 (a Drum Rack's
-	// pads), with velocity; every track's machine, 24 parameters, level and mute are host parameters. The output is
-	// the dry main mix (no master effects yet), resampled when the host does not run at 44.1 kHz.
+	// pads), with velocity; every track's machine, 24 parameters, level and mute are host parameters. The main
+	// output is the dry main mix (no master effects yet); 16 optional mono outputs, "Track 1" to "Track 16", each
+	// take their track out of the main mix when the host enables them. Everything is resampled when the host does
+	// not run at 44.1 kHz.
 	class Processor : public juce::AudioProcessor
 	{
 	public:
@@ -64,18 +66,26 @@ namespace mdDrums
 			int appliedMute = -1;
 		};
 
+		// The main stereo output, then one optional mono output per track, off until the host enables it.
+		static BusesProperties buses();
 		juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+		juce::String synName(int _track, int _param) const;
 		void applyParameters();
-		void render(float* _left, float* _right, int _count);
+		// _count samples into m_outputs (the host's buffers for this block) from sample _offset on.
+		void render(int _offset, int _count);
 
 		std::unique_ptr<Engine> m_engine;
 		juce::AudioProcessorValueTreeState m_state;
 		std::array<Track, Engine::TrackCount> m_tracks;
 
+		// This block's buffer per engine output (Engine::OutputCount), nullptr where the host takes none.
+		std::array<float*, Engine::OutputCount> m_outputs{};
+
 		// Host rate != 44.1 kHz: the engine renders ahead into these, and the interpolators read them.
 		double m_ratio = 1.0;	// engine samples per host sample
-		std::array<juce::LagrangeInterpolator, 2> m_interpolators;
-		std::array<std::vector<float>, 2> m_pending;
+		std::array<juce::LagrangeInterpolator, Engine::OutputCount> m_interpolators;
+		std::array<std::vector<float>, Engine::OutputCount> m_pending;
 		size_t m_pendingCount = 0;
+		std::vector<float> m_scratch;	// where the outputs nobody takes are interpolated to
 	};
 }

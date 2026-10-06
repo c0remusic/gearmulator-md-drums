@@ -39,8 +39,16 @@ namespace mdDrums
 		}
 	}
 
+	juce::AudioProcessor::BusesProperties Processor::buses()
+	{
+		auto properties = BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true);
+		for(int t = 0; t < Engine::TrackCount; ++t)
+			properties = properties.withOutput("Track " + juce::String(t + 1), juce::AudioChannelSet::mono(), false);
+		return properties;
+	}
+
 	Processor::Processor()
-		: AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true))
+		: AudioProcessor(buses())
 		, m_engine(createEngine())
 		, m_state(*this, nullptr, "MDDrums", createLayout())
 	{
@@ -58,6 +66,7 @@ namespace mdDrums
 		}
 		for(auto& pending : m_pending)
 			pending.resize(g_pendingCapacity);
+		m_scratch.resize(g_pendingCapacity);
 	}
 
 	Processor::~Processor() = default;
@@ -89,8 +98,18 @@ namespace mdDrums
 			for(int p = 0; p < Engine::ParamCount; ++p)
 			{
 				const auto* name = Engine::paramNames()[p];
+				juce::AudioParameterIntAttributes attributes;
+				// SYN1-8 show what they are on the track's current machine ("PTCH 64").
+				if(p < 8)
+				{
+					attributes = attributes.withStringFromValueFunction([this, t, p](const int _value, int)
+					{
+						const auto label = synName(t, p);
+						return label.isEmpty() ? juce::String(_value) : label + " " + juce::String(_value);
+					});
+				}
 				group->addChild(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{trackId(t, name), 1},
-					prefix + name, 0, 127, Engine::paramDefaults()[p]));
+					prefix + name, 0, 127, Engine::paramDefaults()[p], attributes));
 			}
 			group->addChild(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{trackId(t, "level"), 1},
 				prefix + "Level", 0, 127, Engine::DefaultLevel));
@@ -101,14 +120,34 @@ namespace mdDrums
 		return layout;
 	}
 
-	bool Processor::isBusesLayoutSupported(const BusesLayout& _layouts) const
+	juce::String Processor::synName(const int _track, const int _param) const
 	{
-		return _layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo()
-			&& _layouts.getMainInputChannelSet().isDisabled();
+		const auto* machine = m_tracks[_track].machine;
+		if(!m_engine || !machine)
+			return {};
+		const auto id = static_cast<int>(std::lround(machine->load(std::memory_order_relaxed)));
+		for(const auto& info : m_engine->machines())
+			if(info.id == id)
+				return juce::String(info.params[_param]).trim();
+		return {};
 	}
 
-	void Processor::prepareToPlay(const double _sampleRate, int)
+	bool Processor::isBusesLayoutSupported(const BusesLayout& _layouts) const
 	{
+		if(_layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo() || !_layouts.inputBuses.isEmpty())
+			return false;
+		for(int bus = 1; bus < _layouts.outputBuses.size(); ++bus)
+		{
+			const auto& set = _layouts.outputBuses.getReference(bus);
+			if(!set.isDisabled() && set != juce::AudioChannelSet::mono())
+				return false;
+		}
+		return true;
+	}
+
+	void Processor::prepareToPlay(const double _sampleRate, const int _maximumBlockSize)
+	{
+		m_scratch.resize(std::max<size_t>(g_pendingCapacity, static_cast<size_t>(std::max(_maximumBlockSize, 0))));
 		m_ratio = Engine::SampleRate / _sampleRate;
 		for(auto& interpolator : m_interpolators)
 			interpolator.reset();
@@ -153,27 +192,37 @@ namespace mdDrums
 		}
 	}
 
-	// _count host samples, at the host's rate.
-	void Processor::render(float* _left, float* _right, const int _count)
+	void Processor::render(const int _offset, const int _count)
 	{
 		if(_count <= 0)
 			return;
+		std::array<float*, Engine::OutputCount> outputs{};
+		for(int o = 0; o < Engine::OutputCount; ++o)
+			outputs[o] = m_outputs[o] ? m_outputs[o] + _offset : nullptr;
 		if(m_ratio == 1.0)
 		{
-			m_engine->render(_left, _right, static_cast<size_t>(_count));
+			m_engine->render(outputs.data(), static_cast<size_t>(_count));
 			return;
 		}
-		// Enough engine samples for the interpolators to produce _count, with a few to spare.
+		// Enough engine samples for the interpolators to produce _count, with a few to spare. Every output is
+		// rendered ahead, wanted or not, so that one enabled later starts from where the others are.
 		const auto needed = std::min(g_pendingCapacity,
 			static_cast<size_t>(std::ceil(_count * m_ratio)) + 4);
 		if(m_pendingCount < needed)
 		{
-			m_engine->render(m_pending[0].data() + m_pendingCount, m_pending[1].data() + m_pendingCount,
-				needed - m_pendingCount);
+			std::array<float*, Engine::OutputCount> pending{};
+			for(int o = 0; o < Engine::OutputCount; ++o)
+				pending[o] = m_pending[o].data() + m_pendingCount;
+			m_engine->render(pending.data(), needed - m_pendingCount);
 			m_pendingCount = needed;
 		}
-		const auto used = m_interpolators[0].process(m_ratio, m_pending[0].data(), _left, _count);
-		m_interpolators[1].process(m_ratio, m_pending[1].data(), _right, _count);
+		int used = 0;
+		for(int o = 0; o < Engine::OutputCount; ++o)
+		{
+			// The interpolator of an output nobody takes still advances, with a scratch destination.
+			auto* destination = outputs[o] ? outputs[o] : m_scratch.data();
+			used = m_interpolators[o].process(m_ratio, m_pending[o].data(), destination, _count);
+		}
 		const auto consumed = std::min(static_cast<size_t>(used), m_pendingCount);
 		for(auto& pending : m_pending)
 			std::copy(pending.begin() + consumed, pending.begin() + m_pendingCount, pending.begin());
@@ -184,13 +233,27 @@ namespace mdDrums
 	{
 		juce::ScopedNoDenormals noDenormals;
 		const auto count = _buffer.getNumSamples();
-		auto* left = _buffer.getWritePointer(0);
-		auto* right = _buffer.getWritePointer(1);
 		if(!m_engine)
 		{
 			_buffer.clear();
 			return;
 		}
+
+		// The main output, and the track outputs the host has enabled: those tracks leave the main mix.
+		auto main = getBusBuffer(_buffer, false, 0);
+		m_outputs.fill(nullptr);
+		m_outputs[0] = main.getWritePointer(0);
+		m_outputs[1] = main.getWritePointer(1);
+		uint32_t separate = 0;
+		for(int t = 0; t < Engine::TrackCount; ++t)
+		{
+			const auto* bus = getBus(false, 1 + t);
+			if(!bus || !bus->isEnabled() || bus->getNumberOfChannels() == 0)
+				continue;
+			m_outputs[2 + t] = getBusBuffer(_buffer, false, 1 + t).getWritePointer(0);
+			separate |= 1u << t;
+		}
+		m_engine->setSeparateOutputs(separate);
 
 		applyParameters();
 		if(const auto* head = getPlayHead())
@@ -210,11 +273,11 @@ namespace mdDrums
 			if(track < 0 || track >= Engine::TrackCount)
 				continue;
 			const auto at = std::clamp(metadata.samplePosition, done, count);
-			render(left + done, right + done, at - done);
+			render(done, at - done);
 			done = at;
 			m_engine->trigger(track, message.getVelocity());
 		}
-		render(left + done, right + done, count - done);
+		render(done, count - done);
 	}
 
 	juce::AudioProcessorEditor* Processor::createEditor()

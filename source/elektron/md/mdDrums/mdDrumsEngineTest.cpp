@@ -4,6 +4,7 @@
 #include "mdDrumsEngine.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -82,6 +83,31 @@ int main()
 		const auto soft = listen(engine).second;
 		std::printf("TRXBD velocity 40: peak %.4f\n", soft);
 		require(soft < loud * 0.8f && soft > 0.0f, "the velocity does not scale the level");
+
+		// Track 1 on its own output: it leaves the main mix and sounds there alone.
+		{
+			settle(engine);
+			engine.setSeparateOutputs(1);
+			std::vector<std::vector<float>> buffers(mdDrums::Engine::OutputCount, std::vector<float>(44100));
+			std::array<float*, mdDrums::Engine::OutputCount> outputs{};
+			for(int i = 0; i < mdDrums::Engine::OutputCount; ++i)
+				outputs[i] = buffers[i].data();
+			engine.trigger(0, 127);
+			engine.render(outputs.data(), 44100);
+			const auto peak = [&](const int _output)
+			{
+				float result = 0;
+				for(const auto value : buffers[_output])
+					result = std::max(result, std::abs(value));
+				return result;
+			};
+			std::printf("track 1 separated: main peak %.4f, own output %.4f, track 2 output %.4f\n",
+				std::max(peak(0), peak(1)), peak(2), peak(3));
+			require(peak(0) == 0.0f && peak(1) == 0.0f, "a separated track still plays in the main mix");
+			require(peak(2) > 0.01f, "a separated track is silent on its own output");
+			require(peak(3) == 0.0f, "another track's output carries track 1");
+			engine.setSeparateOutputs(0);
+		}
 
 		// All 16 tracks, each on a TRX machine, triggered every 64th of a second for 8 seconds.
 		const char* kit[16] = {"TRXBD", "TRXSD", "TRXXT", "TRXCP", "TRXRS", "TRXCB", "TRXCH", "TRXOH",
