@@ -964,6 +964,79 @@ namespace md::automation::sysex
 		return true;
 	}
 
+	MdTrackSteps trackSteps(const PatternDump& _pattern, const uint8_t _track)
+	{
+		MdTrackSteps steps;
+		if(_track >= 16)
+			return steps;
+		steps.trigs = _pattern.trigs[_track];
+		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
+			steps.flags[flag] = _pattern.trackFlags[flag][_track];
+		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+		{
+			for(uint8_t step = 0; step < _pattern.steps; ++step)
+			{
+				if(const auto value = _pattern.lock(_track, parameter, step))
+					steps.locks[parameter][step] = *value;
+			}
+		}
+		return steps;
+	}
+
+	bool MdPatternEditor::setTrackSteps(const uint8_t _track, const MdTrackSteps& _steps)
+	{
+		if(_track >= 16)
+			return false;
+		const auto steps = stepCount();
+		// The parameters locked on a step with a trig, among the steps the dump holds
+		std::array<bool, g_patternParameters> locked{};
+		size_t needed = 0;
+		size_t own = 0;
+		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+		{
+			for(uint8_t step = 0; step < steps && !locked[parameter]; ++step)
+				locked[parameter] = ((_steps.trigs >> step) & 1u) && _steps.locks[parameter][step] < 0x80;
+			needed += locked[parameter] ? 1 : 0;
+			own += hasRow(_track, parameter) ? 1 : 0;
+		}
+		if(rowCount() - own + needed > g_patternRows)
+			return false;
+		// The track's own rows go
+		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+		{
+			if(!hasRow(_track, parameter))
+				continue;
+			removeRow(rowIndex(_track, parameter));
+			maskByte(_track, parameter) &= static_cast<uint8_t>(~(1u << (parameter % 8)));
+		}
+		// Its trigs and its own flags: steps 1 to 32, then 33 to 64 in the long form
+		const auto low = [](const uint64_t _mask) { return static_cast<uint32_t>(_mask); };
+		const auto high = [](const uint64_t _mask) { return static_cast<uint32_t>(_mask >> 32); };
+		writeMask32(&m_trigs[_track * 4], low(_steps.trigs));
+		if(!m_extension.empty())
+			writeMask32(&m_extension[_track * 4], high(_steps.trigs));
+		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
+		{
+			const auto word = (flag * 16 + _track) * 4;
+			writeMask32(&m_tail[g_patternTrackFlags + word], low(_steps.flags[flag]));
+			if(!m_extension.empty())
+				writeMask32(&m_extension[g_patternExtensionTrackFlags + word], high(_steps.flags[flag]));
+		}
+		// A row per locked parameter, in track then parameter order, its values on the steps with a trig
+		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
+		{
+			if(!locked[parameter])
+				continue;
+			const auto row = rowIndex(_track, parameter);
+			insertRow(row);
+			maskByte(_track, parameter) |= static_cast<uint8_t>(1u << (parameter % 8));
+			for(uint8_t step = 0; step < steps; ++step)
+				lockValue(row, step) = ((_steps.trigs >> step) & 1u) ? _steps.locks[parameter][step] : g_noLock;
+		}
+		m_plain[5] = static_cast<uint8_t>(std::min(rowCount(), g_patternRows));
+		return true;
+	}
+
 	bool MdPatternEditor::setFlag(const StepFlag _flag, const std::optional<uint8_t> _track, const uint8_t _step,
 		const bool _on)
 	{

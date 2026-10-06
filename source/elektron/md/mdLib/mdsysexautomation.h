@@ -147,6 +147,20 @@ namespace md::automation::sysex
 		uint64_t flagMask(StepFlag _flag, uint8_t _track) const;
 	};
 
+	// A Machinedrum track's steps as a pattern holds them, on every step of the dump: what the editor's track
+	// copy puts on a track of the same pattern or of another one
+	struct MdTrackSteps
+	{
+		static constexpr uint8_t NoLock = 0xff;
+
+		uint64_t trigs = 0;									// bit n: step n + 1
+		std::array<uint64_t, StepFlagCount> flags{};		// the track's own accent, slide and swing
+		std::array<std::array<uint8_t, 64>, 24> locks{};	// per parameter and step, NoLock without one
+
+		MdTrackSteps() { for(auto& parameter : locks) parameter.fill(NoLock); }
+	};
+	MdTrackSteps trackSteps(const PatternDump& _pattern, uint8_t _track);
+
 	// A Machinedrum pattern dump ($67) that can be edited and sent back. Every
 	// byte of the dump is kept; toDump() changes only what the edits touched.
 	class MdPatternEditor
@@ -173,6 +187,10 @@ namespace md::automation::sysex
 		// The Kit the pattern plays, 0 to 63: the machine loads it when it selects the pattern, or takes the
 		// pattern as its current one; a Kit loaded makes it the current pattern's (mdEditorFirmwareTest)
 		bool setKit(uint8_t _kit);
+		// A track's steps made _steps', on every step the dump holds (past it, they are dropped): its trigs, its
+		// own accent, slide and swing, its locks, each locked parameter on a row of its own. False, and nothing
+		// changed, when the other tracks' rows leave too few of the 64 for its locks.
+		bool setTrackSteps(uint8_t _track, const MdTrackSteps& _steps);
 		// A step's accent, slide or swing below the pattern length: in the mask every
 		// track follows (_track nullopt), or in a track's own (0..15)
 		bool setFlag(StepFlag _flag, std::optional<uint8_t> _track, uint8_t _step, bool _on);
