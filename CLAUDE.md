@@ -21,10 +21,12 @@ The repository split on 2026-10-06 from [c0remusic/gearmulator-md-mm](https://gi
 - **Latency:** the plug-in reports 2 blocks by default (`DefaultLatencyBlocks` in `mdJucePlugin/mdPluginProcessor.h`), so that the machine renders ahead on its own threads (`md::AsyncRender`). The firmware adds 3.4–4.0 ms beyond that at least, about 5.4 ms on average, with about 3 ms of jitter, at every latency setting (`mdTrigLatencyFirmwareTest`, by hand; numbers in `.scratch/parallel-transport/implementation-log.md`).
 - **Machines:** `$5B` ASSIGN MACHINE (`automation::sysex::assignMachine` in `mdLib/mdsysexautomation.*`, table in `mdLib/mdmachines.*`) runs from the editor's machine picker only; no host parameter selects a track's machine yet.
 - **Editor:** the top bar has JOUER, SON, MIX, BIBLIO and SYSTÈME. SON, MIX, the master effects and BIBLIO's Kits are the material for the tabs; JOUER (steps, chains) and BIBLIO's patterns serve the internal sequencer. Skins are generated: edit `.scratch/md-editor/tools/gen_editor.py` and regenerate as `.scratch/md-editor/README.md` says. That README also holds the SysEx formats found and the facts verified on firmware.
-- **Plug-in identity** is still md-mm's: "Gearmulator MD", code `Tmdr` (`mdJucePlugin/CMakeLists.txt:95`). `C:\Program Files\Common Files\VST3\Gearmulator MD.vst3` is a symlink to md-mm's `editor-test` worktree build, which the user plays in Live: give this plug-in its own name and code before installing it.
+- **Plug-in identity:** `mdJucePlugin` (the full firmware) is still md-mm's: "Gearmulator MD", code `Tmdr` (`mdJucePlugin/CMakeLists.txt:95`). `C:\Program Files\Common Files\VST3\Gearmulator MD.vst3` is a symlink to md-mm's `editor-test` worktree build, which the user plays in Live: never install `mdJucePlugin` from here. The engine plug-in has its own: "MD Drums", manufacturer `C0rm`, code `Mddr` (`mdDrumsPlugin/`).
+- **MD Drums** (2026-10-06, `mdDrumsPlugin/` over `mdDrums/`): the engines without the OS as a VST3 with JUCE's generic editor. Notes 36–51 on any channel trigger tracks 1–16 with velocity; per track, the machine (by id), the 24 parameters, level and mute are host parameters (`t<n>_<name>` IDs: keep them). Dry main mix only, no master effects; resampled (Lagrange) when the host is not at 44.1 kHz. It finds `elektron_sps1-1uw_os1.63.bin` as `mdDrums::Engine::findFlashImage` says.
 
 ## Where things are
 
+- `source/elektron/md/mdDrums/`: `mdDrums::Engine`, mdEngine as the plug-in drives it (flash lookup, defaults, 32-sample block rendering), without JUCE. `mdDrumsPlugin/`: the JUCE processor over it.
 - `source/elektron/md/mdEngine/`: the engines without the OS (`EngineT` in `engine/MdEngine.h`), with its origin and local changes in `README.md`. Musashi's entry points serve one CPU class per executable, so nothing links it with `mdLib`'s `Microcontroller`: tests that compare the two run in separate processes.
 - `source/elektron/md/mdLib/`: the machine. `mdhardware.*` runs the UC and the DSPs and delivers MIDI and panel events; `mddevice.*` is the `synthLib::Device`; `mdautomation.*` maps host parameters to CC; `mdsysexautomation.*` holds the SysEx codecs (Kits, patterns, `$5B`, master effects).
 - `source/elektron/md/mdJucePlugin/`: the plug-in. `mdPluginProcessor.*`, `mdController.*` (parameters and SysEx traffic), `mdEditor.*` and its views, `parameterDescriptions_md.json`, skins in `skins/mdDefault/`.
@@ -74,13 +76,13 @@ $rom = "$env:LOCALAPPDATA\Programs\Gearmulator-Elektron"
 $env:GEARMULATOR_MD_FIRMWARE_BIN = "$rom\elektron_sps1-1uw_os1.63.bin"
 $env:GEARMULATOR_MM_FIRMWARE_BIN = "$rom\elektron_sfx6-60_os1.32b.bin"
 $env:MD_AUTOMATION_REQUIRE_FIRMWARE = "1"
-cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest mdTrigLatencyFirmwareTest mdEngineFirmwareTest
+cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest mdTrigLatencyFirmwareTest mdEngineFirmwareTest mdDrumsEngineTest mdDrumsProcessorTest
 Copy-Item "$rom\*.bin" temp\cmake_vs22\source\elektron\md\mdJucePlugin\Release
 cd temp\cmake_vs22
-ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest|mdEngineFirmwareTest)$"
+ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest|mdEngineFirmwareTest|mdDrumsEngineTest|mdDrumsProcessorTest)$"
 ```
 
-Green is 19 passed out of 19 in about 210 s: ctest adds the 8 fixture tests these require (`mdEngineFirmwareHits` boots the firmware to record the hits `mdEngineFirmwareTest` compares the engine with).
+Green is 21 passed out of 21 in 135 to 210 s: ctest adds the 8 fixture tests these require (`mdEngineFirmwareHits` boots the firmware to record the hits `mdEngineFirmwareTest` compares the engine with).
 
 Both ROMs are required. A firmware test exits 77 without its ROM and ctest reports it Skipped, which proves nothing:
 - Most firmware tests read the two variables; the timing tests check the Monomachine as well.
