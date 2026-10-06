@@ -1121,6 +1121,32 @@ MIDI reçu côté UC ?).
   restent muettes jusqu'à ~16,3 s (sonde d'une note par seconde). Dans Live,
   le plug-in serait sourd ~14 s après chargement : cause à trouver.
 
+## Machinemodule évalué contre le firmware complet (2026-10-06)
+
+Machinemodule (sd88me/mpc-vst-machinedrum, `796ded6`, AGPL-3.0) compilé sous MSVC dans
+`C:\dev\mpc-vst-machinedrum` (clone local, retouches jamais poussées : C++20, `memmem` remplacé
+par `std::search`, `vtuneSdk` lié sous Windows, garde MSVC sur deux fonctions ARM de leur
+`dsp.h`, outils `mdrender`/`mdlatency`/`mdhit`). OS `Elektron_SPS1-1UW_OS1.63.syx` d'elektron.se
+dans `C:\dev\mpc-vst-machinedrum-os\`.
+
+- **Leur fork `dsp56300` : JIT cassé sous Windows.** Le DSP des voix ne finit pas son init
+  (« instruction budget exceeded at PC=$10008b »). L'interpréteur marche (57 % d'un cœur sur leur
+  démo). Leur moteur sur **notre** `dsp56300` (JIT) marche : build `build-ours`.
+- **CPU** (démo 6 pistes TRX/EFM/P-I, sans effets maîtres) : 8 s d'audio en 0,80 s CPU, 30 s en
+  2,66 s, soit ~9 % d'un cœur. Le firmware complet tourne à ~1,1× temps réel.
+- **Démarrage** : moteur prêt 45 ms après construction ; pas d'OS qui démarre.
+- **Latence note→son** (`mdlatency`, TRX-BD, 48 notes à des échantillons aléatoires, prise avant le
+  bloc de 32 qui les contient) : 5–36 échantillons, moyenne 21 (0,48 ms), gigue 31 (0,70 ms) :
+  la quantification au bloc de 32, plus ~5 échantillons. Indépendante du tick (11, 6, 3, 1 blocs) :
+  un trig est appliqué au bloc suivant, pas au tick. Firmware complet : 3,4–4,0 ms minimum,
+  ~5,4 ms en moyenne, gigue ~3 ms.
+- **Fidélité** (`mdTrigLatencyFirmwareTest --hit` contre `mdhit`, mêmes 24 paramètres, piste 1
+  routée sur la sortie A, vélocité 100) : TRX-BD et TRX-SD **corrélation 1,000000**, alignés à
+  l'échantillon, résidu −67 et −64 dB après égalisation du niveau, enveloppes identiques au
+  dixième de dB jusqu'à −100 dB. Un gain constant les sépare : firmware = Machinemodule × 1,2541
+  (+1,97 dB), étage de sortie à identifier. La divergence TRX-SD signalée par sd88me est entre
+  forks `dsp56300` : avec le nôtre, elle disparaît.
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée

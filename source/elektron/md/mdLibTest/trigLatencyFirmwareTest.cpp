@@ -3,7 +3,9 @@
 // audible sample at the plug-in's output, at each plug-in latency setting. It also reports which notes
 // sound, what the firmware sends back, and whether the velocity changes the level.
 
+#include "mdLib/mdautomation.h"
 #include "mdLib/mddevice.h"
+#include "mdLib/mdsysexautomation.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdtypes.h"
 
@@ -99,6 +101,14 @@ namespace
 			m_plugin->addMidiEvent({synthLib::MidiEventSource::Host, _status, _note, _velocity, _offset});
 		}
 
+		void sysex(const std::vector<uint8_t>& _message)
+		{
+			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
+			event.sysex.assign(_message.begin(), _message.end());
+			m_plugin->addMidiEvent(event);
+		}
+
+		const std::array<std::array<float, g_block>, 6>& outputs() const { return m_outputs; }
 		uint64_t frame() const { return m_frame; }
 		std::vector<synthLib::SMidiEvent>& midiSeen() { return m_midiSeen; }
 
@@ -282,6 +292,65 @@ namespace
 		}
 	};
 
+	// The 24 track parameters a comparison hit plays with: SYN1-8, then AMD AMF EQF EQG FLTF FLTW FLTQ SRR, then
+	// DIST VOL PAN DEL REV LFOS LFOD LFOM. The other engine sets the same values.
+	constexpr std::array<uint8_t, 24> g_hitParameters{64, 64, 64, 64, 64, 64, 64, 64, 0, 0, 64, 64, 0, 127, 0, 0,
+		0, 100, 64, 0, 0, 0, 0, 0};
+
+	// One hit of _machine on track 1, routed to output A (no master effects), velocity 100: writes a second of
+	// every output channel from the note on, as raw 32-bit floats, channel after channel, to _file.
+	void hit(const char* _path, const uint16_t _machine, const std::string& _file)
+	{
+		Bench bench(_path, 0);
+		const auto floor = bootUntilNotesPlay(bench);
+		const auto threshold = std::max(1e-4f, floor * 8.0f);
+		using namespace md::automation;
+		const auto routing = sysex::trackRouting(0, sysex::TrackOutput::A);
+		const auto machine = sysex::assignMachine(md::MachineModel::Machinedrum, 0, _machine);
+		require(routing && machine, "no routing or machine message");
+		bench.sysex(std::vector<uint8_t>(routing->begin(), routing->end()));
+		bench.sysex(std::vector<uint8_t>(machine->begin(), machine->end()));
+		for(uint32_t block = 0; block < 86; ++block)
+			bench.process();
+		for(uint8_t parameter = 0; parameter < g_hitParameters.size(); ++parameter)
+		{
+			const auto cc = encodeParameterChange(md::MachineModel::Machinedrum,
+				{static_cast<uint8_t>(parameter / 8), 0, static_cast<uint8_t>(parameter % 8), g_hitParameters[parameter]}, 0);
+			require(cc.has_value(), "no CC for a track parameter");
+			bench.note((*cc)[0], (*cc)[1], (*cc)[2], 0);
+		}
+		// Let the smoothing settle, then wait for silence.
+		uint32_t quiet = 0;
+		for(uint32_t block = 0; block < 172 || quiet < 16; ++block)
+		{
+			require(block < 172 * 10, "the machine never fell silent");
+			quiet = bench.process() < threshold ? quiet + 1 : 0;
+		}
+		bench.note(0x90, 36, 100, 0);
+		std::vector<std::vector<float>> channels(6);
+		for(uint32_t block = 0; block < 172; ++block)
+		{
+			bench.process();
+			for(size_t channel = 0; channel < 6; ++channel)
+				channels[channel].insert(channels[channel].end(), bench.outputs()[channel].begin(),
+					bench.outputs()[channel].end());
+		}
+		std::vector<uint8_t> bytes;
+		for(const auto& channel : channels)
+		{
+			const auto* data = reinterpret_cast<const uint8_t*>(channel.data());
+			bytes.insert(bytes.end(), data, data + channel.size() * sizeof(float));
+		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the hit");
+		for(size_t channel = 0; channel < 6; ++channel)
+		{
+			float peak = 0;
+			for(const auto value : channels[channel])
+				peak = std::max(peak, std::abs(value));
+			std::printf("output %zu peak %.4f\n", channel, peak);
+		}
+	}
+
 	void run(const char* _path)
 	{
 		// Which notes on the base channel (channel 1) trigger a track, and what the firmware sends back.
@@ -362,6 +431,9 @@ int main(int argc, char** argv)
 		// --startup <folder>: boot timeline only, with a factory flash cache written to that folder.
 		if(argc > 2 && std::string(argv[1]) == "--startup")
 			startup(path, argv[2]);
+		// --hit <machine id> <file>: one hit on track 1, every output, for comparison with another engine.
+		else if(argc > 3 && std::string(argv[1]) == "--hit")
+			hit(path, static_cast<uint16_t>(std::atoi(argv[2])), argv[3]);
 		else
 			run(path);
 		return 0;
