@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -36,9 +37,10 @@ namespace
 	class Bench
 	{
 	public:
-		Bench(const char* _path, const uint32_t _latencyBlocks)
+		Bench(const char* _path, const uint32_t _latencyBlocks, const std::string& _homePath = {})
 		{
 			synthLib::DeviceCreateParams params;
+			params.homePath = _homePath;
 			require(baseLib::filesystem::readFile(params.romData, _path), "cannot read firmware");
 			require(md::RomLoader::isRomForModel(params.romData, md::MachineModel::Machinedrum),
 				"not the pinned MD firmware");
@@ -182,6 +184,90 @@ namespace
 		}
 	}
 
+	// The 128x64 LCD as text, two pixel rows per line.
+	void printLcd(md::Hardware& _hardware)
+	{
+		md::FrontPanel panel;
+		if(!_hardware.tryGetFrontPanelSnapshot(panel))
+			return;
+		const auto pixel = [&](const uint32_t _x, const uint32_t _y)
+		{
+			return (panel.getLcdVram(_x / 64, _y / 8, _x % 64) >> (_y % 8)) & 1;
+		};
+		for(uint32_t y = 0; y < 64; y += 2)
+		{
+			std::string line("      |");
+			for(uint32_t x = 0; x < 128; ++x)
+			{
+				const auto top = pixel(x, y), bottom = pixel(x, y + 1);
+				line += top && bottom ? '8' : top ? '\'' : bottom ? '.' : ' ';
+			}
+			std::printf("%s|\n", line.c_str());
+		}
+	}
+
+	// From boot: when the firmware takes MIDI, when the factory flash is ready to cache, and when a note
+	// first sounds, probing with one every 32 blocks (186 ms) if _probe.
+	void startupTimeline(Bench& _bench, const bool _probe)
+	{
+		const auto seconds = [&] { return _bench.frame() / g_rate; };
+		double midiReady = -1, cacheReady = -1, firstNote = -1;
+		const auto wallStart = std::chrono::steady_clock::now();
+		for(uint32_t block = 0; block < 172 * 60; ++block)
+		{
+			auto& hardware = _bench.hardware();
+			if(midiReady < 0 && hardware.isFirmwareMidiReady())
+				midiReady = seconds();
+			if(cacheReady < 0 && hardware.isFactoryFlashCacheReady())
+				cacheReady = seconds();
+			if(block % 172 == 0)
+				std::printf("    %.1f s: flash dirty %d, MIDI bytes taken %llu, queued %zu, LCD %016llx\n",
+					seconds(), hardware.flashDirty(), static_cast<unsigned long long>(hardware.midiRxConsumedCount()),
+					hardware.queuedMidiRxBytes(), static_cast<unsigned long long>(hardware.lcdPagesDigest(0, 7)));
+			if(_probe && block % 344 == 0 && firstNote < 0 && std::getenv("MD_TRIG_LCD"))
+				printLcd(hardware);
+			if(_probe && midiReady >= 0 && firstNote < 0 && block % 32 == 0)
+				_bench.note(0x90, 36, 100, 0);
+			std::optional<uint32_t> first;
+			_bench.process(1e-4f, first);
+			if(first && firstNote < 0)
+				firstNote = seconds();
+			if(_probe && block % 32 == 16)
+				_bench.note(0x80, 36, 0, 0);
+			if((!_probe || firstNote >= 0) && cacheReady >= 0 && midiReady >= 0)
+				break;
+		}
+		std::printf("  MIDI ready %.2f s, factory flash cacheable %.2f s, first note %.2f s (-1: never within 60 s)\n",
+			midiReady, cacheReady, firstNote);
+		const auto wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - wallStart).count();
+		std::printf("  %.2f s of audio in %.2f s of wall clock (%.2fx real time)\n", seconds(), wall, seconds() / wall);
+	}
+
+	void startup(const char* _path, const std::string& _homePath)
+	{
+		std::printf("fresh flash, no notes:\n");
+		{
+			Bench bench(_path, 0);
+			startupTimeline(bench, false);
+			const auto cache = bench.hardware().copyFactoryFlashCache();
+			require(!cache.empty(), "no factory flash cache to write");
+			const auto nvram = _homePath + "/nvram/";
+			baseLib::filesystem::createDirectory(nvram);
+			require(baseLib::filesystem::writeFile(nvram + "md-uw-1.63-factory-v2.cache", cache),
+				"cannot write the factory flash cache");
+		}
+		std::printf("fresh flash, a note every 186 ms:\n");
+		{
+			Bench bench(_path, 0);
+			startupTimeline(bench, true);
+		}
+		std::printf("factory flash from the cache, a note every 186 ms:\n");
+		{
+			Bench bench(_path, 0, _homePath);
+			startupTimeline(bench, true);
+		}
+	}
+
 	struct Stats
 	{
 		uint64_t minimum = ~0ull, maximum = 0;
@@ -262,7 +348,7 @@ namespace
 	}
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	setvbuf(stdout, nullptr, _IONBF, 0);
 	const auto* const path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");
@@ -273,7 +359,11 @@ int main()
 	}
 	try
 	{
-		run(path);
+		// --startup <folder>: boot timeline only, with a factory flash cache written to that folder.
+		if(argc > 2 && std::string(argv[1]) == "--startup")
+			startup(path, argv[2]);
+		else
+			run(path);
 		return 0;
 	}
 	catch(const std::exception& _error)
