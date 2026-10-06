@@ -3,14 +3,7 @@
 // audible sample at the plug-in's output, at each plug-in latency setting. It also reports which notes
 // sound, what the firmware sends back, and whether the velocity changes the level.
 
-#include "mdLib/mdautomation.h"
-#include "mdLib/mddevice.h"
-#include "mdLib/mdsysexautomation.h"
-#include "mdLib/mdromloader.h"
-#include "mdLib/mdtypes.h"
-
-#include "baseLib/filesystem.h"
-#include "synthLib/plugin.h"
+#include "firmwareBench.h"
 
 #include <algorithm>
 #include <array>
@@ -27,172 +20,7 @@
 
 namespace
 {
-	void require(const bool _condition, const char* const _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
-
-	constexpr uint32_t g_block = 256;
-	constexpr float g_rate = 44100.0f;
-
-	class Bench
-	{
-	public:
-		Bench(const char* _path, const uint32_t _latencyBlocks, const std::string& _homePath = {})
-		{
-			synthLib::DeviceCreateParams params;
-			params.homePath = _homePath;
-			require(baseLib::filesystem::readFile(params.romData, _path), "cannot read firmware");
-			require(md::RomLoader::isRomForModel(params.romData, md::MachineModel::Machinedrum),
-				"not the pinned MD firmware");
-			params.romName = _path;
-			params.customData = md::deviceCustomData(md::MachineModel::Machinedrum);
-			m_device = std::make_unique<md::Device>(params);
-			require(m_device->isValid(), "invalid device");
-			m_plugin = std::make_unique<synthLib::Plugin>(m_device.get(), [](synthLib::Device*) {});
-			m_plugin->reserveMidiEventCapacity();
-			m_plugin->setHostSamplerate(g_rate, g_rate);
-			m_plugin->setBlockSize(g_block);
-			m_plugin->setLatencyBlocks(_latencyBlocks);
-			// Offline: the render thread is waited for, so a block it has not delivered yet never plays as
-			// silence. This measures the machine's own delay, not whether a CPU keeps up.
-			m_plugin->setHostRealtime(false);
-
-			for(size_t channel = 0; channel < m_outputs.size(); ++channel)
-				m_outs[channel] = m_outputs[channel].data();
-			m_ins = {m_silence[0].data(), m_silence[1].data(), nullptr, nullptr};
-		}
-
-		uint32_t reportedLatency() const { return m_plugin->getLatencyMidiToOutput(); }
-		md::Hardware& hardware() { return m_device->getHardware(); }
-
-		// One host block; returns the block's peak over all outputs and, if any sample reaches _threshold,
-		// the index of the first one.
-		float process(const float _threshold, std::optional<uint32_t>& _first)
-		{
-			m_plugin->process(m_ins, m_outs, g_block, 120.0f, 0.0f, false);
-			m_plugin->getMidiOut(m_midiOut);
-			m_midiSeen.insert(m_midiSeen.end(), m_midiOut.begin(), m_midiOut.end());
-			m_midiOut.clear();
-			float peak = 0;
-			_first.reset();
-			for(uint32_t sample = 0; sample < g_block; ++sample)
-				for(const auto& channel : m_outputs)
-				{
-					const auto value = std::abs(channel[sample]);
-					require(std::isfinite(value), "non-finite sample");
-					peak = std::max(peak, value);
-					if(!_first && value >= _threshold)
-						_first = sample;
-				}
-			m_frame += g_block;
-			return peak;
-		}
-
-		float process()
-		{
-			std::optional<uint32_t> first;
-			return process(2.0f, first);
-		}
-
-		void note(const uint8_t _status, const uint8_t _note, const uint8_t _velocity, const uint32_t _offset)
-		{
-			m_plugin->addMidiEvent({synthLib::MidiEventSource::Host, _status, _note, _velocity, _offset});
-		}
-
-		void sysex(const std::vector<uint8_t>& _message)
-		{
-			synthLib::SMidiEvent event(synthLib::MidiEventSource::Host);
-			event.sysex.assign(_message.begin(), _message.end());
-			m_plugin->addMidiEvent(event);
-		}
-
-		const std::array<std::array<float, g_block>, 6>& outputs() const { return m_outputs; }
-		uint64_t frame() const { return m_frame; }
-		std::vector<synthLib::SMidiEvent>& midiSeen() { return m_midiSeen; }
-
-	private:
-		std::unique_ptr<md::Device> m_device;
-		std::unique_ptr<synthLib::Plugin> m_plugin;
-		std::array<std::array<float, g_block>, 6> m_outputs{};
-		std::array<std::array<float, g_block>, 2> m_silence{};
-		synthLib::TAudioOutputs m_outs{};
-		synthLib::TAudioInputs m_ins{};
-		std::vector<synthLib::SMidiEvent> m_midiOut, m_midiSeen;
-		uint64_t m_frame = 0;
-	};
-
-	struct Hit
-	{
-		bool sounded = false;
-		uint64_t latency = 0;	// samples from the note to the first audible sample
-		float peak = 0;
-	};
-
-	// Waits for silence, plays the note at _offset in the next block and follows it for up to a second.
-	Hit play(Bench& _bench, const float _threshold, const uint8_t _status, const uint8_t _note,
-		const uint8_t _velocity, const uint32_t _offset)
-	{
-		uint32_t quiet = 0;
-		for(uint32_t block = 0; quiet < 16 && block < 2000; ++block)
-			quiet = _bench.process() < _threshold ? quiet + 1 : 0;
-		require(quiet >= 16, "the machine never fell silent");
-
-		const auto at = _bench.frame() + _offset;
-		_bench.note(_status, _note, _velocity, _offset);
-		Hit hit;
-		for(uint32_t block = 0; block < 172; ++block)
-		{
-			std::optional<uint32_t> first;
-			const auto start = _bench.frame();
-			const auto peak = _bench.process(_threshold, first);
-			if(first && !hit.sounded)
-			{
-				hit.sounded = true;
-				hit.latency = start + *first - at;
-			}
-			hit.peak = std::max(hit.peak, peak);
-		}
-		_bench.note(static_cast<uint8_t>(0x80 | (_status & 0x0f)), _note, 0, 0);
-		return hit;
-	}
-
-	float boot(Bench& _bench)
-	{
-		for(uint32_t block = 0; !_bench.hardware().isFirmwareMidiReady(); ++block)
-		{
-			require(block < 172 * 60, "firmware not ready for MIDI within 60 s of audio");
-			_bench.process();
-		}
-		std::printf("MIDI ready %.2f s of audio after boot\n", _bench.frame() / g_rate);
-		// Settle, then take the idle floor.
-		float floor = 0;
-		for(uint32_t block = 0; block < 172 * 2; ++block)
-		{
-			const auto peak = _bench.process();
-			if(block >= 172)
-				floor = std::max(floor, peak);
-		}
-		_bench.midiSeen().clear();
-		return floor;
-	}
-
-	// The firmware reports MIDI ready seconds before a note plays: probe until one does.
-	float bootUntilNotesPlay(Bench& _bench)
-	{
-		const auto floor = boot(_bench);
-		const auto threshold = std::max(1e-4f, floor * 8.0f);
-		for(uint32_t probe = 0; ; ++probe)
-		{
-			require(probe < 60, "no note played within a minute of MIDI ready");
-			if(play(_bench, threshold, 0x90, 36, 100, 0).sounded)
-			{
-				std::printf("first note played %.2f s of audio after boot\n", _bench.frame() / g_rate);
-				return floor;
-			}
-		}
-	}
+	using namespace mdFirmwareBench;
 
 	// The 128x64 LCD as text, two pixel rows per line.
 	void printLcd(md::Hardware& _hardware)
@@ -292,63 +120,39 @@ namespace
 		}
 	};
 
-	// The 24 track parameters a comparison hit plays with: SYN1-8, then AMD AMF EQF EQG FLTF FLTW FLTQ SRR, then
-	// DIST VOL PAN DEL REV LFOS LFOD LFOM. The other engine sets the same values.
-	constexpr std::array<uint8_t, 24> g_hitParameters{64, 64, 64, 64, 64, 64, 64, 64, 0, 0, 64, 64, 0, 127, 0, 0,
-		0, 100, 64, 0, 0, 0, 0, 0};
-
-	// One hit of _machine on track 1, routed to output A (no master effects), velocity 100: writes a second of
-	// every output channel from the note on, as raw 32-bit floats, channel after channel, to _file.
-	void hit(const char* _path, const uint16_t _machine, const std::string& _file)
+	// One hit of each machine, one after the other on one booted machine, the n-th on track n + 2 so that no voice
+	// has played before (see recordHit; the boot probes track 1): writes, for each, its id, its track (0-15), its
+	// sample count and a second of output A from the note on (three 32-bit unsigned, then 32-bit floats;
+	// little-endian), the reference mdEngineFirmwareTest compares the engines with.
+	void hits(const char* _path, const std::string& _file, const std::vector<uint16_t>& _machines)
 	{
 		Bench bench(_path, 0);
-		const auto floor = bootUntilNotesPlay(bench);
-		const auto threshold = std::max(1e-4f, floor * 8.0f);
-		using namespace md::automation;
-		const auto routing = sysex::trackRouting(0, sysex::TrackOutput::A);
-		const auto machine = sysex::assignMachine(md::MachineModel::Machinedrum, 0, _machine);
-		require(routing && machine, "no routing or machine message");
-		bench.sysex(std::vector<uint8_t>(routing->begin(), routing->end()));
-		bench.sysex(std::vector<uint8_t>(machine->begin(), machine->end()));
-		for(uint32_t block = 0; block < 86; ++block)
-			bench.process();
-		for(uint8_t parameter = 0; parameter < g_hitParameters.size(); ++parameter)
-		{
-			const auto cc = encodeParameterChange(md::MachineModel::Machinedrum,
-				{static_cast<uint8_t>(parameter / 8), 0, static_cast<uint8_t>(parameter % 8), g_hitParameters[parameter]}, 0);
-			require(cc.has_value(), "no CC for a track parameter");
-			bench.note((*cc)[0], (*cc)[1], (*cc)[2], 0);
-		}
-		// Let the smoothing settle, then wait for silence.
-		uint32_t quiet = 0;
-		for(uint32_t block = 0; block < 172 || quiet < 16; ++block)
-		{
-			require(block < 172 * 10, "the machine never fell silent");
-			quiet = bench.process() < threshold ? quiet + 1 : 0;
-		}
-		bench.note(0x90, 36, 100, 0);
-		std::vector<std::vector<float>> channels(6);
-		for(uint32_t block = 0; block < 172; ++block)
-		{
-			bench.process();
-			for(size_t channel = 0; channel < 6; ++channel)
-				channels[channel].insert(channels[channel].end(), bench.outputs()[channel].begin(),
-					bench.outputs()[channel].end());
-		}
+		const auto threshold = std::max(1e-4f, bootUntilNotesPlay(bench) * 8.0f);
 		std::vector<uint8_t> bytes;
-		for(const auto& channel : channels)
+		const auto append = [&](const void* _data, const size_t _size)
 		{
-			const auto* data = reinterpret_cast<const uint8_t*>(channel.data());
-			bytes.insert(bytes.end(), data, data + channel.size() * sizeof(float));
-		}
-		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the hit");
-		for(size_t channel = 0; channel < 6; ++channel)
+			const auto* data = static_cast<const uint8_t*>(_data);
+			bytes.insert(bytes.end(), data, data + _size);
+		};
+		require(_machines.size() < 16, "more machines than fresh tracks");
+		for(size_t i = 0; i < _machines.size(); ++i)
 		{
-			float peak = 0;
-			for(const auto value : channels[channel])
-				peak = std::max(peak, std::abs(value));
-			std::printf("output %zu peak %.4f\n", channel, peak);
+			const auto track = static_cast<uint8_t>(i + 1);
+			const auto channels = recordHit(bench, threshold, _machines[i], track);
+			const uint32_t id = _machines[i], trackIndex = track, count = static_cast<uint32_t>(channels[0].size());
+			append(&id, sizeof(id));
+			append(&trackIndex, sizeof(trackIndex));
+			append(&count, sizeof(count));
+			append(channels[0].data(), channels[0].size() * sizeof(float));
+			for(size_t channel = 0; channel < channels.size(); ++channel)
+			{
+				float peak = 0;
+				for(const auto value : channels[channel])
+					peak = std::max(peak, std::abs(value));
+				std::printf("machine %u output %zu peak %.4f\n", id, channel, peak);
+			}
 		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the hits");
 	}
 
 	void run(const char* _path)
@@ -390,7 +194,8 @@ namespace
 				if(hit.sounded)
 					stats.add(hit.latency);
 				else
-					++silent;			}
+					++silent;
+			}
 			const auto reported = bench.reportedLatency();
 			std::printf("latencyBlocks %u (reported %u): %u hits, %u silent, latency min %llu max %llu mean %.1f "
 				"samples, beyond reported min %lld (%.2f ms), jitter %llu (%.2f ms)\n",
@@ -431,9 +236,14 @@ int main(int argc, char** argv)
 		// --startup <folder>: boot timeline only, with a factory flash cache written to that folder.
 		if(argc > 2 && std::string(argv[1]) == "--startup")
 			startup(path, argv[2]);
-		// --hit <machine id> <file>: one hit on track 1, every output, for comparison with another engine.
-		else if(argc > 3 && std::string(argv[1]) == "--hit")
-			hit(path, static_cast<uint16_t>(std::atoi(argv[2])), argv[3]);
+		// --hits <file> <machine id>...: one hit of each machine on track 1, for comparison with another engine.
+		else if(argc > 3 && std::string(argv[1]) == "--hits")
+		{
+			std::vector<uint16_t> machines;
+			for(int i = 3; i < argc; ++i)
+				machines.push_back(static_cast<uint16_t>(std::atoi(argv[i])));
+			hits(path, argv[2], machines);
+		}
 		else
 			run(path);
 		return 0;

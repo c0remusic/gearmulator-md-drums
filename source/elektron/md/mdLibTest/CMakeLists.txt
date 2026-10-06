@@ -318,9 +318,23 @@ set_tests_properties(mdAudioFirmwareTest PROPERTIES
 set_property(TARGET mdAudioFirmwareTest PROPERTY FOLDER "Elektron/test")
 
 # Measurement, not a gate: run by hand to report note-to-sound latency, jitter, the note map and velocity.
-add_executable(mdTrigLatencyFirmwareTest trigLatencyFirmwareTest.cpp)
+add_executable(mdTrigLatencyFirmwareTest trigLatencyFirmwareTest.cpp firmwareBench.h hitParameters.h)
 target_link_libraries(mdTrigLatencyFirmwareTest PRIVATE mdLib)
 set_property(TARGET mdTrigLatencyFirmwareTest PROPERTY FOLDER "Elektron/test")
+
+# The engines without the ColdFire OS against the full firmware. Two processes: Musashi's entry points serve one
+# CPU class per executable, so the firmware records its hits first (keep the ids in step with g_hitMachines in
+# hitParameters.h) and the engine test compares them.
+add_executable(mdEngineFirmwareTest engineFirmwareTest.cpp hitParameters.h)
+target_link_libraries(mdEngineFirmwareTest PRIVATE mdEngine)
+set(MD_ENGINE_HITS "${CMAKE_CURRENT_BINARY_DIR}/mdEngineFirmwareHits.bin")
+add_test(NAME mdEngineFirmwareHits COMMAND mdTrigLatencyFirmwareTest --hits ${MD_ENGINE_HITS} 16 17 37 66)
+add_test(NAME mdEngineFirmwareTest COMMAND mdEngineFirmwareTest ${MD_ENGINE_HITS})
+set_tests_properties(mdEngineFirmwareHits PROPERTIES
+	LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 300 FIXTURES_SETUP MdEngineHits)
+set_tests_properties(mdEngineFirmwareTest PROPERTIES
+	LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 120 FIXTURES_REQUIRED MdEngineHits)
+set_property(TARGET mdEngineFirmwareTest PROPERTY FOLDER "Elektron/test")
 
 add_executable(mdTransportScorecardTest transportScorecardTest.cpp)
 target_link_libraries(mdTransportScorecardTest PRIVATE mdLib)

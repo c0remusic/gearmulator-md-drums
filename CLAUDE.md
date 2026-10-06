@@ -10,7 +10,7 @@ The TUS architecture, with OsTIrus as the reference (`osTIrusJucePlugin/` over `
 
 **Latency** is a requirement, measured rather than assumed: the time from a host note to the sound at the plug-in's output, and its jitter. A change to the trig path or the render pipeline reports both, before and after.
 
-The plug-in drives the intact firmware over MIDI: notes trigger tracks, host parameters reach it as CC, Kits travel as SysEx, and the editor is a layer over those protocols. Engines without the UC were ruled out in `.scratch/parallel-transport/issues/07-go-no-go.md` on CPU and effort: the sequencer costs about 6 points of UC, dropping the UC leaves DSP1 (the busiest core) as heavy, and the DSPs' HI08 protocol would need reverse engineering machine by machine. **That question is open again (2026-10-06).** The protocol is now documented in public, and Machinemodule (sd88me, AGPL-3.0) runs OS 1.63's engines without the OS: DSP2 emulated, the OS's own machine, LFO and smoothing routines called in a 68k emulator, DSP1's track chain and mix in C++. Their documentation is in `.scratch/uc-less-engines/`. The full firmware also costs a silent boot of about 14 s before a note plays (logos, then LOADING SAMPLES). Decide the architecture before building on either.
+The plug-in drives the intact firmware over MIDI: notes trigger tracks, host parameters reach it as CC, Kits travel as SysEx, and the editor is a layer over those protocols. Engines without the UC were ruled out in `.scratch/parallel-transport/issues/07-go-no-go.md` on CPU and effort: the sequencer costs about 6 points of UC, dropping the UC leaves DSP1 (the busiest core) as heavy, and the DSPs' HI08 protocol would need reverse engineering machine by machine. **Decided otherwise on 2026-10-06: the plug-in moves to the engines without the OS.** The protocol is now documented in public (`.scratch/uc-less-engines/`), and Machinemodule's engine (sd88me, AGPL-3.0), imported as `source/elektron/md/mdEngine/`, runs OS 1.63's engines without it: DSP2 emulated, the OS's own machine, LFO and smoothing routines called in a 68k emulator, DSP1's track chain and mix in C++. Measured against the full firmware: the same samples (`mdEngineFirmwareTest`), about a tenth of the CPU, 0.48 ms of note-to-sound latency against ~5.4 ms, and no 14 s silent boot. The combined work is AGPL v3 (`NOTICE.md`). Master effects come later; the plug-in still runs the full firmware until the engine is wired in.
 
 The repository split on 2026-10-06 from [c0remusic/gearmulator-md-mm](https://github.com/c0remusic/gearmulator-md-mm), which keeps the full-machine plug-ins (sequencer editor, BIBLIO's patterns, pattern chains). The Monomachine is out of this project: its plug-in, tests and code paths may go, and nothing here maintains them. The other Gearmulator synths stay out of the build.
 
@@ -25,6 +25,7 @@ The repository split on 2026-10-06 from [c0remusic/gearmulator-md-mm](https://gi
 
 ## Where things are
 
+- `source/elektron/md/mdEngine/`: the engines without the OS (`EngineT` in `engine/MdEngine.h`), with its origin and local changes in `README.md`. Musashi's entry points serve one CPU class per executable, so nothing links it with `mdLib`'s `Microcontroller`: tests that compare the two run in separate processes.
 - `source/elektron/md/mdLib/`: the machine. `mdhardware.*` runs the UC and the DSPs and delivers MIDI and panel events; `mddevice.*` is the `synthLib::Device`; `mdautomation.*` maps host parameters to CC; `mdsysexautomation.*` holds the SysEx codecs (Kits, patterns, `$5B`, master effects).
 - `source/elektron/md/mdJucePlugin/`: the plug-in. `mdPluginProcessor.*`, `mdController.*` (parameters and SysEx traffic), `mdEditor.*` and its views, `parameterDescriptions_md.json`, skins in `skins/mdDefault/`.
 - Tests: firmware and protocol tests in `mdLibTest/`, plug-in tests as `mdJucePlugin/*Test.cpp`.
@@ -73,13 +74,13 @@ $rom = "$env:LOCALAPPDATA\Programs\Gearmulator-Elektron"
 $env:GEARMULATOR_MD_FIRMWARE_BIN = "$rom\elektron_sps1-1uw_os1.63.bin"
 $env:GEARMULATOR_MM_FIRMWARE_BIN = "$rom\elektron_sfx6-60_os1.32b.bin"
 $env:MD_AUTOMATION_REQUIRE_FIRMWARE = "1"
-cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest
+cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest mdTrigLatencyFirmwareTest mdEngineFirmwareTest
 Copy-Item "$rom\*.bin" temp\cmake_vs22\source\elektron\md\mdJucePlugin\Release
 cd temp\cmake_vs22
-ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest)$"
+ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest|mdEngineFirmwareTest)$"
 ```
 
-Green is 17 passed out of 17 in about 85 s: ctest adds the 7 fixture tests these require.
+Green is 19 passed out of 19 in about 210 s: ctest adds the 8 fixture tests these require (`mdEngineFirmwareHits` boots the firmware to record the hits `mdEngineFirmwareTest` compares the engine with).
 
 Both ROMs are required. A firmware test exits 77 without its ROM and ctest reports it Skipped, which proves nothing:
 - Most firmware tests read the two variables; the timing tests check the Monomachine as well.

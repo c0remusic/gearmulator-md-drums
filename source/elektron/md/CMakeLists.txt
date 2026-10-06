@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 add_subdirectory(mdLib)
+add_subdirectory(mdEngine)
 
 if(BUILD_TESTING)
 	add_subdirectory(mdLibTest)

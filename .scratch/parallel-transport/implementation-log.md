@@ -1146,6 +1146,12 @@ dans `C:\dev\mpc-vst-machinedrum-os\`.
   dixième de dB jusqu'à −100 dB. Un gain constant les sépare : firmware = Machinemodule × 1,2541
   (+1,97 dB), étage de sortie à identifier. La divergence TRX-SD signalée par sd88me est entre
   forks `dsp56300` : avec le nôtre, elle disparaît.
+- **Gain expliqué** (même jour, `mdEngineFirmwareTest` dans `mdEngine`) : c'était le niveau de piste
+  (LEV) du Kit de démarrage, différent sur chaque piste. Niveau réglé à 100 des deux côtés : TRX-BD,
+  TRX-SD, EFM-CB et P-I-MT, chacun sur une piste neuve, corrélation 1,000000, gain 1,0000, résidus
+  −99 à −110 dB. Une voix garde l'état de son bruit d'une frappe à l'autre, et le moteur cesse de
+  rendre une voix éteinte que le firmware continue de faire tourner : la deuxième frappe d'une
+  machine bruitée sur une même piste diffère (corrélation 0,08 pour TRX-SD après TRX-BD).
 
 ## Leçons dures
 
