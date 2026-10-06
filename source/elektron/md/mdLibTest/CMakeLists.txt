@@ -317,6 +317,11 @@ set_tests_properties(mdAudioFirmwareTest PROPERTIES
 
 set_property(TARGET mdAudioFirmwareTest PROPERTY FOLDER "Elektron/test")
 
+# Measurement, not a gate: run by hand to report note-to-sound latency, jitter, the note map and velocity.
+add_executable(mdTrigLatencyFirmwareTest trigLatencyFirmwareTest.cpp)
+target_link_libraries(mdTrigLatencyFirmwareTest PRIVATE mdLib)
+set_property(TARGET mdTrigLatencyFirmwareTest PROPERTY FOLDER "Elektron/test")
+
 add_executable(mdTransportScorecardTest transportScorecardTest.cpp)
 target_link_libraries(mdTransportScorecardTest PRIVATE mdLib)
 add_test(NAME mdTransportScorecardTest COMMAND mdTransportScorecardTest)

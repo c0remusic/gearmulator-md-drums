@@ -145,13 +145,13 @@ namespace
 		return bytes;
 	}
 
-	void deviceAdmission(md::Device& _device, bool _panel, uint32_t _offset,
+	void deviceAdmission(md::Device& _device, uint32_t _offset,
 		uint32_t _extraLatency, uint64_t _frame)
 	{
 		auto& hardware = _device.getHardware();
 		Access::frame(hardware, _frame);
 		_device.setExtraLatencySamples(_extraLatency);
-		const SMidiEvent note(MidiEventSource::Host, 0x90, _panel ? 36 : 60, 100, _offset);
+		const SMidiEvent note(MidiEventSource::Host, 0x90, 60, 100, _offset);
 		std::vector<SMidiEvent> output;
 		// The real Device translation/routing path admits events before a native
 		// block. A zero-length block isolates admission without running firmware.
@@ -161,13 +161,12 @@ namespace
 		require(expected > 0, "test must exercise a nonzero deadline");
 		Access::pump(hardware, expected - 1);
 		require(drain(hardware, false).empty() && drain(hardware, true).empty(),
-			"Device delivered MIDI/pad input before its sample deadline");
+			"Device delivered MIDI input before its sample deadline");
 		require(Access::pending(hardware) == 1, "future event was lost");
 		Access::pump(hardware, expected);
-		const std::vector<uint8_t> bytes = _panel ? std::vector<uint8_t>{0x20, 1, 0x20, 0}
-			: std::vector<uint8_t>{0x90, 60, 100};
-		require(drain(hardware, _panel) == bytes, "deadline delivery changed UART bytes");
-		require(drain(hardware, !_panel).empty(), "event reached the wrong UART");
+		require(drain(hardware, false) == std::vector<uint8_t>({0x90, 60, 100}),
+			"deadline delivery changed UART bytes");
+		require(drain(hardware, true).empty(), "event reached the panel UART");
 		require(Access::pending(hardware) == 0, "delivered event was retained");
 	}
 
@@ -264,7 +263,7 @@ namespace
 		}
 	}
 
-	void pressureAndArbitration(md::Device& _device, bool _panel)
+	void pressureAndArbitration(md::Device& _device)
 	{
 		auto& hardware = _device.getHardware();
 		Access::frame(hardware, 0);
@@ -273,22 +272,18 @@ namespace
 		std::vector<uint8_t> expected, actual;
 		for(unsigned i=0;i<16384;++i)
 		{
-			const uint8_t first = _panel ? 36 + i % 16 : i % 128;
-			const uint8_t second = _panel ? 100 : (i / 128) % 128;
-			require(hardware.scheduleMidi({MidiEventSource::Host,
-				static_cast<uint8_t>(_panel ? 0x90 : 0xb0), first, second}, 0),
+			const uint8_t first = i % 128;
+			const uint8_t second = (i / 128) % 128;
+			require(hardware.scheduleMidi({MidiEventSource::Host, 0xb0, first, second}, 0),
 				"production scheduled queue filled before its advertised capacity");
-			if(_panel) {
-				const uint8_t row = 0x20 + (first-36)/8, mask = 1u << ((first-36)%8);
-				expected.insert(expected.end(), {row,mask,row,0});
-			} else expected.insert(expected.end(), {0xb0,first,second});
+			expected.insert(expected.end(), {0xb0,first,second});
 		}
 		require(!hardware.scheduleMidi({MidiEventSource::Host,0xf8},0),
 			"production scheduled queue accepted an event beyond capacity");
 		require(Access::overflow(hardware) == oldOverflow+1, "overflow was not counted");
 		for(unsigned n=0;n<1024 && actual.size()<expected.size();++n) {
 			Access::pump(hardware,0);
-			auto chunk=drain(hardware,_panel);
+			auto chunk=drain(hardware,false);
 			actual.insert(actual.end(),chunk.begin(),chunk.end());
 		}
 		require(actual == expected && Access::pending(hardware) == 0,
@@ -358,11 +353,11 @@ namespace
 			for(const auto frame : {uint64_t{0}, uint64_t{44100} * 86400 * 2})
 				for(const auto offset : {1u, 63u, 127u, 255u, 511u, 16385u})
 					for(const auto delay : {0u, 128u, 512u})
-						deviceAdmission(*device, model == md::MachineModel::Machinedrum, offset, delay, frame);
+						deviceAdmission(*device, offset, delay, frame);
 			latencyTransitions(plugin, *device);
 			if(model == md::MachineModel::Monomachine)
 				orderedMessages(*device);
-			pressureAndArbitration(*device, model == md::MachineModel::Machinedrum);
+			pressureAndArbitration(*device);
 			uartOutputTimestamp(*device);
 		}
 		return true;

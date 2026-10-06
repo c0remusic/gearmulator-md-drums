@@ -1088,6 +1088,39 @@ menées : HDI08 servi seulement à l'arrivée d'un mot hôte (1 à 2 points,
 invasif), chemin court DMA pour les transferts d'un mot déclenchés par ESSI
 (~1 point), coût fixe par rattrapage (ci-dessus).
 
+## Note de l'hôte vers son : entrée MIDI du firmware (md-drums, 2026-10-06)
+
+Les notes 36–51 ne sont plus converties en appuis TRIG : toute note de l'hôte
+va à l'entrée MIDI du firmware (`Hardware::pumpScheduledMidi`). Mesuré avec
+`mdTrigLatencyFirmwareTest` (outil manuel, pas dans la gate), MD 1.63, 44,1 kHz,
+blocs de 256, rendu hors temps réel (`setHostRealtime(false)` : mesure le délai
+de la machine, pas la tenue CPU), 48 notes 36 à des positions aléatoires dans le bloc.
+
+| latencyBlocks | rapporté | min | max | moyenne | au-delà du rapporté (min) | gigue |
+|---|---|---|---|---|---|---|
+| 0 | 0 | 164 | 310 | 239,6 | 164 (3,72 ms) | 146 (3,31 ms) |
+| 1 | 256 | 406 | 560 | 489,0 | 150 (3,40 ms) | 154 (3,49 ms) |
+| 2 | 512 | 690 | 816 | 747,6 | 178 (4,04 ms) | 126 (2,86 ms) |
+| 4 | 1024 | 1181 | 1325 | 1259,6 | 157 (3,56 ms) | 144 (3,27 ms) |
+
+(échantillons). Le délai propre du firmware ne dépend pas du réglage : 3,4–4,0 ms
+au minimum, ~5,4 ms en moyenne, gigue ~3 ms. La position de la note dans le
+bloc est respectée (latence et décalage varient ensemble), mais l'attaque tombe
+sur une grille de 32 échantillons à partir du début du bloc : le reste de la
+gigue (~4–5 pas de grille) vient du firmware, à creuser (tick de traitement du
+MIDI reçu côté UC ?).
+
+- **Table de notes** (canal de base, canal 1) : 36 38 40 41 43 45 47 48 50 52
+  53 55 57 59 60 62, touches blanches de C2 à D4, une par piste. Les touches
+  noires entre elles ne sonnent pas. Une note ≥ 64 a été suivie, à la première
+  mesure, d'une rafale de notes émises par le firmware (accents 127/95), comme
+  un pattern qui joue : à vérifier avant de laisser passer ces notes.
+- **Vélocité** : module le niveau, à peu près linéairement (pic 0,221 à 127,
+  0,174 à 100, 0,112 à 64, 0,056 à 32, 0,014 à 8, piste 1 du Kit d'usine).
+- **Démarrage** : `isFirmwareMidiReady()` vrai à 2,3 s d'audio, mais les notes
+  restent muettes jusqu'à ~16,3 s (sonde d'une note par seconde). Dans Live,
+  le plug-in serait sourd ~14 s après chargement : cause à trouver.
+
 ## Leçons dures
 
 - PowerShell 7.6 : `[Environment]::SetEnvironmentVariable($v, $null)` crée

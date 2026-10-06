@@ -3771,40 +3771,11 @@ namespace md
 	{
 		while(m_scheduledMidi.ready(m_schedUcCyclesDone))
 		{
-			const auto& event = m_scheduledMidi.front().event;
-			const auto type = static_cast<uint8_t>(event.a & 0xf0);
-			const bool pad = !isMonomachine() && event.sysex.empty()
-				&& (type == synthLib::M_NOTEON || type == synthLib::M_NOTEOFF)
-				&& event.b >= 36 && event.b <= 51;
-			if(pad)
-			{
-				if(type == synthLib::M_NOTEON && event.c != 0)
-				{
-					// Admit a complete press/release pulse, retaining it if UART2 is
-					// full. Host notes must not be coalesced into a UI row snapshot.
-					if(m_uc.availablePanelRxBytes() < 4)
-						return;
-					const auto padIndex = static_cast<uint8_t>(event.b - 36);
-					const auto row = static_cast<uint8_t>(0x20 + (padIndex >> 3));
-					const auto mask = static_cast<uint8_t>(1u << (padIndex & 7));
-					m_uc.queuePanelRx(row);
-					m_uc.queuePanelRx(mask);
-					m_uc.queuePanelRx(row);
-					m_uc.queuePanelRx(0);
-					synthLib::RealtimeInstrumentation::recordCurrentPanelDelivery(
-						static_cast<uint32_t>(m_model), row, mask);
-					synthLib::RealtimeInstrumentation::recordCurrentPanelDelivery(
-						static_cast<uint32_t>(m_model), row, 0);
-				}
-			}
-			else
-			{
-				// Both this producer and Device/control callers hold the owning
-				// Plugin lock. Do not enter the blocking ring operation when full.
-				if(m_midiIn.full())
-					return;
-				m_midiIn.push_back(event);
-			}
+			// Both this producer and Device/control callers hold the owning
+			// Plugin lock. Do not enter the blocking ring operation when full.
+			if(m_midiIn.full())
+				return;
+			m_midiIn.push_back(m_scheduledMidi.front().event);
 			m_scheduledMidi.pop();
 		}
 	}
