@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v20</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v20-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.5 "Inter", system-ui, sans-serif; --s: 1; --u: 1; }
+	@media (max-width: 1340px) { body { --s: 0.85; } }
+	@media (max-width: 1140px) { body { --s: 0.68; } }
+	@media (max-width: 900px) { body { --s: 0.5; } }
+	@media (max-width: 640px) { body { --s: 0.28; } }
+	header.intro { padding: 18px 28px 10px; max-width: 1200px; }
+	header.intro h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	header.intro p { margin: 2px 0; color: #a3a6ab; }
+	.controls { display: flex; gap: 6px; margin: 10px 0 2px; flex-wrap: wrap; align-items: center; }
+	.controls span { color: #8e9197; font-size: 12px; margin: 0 4px 0 10px; }
+	.controls button { background: none; color: #d8d6d0; border: 1px solid #3a3c40; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+	.controls button:focus-visible { outline: 1px solid #6fd1c4; outline-offset: 2px; }
+	.controls button.on { background: #6fd1c4; color: #10201e; border-color: #6fd1c4; }
+	.viewport { margin: 0 28px 28px; width: calc(1280px * var(--s) * var(--u)); height: calc(800px * var(--s) * var(--u)); overflow: hidden; border: 1px solid #333; }
+	.frame { width: 1280px; height: 800px; transform: scale(calc(var(--s) * var(--u))); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header class="intro">
+	<h1>MD Drums v20</h1>
+	<p>v19 posé sur une vraie grille de colonnes, comme Figma : 16 colonnes de 64 px, gouttières de 16 px, marges de 8 px, ligne de base de 8 px. Chaque élément est une boîte dont les bords tombent sur des bords de colonne (« Afficher la grille » les montre). Plug-in en anglais. L'écran SYN dessine la vraie frappe de chaque machine, rendue par le moteur.</p>
+	<p>Plus de barre de raccourcis en bas : ils sont dans les infobulles, et les bandes prennent sa hauteur. Flèches (4 places) et play (3) se choisissent ci-dessous, ou côte à côte dans v20-var-head.html. Cible du LFO : clic sur son nom (menu sur tout l'écran LFO) ou ASSIGN puis clic sur n'importe quel bouton.</p>
+	<div class="controls">
+		<button id="demo">Jouer le motif de démo</button>
+		<button id="grid">Afficher la grille</button>
+		<span>Flèches</span><button data-a="ends">Aux bouts</button><button data-a="stepper">Stepper</button><button data-a="caption" class="on">Légende · pistes</button><button data-a="wheel">Molette</button>
+		<span>Play</span><button data-p="key" class="on">Touche + vélocité</button><button data-p="screen">Écran</button><button data-p="list">Liste + Espace</button>
+	</div>
+</header>
+<div class="viewport"><div class="frame" data-view="TRACK" data-arrows="caption" data-play="key" data-font="'Inter', sans-serif"></div></div>
+
+<script src="v6-machines.js"></script>
+<script src="v20-hits.js"></script>
+<script src="v20-ui.js"></script>
+<script>
+	const demo = document.getElementById("demo"), grid = document.getElementById("grid"), frame = document.querySelector(".frame");
+	demo.addEventListener("click", () => {
+		const on = !demo.classList.contains("on");
+		demo.classList.toggle("on", on);
+		demo.textContent = on ? "Arrêter le motif" : "Jouer le motif de démo";
+		MD.setDemo(on);
+	});
+	grid.addEventListener("click", () => { grid.classList.toggle("on"); MD.setGrid(grid.classList.contains("on")); });
+	// Each row of buttons sets one of the frame's choices: data-a its arrows, data-p its play control.
+	for(const [attr, key] of [["data-a", "arrows"], ["data-p", "play"]])
+		document.querySelectorAll(`[${attr}]`).forEach(b => b.addEventListener("click", () => {
+			document.querySelectorAll(`[${attr}]`).forEach(x => x.classList.toggle("on", x === b));
+			frame.dataset[key] = b.getAttribute(attr); MD.renderAll();
+		}));
+	MD.onScaleChange(scale => document.body.style.setProperty("--u", scale));
+	MD.start();
+</script>
+</body>
+</html>

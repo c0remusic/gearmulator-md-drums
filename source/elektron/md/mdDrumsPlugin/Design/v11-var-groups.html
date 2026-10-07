@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v11, groupes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v11-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.5 "Inter", system-ui, sans-serif; }
+	header.intro { padding: 18px 24px 6px; max-width: 1200px; }
+	header.intro h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	header.intro p { margin: 2px 0; color: #a3a6ab; }
+	.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(640px, 1fr)); gap: 20px 24px; padding: 12px 24px 28px; }
+	.option h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #f2f2f2; }
+	.option h2 span { font-weight: 400; color: #a3a6ab; margin-left: 8px; }
+	/* Each option shows the pages from just over their titles to just under their second row of values:
+	   x 240-1280, y 150-470 of the 1280 x 760 window, scaled to the column's width. */
+	.crop { width: 100%; height: calc(320px * var(--k, 1)); overflow: hidden; border: 1px solid #333; }
+	.crop .frame { width: 1280px; height: 760px; transform-origin: 0 0; transform: scale(var(--k, 1)) translate(-240px, -150px); }
+</style>
+</head>
+<body>
+<header class="intro">
+	<h1>MD Drums v11 : groupes dans les pages</h1>
+	<p>Quatre façons de montrer les groupes, le reste identique (titres de page seuls, sans texte à côté). Les quatre partagent le même état : régler un potard dans l'une le règle dans toutes.</p>
+</header>
+<div class="options">
+	<section class="option"><h2>A · Ni barres ni noms<span>trois pages identiques ; groupes lus dans les noms MD</span></h2>
+		<div class="crop"><div class="frame" data-view="PISTE" data-groups="none" data-font="'Inter', sans-serif"></div></div></section>
+	<section class="option"><h2>B · Noms sans barres<span>AM, EQ, FILTRE, CANAL, ENVOIS, LFO en petit</span></h2>
+		<div class="crop"><div class="frame" data-view="PISTE" data-groups="names" data-font="'Inter', sans-serif"></div></div></section>
+	<section class="option"><h2>C · Comme v10<span>noms et barres dans EFX et ROUTING, rien dans SYN</span></h2>
+		<div class="crop"><div class="frame" data-view="PISTE" data-groups="rules" data-font="'Inter', sans-serif"></div></div></section>
+	<section class="option"><h2>D · Barres aussi dans SYN<span>un trait sans nom sur chaque rangée de SYN</span></h2>
+		<div class="crop"><div class="frame" data-view="PISTE" data-groups="all" data-font="'Inter', sans-serif"></div></div></section>
+</div>
+
+<script src="v6-machines.js"></script>
+<script src="v11-ui.js"></script>
+<script>
+	// Scale each crop to its column: 1040 px of window per column width.
+	const fit = () => document.querySelectorAll(".crop").forEach(c => c.style.setProperty("--k", c.clientWidth / 1040));
+	addEventListener("resize", fit);
+	fit();
+	MD.start();
+</script>
+</body>
+</html>

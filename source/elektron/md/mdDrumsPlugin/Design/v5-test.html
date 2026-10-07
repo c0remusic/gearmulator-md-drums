@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v5-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.45 "Inter", system-ui, sans-serif; --s: 1; }
+	@media (max-width: 1340px) { body { --s: 0.85; } }
+	@media (max-width: 1140px) { body { --s: 0.68; } }
+	@media (max-width: 900px) { body { --s: 0.5; } }
+	header.intro { padding: 18px 28px 10px; max-width: 1200px; }
+	header.intro h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	header.intro p { margin: 2px 0; color: #8a8781; }
+	.controls { display: flex; gap: 6px; margin: 8px 0 2px; }
+	.controls button { background: none; color: #d8d6d0; border: 1px solid #3a3c40; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+	.controls button.on { background: #6fd1c4; color: #10201e; border-color: #6fd1c4; }
+	.viewport { margin: 0 28px 28px; width: calc(1280px * var(--s)); height: calc(760px * var(--s)); overflow: hidden; border: 1px solid #333; }
+	.frame { width: 1280px; height: 760px; transform: scale(var(--s)); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header class="intro">
+	<h1>MD Drums v5 : une grille, pas de cartes</h1>
+	<p>Une grille de 40 px (32 × 19 modules) porte tout : zones séparées par des filets sur ses lignes, aucun coin arrondi, aucun fond teinté. Les 8 encodeurs d'une page sur une rangée, comme sur la machine. Police : Inter.</p>
+	<p>Onglets PISTE, MIX et SORTIES cliquables ; potards et faders se tirent, double-clic pour la valeur par défaut.</p>
+	<div class="controls"><button id="grid">Afficher la grille</button></div>
+</header>
+<div class="viewport"><div class="frame" data-view="PISTE" data-font="'Inter', sans-serif"></div></div>
+
+<script src="v5-ui.js"></script>
+<script>
+	const button = document.getElementById("grid");
+	button.addEventListener("click", () => { button.classList.toggle("on"); MD.setGrid(button.classList.contains("on")); });
+	MD.start();
+</script>
+</body>
+</html>

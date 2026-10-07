@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;600;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v4-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; --s: 1; }
+	@media (max-width: 1340px) { body { --s: 0.85; } }
+	@media (max-width: 1140px) { body { --s: 0.68; } }
+	@media (max-width: 900px) { body { --s: 0.5; } }
+	header.intro { padding: 18px 28px 10px; max-width: 1200px; }
+	header.intro h1 { font-size: 20px; margin: 0 0 4px; }
+	header.intro p { margin: 2px 0; color: #8a8781; }
+	.fonts { display: flex; gap: 6px; margin: 8px 0 2px; }
+	.fonts button { background: #26272a; color: #d8d6d0; border: 1px solid #3a3c40; border-radius: 3px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+	.fonts button.on { background: #6fd1c4; color: #102624; border-color: #6fd1c4; }
+	.viewport { margin: 0 28px 28px; width: calc(1280px * var(--s)); height: calc(760px * var(--s)); overflow: hidden; border: 1px solid #333; border-radius: 6px; }
+	.frame { width: 1280px; height: 760px; transform: scale(var(--s)); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header class="intro">
+	<h1>MD Drums v4 : sorties numérotées, une seule police</h1>
+	<p>Chaque piste a sa sortie du même numéro (piste 01, sortie 01), nommée Out 01 à Out 16 dans l'hôte ; la stéréo principale s'appelle Main. MIX et SORTIES n'affichent plus que le numéro.</p>
+	<p>Onglets PISTE, MIX et SORTIES cliquables. Police essayée :</p>
+	<div class="fonts">
+		<button data-font="'Barlow Semi Condensed', sans-serif">Barlow Semi Condensed</button>
+		<button data-font="'Inter', sans-serif" class="on">Inter</button>
+		<button data-font="'JetBrains Mono', monospace">JetBrains Mono</button>
+	</div>
+</header>
+<div class="viewport"><div class="frame" data-view="PISTE" data-font="'Inter', sans-serif"></div></div>
+
+<script src="v4-ui.js"></script>
+<script>
+	document.querySelectorAll(".fonts button").forEach(button => button.addEventListener("click", () => {
+		document.querySelectorAll(".fonts button").forEach(b => b.classList.toggle("on", b === button));
+		document.querySelector(".frame").dataset.font = button.dataset.font;
+		MD.renderAll();
+	}));
+	MD.start();
+</script>
+</body>
+</html>

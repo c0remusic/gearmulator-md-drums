@@ -1,0 +1,188 @@
+/* MD Drums v20 UI: v19's arrangement placed on a column grid the way Figma lays one out: 16 columns of 64 px, 16 px
+   gutters, 8 px margins (an 80 px pitch: MIX's 16 strips are its 16 columns). Every element is a box whose sides lie on
+   column edges (inside a component, on multiples of 4); every position, size, padding and spacing is a multiple of 4,
+   across and down, and so is every text baseline. 1-2 px strokes (rules, borders, underlines) are centred on those
+   positions. Backgrounds run to the middle of a gutter or to the window's edge. The boxes are absolute (v20-ui.js
+   computes them from the columns), as the RmlUi editor will place them. In English. Where ‹ › and the play control go
+   comes in versions (the frame's data-arrows and data-play), compared in v20-var-head.html. Earlier: v19-ui.css. */
+.ui { --chrome: #1b1c1e; --surface: #26272a; --display: #151618; --line: #3a3c40; --rule: #55585e; --tick: #3c3e43;
+	--ink: #f2f2f2; --ink-dim: #a7aaaf; --ink-faint: #8e9197; --accent: #6fd1c4; --on-accent: #10201e; --mute: #ff7a5c; --track: #6e7177;
+	--wave: #a7aaaf; }
+.ui { position: relative; width: 1280px; height: 800px; background: var(--chrome); color: var(--ink); font-family: var(--font); user-select: none; overflow: hidden; }
+.ui * { font-family: inherit; box-sizing: border-box; }
+.cell, .bg, .rule { position: absolute; }
+.cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.cell.c { justify-content: center; }
+.cell.r { justify-content: flex-end; }
+.label { font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); text-transform: uppercase; line-height: 16px; }
+.value { font-size: 13px; font-variant-numeric: tabular-nums; line-height: 16px; }
+.meta { font-size: 13px; color: var(--ink-dim); line-height: 16px; }
+.meta b { font-weight: 400; color: var(--ink); }
+/* Text in the screens' column starts where the screens' titles do: 16 px inside the column's edge. */
+.inset { padding-left: 16px; }
+/* Baselines on multiples of 4 (measured with a probe on the baseline, 2026-10-07): Inter puts a 13 px line's baseline
+   1 px under the 4 px step in these boxes, a 21 px one 1 px over it, a 14 px one 1.5 px under; the text moves inside
+   its box, which stays on the grid. */
+.logo, .step.small { padding-bottom: 3px; }
+.meta.inset, .cell.value { padding-bottom: 2px; }
+/* A title and the small text after it share the title's baseline. */
+.bhead, .pvname { align-items: baseline; padding-top: 1px; }
+.step.edge { padding-top: 2px; }
+.machine.inpicker { padding-bottom: 2px; }
+.btitle, .velv { padding-top: 2px; }
+.hint { font-size: 11px; color: var(--ink-faint); line-height: 16px; }
+.hint b { color: var(--ink-dim); font-weight: 500; }
+.num { font-variant-numeric: tabular-nums; }
+[tabindex] { outline: none; cursor: pointer; }
+[tabindex]:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.bg.surface { background: var(--surface); }
+.rule { background: var(--rule); height: 1px; }
+.rule.v { width: 1px; height: auto; }
+
+/* Top bar */
+.logo { font-weight: 700; font-size: 14px; letter-spacing: 3px; }
+.logo span { color: var(--ink-dim); font-weight: 400; margin-left: 4px; }
+.tab { font-size: 12px; font-weight: 500; letter-spacing: 1.5px; color: var(--ink-dim); }
+.tab:hover, .tab.on { color: var(--ink); }
+/* The open tab's mark: under its text only, 2 px, on the top bar's edge, drawn over the bar's rule. */
+.tab { z-index: 1; }
+.tab span { align-self: stretch; display: flex; align-items: center; }
+.tab.on span { box-shadow: inset 0 -2px 0 var(--accent); }
+.outbars { display: grid; gap: 4px; align-content: center; }
+.outbars i { display: block; height: 2px; background: var(--track); position: relative; }
+.outbars i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); }
+
+/* Track list */
+.tn { font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.tn:hover, .tsel .tn { color: var(--ink); }
+.tn.trig { color: var(--accent); }
+.tm { font-size: 13px; letter-spacing: 1px; color: var(--ink-dim); }
+.tm:hover, .tsel.tm { color: var(--ink); }
+.scope canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.selbar { background: var(--accent); }
+.ui[data-playmode="list"] .tn:hover::after { content: " \25B6"; font-size: 11px; color: var(--accent); }
+.kitname { font-size: 12px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); text-transform: uppercase; }
+.kitname:hover { color: var(--ink); }
+.toggle { justify-content: center; border: 1px solid var(--track); font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+.toggle:hover { border-color: var(--ink-dim); color: var(--ink-dim); }
+.toggle.mute.on { background: var(--mute); border-color: var(--mute); color: #111; }
+.toggle.solo.on { background: var(--ink); border-color: var(--ink); color: #111; }
+
+/* Head band */
+.machine { font-size: 34px; font-weight: 400; line-height: 40px; }
+.r24, .r24 .label { line-height: 24px; }
+.machine.drop::after { content: "\25BE"; margin-left: 8px; font-size: 14px; color: var(--ink-dim); }
+.machine:hover.drop::after { color: var(--ink); }
+.step { font-size: 20px; color: var(--ink-dim); justify-content: center; }
+.step:hover { color: var(--ink); }
+.step.small { font-size: 14px; }
+/* ends: a picker with ‹ › at its two ends */
+.picker { box-shadow: inset 0 0 0 1px var(--line); }
+.machine.inpicker { font-size: 26px; }
+.step.edge { box-shadow: inset -1px 0 0 var(--line); }
+.step.edge.right { box-shadow: inset 1px 0 0 var(--line); }
+/* B: the field's underline, and the stepper docked at its right end */
+.field { box-shadow: inset 0 -1px 0 var(--rule); }
+.stepper { flex-direction: column; justify-content: center; gap: 0; }
+.stepper span { height: 16px; line-height: 16px; font-size: 11px; color: var(--ink-dim); width: 24px; text-align: center; }
+.stepper span:hover { color: var(--ink); }
+/* key: the play key at the band's right end, its velocity beside it. A hit lights its border and glyph only. */
+.velv { font-size: 21px; font-weight: 400; line-height: 32px; font-variant-numeric: tabular-nums; cursor: ns-resize; }
+.playkey { justify-content: center; border: 1px solid var(--rule); }
+.playkey path { fill: var(--ink); }
+.playkey:hover { border-color: var(--ink); }
+.playkey.trig { border-color: var(--accent); }
+.playkey.trig path { fill: var(--accent); }
+
+/* Bands */
+.btitle { font-size: 21px; font-weight: 600; letter-spacing: 1.5px; line-height: 24px; }
+.grp { gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--ink); line-height: 16px; }
+.grp::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.grp.one::after { display: none; }
+.grp.sym { gap: 0; }
+.grp.pending { color: var(--ink-faint); }
+.knob { justify-content: center; cursor: ns-resize; }
+.kl { justify-content: center; }
+.kv { justify-content: center; }
+.kl.lfo .label { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.unused { opacity: .35; cursor: default; }
+.screen { background: var(--display); box-shadow: inset 1px 0 0 var(--rule); }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.screen .stitle { position: absolute; left: 16px; right: 24px; top: 8px; height: 24px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.screen .stitle .note { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.screen .stitle [tabindex] { pointer-events: auto; color: var(--ink); font-size: 12px; letter-spacing: 1px; padding: 0 4px; }
+.screen .stitle [tabindex]:hover { background: var(--surface); }
+/* B: the hit screen plays the track */
+.screen.plays { cursor: pointer; }
+.screen.plays .playglyph { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--ink-dim); }
+.screen.plays .playglyph path { fill: var(--ink); }
+.screen.plays:hover .playglyph { border-color: var(--ink); }
+.screen.plays.trig .playglyph { border-color: var(--accent); }
+.screen.plays.trig .playglyph path { fill: var(--accent); }
+/* The LFO's target. Menu: over the LFO's screen, under its title, the 16 tracks and the chosen track's 24 parameters
+   by their names on its machine, a row per band. Assign: every knob a target, ringed. */
+.lfomenu { position: absolute; inset: 0; padding: 8px 24px 16px 16px; background: var(--display); z-index: 2; display: grid; grid-template-rows: 24px 48px 1fr; gap: 8px; pointer-events: auto; }
+.mhead { display: flex; align-items: center; gap: 8px; }
+.mhead .done { margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 1px; color: var(--accent); padding: 0 4px; }
+.mhead .done:hover { background: var(--surface); }
+.mtracks { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 24px; }
+.screen .stitle .assign { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-dim); box-shadow: inset 0 0 0 1px var(--track); height: 20px; padding: 0 8px; display: inline-flex; align-items: center; }
+.screen .stitle .assign:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-dim); background: none; }
+.screen .stitle .assign.on { color: var(--on-accent); background: var(--accent); box-shadow: none; }
+.mt, .mp { display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.mt:hover, .mp:hover { color: var(--ink); background: var(--surface); }
+.mt.on, .mp.on { background: var(--accent); color: var(--on-accent); }
+.mp.off { color: var(--track); }
+.mparams { display: grid; grid-auto-rows: 24px; gap: 0; align-content: start; }
+.mg { display: grid; grid-template-columns: 64px repeat(8, 32px); align-items: center; column-gap: 4px; }
+.knob.target { border-radius: 50%; box-shadow: 0 0 0 1px var(--accent); }
+.knob.target:hover { box-shadow: 0 0 0 2px var(--accent); }
+.lfoshapes { position: absolute; left: 16px; right: 24px; bottom: 16px; display: grid; gap: 8px; }
+.srow { display: grid; grid-template-columns: 24px repeat(6, 48px); grid-template-rows: 24px; align-items: center; gap: 0 4px; }
+.chip { height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); }
+.chip:hover { color: var(--ink); }
+.chip.on { background: var(--accent); color: var(--on-accent); }
+
+/* Machine browser */
+.bhead b { font-size: 21px; font-weight: 600; line-height: 24px; }
+.bhead { gap: 12px; }
+.bhead span { font-size: 12px; color: var(--ink-faint); }
+.bact { gap: 24px; font-size: 12px; color: var(--ink-dim); }
+.bact [tabindex]:hover { color: var(--ink); }
+.bact .keep { color: var(--accent); font-weight: 600; }
+.fam span { color: var(--ink-faint); font-weight: 500; }
+.kind { font-size: 12px; color: var(--ink-dim); }
+.mach { font-size: 13px; letter-spacing: 1px; color: var(--ink-dim); }
+.mach:hover { color: var(--ink); }
+.mach.cur { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.pvname b { font-size: 21px; font-weight: 600; }
+.pvname { gap: 8px; }
+.pvauto { gap: 8px; font-size: 12px; color: var(--ink-dim); }
+.pvauto i { width: 16px; height: 16px; border: 1px solid var(--track); }
+.pvauto.on i { background: var(--accent); border-color: var(--accent); }
+.pvauto:hover { color: var(--ink); }
+
+/* MIX */
+.strip.sel { background: var(--chrome); }
+.stripsel { background: var(--accent); }
+.sn { font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.sn.trig, .sn.on { color: var(--accent); }
+.sm { font-size: 13px; letter-spacing: 1px; }
+.pan { cursor: ns-resize; justify-content: center; }
+.vu { background: var(--display); }
+.vu b { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); }
+.fader { cursor: ns-resize; }
+/* The cap on x 16-64 of the strip's column, 12 px from the meter on x 0-4; the rail a 2 px stroke centred under it (x 40). */
+.fader .rail { position: absolute; left: 39px; top: 0; bottom: 0; width: 2px; background: var(--track); }
+.fader .capf { position: absolute; left: 16px; width: 48px; height: 8px; background: var(--ink); }
+.dest { font-size: 12px; letter-spacing: 1px; color: var(--ink-faint); }
+.dest.own { color: var(--ink); }
+.sepline { background: var(--line); width: 1px; }
+
+/* The grid, overlaid on demand as Figma shows a layout grid: the 16 columns filled, the gutters clear, the 4 px rows
+   faint, every 8 px a little less, every 40 px (a track row) less still. */
+.gridlayer { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+.gridlayer .colstripe { position: absolute; top: 0; bottom: 0; width: 64px; background: rgba(255, 72, 72, .11); box-shadow: inset 1px 0 0 rgba(255, 72, 72, .45), inset -1px 0 0 rgba(255, 72, 72, .45); }
+.gridlayer .baseline { position: absolute; inset: 0;
+	background-image: linear-gradient(to bottom, rgba(90, 170, 255, .18) 1px, transparent 1px), linear-gradient(to bottom, rgba(90, 170, 255, .08) 1px, transparent 1px), linear-gradient(to bottom, rgba(90, 170, 255, .04) 1px, transparent 1px);
+	background-size: 100% 40px, 100% 8px, 100% 4px; }

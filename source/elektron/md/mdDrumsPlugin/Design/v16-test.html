@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v16</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v16-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.5 "Inter", system-ui, sans-serif; --s: 1; --u: 1; }
+	@media (max-width: 1340px) { body { --s: 0.85; } }
+	@media (max-width: 1140px) { body { --s: 0.68; } }
+	@media (max-width: 900px) { body { --s: 0.5; } }
+	@media (max-width: 640px) { body { --s: 0.28; } }
+	header.intro { padding: 18px 28px 10px; max-width: 1200px; }
+	header.intro h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	header.intro p { margin: 2px 0; color: #a3a6ab; }
+	.controls { display: flex; gap: 6px; margin: 10px 0 2px; flex-wrap: wrap; }
+	.controls button { background: none; color: #d8d6d0; border: 1px solid #3a3c40; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+	.controls button:focus-visible { outline: 1px solid #6fd1c4; outline-offset: 2px; }
+	.controls button.on { background: #6fd1c4; color: #10201e; border-color: #6fd1c4; }
+	.viewport { margin: 0 28px 28px; width: calc(1280px * var(--s) * var(--u)); height: calc(800px * var(--s) * var(--u)); overflow: hidden; border: 1px solid #333; }
+	.frame { width: 1280px; height: 800px; transform: scale(calc(var(--s) * var(--u))); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header class="intro">
+	<h1>MD Drums v16</h1>
+	<p>La liste des pistes montre le son de chaque piste pendant qu'elle joue. Choisir une machine : clic sur son nom (navigateur par famille : chaque clic la charge et la joue) ou flèches ‹ ›. Écouter : ▶ à côté du nom, ou clic sur un numéro de piste.</p>
+	<p>Au clavier : Tab pour parcourir, flèches pour régler, Entrée pour activer. Dans le navigateur : ↑ ↓ machine voisine, ← → famille voisine (chacune jouée), Entrée pour garder, Échap pour annuler.</p>
+	<div class="controls">
+		<button id="demo">Jouer le motif de démo</button>
+		<button id="grid">Afficher la grille</button>
+	</div>
+</header>
+<div class="viewport"><div class="frame" data-view="PISTE" data-groups="all" data-font="'Inter', sans-serif"></div></div>
+
+<script src="v6-machines.js"></script>
+<script src="v16-ui.js"></script>
+<script>
+	const demo = document.getElementById("demo"), grid = document.getElementById("grid");
+	demo.addEventListener("click", () => {
+		const on = !demo.classList.contains("on");
+		demo.classList.toggle("on", on);
+		demo.textContent = on ? "Arrêter le motif" : "Jouer le motif de démo";
+		MD.setDemo(on);
+	});
+	grid.addEventListener("click", () => { grid.classList.toggle("on"); MD.setGrid(grid.classList.contains("on")); });
+	MD.onScaleChange(scale => document.body.style.setProperty("--u", scale));
+	MD.start();
+</script>
+</body>
+</html>

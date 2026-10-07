@@ -1,0 +1,197 @@
+/* MD Drums v18 UI: v17's bands, framed. A rule runs across the editing width between the categories (and over SYN,
+   under ROUTING); the bands touch, 200 px each; each screen fills its band's cell in the screen column, so the rules
+   between the categories are its top and bottom, a rule at x 880 its left side.
+   MD Drums v17 UI: v16's system with v6's arrangement, the user's request: SYN, EFX and ROUTING as three bands, each
+   its eight knobs in a row in the Machinedrum's order and its screen right after them. The editing width splits
+   640 px of knobs to 400 px of screens, 1.6: the golden ratio, now between the knobs and what they show.
+   MD Drums v16 UI: v15's in a 1280 x 800 window (1.600, a golden rectangle that stays on the grid); the 40 px it
+   gains go to the space above the pages (now 60 px) and under them (60 px), so the pages keep their golden size.
+   MD Drums v15 UI: v14's with golden proportions in the details, as Figma's guide on the golden ratio advises
+   (structure symmetric, the ratio in the details): type on the Fibonacci numbers 13, 21, 34 (ratios 1.615 and
+   1.619); each screen a golden rectangle, 288 x 180 (1.600); each page one too, 320 x 520 (1.625). The 40 x 20 grid
+   stays: every golden size above is the nearest one on it. The browser offers ROM again, its 32 samples.
+   MD Drums v14 UI: v13's, with each family of the browser saying what it is under its code.
+   MD Drums v13 UI: v12's, without the SORTIES view.
+   MD Drums v12 UI: v11's, with a machine browser that plays what it loads, stays open and previews the machine
+   chosen; ROM's empty slots are not offered.
+   MD Drums v11 UI: v10's, with the pages' titles alone, and group styles for the comparison in v11-var-groups.html.
+   MD Drums v10 UI. v8's pages (one column per page of the Machinedrum's track, SYN, EFX, ROUTING, each with its title,
+   its eight knobs as the Machinedrum lays them out, then the screen that shows them), under v9's track head band in
+   the chrome of the top bar and the track list: everything that names or picks is dark, only what edits the sound is
+   light. v10: one title, the machine; the track's number over it, small; ▶ against it to hear the track. The machine's
+   name appears once outside the list. Everything sits on 40 px columns and 20 px rows; inside each column the content
+   shares one left edge, 16 px in. One font, Inter. */
+.ui { --chrome: #1b1c1e; --surface: #26272a; --display: #151618; --line: #3a3c40; --rule: #55585e; --tick: #3c3e43;
+	--ink: #f2f2f2; --ink-dim: #a7aaaf; --ink-faint: #8e9197; --accent: #6fd1c4; --on-accent: #10201e; --mute: #ff7a5c; --track: #6e7177;
+	--wave: #a7aaaf; --m: 40px; --r: 20px; --slot: 80px; --inset: 16px; }
+.ui { position: relative; width: 1280px; height: 800px; background: var(--surface); color: var(--ink); font-family: var(--font);
+	display: grid; grid-template-columns: repeat(32, var(--m)); grid-template-rows: repeat(20, var(--m)); user-select: none; overflow: hidden; }
+.ui * { font-family: inherit; box-sizing: border-box; }
+.cell { display: flex; align-items: center; min-width: 0; }
+.label { font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); text-transform: uppercase; }
+.value { font-size: 13px; font-variant-numeric: tabular-nums; }
+.meta { font-size: 13px; color: var(--ink-dim); }
+.hint { font-size: 11px; color: var(--ink-faint); }
+.num { font-variant-numeric: tabular-nums; }
+[tabindex] { outline: none; cursor: pointer; }
+[tabindex]:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Top bar, on the columns below: the tabs from the second page, the plug-in's state in the third's slots */
+.top { grid-row: 1; grid-column: 1 / 33; display: grid; grid-template-columns: repeat(32, var(--m)); background: var(--chrome); box-shadow: inset 0 -1px 0 var(--line); }
+.top .logo { grid-column: 1 / 7; padding-left: var(--inset); font-weight: 700; font-size: 14px; letter-spacing: 3px; }
+.top .logo span { color: var(--ink-dim); font-weight: 400; margin-left: 6px; }
+.top .tab { justify-content: center; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; color: var(--ink-dim); }
+.top .tab span { padding: 6px 0 4px; border-bottom: 2px solid transparent; }
+.top .tab:hover, .top .tab.on { color: var(--ink); }
+.top .tab.on span { border-bottom-color: var(--accent); }
+.top .t1 { grid-column: 16 / 18; } .top .t2 { grid-column: 18 / 20; }
+.top .scale { grid-column: 25 / 27; justify-content: center; font-size: 12px; color: var(--ink-dim); }
+.top .rate { grid-column: 27 / 31; justify-content: center; font-size: 12px; color: var(--ink-dim); }
+.top .out { grid-column: 31 / 33; flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; padding: 0 var(--inset); }
+.top .out .bars { display: grid; gap: 3px; }
+.top .out .bars i { display: block; height: 3px; background: var(--track); position: relative; }
+.top .out .bars i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); }
+
+/* Track list (chrome), columns 1-6 */
+.tracks { grid-column: 1 / 7; grid-row: 2 / 21; display: grid; grid-template-columns: repeat(6, var(--m)); grid-template-rows: repeat(19, var(--m)); background: var(--chrome); }
+.tracks .head, .tracks .foot { grid-column: 1 / 7; padding: 0 var(--inset); justify-content: space-between; }
+.tracks .foot { grid-row: 19; }
+.trow { grid-column: 1 / 7; display: grid; grid-template-columns: repeat(6, var(--m)); position: relative; color: var(--ink-dim); }
+.trow .n { padding-left: var(--inset); font-size: 12px; font-variant-numeric: tabular-nums; }
+.trow .m { grid-column: 2 / 4; padding-left: 8px; font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.trow .scope { grid-column: 4; position: relative; }
+.trow .scope canvas { position: absolute; left: 2px; right: 2px; top: 8px; bottom: 8px; width: calc(100% - 4px); height: calc(100% - 16px); }
+.trow:hover { color: var(--ink); }
+.trow.sel { color: var(--ink); background: var(--surface); }
+.trow.sel::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: var(--accent); }
+.trow .n.trig { color: var(--accent); }
+.toggle { justify-content: center; }
+.toggle i { width: 20px; height: 20px; border: 1px solid var(--track); display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+.toggle:hover i { border-color: var(--ink-dim); color: var(--ink-dim); }
+.toggle.mute.on i { background: var(--mute); border-color: var(--mute); color: #111; }
+.toggle.solo.on i { background: var(--ink); border-color: var(--ink); color: #111; }
+
+/* Editing surface: columns 7-32, in 20 px rows. Pages: SYN columns 1-8, EFX 10-17, ROUTING 19-26, a column between. */
+.detail { grid-column: 7 / 33; grid-row: 2 / 21; display: grid; grid-template-columns: repeat(26, var(--m)); grid-template-rows: repeat(38, var(--r)); }
+
+/* Track head, a band in chrome over rows 1-4, over SYN: ▶ on its first slot, then the track's number (small) over the
+   machine (the one title, 32 px), then ‹ ›; over EFX, what the machine is, where the track goes, its last velocity */
+.dhead { grid-column: 1 / 27; grid-row: 1 / 5; display: grid; grid-template-columns: repeat(26, var(--m)); grid-template-rows: repeat(4, var(--r)); background: var(--chrome); }
+.dhead .play { grid-column: 1 / 3; grid-row: 1 / 5; justify-content: center; }
+.dhead .play .ring { width: 40px; height: 40px; border: 1px solid var(--ink-dim); border-radius: 50%; display: grid; place-items: center; }
+.dhead .play .ring path { fill: var(--ink); }
+.dhead .play:hover .ring { border-color: var(--ink); }
+.dhead .play.trig .ring { border-color: var(--accent); }
+.dhead .play.trig .ring path { fill: var(--accent); }
+.dhead .name { grid-column: 3 / 7; grid-row: 1 / 5; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding-left: var(--inset); white-space: nowrap; }
+.dhead .machine { font-size: 34px; font-weight: 400; line-height: 1; }
+.dhead .machine::after { content: "\25BE"; margin-left: 10px; font-size: 14px; color: var(--ink-dim); }
+.dhead .machine:hover::after { color: var(--ink); }
+.dhead .step { grid-row: 1 / 5; justify-content: center; font-size: 20px; color: var(--ink-dim); }
+.dhead .step:hover { color: var(--ink); }
+.dhead .prev { grid-column: 7; } .dhead .next { grid-column: 8; }
+.dhead .info { grid-column: 17 / 27; grid-row: 1 / 5; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding-left: var(--inset); white-space: nowrap; }
+.dhead .info b { font-weight: 400; color: var(--ink); }
+
+/* Bands, one per page of the Machinedrum's track: SYN (rows 7-14, y 160-320), EFX (17-24, y 360-520), ROUTING (27-34,
+   y 560-720), 40 px between them. Each: its title (band rows 1-2), the rule and group names over its knobs (3), its
+   eight knobs in a row (4-6), their labels and values (7-8), and its screen in the last 400 px, as tall as the band,
+   starting 32 px after the eighth knob's circle (the space between two knobs). */
+.pg { grid-column: 1 / 27; display: grid; grid-template-columns: repeat(8, var(--slot)) calc(10 * var(--m)); grid-template-rows: repeat(10, var(--r)); box-shadow: inset 0 1px 0 var(--rule); }
+.pg.rte { box-shadow: inset 0 1px 0 var(--rule), inset 0 -1px 0 var(--rule); }
+.pg.syn { grid-row: 7 / 17; } .pg.efx { grid-row: 17 / 27; } .pg.rte { grid-row: 27 / 37; }
+.pg .title { grid-column: 1 / 9; grid-row: 2 / 4; align-items: flex-end; padding: 0 var(--inset) 6px; gap: 12px; white-space: nowrap; }
+.pg .title b { font-size: 21px; font-weight: 600; letter-spacing: 1.5px; line-height: 1; }
+.s1 { grid-column: 1; } .s2 { grid-column: 2; } .s3 { grid-column: 3; } .s4 { grid-column: 4; }
+.s5 { grid-column: 5; } .s6 { grid-column: 6; } .s7 { grid-column: 7; } .s8 { grid-column: 8; }
+/* A group's name over its knobs, and a rule that ends where its last knob ends; SYN's rule has no name */
+.grp { padding: 0 var(--inset); gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.grp::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.grp.one::after { display: none; }	/* one slot: the name spans it already */
+.grp.bare::after { display: none; }
+.grp.sym { gap: 0; }
+.grp.pending { color: var(--ink-faint); }
+.pg .grp { grid-row: 4; }
+.knob { grid-row: 5 / 8; justify-content: center; cursor: ns-resize; }
+.kl { grid-row: 8 / 10; flex-direction: column; justify-content: flex-start; gap: 1px; padding-top: 2px; }
+.kl.lfo .label { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.knob.unused, .kl.unused { opacity: .35; cursor: default; }
+.screen { grid-column: 9; grid-row: 1 / 11; position: relative; background: var(--display); box-shadow: inset 1px 0 0 var(--rule), inset 0 1px 0 var(--rule); }
+.pg.rte .screen { box-shadow: inset 1px 0 0 var(--rule), inset 0 1px 0 var(--rule), inset 0 -1px 0 var(--rule); }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.screen .stitle { position: absolute; left: var(--inset); right: var(--inset); top: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.screen .stitle .note { margin-left: auto; }
+.screen .stitle [tabindex] { pointer-events: auto; color: var(--ink); font-size: 12px; letter-spacing: 1px; padding: 1px 4px; }
+.screen .stitle [tabindex]:hover { background: var(--surface); }
+/* The LFO's two shape rows, at the foot of its screen; LFOM mixes shape 1 into shape 2 */
+.lfoshapes { position: absolute; left: var(--inset); right: var(--inset); bottom: 14px; display: grid; gap: 4px; }
+.srow { display: grid; grid-template-columns: 24px repeat(6, var(--m)); grid-template-rows: 24px; align-items: center; }
+.srow .chips { display: contents; }
+.chip { height: 24px; justify-content: center; font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); }
+.chip:hover { color: var(--ink); }
+.chip.on { background: var(--accent); color: var(--on-accent); }
+.dfoot { grid-column: 1 / 27; grid-row: 37 / 39; padding: 0 var(--inset); gap: 24px; }
+.dfoot b { color: var(--ink-dim); font-weight: 500; }
+.dfoot .last { margin-left: auto; }
+
+/* Machine browser, in place of the pages: its title where the pages' titles are; the families over the first two
+   page columns, each named over its machines like a group over its knobs; a click loads the machine and plays it, the
+   browser stays open. The third column previews the machine chosen, built like a page: name, its eight parameters as
+   SYN lays them out, its last hit where the pages show their screens. Rows of the browser start at y 120. */
+.browser { grid-column: 1 / 27; grid-row: 5 / 37; display: grid; grid-template-columns: repeat(26, var(--m)); grid-template-rows: repeat(32, var(--r)); background: var(--surface); }
+.browser .bhead { grid-column: 1 / 17; grid-row: 4 / 6; align-items: flex-end; padding: 0 var(--inset) 6px; gap: 12px; white-space: nowrap; }
+.browser .bhead b { font-size: 21px; font-weight: 600; line-height: 1; }
+.browser .bhead span { font-size: 12px; color: var(--ink-faint); }
+.browser .bact { grid-column: 17 / 27; grid-row: 4 / 6; justify-content: flex-end; align-items: flex-end; gap: 24px; padding: 0 var(--inset) 6px; font-size: 12px; color: var(--ink-dim); }
+.browser .bact [tabindex]:hover { color: var(--ink); }
+.browser .bact .keep { color: var(--accent); font-weight: 600; }
+.browser .fam { grid-row: 6; }
+.browser .fam span { color: var(--ink-faint); font-weight: 500; }
+.browser .kind { grid-row: 7; padding-left: var(--inset); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.browser .col { grid-row: 8 / 33; display: grid; grid-auto-flow: column; align-content: start; }
+.mach { padding-left: var(--inset); font-size: 13px; letter-spacing: 1px; color: var(--ink-dim); position: relative; white-space: nowrap; }
+.mach:hover { color: var(--ink); }
+.mach.cur { color: var(--ink); }
+.mach.cur::before { content: ""; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 3px; background: var(--accent); }
+.browser .col.rom { grid-auto-flow: row; }
+.col.rom .mach { padding-left: 0; justify-content: center; font-size: 12px; }
+.col.rom .mach.cur::before { left: 2px; }
+/* The preview, in the third column under ROM: its name and what it is, its screen where the pages put theirs */
+.browser .pvhead { grid-column: 17 / 27; grid-row: 17; }
+.browser .pvname { grid-column: 17 / 27; grid-row: 18 / 20; padding-left: var(--inset); gap: 10px; white-space: nowrap; }
+.browser .pvname b { font-size: 21px; font-weight: 600; }
+.browser .screen.pv { grid-column: 17 / 27; grid-row: 23 / 33; box-shadow: inset 1px 0 0 var(--rule), inset 0 1px 0 var(--rule), inset 0 -1px 0 var(--rule); }
+.browser .pvauto { grid-column: 17 / 27; grid-row: 20 / 22; padding-left: var(--inset); gap: 10px; font-size: 12px; color: var(--ink-dim); }
+.browser .pvauto i { width: 16px; height: 16px; border: 1px solid var(--track); }
+.browser .pvauto.on i { background: var(--accent); border-color: var(--accent); }
+.browser .pvauto:hover { color: var(--ink); }
+
+/* MIX: 16 channels of 2 modules; a hairline separates the channels, nothing else is drawn */
+.mix { grid-column: 1 / 33; grid-row: 2 / 21; display: grid; grid-template-columns: repeat(16, calc(2 * var(--m))); }
+.strip { display: grid; grid-template-columns: repeat(2, var(--m)); grid-template-rows: repeat(19, var(--m)); position: relative; }
+.strip + .strip { box-shadow: inset 1px 0 0 var(--line); }
+.strip.sel { background: var(--chrome); }
+.strip.sel::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 3px; background: var(--accent); }
+.strip > .cell { grid-column: 1 / 3; justify-content: center; }
+.strip .n { grid-row: 1; font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; align-items: flex-end; }
+.strip .n.trig, .strip.sel .n { color: var(--accent); }
+.strip .m { grid-row: 2; font-size: 13px; letter-spacing: 1px; align-items: flex-start; padding-top: 4px; }
+.strip .pan { grid-row: 3 / 5; flex-direction: column; justify-content: center; gap: 0; cursor: ns-resize; }
+.strip .fz { grid-row: 5 / 17; gap: 8px; padding: 10px 0; }
+.vu { width: 4px; align-self: stretch; background: var(--display); position: relative; }
+.vu b { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); }
+.fader { width: 24px; align-self: stretch; position: relative; cursor: ns-resize; }
+.fader .rail { position: absolute; left: 11px; top: 0; bottom: 0; width: 2px; background: var(--track); }
+.fader .capf { position: absolute; left: 0; width: 24px; height: 10px; background: var(--ink); }
+.strip .val { grid-row: 17; }
+.strip .toggle { grid-row: 18; grid-column: auto; }
+.strip .dest { grid-row: 19; font-size: 12px; letter-spacing: 1px; color: var(--ink-faint); }
+.strip .dest.own { color: var(--ink); }
+
+/* The grid, overlaid on demand: 40 px columns and 20 px rows, and the three pages' outlines */
+.ui.showgrid::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+	background-image: linear-gradient(to right, rgba(255, 90, 60, .35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 90, 60, .18) 1px, transparent 1px);
+	background-size: var(--m) var(--m), var(--m) var(--r); }
+.ui.showgrid .pg { box-shadow: inset 0 0 0 1px rgba(255, 90, 60, .7); }
+/* and the golden rectangles: every page (320 x 520) and every screen (288 x 180) */
+.ui.showgrid .pg, .ui.showgrid .screen { outline: 1px dashed rgba(240, 190, 60, .95); outline-offset: -1px; }

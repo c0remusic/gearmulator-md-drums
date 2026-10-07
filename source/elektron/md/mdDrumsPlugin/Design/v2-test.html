@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v2</title>
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+	header.page { padding: 18px 28px 10px; max-width: 1200px; }
+	header.page h1 { font-size: 20px; margin: 0 0 4px; }
+	header.page p { margin: 2px 0; color: #8a8781; }
+	.viewport { margin: 0 28px 28px; width: calc(1280px * var(--s)); height: calc(760px * var(--s)); overflow: hidden; border: 1px solid #333; border-radius: 6px; }
+	.frame { width: 1280px; height: 760px; transform: scale(var(--s)); transform-origin: 0 0; }
+	body { --s: 1; }
+	@media (max-width: 1340px) { body { --s: 0.85; } }
+	@media (max-width: 1140px) { body { --s: 0.68; } }
+	@media (max-width: 900px) { body { --s: 0.5; } }
+
+	/* Graphite */
+	.ui { --bg: #2b2c2e; --head: #232426; --panel: #26272a; --cell: #34363a; --cell-q: #3d4045; --hair: #3a3c40; --ink: #f2f2f2; --ink-dim: #a9abb0;
+		--ink-faint: #74777d; --sel: #6fd1c4; --arc: #ffffff; --track: #4a4d52; --screen: #1a1b1d; --grid: #2a2c2f; --curve: #6fd1c4; --curve2: #e8e8e8; --warn: #ff7a5c; }
+	.ui { width: 1280px; height: 760px; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; user-select: none; }
+	.mono { font-family: Consolas, "Cascadia Mono", monospace; }
+	.top { height: 48px; background: var(--head); border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+	.logo { font-weight: 700; letter-spacing: 3px; font-size: 15px; }
+	.logo span { color: var(--ink-dim); font-weight: 400; }
+	.lcd { color: var(--ink); background: var(--screen); border: 1px solid var(--hair); padding: 4px 10px; border-radius: 3px; font-size: 13px; letter-spacing: 1px; }
+	.tab { padding: 6px 12px; border-radius: 3px; color: var(--ink-dim); font-size: 12px; letter-spacing: 1px; cursor: pointer; }
+	.tab.on { background: var(--cell-q); color: var(--ink); box-shadow: inset 0 -2px 0 var(--sel); }
+	.grow { flex: 1; }
+	.meter { width: 120px; height: 8px; background: var(--cell); border-radius: 2px; overflow: hidden; }
+	.meter i { display: block; height: 100%; width: 0; background: var(--sel); transition: width .08s; }
+	.body { flex: 1; display: flex; min-height: 0; }
+
+	.tracklist { width: 250px; background: var(--head); border-right: 1px solid var(--hair); padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+	.trow { display: grid; grid-template-columns: 26px 1fr 54px 22px; align-items: center; gap: 6px; height: 38px; padding: 0 8px; background: var(--cell); border-radius: 3px; font-size: 12px; cursor: pointer; }
+	.trow:hover { background: var(--cell-q); }
+	.trow.sel { box-shadow: inset 3px 0 0 var(--sel); background: var(--cell-q); }
+	.trow .n { color: var(--ink-dim); }
+	.trow .m { letter-spacing: 1px; }
+	.trow.hit .n { color: var(--sel); }
+	.bar { height: 6px; background: var(--track); border-radius: 2px; overflow: hidden; }
+	.bar i { display: block; height: 100%; background: var(--ink-dim); }
+	.mute { width: 18px; height: 18px; border-radius: 3px; border: 1px solid var(--ink-faint); font-size: 10px; display: grid; place-items: center; color: var(--ink-faint); cursor: pointer; }
+	.mute.on { background: var(--warn); color: #000; border-color: var(--warn); }
+
+	.detail { flex: 1; padding: 12px 18px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+	.dhead { display: flex; align-items: center; gap: 14px; height: 54px; }
+	.dhead .big { font-size: 22px; letter-spacing: 2px; }
+	.select { background: var(--cell); border: 1px solid var(--hair); border-radius: 3px; padding: 6px 10px; font-size: 13px; min-width: 150px; cursor: pointer; }
+	.select::after { content: " \25BE"; color: var(--ink-dim); }
+	.family { color: var(--ink-dim); font-size: 12px; }
+	.page { display: grid; grid-template-columns: 1fr 330px; gap: 12px; background: var(--panel); border: 1px solid var(--hair); border-radius: 4px; padding: 8px 12px 10px; height: 198px; }
+	.page h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: 2px; color: var(--ink-dim); font-weight: 600; }
+	.knobs { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 2px 6px; height: 160px; }
+	.knob { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; gap: 0; cursor: ns-resize; }
+	.knob .l { letter-spacing: 1px; color: var(--ink-dim); }
+	.knob .v { color: var(--ink); }
+	.knob.lfoTarget .l { color: var(--sel); }
+	.screen { background: var(--screen); border: 1px solid var(--hair); border-radius: 3px; position: relative; overflow: hidden; }
+	.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+	.screen .cap { position: absolute; left: 8px; top: 5px; font-size: 10px; letter-spacing: 2px; color: var(--ink-dim); }
+	.screen .note { position: absolute; right: 8px; top: 5px; font-size: 10px; color: var(--ink-faint); }
+	.screen .chips { position: absolute; left: 8px; right: 8px; bottom: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+	.chip { font-size: 10px; padding: 2px 6px; border-radius: 2px; background: var(--cell); color: var(--ink-dim); letter-spacing: 1px; cursor: pointer; }
+	.chip.on { background: var(--sel); color: #102624; }
+	.side { display: flex; flex-direction: column; }
+	.side .screen { flex: 1; }
+</style>
+</head>
+<body>
+<header class="page">
+	<h1>MD Drums v2 : disposition A, look Graphite, cadres graphiques</h1>
+	<p>Cliquer une piste pour la choisir, tirer un potard vers le haut ou le bas pour le tourner (double-clic : valeur par défaut). Les cadres suivent les potards. « Frappe » montrera dans le plugin le vrai son de la dernière note ; ici, une approximation.</p>
+</header>
+<div class="viewport"><div class="frame" id="frame"></div></div>
+
+<script>
+const machines = ["TRX-BD","TRX-SD","TRX-XT","TRX-CP","TRX-RS","TRX-CB","TRX-CH","TRX-OH","TRX-CY","TRX-MA","TRX-CL","TRX-XC","TRX-B2","TRX-S2","EFM-BD","EFM-SD"];
+const families = { TRX: "Analogique modélisée", EFM: "FM électronique" };
+const synNames = {
+	"TRX-BD": ["PTCH","DEC","RAMP","RDEC","STRT","NOIS","HARM","CLIP"],
+	"TRX-SD": ["PTCH","DEC","BUMP","BENV","SNAP","TONE","TUNE","CLIP"],
+	"EFM-BD": ["PTCH","DEC","RAMP","RDEC","MOD","MFRQ","MDEC","MFB"] };
+const efxNames = ["AMD","AMF","EQF","EQG","FLTF","FLTW","FLTQ","SRR"];
+const routeNames = ["DIST","VOL","PAN","DEL","REV","LFOS","LFOD","LFOM"];
+const shapes = ["TRI","SAW","SQR","RMP","EXP","RND"];
+const modes = ["FREE","TRIG","HOLD"];
+const defaults = [64,64,64,64,64,64,64,64, 0,0,64,64,0,127,0,0, 0,100,64,0,0,64,0,0];
+
+const tracks = machines.map((m, t) => ({ machine: m, level: [100,96,88,90,70,64,82,76,60,58,66,72,100,92,84,80][t], mute: t === 12,
+	p: defaults.map((d, i) => i < 8 ? (d + t * 9 + i * 13) % 128 : d), lfo: { track: t, param: 12, shape1: 0, shape2: 0, mode: 0 } }));
+tracks[0].p = [52,78,96,40,64,12,30,8, 0,0,64,64,0,127,0,0, 0,100,64,0,0,64,0,0];
+tracks[0].p[12] = 18; tracks[0].p[13] = 70; tracks[0].p[14] = 40; tracks[0].p[22] = 38; tracks[0].lfo.param = 12;
+let sel = 0;
+
+function knobSvg(size, value) {
+	const r = size / 2 - 4, c = size / 2, a0 = 0.75 * Math.PI, sweep = 1.5 * Math.PI, a = a0 + sweep * value / 127;
+	const p = t => [c + r * Math.cos(t), c + r * Math.sin(t)];
+	const arc = (from, to) => { const [x0, y0] = p(from), [x1, y1] = p(to); return `M${x0} ${y0} A${r} ${r} 0 ${to - from > Math.PI ? 1 : 0} 1 ${x1} ${y1}`; };
+	const [hx, hy] = [c + (r - 6) * Math.cos(a), c + (r - 6) * Math.sin(a)];
+	return `<svg width="${size}" height="${size}"><path d="${arc(a0, a0 + sweep)}" stroke="var(--track)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+		${value > 0 ? `<path d="${arc(a0, a)}" stroke="var(--arc)" stroke-width="3.5" fill="none" stroke-linecap="round"/>` : ""}
+		<circle cx="${c}" cy="${c}" r="${r - 7}" fill="var(--cell)"/>
+		<line x1="${c}" y1="${c}" x2="${hx}" y2="${hy}" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg>`;
+}
+
+function render() {
+	const t = tracks[sel];
+	const syn = synNames[t.machine] || ["SYN1","SYN2","SYN3","SYN4","SYN5","SYN6","SYN7","SYN8"];
+	const names = [...syn, ...efxNames, ...routeNames];
+	const lfoTarget = t.lfo.track === sel ? t.lfo.param : -1;
+	const knob = i => `<div class="knob${i === lfoTarget ? " lfoTarget" : ""}" data-i="${i}">${knobSvg(46, t.p[i])}<span class="l mono">${names[i]}</span><span class="v mono">${t.p[i]}</span></div>`;
+	const page = (title, from, side) => `<div class="page"><div><h4>${title}</h4><div class="knobs">${[0,1,2,3,4,5,6,7].map(k => knob(from + k)).join("")}</div></div>${side}</div>`;
+	const rows = tracks.map((tr, i) => `<div class="trow${i === sel ? " sel" : ""}" data-t="${i}"><span class="n mono">${String(i + 1).padStart(2, "0")}</span><span class="m mono">${tr.machine}</span>
+		<div class="bar"><i style="width:${tr.level / 1.27}%"></i></div><div class="mute mono${tr.mute ? " on" : ""}" data-mute="${i}">M</div></div>`).join("");
+	const destName = names[t.lfo.param] && t.lfo.track === sel ? names[t.lfo.param] : ["SYN1","SYN2","SYN3","SYN4","SYN5","SYN6","SYN7","SYN8", ...efxNames, ...routeNames][t.lfo.param];
+	document.getElementById("frame").innerHTML = `<div class="ui">
+		<div class="top"><div class="logo">MD <span>DRUMS</span></div><div class="lcd mono">KIT 01 · T${String(sel + 1).padStart(2, "0")} · ${t.machine}</div>
+			<div class="tab on">PISTE</div><div class="tab">MIX</div><div class="tab">SORTIES</div><div class="grow"></div>
+			<span style="font-size:11px;color:var(--ink-dim)">44,1 kHz · 0,5 ms</span><div class="meter"><i id="meter"></i></div></div>
+		<div class="body"><div class="tracklist">${rows}</div>
+		<div class="detail">
+			<div class="dhead"><span class="big mono">${String(sel + 1).padStart(2, "0")}</span><div class="select mono">${t.machine}</div>
+				<span class="family">${families[t.machine.slice(0, 3)] || ""}</span><div class="grow"></div>
+				<div class="knob" data-level="1">${knobSvg(40, t.level)}<span class="l mono">LEVEL</span></div><div class="mute mono${t.mute ? " on" : ""}" data-mute="${sel}">M</div></div>
+			${page("SYN", 0, `<div class="side"><div class="screen" id="hit"><canvas></canvas><span class="cap">FRAPPE</span><span class="note">dernière note · cliquer pour jouer</span></div></div>`)}
+			${page("EFX", 8, `<div class="side"><div class="screen" id="filter"><canvas></canvas><span class="cap">FILTRE · EQ · AM</span><span class="note mono">20 Hz – 20 kHz</span></div></div>`)}
+			${page("ROUTING", 16, `<div class="side"><div class="screen" id="lfo"><canvas></canvas><span class="cap">LFO → T${String(t.lfo.track + 1).padStart(2, "0")} ${destName}</span><span class="note mono">${modes[t.lfo.mode]}</span>
+				<div class="chips">${shapes.map((s, i) => `<span class="chip mono${i === t.lfo.shape1 ? " on" : ""}" data-shape="${i}">${s}</span>`).join("")}
+				${modes.map((s, i) => `<span class="chip mono${i === t.lfo.mode ? " on" : ""}" data-mode="${i}">${s}</span>`).join("")}</div></div></div>`)}
+		</div></div></div>`;
+	draw();
+}
+
+function canvasOf(id) {
+	const box = document.getElementById(id), c = box.querySelector("canvas");
+	c.width = box.clientWidth * 2; c.height = box.clientHeight * 2;
+	const g = c.getContext("2d"); g.scale(2, 2);
+	return [g, box.clientWidth, box.clientHeight];
+}
+const css = n => getComputedStyle(document.querySelector(".ui")).getPropertyValue(n).trim();
+
+function grid(g, w, h, xs, ys) {
+	g.strokeStyle = css("--grid"); g.lineWidth = 1;
+	xs.forEach(x => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); });
+	ys.forEach(y => { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); });
+}
+
+function draw() {
+	const t = tracks[sel], p = t.p;
+	// Hit: a decaying tone shaped by DEC (SYN2), pitch (SYN1) and the amplitude modulation
+	{
+		const [g, w, h] = canvasOf("hit");
+		grid(g, w, h, [w * .25, w * .5, w * .75], [h / 2]);
+		const decay = 0.02 + p[1] / 127 * 0.6, freq = 2 + p[0] / 127 * 20, amd = p[8] / 127, amf = 1 + p[9] / 6;
+		g.beginPath(); g.strokeStyle = css("--curve2"); g.lineWidth = 1.2;
+		for(let x = 0; x <= w; ++x) {
+			const s = x / w, env = Math.exp(-s / decay) * (1 - amd * 0.5 * (1 + Math.sin(2 * Math.PI * amf * s)));
+			const y = h / 2 - env * (h * 0.38) * Math.sin(2 * Math.PI * freq * s * (1 + (1 - s) * p[2] / 127));
+			x ? g.lineTo(x, y) : g.moveTo(x, y);
+		}
+		g.stroke();
+		g.beginPath(); g.strokeStyle = css("--curve"); g.lineWidth = 1.5;
+		for(let x = 0; x <= w; ++x) { const s = x / w, y = h / 2 - Math.exp(-s / decay) * h * 0.38; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+		g.stroke();
+	}
+	// Filter (band from FLTF, width FLTW, resonance FLTQ) and EQ peak (EQF, EQG)
+	{
+		const [g, w, h] = canvasOf("filter");
+		const xs = [100, 1000, 10000].map(f => Math.log(f / 20) / Math.log(1000) * w);
+		grid(g, w, h, xs, [h * 0.5]);
+		const lo = 20 * Math.pow(1000, p[12] / 127), hi = 20 * Math.pow(1000, Math.min(1, (p[12] + p[13]) / 127)), q = p[14] / 127;
+		const eqf = 20 * Math.pow(1000, p[10] / 127), eqg = (p[11] - 64) / 64 * 12;
+		g.beginPath(); g.strokeStyle = css("--curve"); g.lineWidth = 2;
+		for(let x = 0; x <= w; ++x) {
+			const f = 20 * Math.pow(1000, x / w);
+			const hp = 1 / Math.sqrt(1 + Math.pow(lo / f, 4)), lp = 1 / Math.sqrt(1 + Math.pow(f / hi, 4));
+			const res = 1 + q * 3 * (Math.exp(-Math.pow(Math.log(f / lo), 2) * 20) + Math.exp(-Math.pow(Math.log(f / hi), 2) * 20));
+			const eq = Math.pow(10, eqg * Math.exp(-Math.pow(Math.log(f / eqf), 2) * 2) / 20);
+			const db = 20 * Math.log10(Math.max(1e-4, hp * lp * res * eq));
+			const y = h * 0.5 - db / 24 * h * 0.42;
+			x ? g.lineTo(x, y) : g.moveTo(x, y);
+		}
+		g.stroke();
+		const ex = Math.log(eqf / 20) / Math.log(1000) * w;
+		g.fillStyle = css("--curve2"); g.beginPath(); g.arc(ex, h * 0.5 - eqg / 24 * h * 0.42, 3, 0, 7); g.fill();
+		if(p[15] > 0) { g.fillStyle = css("--warn"); g.font = "10px Consolas"; g.fillText(`SRR ${p[15]}`, w - 50, h - 8); }
+	}
+	// LFO: shape over two periods at LFOS, scaled by LFOD
+	{
+		const [g, w, h] = canvasOf("lfo");
+		grid(g, w, h, [w / 2], [h * 0.42]);
+		const depth = p[22] / 127, periods = 1 + p[21] / 127 * 5, shape = t.lfo.shape1;
+		let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+		const steps = []; for(let i = 0; i < 64; ++i) steps.push(rnd() * 2 - 1);
+		const wave = ph => { const f = ph - Math.floor(ph);
+			return [1 - 4 * Math.abs(f - 0.5), 1 - 2 * f, f < 0.5 ? 1 : -1, 2 * f - 1, Math.exp(-4 * f) * 2 - 1, steps[Math.floor(ph * 2) % 64]][shape]; };
+		g.beginPath(); g.strokeStyle = depth > 0 ? css("--curve") : css("--ink-faint"); g.lineWidth = 2;
+		for(let x = 0; x <= w; ++x) { const y = h * 0.42 - wave(x / w * periods) * Math.max(depth, 0.04) * h * 0.3; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+		g.stroke();
+	}
+}
+
+function flash(i) {
+	const row = document.querySelector(`.trow[data-t="${i}"]`); row.classList.add("hit"); setTimeout(() => row.classList.remove("hit"), 160);
+	const m = document.getElementById("meter"); m.style.width = (tracks[i].level / 1.27) + "%"; setTimeout(() => m.style.width = "0", 200);
+}
+
+let drag = null;
+document.addEventListener("pointerdown", e => {
+	const trow = e.target.closest(".trow"), mute = e.target.closest("[data-mute]"), knob = e.target.closest(".knob"), chip = e.target.closest(".chip");
+	if(mute) { const i = +mute.dataset.mute; tracks[i].mute = !tracks[i].mute; render(); return; }
+	if(chip) { const t = tracks[sel]; if(chip.dataset.shape) t.lfo.shape1 = +chip.dataset.shape; else t.lfo.mode = +chip.dataset.mode; render(); return; }
+	if(e.target.closest("#hit")) { flash(sel); return; }
+	if(trow) { sel = +trow.dataset.t; render(); flash(sel); return; }
+	if(knob) { drag = { knob, y: e.clientY, start: knob.dataset.level ? tracks[sel].level : tracks[sel].p[+knob.dataset.i] }; e.preventDefault(); }
+});
+document.addEventListener("pointermove", e => {
+	if(!drag) return;
+	const v = Math.max(0, Math.min(127, Math.round(drag.start + (drag.y - e.clientY) / 1.5)));
+	if(drag.knob.dataset.level) tracks[sel].level = v; else tracks[sel].p[+drag.knob.dataset.i] = v;
+	const keep = drag; render(); drag = { ...keep, knob: document.querySelector(keep.knob.dataset.level ? "[data-level]" : `.knob[data-i="${keep.knob.dataset.i}"]`) };
+});
+document.addEventListener("pointerup", () => drag = null);
+document.addEventListener("dblclick", e => { const k = e.target.closest(".knob[data-i]"); if(k) { tracks[sel].p[+k.dataset.i] = defaults[+k.dataset.i]; render(); } });
+render();
+</script>
+</body>
+</html>

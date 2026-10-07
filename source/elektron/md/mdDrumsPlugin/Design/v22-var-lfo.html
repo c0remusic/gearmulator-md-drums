@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v22 LFO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v22-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.5 "Inter", system-ui, sans-serif; --k: 1; }
+	@media (max-width: 1360px) { body { --k: 0.85; } }
+	@media (max-width: 1160px) { body { --k: 0.68; } }
+	@media (max-width: 920px) { body { --k: 0.6; } }
+	@media (max-width: 780px) { body { --k: 0.5; } }
+	@media (max-width: 640px) { body { --k: 0.28; } }
+	main { padding: 18px 28px 40px; }
+	h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	h2 { font-size: 17px; margin: 32px 0 4px; font-weight: 600; }
+	p { margin: 2px 0 8px; color: #a3a6ab; max-width: 1100px; }
+	ul { margin: 4px 0 8px; color: #a3a6ab; max-width: 1100px; padding-left: 20px; }
+	.controls { display: flex; gap: 6px; margin: 8px 0; }
+	.controls button { background: none; color: #d8d6d0; border: 1px solid #3a3c40; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+	.controls button.on { background: #6fd1c4; color: #10201e; border-color: #6fd1c4; }
+	.crop { width: calc(1296px * var(--k)); height: calc(228px * var(--k)); overflow: hidden; border: 1px solid #333; position: relative; }
+	.crop .frame { width: 1296px; height: 824px; transform-origin: 0 0; position: absolute; left: 0; top: 0; transform: scale(var(--k)) translateY(-596px); }
+</style>
+</head>
+<body>
+<main>
+	<h1>L'écran LFO : options</h1>
+	<p>Ce qui ne va pas dans la v22 :</p>
+	<ul>
+		<li>Le tracé fait 56 px de haut, écrasé entre le titre et trois rangées de puces : l'écran ressemble plus à un formulaire qu'à un affichage.</li>
+		<li>Les réglages du LFO sont coupés en deux : vitesse, profondeur et mélange (LFOS, LFOD, LFOM) sont des boutons dans la bande ROUTING, les formes et le mode des puces dans l'écran.</li>
+		<li>Deux rangées de six formes écrites (TRI, SAW…) prennent beaucoup de place pour dire peu : une forme se voit mieux qu'elle ne se lit.</li>
+	</ul>
+	<p><b>Choix (2026-10-07) :</b> la mise en page de la v22, avec un tracé sans ligne et zoomé sur ce que l'onde parcourt (ses deux bornes notées en chiffres). Les trois options restent ici pour mémoire.</p>
+	<p>Tout le reste est figé ; seul l'écran LFO change. Chaque cadre est vivant : clic, molette, glisser. Le motif de démo et la grille aident à juger.</p>
+	<div class="controls"><button id="grid">Grille masquée</button><button id="demo">Jouer le motif de démo</button></div>
+
+	<h2>v22 telle quelle</h2>
+	<p>Titre, tracé de 56 px, puis Shape 1, Shape 2 et Mode en puces écrites.</p>
+	<div class="crop"><div class="frame" data-view="TRACK" data-lfo="chips" data-font="'Inter', sans-serif"></div></div>
+
+	<h2>A · Côte à côte</h2>
+	<p>Le tracé à gauche (136 px de haut), les réglages à droite : les formes dessinées en deux rangées de six petites icônes, le mode sous elles. Tout reste à un clic, rien ne se cache dans un menu.</p>
+	<div class="crop"><div class="frame" data-view="TRACK" data-lfo="side" data-font="'Inter', sans-serif"></div></div>
+
+	<h2>B · Fiche de la Machinedrum</h2>
+	<p>Comme la page LFO de la machine : cinq champs en pied d'écran, Track, Parameter, Shape 1, Shape 2, Mode. Clic : sa liste (piste et paramètre ouvrent le menu sur tout l'écran, formes et mode une rangée de choix) ; glisser ou molette : la valeur suivante. Le tracé gagne de la place (104 px), la cible quitte le titre.</p>
+	<div class="crop"><div class="frame" data-view="TRACK" data-lfo="fields" data-font="'Inter', sans-serif"></div></div>
+
+	<h2>C · Mélange</h2>
+	<p>LFOM mélange la forme 1 dans la forme 2 : la forme 1 en pied d'écran à gauche, la forme 2 à droite, LFOM entre les deux, là où il en est. Le tracé montre les deux formes en pâle derrière leur mélange en couleur. Le mode passe en menu dans le titre.</p>
+	<div class="crop"><div class="frame" data-view="TRACK" data-lfo="mix" data-font="'Inter', sans-serif"></div></div>
+</main>
+<script src="v6-machines.js"></script>
+<script src="v22-hits.js"></script>
+<script src="v22-ui.js"></script>
+<script>
+	const grid = document.getElementById("grid"), demo = document.getElementById("demo");
+	grid.addEventListener("click", () => {
+		const on = !grid.classList.contains("on");
+		grid.classList.toggle("on", on); grid.textContent = on ? "Grille affichée" : "Grille masquée";
+		document.querySelectorAll(".frame").forEach(f => f.dataset.grid = on ? "on" : "off"); MD.renderAll();
+	});
+	demo.addEventListener("click", () => { const on = !demo.classList.contains("on"); demo.classList.toggle("on", on); MD.setDemo(on); });
+	MD.start();
+</script>
+</body>
+</html>

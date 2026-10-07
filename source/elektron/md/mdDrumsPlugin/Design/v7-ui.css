@@ -1,0 +1,169 @@
+/* MD Drums v7 UI. The 40 px module grid (32 x 19) places everything but is not drawn: no rule between cells.
+   Hierarchy by three solid surface levels (chrome for navigation, surface for editing, display for screens), by a
+   stepped type scale, and by whitespace between sections. A line is drawn only where it says something: a screen's
+   labelled graduations, the separation of the MIX's channels, a table's head. One font, Inter. */
+.ui { --chrome: #1b1c1e; --surface: #26272a; --display: #151618; --line: #3a3c40; --tick: #3c3e43;
+	--ink: #f2f2f2; --ink-dim: #a7aaaf; --ink-faint: #8e9197; --accent: #6fd1c4; --on-accent: #10201e; --mute: #ff7a5c; --track: #6e7177;
+	--wave: #a7aaaf; --m: 40px; }
+.ui { position: relative; width: 1280px; height: 760px; background: var(--surface); color: var(--ink); font-family: var(--font);
+	display: grid; grid-template-columns: repeat(32, var(--m)); grid-template-rows: repeat(19, var(--m)); user-select: none; overflow: hidden; }
+.ui * { font-family: inherit; box-sizing: border-box; }
+.cell { display: flex; align-items: center; min-width: 0; }
+.label { font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); text-transform: uppercase; }
+.value { font-size: 14px; font-variant-numeric: tabular-nums; }
+.meta { font-size: 12px; color: var(--ink-dim); }
+.hint { font-size: 11px; color: var(--ink-faint); }
+.num { font-variant-numeric: tabular-nums; }
+[tabindex] { outline: none; cursor: pointer; }
+[tabindex]:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Chrome: top bar (row 1) and track list (columns 1-7) */
+.top { grid-row: 1; grid-column: 1 / 33; display: grid; grid-template-columns: repeat(32, var(--m)); background: var(--chrome); }
+.top .logo { grid-column: 1 / 8; padding-left: 16px; font-weight: 700; font-size: 14px; letter-spacing: 3px; }
+.top .logo span { color: var(--ink-dim); font-weight: 400; margin-left: 6px; }
+.top .status { grid-column: 8 / 16; padding-left: 16px; font-size: 13px; color: var(--ink-dim); letter-spacing: 1px; }
+.top .tab { grid-column: span 2; justify-content: center; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; color: var(--ink-dim); position: relative; }
+.top .tab:hover { color: var(--ink); }
+.top .tab.on { color: var(--ink); }
+.top .tab.on::after { content: ""; position: absolute; left: 22px; right: 22px; bottom: 6px; height: 2px; background: var(--accent); }
+.top .scale { grid-column: 24 / 26; justify-content: center; font-size: 12px; color: var(--ink-dim); }
+.top .rate { grid-column: 26 / 30; justify-content: flex-end; padding-right: 16px; font-size: 12px; color: var(--ink-dim); }
+.top .out { grid-column: 30 / 33; padding: 0 16px 0 0; gap: 8px; }
+.top .out .bars { flex: 1; display: grid; gap: 3px; }
+.top .out .bars i { display: block; height: 3px; background: var(--track); position: relative; }
+.top .out .bars i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); }
+
+.tracks { grid-column: 1 / 8; grid-row: 2 / 20; display: grid; grid-template-columns: repeat(7, var(--m)); grid-template-rows: repeat(18, var(--m)); background: var(--chrome); }
+.tracks .head, .tracks .foot { grid-column: 1 / 8; padding: 0 16px; justify-content: space-between; }
+.trow { grid-column: 1 / 8; display: grid; grid-template-columns: repeat(7, var(--m)); position: relative; color: var(--ink-dim); }
+.trow .n { padding-left: 16px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.trow .m { grid-column: 2 / 4; padding-left: 8px; font-size: 13px; letter-spacing: 1px; }
+.trow .scope { grid-column: 4 / 6; position: relative; }
+.trow .scope canvas { position: absolute; left: 4px; right: 4px; top: 6px; bottom: 6px; width: calc(100% - 8px); height: calc(100% - 12px); }
+.trow:hover { color: var(--ink); }
+.trow.sel { color: var(--ink); background: var(--surface); }
+.trow.sel::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: var(--accent); }
+.trow .n.trig { color: var(--accent); }
+.toggle { justify-content: center; }
+.toggle i { width: 20px; height: 20px; border: 1px solid var(--track); display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+.toggle:hover i { border-color: var(--ink-dim); color: var(--ink-dim); }
+.toggle.mute.on i { background: var(--mute); border-color: var(--mute); color: #111; }
+.toggle.solo.on i { background: var(--ink); border-color: var(--ink); color: #111; }
+
+/* Editing surface: columns 8-32, rows 2-19 */
+.detail { grid-column: 8 / 33; grid-row: 2 / 20; display: grid; grid-template-columns: repeat(25, var(--m)); grid-template-rows: repeat(18, var(--m)); }
+.dhead { grid-column: 1 / 26; grid-row: 1 / 4; display: grid; grid-template-columns: repeat(25, var(--m)); grid-template-rows: repeat(3, var(--m)); }
+.dhead .big { grid-column: 1 / 3; grid-row: 1 / 3; padding-left: 16px; font-size: 32px; font-weight: 300; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.dhead .machine { grid-column: 3 / 10; grid-row: 1 / 3; padding-left: 8px; font-size: 32px; font-weight: 400; letter-spacing: 1px; }
+.dhead .machine::after { content: "\25BE"; margin-left: 14px; font-size: 14px; color: var(--ink-dim); }
+.dhead .machine:hover::after { color: var(--ink); }
+.dhead .step { grid-row: 1 / 3; justify-content: center; font-size: 18px; color: var(--ink-dim); }
+.dhead .step:hover { color: var(--ink); }
+.dhead .prev { grid-column: 10; }
+.dhead .next { grid-column: 11; }
+.dhead .info { grid-column: 1 / 17; grid-row: 3; padding-left: 16px; gap: 28px; align-items: flex-start; padding-top: 2px; }
+.dhead .info b { font-weight: 400; color: var(--ink); }
+.dhead .play { grid-column: 17 / 19; grid-row: 1 / 3; flex-direction: column; justify-content: center; gap: 6px; }
+.dhead .play .ring { width: 44px; height: 44px; border: 1px solid var(--ink-dim); border-radius: 50%; display: grid; place-items: center; }
+.dhead .play:hover .ring { border-color: var(--ink); }
+.dhead .lknob { grid-column: 19 / 21; grid-row: 1 / 3; justify-content: center; cursor: ns-resize; }
+.dhead .lval { grid-column: 19 / 21; grid-row: 3; flex-direction: column; justify-content: flex-start; gap: 0; }
+.dhead .mute { grid-column: 22; grid-row: 1 / 3; }
+.dhead .solo { grid-column: 23; grid-row: 1 / 3; }
+
+/* Sections: a header line (title, then what the section holds), eight knobs, a screen. SYN rows 4-7, EFX 8-11,
+   ROUTING 12-17 (with the LFO's shapes); the header line also makes the space between sections. */
+.pg { grid-column: 1 / 26; display: grid; grid-template-columns: repeat(25, var(--m)); grid-template-rows: repeat(4, var(--m)); }
+.pg.syn { grid-row: 4 / 8; }
+.pg.efx { grid-row: 8 / 12; }
+.pg.rte { grid-row: 12 / 18; grid-template-rows: repeat(6, var(--m)); }
+.pg .title { grid-column: 1 / 19; grid-row: 1; align-items: flex-end; padding: 0 0 6px 16px; gap: 14px; }
+.pg .title b { font-size: 15px; font-weight: 600; letter-spacing: 2px; }
+.pg .title span { font-size: 12px; color: var(--ink-faint); }
+.knob { grid-row: 2 / 4; justify-content: center; cursor: ns-resize; }
+.kl { grid-row: 4; flex-direction: column; justify-content: flex-start; gap: 1px; }
+.kl.lfo .label { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.knob.unused, .kl.unused { opacity: .35; cursor: default; }
+.k1 { grid-column: 1 / 3; } .k2 { grid-column: 3 / 5; } .k3 { grid-column: 5 / 7; } .k4 { grid-column: 7 / 9; }
+.k5 { grid-column: 9 / 11; } .k6 { grid-column: 11 / 13; } .k7 { grid-column: 13 / 15; } .k8 { grid-column: 15 / 17; }
+.pg .pending { grid-column: 7 / 14; grid-row: 5; padding-left: 12px; }
+.screen { grid-column: 19 / 26; grid-row: 2 / 5; position: relative; background: var(--display); }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.screen .stitle { position: absolute; left: 10px; right: 10px; top: 6px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.screen .stitle .note { margin-left: auto; }
+.screen .stitle [tabindex] { pointer-events: auto; color: var(--ink); font-size: 12px; letter-spacing: 1px; padding: 1px 4px; }
+.screen .stitle [tabindex]:hover { background: var(--surface); }
+.lfoshapes { grid-column: 20 / 26; grid-row: 5 / 7; display: grid; grid-template-columns: repeat(6, var(--m)); grid-template-rows: repeat(2, var(--m)); }
+.lfolabel { grid-column: 19; justify-content: center; }
+.lfolabel.r1 { grid-row: 5; } .lfolabel.r2 { grid-row: 6; }
+.chip { justify-content: center; font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--ink-dim); }
+.chip:hover { color: var(--ink); }
+.chip.on { background: var(--accent); color: var(--on-accent); }
+.dfoot { grid-column: 1 / 26; grid-row: 18; padding: 0 16px; gap: 24px; }
+.dfoot b { color: var(--ink-dim); font-weight: 500; }
+.dfoot .last { margin-left: auto; }
+
+/* Machine browser, over the sections (rows 4-18) */
+.browser { grid-column: 1 / 26; grid-row: 4 / 19; display: grid; grid-template-columns: repeat(25, var(--m)); grid-template-rows: repeat(15, var(--m)); background: var(--surface); }
+.browser .bhead { grid-column: 1 / 22; grid-row: 1; padding-left: 16px; gap: 16px; }
+.browser .bhead b { font-weight: 600; font-size: 14px; letter-spacing: 2px; }
+.browser .bhead span { font-size: 12px; color: var(--ink-dim); }
+.browser .fam span { font-size: 11px; color: var(--ink-faint); }
+.browser .close { grid-column: 22 / 26; grid-row: 1; justify-content: flex-end; padding-right: 16px; font-size: 12px; color: var(--ink-dim); }
+.browser .close:hover { color: var(--ink); }
+.browser .fam { grid-row: 2; padding-left: 16px; gap: 8px; align-items: flex-end; padding-bottom: 6px; }
+.browser .fam b { font-weight: 600; font-size: 13px; letter-spacing: 2px; }
+.browser .col { grid-row: 3 / 16; display: grid; grid-auto-flow: column; grid-template-rows: repeat(13, var(--m)); }
+.browser .col.rom { grid-template-rows: repeat(8, var(--m)); grid-template-columns: repeat(6, var(--m)); grid-auto-flow: row; align-content: start; }
+.browser .col.e12 { grid-template-rows: repeat(8, var(--m)); grid-template-columns: repeat(2, calc(2 * var(--m))); align-content: start; }
+.mach { padding-left: 16px; font-size: 13px; letter-spacing: 1px; color: var(--ink-dim); position: relative; }
+.mach:hover { color: var(--ink); }
+.mach.cur { color: var(--ink); }
+.mach.cur::before { content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 3px; background: var(--accent); }
+.col.rom .mach { padding-left: 0; justify-content: center; font-size: 12px; }
+.col.rom .mach.cur::before { left: 6px; }
+
+/* MIX: 16 channels of 2 modules; a hairline separates the channels, nothing else is drawn */
+.mix { grid-column: 1 / 33; grid-row: 2 / 20; display: grid; grid-template-columns: repeat(16, calc(2 * var(--m))); }
+.strip { display: grid; grid-template-columns: repeat(2, var(--m)); grid-template-rows: repeat(18, var(--m)); position: relative; }
+.strip + .strip { box-shadow: inset 1px 0 0 var(--line); }
+.strip.sel { background: var(--chrome); }
+.strip.sel::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 3px; background: var(--accent); }
+.strip > .cell { grid-column: 1 / 3; justify-content: center; }
+.strip .n { grid-row: 1; font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; align-items: flex-end; }
+.strip .n.trig, .strip.sel .n { color: var(--accent); }
+.strip .m { grid-row: 2; font-size: 13px; letter-spacing: 1px; align-items: flex-start; padding-top: 4px; }
+.strip .pan { grid-row: 3 / 5; flex-direction: column; justify-content: center; gap: 0; cursor: ns-resize; }
+.strip .fz { grid-row: 5 / 16; gap: 8px; padding: 10px 0; }
+.vu { width: 4px; align-self: stretch; background: var(--display); position: relative; }
+.vu b { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); }
+.fader { width: 24px; align-self: stretch; position: relative; cursor: ns-resize; }
+.fader .rail { position: absolute; left: 11px; top: 0; bottom: 0; width: 2px; background: var(--track); }
+.fader .capf { position: absolute; left: 0; width: 24px; height: 10px; background: var(--ink); }
+.strip .val { grid-row: 16; }
+.strip .toggle { grid-row: 17; grid-column: auto; }
+.strip .dest { grid-row: 18; font-size: 12px; letter-spacing: 1px; color: var(--ink-faint); }
+.strip .dest.own { color: var(--ink); }
+
+/* SORTIES: a table whose head is ruled, and help */
+.otable { grid-column: 1 / 21; grid-row: 2 / 20; display: grid; grid-template-rows: repeat(18, var(--m)); }
+.orow { display: grid; grid-template-columns: calc(2 * var(--m)) calc(4 * var(--m)) calc(3 * var(--m)) calc(7 * var(--m)) calc(4 * var(--m)); font-size: 13px; color: var(--ink-dim); position: relative; }
+.orow > .cell { padding-left: 16px; }
+.orow.ohead { box-shadow: inset 0 -1px 0 var(--line); }
+.orow.main { color: var(--ink); }
+.orow .out { font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.orow.own { color: var(--ink); }
+.orow.own::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; background: var(--accent); }
+.orow .lvl i { display: block; width: calc(3 * var(--m)); height: 3px; background: var(--display); position: relative; }
+.orow .lvl i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); }
+.ohelp { grid-column: 21 / 33; grid-row: 2 / 20; display: grid; grid-template-rows: repeat(18, var(--m)); align-content: start; background: var(--chrome); }
+.ohelp .h { padding-left: 20px; font-size: 14px; font-weight: 600; letter-spacing: 1px; align-items: flex-end; padding-bottom: 6px; }
+.ohelp p { margin: 0; padding: 4px 20px 0; font-size: 13px; line-height: 20px; color: var(--ink-dim); }
+.ohelp p b { color: var(--ink); font-weight: 600; }
+.ohelp .t1 { grid-row: 2 / 6; } .ohelp .t2 { grid-row: 7 / 11; } .ohelp .t3 { grid-row: 12 / 14; }
+.ohelp .h1 { grid-row: 1; } .ohelp .h2 { grid-row: 6; } .ohelp .h3 { grid-row: 11; }
+
+/* The module grid, overlaid on demand: it is there, just not drawn */
+.ui.showgrid::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+	background-image: linear-gradient(to right, rgba(255, 90, 60, .35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 90, 60, .35) 1px, transparent 1px);
+	background-size: var(--m) var(--m); }

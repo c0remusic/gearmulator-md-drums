@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MD Drums v22 options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v22-ui.css">
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #0e0f10; color: #d8d6d0; font: 14px/1.5 "Inter", system-ui, sans-serif; --k: 1; }
+	@media (max-width: 1340px) { body { --k: 0.85; } }
+	@media (max-width: 1140px) { body { --k: 0.68; } }
+	@media (max-width: 900px) { body { --k: 0.6; } }
+	@media (max-width: 760px) { body { --k: 0.5; } }
+	@media (max-width: 640px) { body { --k: 0.28; } }
+	main { padding: 18px 28px 40px; }
+	h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+	h2 { font-size: 17px; margin: 36px 0 4px; font-weight: 600; }
+	h3 { font-size: 14px; margin: 20px 0 2px; font-weight: 600; }
+	p { margin: 2px 0 8px; color: #a3a6ab; max-width: 1100px; }
+	.controls { display: flex; gap: 6px; margin: 8px 0; }
+	.controls button { background: none; color: #d8d6d0; border: 1px solid #3a3c40; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+	.controls button.on { background: #6fd1c4; color: #10201e; border-color: #6fd1c4; }
+	.crop { width: calc(1296px * var(--k)); overflow: hidden; border: 1px solid #333; position: relative; }
+	.crop .frame { width: 1296px; height: 824px; transform-origin: 0 0; position: absolute; left: 0; top: 0; }
+	.crop.head { height: calc(384px * var(--k)); }
+	.crop.head .frame { transform: scale(var(--k)); }
+	.crop.lfo { height: calc(228px * var(--k)); }
+	.crop.lfo .frame { transform: scale(var(--k)) translateY(-596px); }
+</style>
+</head>
+<body>
+<main>
+	<h1>Tête de piste et cible du LFO : options</h1>
+	<p>Sur la grille de v20 (16 colonnes de 64 px en rouge, gouttières de 16, marges de 8, ligne de base de 8 en bleu). Flèches et play se choisissent séparément. Chaque cadre est vivant : clic, molette, glisser.</p>
+	<div class="controls"><button id="grid" class="on">Grille affichée</button><button id="demo">Jouer le motif de démo</button></div>
+
+	<h2>1 · Les flèches ‹ › (play : touche ▶ en bout de bande)</h2>
+	<h3>Aux deux bouts du champ</h3>
+	<p>Le champ du nom (colonnes 4–7) a ‹ à gauche et › à droite, à place fixe : elles ne bougent plus quand le nom change de longueur.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="ends" data-play="key" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>Stepper dans le champ</h3>
+	<p>▲ ▼ empilés au bout droit du champ souligné, comme une liste déroulante.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="stepper" data-play="key" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>Sur la ligne de légende : changer de piste (choisi)</h3>
+	<p>Petites, juste après « TRACK 01 » : piste précédente, piste suivante. La machine se change sur son nom : clic pour le navigateur, molette ou ↑ ↓ pour la voisine.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="caption" data-play="key" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>Aucune : molette</h3>
+	<p>Molette ou ↑ ↓ sur le nom pour passer à la machine voisine ; clic pour le navigateur.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="wheel" data-play="key" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+
+	<h2>2 · Le play (flèches : légende, pistes)</h2>
+	<h3>Touche ▶ en bout de bande, avec sa vélocité</h3>
+	<p>Colonne 16, au-dessus des écrans ; la vélocité à côté (colonne 15) se règle en glissant.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="caption" data-play="key" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>L'écran SYN joue</h3>
+	<p>Clic sur l'écran qui montre la frappe ; ▶ dans son coin.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="caption" data-play="screen" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>La liste et Espace</h3>
+	<p>Pas de bouton dans la bande : clic sur un numéro de la liste (▶ au survol), ou Espace pour la piste affichée.</p>
+	<div class="crop head"><div class="frame" data-view="TRACK" data-arrows="caption" data-play="list" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+
+	<h2>3 · La cible du LFO : les deux</h2>
+	<h3>Fermé</h3>
+	<p>Dans le titre de l'écran LFO : la cible (clic : le menu), ASSIGN, le mode.</p>
+	<div class="crop lfo"><div class="frame" data-view="TRACK" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>Menu, sur tout l'écran LFO</h3>
+	<p>Les 16 pistes, puis les 24 paramètres de la piste choisie sous leurs noms sur sa machine, une ligne par bande. Done ou Échap ferme ; choisir un paramètre ferme aussi.</p>
+	<div class="crop lfo"><div class="frame" data-view="TRACK" data-lfopick="menu" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+	<h3>ASSIGN</h3>
+	<p>ASSIGN allumé : chaque bouton devient une cible (cerclé) ; clic sur un bouton de cette piste, ou d'une autre choisie dans la liste. Échap annule. Un bouton modulé a son nom souligné ; au survol, quels LFO le modulent.</p>
+	<div class="crop lfo"><div class="frame" data-view="TRACK" data-lfopick="assign" data-grid="on" data-font="'Inter', sans-serif"></div></div>
+</main>
+<script src="v6-machines.js"></script>
+<script src="v22-hits.js"></script>
+<script src="v22-ui.js"></script>
+<script>
+	const grid = document.getElementById("grid"), demo = document.getElementById("demo");
+	grid.addEventListener("click", () => {
+		const on = !grid.classList.contains("on");
+		grid.classList.toggle("on", on); grid.textContent = on ? "Grille affichée" : "Grille masquée";
+		document.querySelectorAll(".frame").forEach(f => f.dataset.grid = on ? "on" : "off"); MD.renderAll();
+	});
+	demo.addEventListener("click", () => { const on = !demo.classList.contains("on"); demo.classList.toggle("on", on); MD.setDemo(on); });
+	MD.start();
+</script>
+</body>
+</html>
