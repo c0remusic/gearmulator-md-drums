@@ -195,7 +195,7 @@ namespace mdFirmwareBench
 	// The note that triggers each track on the base channel (the firmware's default map, white keys C2-D4).
 	inline constexpr std::array<uint8_t, 16> g_trackNotes{36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62};
 
-	// One hit of _machine on _track (0-15), routed to output A (no master effects), with g_hitParameters and
+	// One hit of _machine on _track (0-15), routed to output A (no master effects), with hitParameters(_machine) and
 	// velocity 100, on a booted machine: a second of every output channel from the note on. A voice keeps its noise
 	// generator's state from one hit to the next, so a hit compared with another engine takes a track not played yet.
 	inline std::vector<std::vector<float>> recordHit(Bench& _bench, const float _threshold, const uint16_t _machine,
@@ -209,10 +209,11 @@ namespace mdFirmwareBench
 		_bench.sysex(std::vector<uint8_t>(machine->begin(), machine->end()));
 		for(uint32_t block = 0; block < 86; ++block)
 			_bench.process();
-		for(uint8_t parameter = 0; parameter < g_hitParameters.size(); ++parameter)
+		const auto parameters = hitParameters(_machine);
+		for(uint8_t parameter = 0; parameter < parameters.size(); ++parameter)
 		{
 			const auto cc = encodeParameterChange(md::MachineModel::Machinedrum,
-				{static_cast<uint8_t>(parameter / 8), _track, static_cast<uint8_t>(parameter % 8), g_hitParameters[parameter]}, 0);
+				{static_cast<uint8_t>(parameter / 8), _track, static_cast<uint8_t>(parameter % 8), parameters[parameter]}, 0);
 			require(cc.has_value(), "no CC for a track parameter");
 			_bench.note((*cc)[0], (*cc)[1], (*cc)[2], 0);
 		}
@@ -237,5 +238,15 @@ namespace mdFirmwareBench
 					_bench.outputs()[channel].end());
 		}
 		return channels;
+	}
+
+	// Takes _track's hit out of the outputs once recorded (LEV 0): a hit still sounding, as a looped ROM sample does
+	// while it holds, would otherwise play into the next one and keep the machine from falling silent.
+	inline void silenceHit(Bench& _bench, const uint8_t _track)
+	{
+		const auto level = md::automation::encodeParameterChange(md::MachineModel::Machinedrum,
+			{md::automation::machinedrum::Level, _track, 0, 0}, 0);
+		require(level.has_value(), "no CC for the track level");
+		_bench.note((*level)[0], (*level)[1], (*level)[2], 0);
 	}
 }

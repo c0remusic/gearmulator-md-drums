@@ -1,9 +1,11 @@
 // The engines without the ColdFire OS (mdEngine) against the full firmware: one hit of each machine in
 // g_hitMachines, with the same 24 track parameters and level, routed to an individual output, must give the same
-// samples (2026-10-06: residuals 99-110 dB down, the 32-bit float conversion's). The firmware's hits come from `mdTrigLatencyFirmwareTest --hits` (a separate
+// samples (2026-10-06: residuals 99-110 dB down, the 32-bit float conversion's; a ROM machine within
+// hitResidualFloorDb, as the firmware's own ROM hits vary). The firmware's hits come from `mdTrigLatencyFirmwareTest --hits` (a separate
 // process: Musashi's entry points serve one CPU class per executable); the engine reads its OS and DSP programs
-// from the same 8 MB flash image the firmware boots from.
-// usage: mdEngineFirmwareTest <hits file>
+// from the same 8 MB flash image the firmware boots from. The UW bank the engine copies into its voice DSP must
+// equal, word for word, what the firmware's boot leaves in DSP2 (`mdTrigLatencyFirmwareTest --dsp2`, from $147e00).
+// usage: mdEngineFirmwareTest <hits file> <DSP2 dump>
 
 #include "hitParameters.h"
 
@@ -74,6 +76,31 @@ namespace
 		return hits;
 	}
 
+	// The UW bank as loadRomBankFromFlash makes it, against DSP2's P memory after the firmware's boot (little-endian
+	// 32-bit words from fw::RomBank::DirectoryAddr): every ROM slot's directory entry, then every sample word.
+	void compareRomBank(const md::fw::RomBank& _bank, const std::vector<uint8_t>& _dump)
+	{
+		const auto word = [&](const uint32_t _address)
+		{
+			const size_t at = static_cast<size_t>(_address - md::fw::RomBank::DirectoryAddr) * 4;
+			require(_address >= md::fw::RomBank::DirectoryAddr && at + 4 <= _dump.size(),
+				"the DSP2 dump does not cover the bank");
+			uint32_t value;
+			std::memcpy(&value, &_dump[at], 4);
+			return value & 0xffffff;
+		};
+		size_t entries = 0, data = 0;
+		for(const auto& entry : _bank.directory)
+			for(uint32_t i = 0; i < 4; ++i)
+				entries += word(entry.addr + i) != entry.words[i];
+		for(size_t i = 0; i < _bank.data.size(); ++i)
+			data += word(md::fw::RomBank::DataAddr + static_cast<uint32_t>(i)) != _bank.data[i];
+		std::printf("UW bank: %u samples in %zu words; against the firmware's boot, %zu directory and %zu sample words"
+			" differ\n", _bank.samples, _bank.data.size(), entries, data);
+		require(_bank.samples > 0, "the flash image holds no UW bank");
+		require(entries == 0 && data == 0, "the engine's UW bank differs from the one the firmware's boot leaves in DSP2");
+	}
+
 	// _track alone from the trigger on, routed to output A, as mdEngine renders the hit recordHit plays on the
 	// firmware.
 	std::vector<float> engineHit(md::engine::Engine& _engine, const uint8_t _machine, const int _track,
@@ -82,8 +109,9 @@ namespace
 		auto& host = _engine.host();
 		host.setMachine(_track, _machine);
 		host.setRouting(_track, 0);
-		for(int parameter = 0; parameter < static_cast<int>(g_hitParameters.size()); ++parameter)
-			host.setParam(_track, parameter, g_hitParameters[parameter]);
+		const auto parameters = hitParameters(_machine);
+		for(int parameter = 0; parameter < static_cast<int>(parameters.size()); ++parameter)
+			host.setParam(_track, parameter, parameters[parameter]);
 		host.setLevel(_track, g_hitLevel);
 
 		md::engine::Engine::Output out;
@@ -153,15 +181,20 @@ int main(const int _argc, char** _argv)
 		std::cout << "mdEngineFirmwareTest: SKIP (GEARMULATOR_MD_FIRMWARE_BIN not set)\n";
 		return 77;
 	}
-	if(_argc < 2)
+	if(_argc < 3)
 	{
-		std::cerr << "usage: mdEngineFirmwareTest <hits file from mdTrigLatencyFirmwareTest --hits>\n";
+		std::cerr << "usage: mdEngineFirmwareTest <hits file from mdTrigLatencyFirmwareTest --hits>"
+			" <DSP2 dump from mdTrigLatencyFirmwareTest --dsp2, from $147e00>\n";
 		return 2;
 	}
 	try
 	{
-		auto os = md::fw::loadFirmwareFromFlash(readAll(path));
+		const auto flash = readAll(path);
+		auto os = md::fw::loadFirmwareFromFlash(flash);
 		md::engine::Engine engine(os.firmware, std::move(os.osImage));
+		const auto bank = md::fw::loadRomBankFromFlash(flash);
+		compareRomBank(bank, readAll(_argv[2]));
+		engine.loadRomBank(bank);
 		const auto hits = readHits(_argv[1]);
 
 		for(const auto id : g_hitMachines)
@@ -174,12 +207,14 @@ int main(const int _argc, char** _argv)
 			const auto& hit = firmware->second;
 			const auto result = compare(hit.samples,
 				engineHit(engine, static_cast<uint8_t>(id), hit.track, hit.samples.size()));
+			// Silenced once recorded, as the firmware bench does.
+			engine.host().setLevel(hit.track, 0);
 			std::printf("%-6s id %3u track %2d: correlation %.6f, gain %.4f (%+.2f dB), residual %.1f dB\n",
 				machine->name.c_str(), id, hit.track + 1, result.correlation, result.gain,
 				20.0 * std::log10(result.gain), result.residualDb);
 			require(result.correlation > 0.999999, "the engine's hit differs from the firmware's");
 			require(std::abs(20.0 * std::log10(result.gain)) < 0.01, "the engine's hit is louder or quieter");
-			require(result.residualDb < -90.0, "the engine's hit leaves a residual above -90 dB");
+			require(result.residualDb < hitResidualFloorDb(id), "the engine's hit leaves a residual above its floor");
 		}
 		std::cout << "mdEngineFirmwareTest: PASS\n";
 		return 0;

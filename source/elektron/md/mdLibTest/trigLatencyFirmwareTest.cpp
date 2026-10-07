@@ -121,9 +121,9 @@ namespace
 	};
 
 	// One hit of each machine, one after the other on one booted machine, the n-th on track n + 2 so that no voice
-	// has played before (see recordHit; the boot probes track 1): writes, for each, its id, its track (0-15), its
-	// sample count and a second of output A from the note on (three 32-bit unsigned, then 32-bit floats;
-	// little-endian), the reference mdEngineFirmwareTest compares the engines with.
+	// has played before (see recordHit; the boot probes track 1), each silenced once recorded: writes, for each, its
+	// id, its track (0-15), its sample count and a second of output A from the note on (three 32-bit unsigned, then
+	// 32-bit floats; little-endian), the reference mdEngineFirmwareTest compares the engines with.
 	void hits(const char* _path, const std::string& _file, const std::vector<uint16_t>& _machines)
 	{
 		Bench bench(_path, 0);
@@ -139,6 +139,7 @@ namespace
 		{
 			const auto track = static_cast<uint8_t>(i + 1);
 			const auto channels = recordHit(bench, threshold, _machines[i], track);
+			silenceHit(bench, track);
 			const uint32_t id = _machines[i], trackIndex = track, count = static_cast<uint32_t>(channels[0].size());
 			append(&id, sizeof(id));
 			append(&trackIndex, sizeof(trackIndex));
@@ -153,6 +154,27 @@ namespace
 			}
 		}
 		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the hits");
+	}
+
+	// The voice DSP's (DSP2's) P memory from _from to _to (exclusive) once the OS has booted and plays notes: what the
+	// boot leaves there besides the program, among it the UW sample bank it copies from the flash (a directory at
+	// $147e00, the sample data from $150000). Little-endian 32-bit words: the reference for the engine's own copy.
+	void dsp2(const char* _path, const std::string& _file, const uint32_t _from, const uint32_t _to)
+	{
+		require(_from < _to, "empty DSP2 range");
+		Bench bench(_path, 0);
+		bootUntilNotesPlay(bench);
+		const auto& memory = bench.hardware().getDspProducer().dsp().memory();
+		std::vector<uint8_t> bytes;
+		bytes.reserve(static_cast<size_t>(_to - _from) * 4);
+		for(uint32_t address = _from; address < _to; ++address)
+		{
+			const uint32_t word = memory.get(dsp56k::MemArea_P, address);
+			for(int shift = 0; shift < 32; shift += 8)
+				bytes.push_back(static_cast<uint8_t>(word >> shift));
+		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the DSP2 dump");
+		std::printf("DSP2 P $%06x-$%06x: %u words\n", _from, _to, _to - _from);
 	}
 
 	void run(const char* _path)
@@ -244,6 +266,10 @@ int main(int argc, char** argv)
 				machines.push_back(static_cast<uint16_t>(std::atoi(argv[i])));
 			hits(path, argv[2], machines);
 		}
+		// --dsp2 <file> <from> <to>: DSP2's P memory after the boot, addresses in hexadecimal.
+		else if(argc > 4 && std::string(argv[1]) == "--dsp2")
+			dsp2(path, argv[2], static_cast<uint32_t>(std::stoul(argv[3], nullptr, 16)),
+				static_cast<uint32_t>(std::stoul(argv[4], nullptr, 16)));
 		else
 			run(path);
 		return 0;

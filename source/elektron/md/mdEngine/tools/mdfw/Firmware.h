@@ -73,4 +73,19 @@ struct FlashOs {
 };
 FlashOs loadFirmwareFromFlash(const std::vector<uint8_t>& flash);
 
+// md-drums: the UW sample bank as OS 1.63's boot leaves it in the voice DSP (DSP2), redone from the flash image alone
+// (the OS's ROM sample transfer, $20d20e): a directory at P:$147e00 of 4-word entries (start, length, loop start or
+// $ffffff, rate as a fraction of 44.1 kHz with 2^18 = 1), ROM slots 0-31 at entries 0-31 and 32-47 at entries 48-63
+// (entries 32-47 belong to the RAM machines), and the samples, two 12-bit codes per word, first in the high half, from
+// P:$150000. The bank's 16-bit samples become 12-bit codes through the OS's own table in the flash. Write both into
+// the voice DSP (VoiceEngine::writeP) after constructing it; nothing is filled if the image holds no bank.
+struct RomBank {
+    static constexpr uint32_t DirectoryAddr = 0x147e00, DataAddr = 0x150000, SlotCount = 48;
+    struct Entry { uint32_t addr; uint32_t words[4]; };
+    std::vector<Entry> directory;   // one per ROM slot, filled or empty
+    std::vector<uint32_t> data;     // from DataAddr
+    uint32_t samples = 0;           // ROM slots that hold a sample
+};
+RomBank loadRomBankFromFlash(const std::vector<uint8_t>& flash);
+
 } // namespace md::fw

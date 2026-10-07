@@ -185,4 +185,77 @@ FlashOs loadFirmwareFromFlash(const std::vector<uint8_t>& flash)
     return os;
 }
 
+RomBank loadRomBankFromFlash(const std::vector<uint8_t>& flash)
+{
+    // The bank (flash 0x100000): 0xabcd, the sample count, then per sample 12 big-endian words (tag 0x1a00 + slot,
+    // bits, period in ns low/high, length low/high, loop start low/high, loop end low/high, loop type with 0x7f for
+    // none, gain) and its 16-bit samples. The OS's conversion table (0x7a0000): 65536 big-endian words, the 12-bit code
+    // of each 16-bit sample read as unsigned.
+    constexpr size_t kBank = 0x100000, kTable = 0x7a0000, kTableEnd = kTable + 0x20000;
+    RomBank bank;
+    if (flash.size() < kTableEnd) return bank;
+    const auto w16 = [&](const size_t o) -> uint32_t { return o + 1 < flash.size() ? (uint32_t(flash[o]) << 8) | flash[o + 1] : 0xffff; };
+    const auto lohi = [&](const size_t o) { return w16(o) | (w16(o + 2) << 16); };
+    if (w16(kBank) != 0xabcd) return bank;
+    const uint32_t count = w16(kBank + 2);
+    if (count == 0 || count > RomBank::SlotCount) return bank;
+
+    struct Sample { size_t data; uint32_t period, length, loopStart, loopEnd, loopType, gain; };
+    std::vector<std::optional<Sample>> slots(RomBank::SlotCount);
+    size_t pos = kBank + 4;
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint32_t tag = w16(pos), slot = tag & 0xff;
+        const Sample s{pos + 24, lohi(pos + 4), lohi(pos + 8), lohi(pos + 12), lohi(pos + 16), w16(pos + 20), w16(pos + 22)};
+        if ((tag & 0xff00) != 0x1a00 || slot >= RomBank::SlotCount || s.data + 2 * size_t(s.length) > kTable) return {};
+        slots[slot] = s;
+        pos = s.data + 2 * size_t(s.length);
+    }
+
+    // The OS reads a sample from its own copy of it in 64 KiB flash blocks, where erased flash (0xffff) follows the
+    // sample's end. A gain at or below $74ff scales the samples first, as the OS does.
+    const auto value = [&](const Sample& _s, const uint32_t _k) -> uint16_t {
+        const uint32_t raw = _k < _s.length ? w16(_s.data + 2 * size_t(_k)) : 0xffff;
+        if (_s.gain > 0x74ff) return uint16_t(raw);
+        const int32_t v = int16_t(uint16_t(raw));
+        if (_s.gain <= 0x1fff) return uint16_t(v * 4);
+        const int32_t factor = 0x3fffffff / int32_t(_s.gain);
+        return uint16_t(int32_t(uint32_t(v) * uint32_t(factor)) >> 15);
+    };
+    const auto code = [&](const uint16_t _v) { return w16(kTable + 2 * size_t(_v)) & 0xfff; };
+
+    uint32_t offset = 0;
+    for (uint32_t slot = 0; slot < RomBank::SlotCount; ++slot) {
+        RomBank::Entry entry{RomBank::DirectoryAddr + 4 * (slot < 32 ? slot : slot + 16), {0, 0, 0xffffff, 0}};
+        const auto& s = slots[slot];
+        // The OS leaves a slot empty when its rate is below 2 kHz (a period above 500 us).
+        if (s && s->period != 0 && s->period <= 0x7a120) {
+            uint32_t used = s->length, loop = 0xffffff;
+            // A loop shorter than 151 samples, or outside the sample, is ignored; a loop ends the sample at its end.
+            if (s->loopType != 0x7f && s->loopEnd > s->loopStart && s->loopEnd <= s->length && s->loopEnd - s->loopStart > 0x96) {
+                loop = s->loopStart;
+                used = s->loopEnd + 1;
+            }
+            entry.words[0] = (RomBank::DataAddr + offset) & 0xffffff;
+            entry.words[1] = used & 0xffffff;
+            entry.words[2] = loop & 0xffffff;
+            entry.words[3] = (uint32_t(0x16250000 / int32_t(s->period)) << 4) & 0xffffff;
+            // The OS's chunks, one per flash block: 0x7ff4 samples, then 0x7ffe; the last takes one sample more than
+            // remain; each packs floor(n / 2) words.
+            uint32_t remaining = used, k = 0, chunk = 0x7ff4;
+            while (remaining > 0) {
+                const uint32_t n = chunk <= remaining ? chunk : remaining + 1;
+                for (uint32_t j = 0; j + 1 < n; j += 2)
+                    bank.data.push_back((code(value(*s, k + j)) << 12) | code(value(*s, k + j + 1)));
+                offset += n / 2;
+                k += n;
+                remaining = n >= remaining ? 0 : remaining - n;
+                chunk = 0x7ffe;
+            }
+            ++bank.samples;
+        }
+        bank.directory.push_back(entry);
+    }
+    return bank;
+}
+
 } // namespace md::fw

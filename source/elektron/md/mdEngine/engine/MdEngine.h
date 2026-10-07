@@ -59,6 +59,15 @@ namespace md::engine
 		const MachineRunner& os() const { return *m_os; }
 		TVoices& voices() { return *m_voices; }
 
+		// md-drums: the UW sample bank the ROM machines play (fw::loadRomBankFromFlash). The OS's boot copies it from
+		// the flash into the voice DSP; this voice DSP starts without it, and every ROM machine is silent until then.
+		void loadRomBank(const fw::RomBank& _bank)
+		{
+			for(const auto& entry : _bank.directory)
+				m_voices->writeP(entry.addr, entry.words, std::size(entry.words));
+			m_voices->writeP(fw::RomBank::DataAddr, _bank.data.data(), _bank.data.size());
+		}
+
 		struct Output
 		{
 			Mixer::Output mix;													// main, sends, individual outputs

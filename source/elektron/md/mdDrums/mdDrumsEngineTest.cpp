@@ -1,5 +1,5 @@
 // mdDrums::Engine as MD Drums drives it: it finds the flash image, plays a trigger within one 32-sample block,
-// scales the velocity, and renders all 16 tracks playing faster than real time.
+// scales the velocity, plays the UW bank's samples, and renders all 16 tracks playing faster than real time.
 
 #include "mdDrumsEngine.h"
 
@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace
@@ -107,6 +108,26 @@ int main()
 			require(peak(2) > 0.01f, "a separated track is silent on its own output");
 			require(peak(3) == 0.0f, "another track's output carries track 1");
 			engine.setSeparateOutputs(0);
+		}
+
+		// The ROM machines play the UW bank, which fills ROM-01 to -32: the whole sample once (PTCH 64, DEC and HOLD
+		// 127, BRR 0, STRT 0, END 127, no retrig). ROM-33 holds no sample and stays silent.
+		{
+			const int whole[8] = {64, 127, 127, 0, 0, 127, 0, 0};
+			for(const char* name : {"ROM01", "ROM32", "ROM33"})
+			{
+				engine.setMachine(0, machineId(engine, name));
+				for(int param = 0; param < 8; ++param)
+					engine.setParam(0, param, whole[param]);
+				settle(engine);
+				engine.trigger(0, 127);
+				const auto peak = listen(engine).second;
+				std::printf("%s velocity 127: peak %.4f\n", name, peak);
+				if(std::string(name) == "ROM33")
+					require(peak == 0.0f, "an empty ROM slot sounds");
+				else
+					require(peak > 0.01f, "a ROM machine of the factory bank is silent");
+			}
 		}
 
 		// All 16 tracks, each on a TRX machine, triggered every 64th of a second for 8 seconds.

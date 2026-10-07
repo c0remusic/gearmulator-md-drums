@@ -90,6 +90,7 @@ namespace mdDrums
 	Engine::Engine(const std::vector<uint8_t>& _flashImage)
 		: m_state(std::make_unique<State>(md::fw::loadFirmwareFromFlash(_flashImage)))
 	{
+		m_state->engine.loadRomBank(md::fw::loadRomBankFromFlash(_flashImage));
 		auto& host = m_state->engine.host();
 		for(int track = 0; track < TrackCount; ++track)
 		{
