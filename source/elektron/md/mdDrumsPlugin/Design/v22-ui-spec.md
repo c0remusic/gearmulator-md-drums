@@ -1,5 +1,8 @@
 # MD Drums v22 — UI spec
 
+**Approved by the user on 2026-10-08.** `HANDOFF.md` gives the final placement in window pixels; the y values in this
+spec are those of the versions it went through.
+
 v21 (see `v21-ui-spec.md`, and `v20-ui-spec.md` for the grid, regions, head band, rules, screens and LFO target) with
 the user's review of v21 on 2026-10-07: the hit's curve looked odd and its waveform no longer changed, the screens had
 lost their colour, ASSIGN sat in a frame, the LFO's "0" said nothing, the play key still flashed on every hit, and MIX
