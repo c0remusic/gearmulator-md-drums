@@ -25,7 +25,7 @@ namespace synthLib
 		const auto ptr = buf.data();
 
 		const TAudioInputs in = {ptr, ptr, nullptr, nullptr};//, nullptr, nullptr, nullptr, nullptr};
-		const TAudioOutputs out = {ptr, ptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+		const TAudioOutputs out = {ptr, ptr};
 
 		std::vector<SMidiEvent> midi;
 

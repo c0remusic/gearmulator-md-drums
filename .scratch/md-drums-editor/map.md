@@ -66,6 +66,9 @@ mesurées avant et après. Pas de tag.
   `synthLib` à 18 sorties ; resampler de la pile (Legacy, +0,67 ms hors 44,1 kHz) ; 592 paramètres figés au premier
   push, pages 0-4 = CC de la MD ; état = dump `$52` + SysEx privée ; codecs dans `mdProtocol` ; Links et Chokes joués
   comme l'OS ; Mute et Solo perdent les Hits.
+- [synthLib à 18 sorties](issues/14-synthlib-18-sorties.md) : `synthLib::MaxAudioOutputs` = 18 ; les 18 canaux
+  sortent alignés à la latence rapportée dans les trois modes ; Legacy confirmé à 0,67 ms à 48 kHz et gardé par
+  défaut (5,8 % d'un cœur à 48 kHz pour 18 canaux, contre 27,9 % en MameHq).
 
 ## Not yet specified
 

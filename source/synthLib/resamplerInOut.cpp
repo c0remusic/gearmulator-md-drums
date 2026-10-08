@@ -115,7 +115,7 @@ namespace synthLib
 		m_in.reset(new Resampler(m_samplerateHost, m_samplerateDevice, m_mode));
 
 		// prewarm to calculate latency
-		std::array<std::vector<float>, 12> data;
+		std::array<std::vector<float>, std::max(MaxAudioInputs, MaxAudioOutputs)> data;
 
 		TAudioInputs ins;
 		TAudioOutputs outs;

@@ -76,13 +76,13 @@ $rom = "$env:LOCALAPPDATA\Programs\Gearmulator-Elektron"
 $env:GEARMULATOR_MD_FIRMWARE_BIN = "$rom\elektron_sps1-1uw_os1.63.bin"
 $env:GEARMULATOR_MM_FIRMWARE_BIN = "$rom\elektron_sfx6-60_os1.32b.bin"
 $env:MD_AUTOMATION_REQUIRE_FIRMWARE = "1"
-cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest mdTrigLatencyFirmwareTest mdEngineFirmwareTest mdDrumsEngineTest mdDrumsProcessorTest
+cmake --build temp\cmake_vs22 --config Release -j 6 --target mdAudioFirmwareTest mdMidiTimingTest mdHostRxTimingTest mdHostRxFirmwareTest mdAudioQueueTest mdAutomationMidiTest mdAutomationParameterTest mdAutomationFirmwareTest mdParallelTransportFirmwareTest mdTrigLatencyFirmwareTest mdEngineFirmwareTest mdDrumsEngineTest mdDrumsProcessorTest synthLibResamplerTimingTest synthLibOutputChannelsTest
 Copy-Item "$rom\*.bin" temp\cmake_vs22\source\elektron\md\mdJucePlugin\Release
 cd temp\cmake_vs22
-ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest|mdEngineFirmwareTest|mdDrumsEngineTest|mdDrumsProcessorTest)$"
+ctest -C Release -R "^(mdAudioFirmwareTest|mdMidiTimingTest|mdMidiTimingFirmwareTest|mdHostRxTimingTest|mdHostRxFirmwareTest|mdAudioQueueTest|mdAutomationMidiTest|mdAutomationParameterTest|mdAutomationFirmwareTest|mdParallelTransportFirmwareTest|mdEngineFirmwareTest|mdDrumsEngineTest|mdDrumsProcessorTest|synthLibResamplerTimingTest|synthLibOutputChannelsTest)$"
 ```
 
-Green is 22 passed out of 22 in 150 to 230 s: ctest adds the 9 fixture tests these require (`mdEngineFirmwareHits` and `mdEngineFirmwareRomBank` boot the firmware to record the hits and the voice DSP's UW bank that `mdEngineFirmwareTest` compares the engine with).
+Green is 24 passed out of 24 in 170 to 250 s: ctest adds the 9 fixture tests these require (`mdEngineFirmwareHits` and `mdEngineFirmwareRomBank` boot the firmware to record the hits and the voice DSP's UW bank that `mdEngineFirmwareTest` compares the engine with).
 
 Both ROMs are required. A firmware test exits 77 without its ROM and ctest reports it Skipped, which proves nothing:
 - Most firmware tests read the two variables; the timing tests check the Monomachine as well.

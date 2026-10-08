@@ -80,6 +80,12 @@ if(BUILD_TESTING)
 	add_test(NAME synthLibResamplerTimingTest COMMAND synthLibResamplerTimingTest)
 	set_tests_properties(synthLibResamplerTimingTest PROPERTIES LABELS "UnitTest;AudioIo;Midi;Timing")
 
+	add_executable(synthLibOutputChannelsTest synthLibTest/outputChannelsTest.cpp)
+	target_link_libraries(synthLibOutputChannelsTest PRIVATE synthLib)
+	add_test(NAME synthLibOutputChannelsTest COMMAND synthLibOutputChannelsTest)
+	set_tests_properties(synthLibOutputChannelsTest PROPERTIES LABELS "UnitTest;AudioIo;Timing" TIMEOUT 120)
+	set_property(TARGET synthLibOutputChannelsTest PROPERTY FOLDER "Gearmulator/test")
+
 	add_executable(synthLibStateTransactionTest synthLibTest/stateTransactionTest.cpp)
 	target_link_libraries(synthLibStateTransactionTest PRIVATE synthLib)
 	add_test(NAME synthLibStateTransactionTest COMMAND synthLibStateTransactionTest)
