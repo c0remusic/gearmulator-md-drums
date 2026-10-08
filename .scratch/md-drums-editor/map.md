@@ -104,12 +104,16 @@ mesurées avant et après. Pas de tag.
   sortie solo), 31 moins l'attente du bloc ; somme modulo 56 bits comme le DSP, identique au mixeur du moteur ; Link
   au même retard, Choke coupé au retard du Hit ; TRX-BD 37-67 → 67-67 échantillons à 44,1 kHz (gigue 0), 53-87 →
   86-87 à 48 kHz ; latence déclarée 21 → 35 ; CPU inchangé.
+- [Lecture du moteur par l'éditeur](issues/16-lecture-moteur-editeur.md) : `Telemetry` possédée par le Processor,
+  écrite par le Device sans verrou ; Controller vérité du Kit, MIDI out pour SYN1-8 seulement ; mètres des 18 sorties
+  du Device (chute 20 dB/s, −60 à 0 dBFS), scopes tenus par l'éditeur ; écran Hit en capture live progressive (min/max
+  de 8 échantillons, échelle fixe ±0,5) ; LFO sans valeur live ; ≤ 1 % d'un cœur côté audio ; tickets 20, 21, 22.
 
 ## Not yet specified
 
-- **Tranches de construction après le skin** : skin statique fait (17, 18), gigue réglée (19) ; restent les tranches
-  de comportement en C++ (écrans, mètres, ASSIGN, Kits et leur Bank, écran hit, Push), chacune un ticket `task` quand
-  la lecture du moteur par l'éditeur (16) a fixé sa forme.
+- **Tranches de construction après le skin** : skin statique fait (17, 18), gigue réglée (19), lecture du moteur
+  fixée (16) : tickets 20 (télémétrie, mètres, scopes), 21 (écran Hit), 22 (écrans Filter/EQ et LFO, ASSIGN, écoute
+  du browser) ; restent les Kits et leur Bank (après le ticket 10) et Push (après le ticket 11).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui
