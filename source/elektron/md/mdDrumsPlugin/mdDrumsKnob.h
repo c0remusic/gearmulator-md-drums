@@ -1,0 +1,52 @@
+#pragma once
+
+#include "juceRmlUi/rmlElemKnob.h"
+
+namespace juce
+{
+	class Graphics;
+	class Image;
+}
+
+namespace juceRmlUi
+{
+	class ElemCanvas;
+}
+
+namespace mdDrums
+{
+	// The v22 knob (Design/HANDOFF.md, "Controls"), the <vknob> element: a 270 degree track, and once the value leaves
+	// its default an arc from the minimum (from 64 with the "bipolar" attribute) and an ink pointer. It draws on a
+	// canvas of its own, sharp at every scale, and repaints only when its value, range, default or size change. It keeps
+	// ElemKnob's binding (param=), drag and double-click to the default, at the HANDOFF's pace: 1.5 px a step, Shift
+	// four times finer; the wheel moves 2 steps (1 with Shift), the arrow keys 1 (10 with Shift) on the focused knob.
+	class Knob final : public juceRmlUi::ElemKnob
+	{
+	public:
+		static constexpr float PixelsPerStep = 1.5f;
+		static constexpr float ShiftScale = 0.25f;
+
+		Knob(Rml::CoreInstance& _coreInstance, const Rml::String& _tag);
+		~Knob() override;
+
+		void OnUpdate() override;
+		void ProcessEvent(Rml::Event& _event) override;
+
+		void onChangeValue() override;
+		void onChangeMinValue() override;
+		void onChangeMaxValue() override;
+		void onChangeDefaultValue() override;
+		void onPropertyChanged(const std::string& _key) override;
+
+		bool isEdited() const;
+
+	private:
+		void step(float _steps);
+		void updateSpeed();
+		void repaint() const;
+		void paint(const juce::Image& _image, juce::Graphics& _g) const;
+
+		juceRmlUi::ElemCanvas* m_canvas = nullptr;
+		bool m_bipolar = false;
+	};
+}

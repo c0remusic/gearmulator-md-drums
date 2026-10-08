@@ -1,21 +1,29 @@
 cmake_minimum_required(VERSION 3.15)
 
 # MD Drums: the Machinedrum's engines without its OS (mdDrums, mdEngine) as an instrument plug-in on the TUS stack
-# (ADR 0001). Its Device speaks the Machinedrum's MIDI (ADR 0002); its Controller and skin come from
-# parameterDescriptions_mddrums.json and skins/, which .scratch/md-drums-editor/tools/gen_minimal.py generates. Its own
-# name and codes: it never replaces md-mm's "Gearmulator MD".
+# (ADR 0001). Its Device speaks the Machinedrum's MIDI (ADR 0002); its Controller comes from
+# parameterDescriptions_mddrums.json. Its skins: the v22 editor (skins/mdDrums, written by hand, ticket 17) and the
+# minimal one (skins/mdDrumsMinimal, from .scratch/md-drums-editor/tools/gen_minimal.py) until ticket 18. Its own name
+# and codes: it never replaces md-mm's "Gearmulator MD".
 project(mdDrumsPlugin VERSION ${CMAKE_PROJECT_VERSION})
 
 set(SOURCES
 	mdDrumsController.cpp mdDrumsController.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
+	mdDrumsGlyph.cpp mdDrumsGlyph.h
+	mdDrumsKnob.cpp mdDrumsKnob.h
 	mdDrumsProcessor.cpp mdDrumsProcessor.h
+	mdDrumsTrackView.cpp mdDrumsTrackView.h
 	parameterDescriptions_mddrums.json
+	skins/mdDrums/mdDrums.rml
+	skins/mdDrums/mdDrums.rcss
 	skins/mdDrumsMinimal/mdDrumsMinimal.rml
 	skins/mdDrumsMinimal/mdDrumsMinimal.rcss
 )
 
 set(ASSETS parameterDescriptions_mddrums.json)
+# The first skin is the default one
+addSkin("MD Drums" "MD Drums" "skins/mdDrums" "mdDrums.rml")
 addSkin("MD Drums" "mdDrumsMinimal" "skins/mdDrumsMinimal" "mdDrumsMinimal.rml")
 buildSkinHeader()
 
@@ -65,4 +73,13 @@ if(BUILD_TESTING)
 	add_test(NAME mdDrumsProcessorTest COMMAND mdDrumsProcessorTest)
 	set_tests_properties(mdDrumsProcessorTest PROPERTIES LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 180)
 	set_property(TARGET mdDrumsProcessorTest PROPERTY FOLDER "Elektron/test")
+
+	add_executable(mdDrumsSkinTest mdDrumsSkinTest.cpp)
+	target_link_libraries(mdDrumsSkinTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
+	target_compile_definitions(mdDrumsSkinTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
+		MD_DRUMS_DESIGN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Design")
+	add_test(NAME mdDrumsSkinTest COMMAND mdDrumsSkinTest)
+	set_tests_properties(mdDrumsSkinTest PROPERTIES LABELS "FirmwareTest;Performance" SKIP_RETURN_CODE 77 TIMEOUT 180)
+	set_property(TARGET mdDrumsSkinTest PROPERTY FOLDER "Elektron/test")
 endif()

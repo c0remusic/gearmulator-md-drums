@@ -1,0 +1,190 @@
+<rml>
+	<head>
+		<link type="text/rcss" href="tus_default.rcss"/>
+		<link type="text/rcss" href="mdDrums.rcss"/>
+	</head>
+	<!-- MD Drums v22 (source/elektron/md/mdDrumsPlugin/Design/HANDOFF.md), written by hand. IDs are the keys of
+	     Design/v22-boxes.txt, the mockup's boxes mdDrumsSkinTest compares this document with. What moves is drawn in
+	     C++ (vknob, vglyph, mdDrumsTrackView.cpp); the bands follow the shown Track through partCurrent. -->
+	<body id="Root" class="mdd" style="width: 1296dp; height: 824dp;">
+		<!-- ===== Top bar ===== -->
+		<div id="rule_55" class="a rule full" style="top: 55dp;"/>
+		<div id="logo" class="a c1 w3 bar logo">MD<span>Drums</span></div>
+		<button id="tab_track" class="a c4 w1 bar tab" tabgroup="view" tabbutton="0" isToggle="1"><span>Track</span></button>
+		<button id="tab_mix" class="a c5 w1 bar tab" tabgroup="view" tabbutton="1" isToggle="1"><span>Mix</span></button>
+		<button id="tab_master" class="a c6 w1 bar tab" tabgroup="view" tabbutton="2" isToggle="1"><span>Master</span></button>
+		<div id="size" class="a c12 w3 size inset"><span class="label">Size</span><span id="size_value">100%</span></div>
+		<div id="main_label" class="a c16 w1 label mainlabel">Main</div>
+		<div id="main_meter" class="a c16 w1 meter"><div class="bar1"><div id="main_fill_l" class="fill"/></div><div class="bar2"><div id="main_fill_r" class="fill"/></div></div>
+
+		<!-- ===== Track tab ===== -->
+		<div id="page_track" class="layer" tabgroup="view" tabpage="0">
+			<div id="surface" class="a surface"/>
+
+			<!-- Head band, y 56-176 -->
+			<div id="kit" class="a kit"><span class="label">Kit</span><span id="kit_slot" class="num">01</span><span id="kit_name"></span><vglyph class="down" shape="down"/></div>
+			<div id="kit_save" class="a kitsave">Save</div>
+			<div id="tracks_label" class="a c1 w3 label r24 tracks">Tracks</div>
+			<div class="layer" data-model="partCurrent">
+				<div id="caption" class="a c4 w1 label r24 caption">Track 01</div>
+				<div id="track_prev" class="a step prev">‹</div>
+				<div id="track_next" class="a step next">›</div>
+				<div id="machine" class="a c4 w4 machine">{{Machine_text}}<vglyph class="chevron" shape="chevron"/></div>
+				<div id="family" class="a c12 w3 meta inset family"><span id="family_code" class="code">TRX</span><span id="family_text">modelled analog</span></div>
+				<div id="output" class="a c12 w3 meta inset output">Plays on <b id="output_text">Main</b></div>
+				<div id="velocity_label" class="a c15 w1 label velocitylabel">Velocity</div>
+				<div id="velocity" class="a c15 w1 velocity">100</div>
+				<div id="velocity_bar" class="a c15 w1 velocitybar"><div id="velocity_fill" class="fill" style="width: 50dp;"/></div>
+				<div id="play" class="a c16 play"><vglyph shape="play"/></div>
+			</div>
+			<div id="rule_175" class="a rule full" style="top: 175dp;"/>
+
+			<!-- Track list, columns 1-3, rows of 40 from y 176 -->
+			<div id="row_sel_bg" class="a rowsel" style="top: 176dp;"/>
+			<div id="row_sel_mark" class="a rowmark" style="top: 184dp;"/>
+			<div class="a row" style="top: 176dp;" data-model="part0">
+				<div id="row1_num" class="a tn">01</div><div id="row1_name" class="a tm">{{Machine_text}}</div><div id="row1_scope" class="a scope"/>
+				<button id="row1_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row1_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 216dp;" data-model="part1">
+				<div id="row2_num" class="a tn">02</div><div id="row2_name" class="a tm">{{Machine_text}}</div><div id="row2_scope" class="a scope"/>
+				<button id="row2_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row2_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 256dp;" data-model="part2">
+				<div id="row3_num" class="a tn">03</div><div id="row3_name" class="a tm">{{Machine_text}}</div><div id="row3_scope" class="a scope"/>
+				<button id="row3_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row3_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 296dp;" data-model="part3">
+				<div id="row4_num" class="a tn">04</div><div id="row4_name" class="a tm">{{Machine_text}}</div><div id="row4_scope" class="a scope"/>
+				<button id="row4_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row4_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 336dp;" data-model="part4">
+				<div id="row5_num" class="a tn">05</div><div id="row5_name" class="a tm">{{Machine_text}}</div><div id="row5_scope" class="a scope"/>
+				<button id="row5_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row5_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 376dp;" data-model="part5">
+				<div id="row6_num" class="a tn">06</div><div id="row6_name" class="a tm">{{Machine_text}}</div><div id="row6_scope" class="a scope"/>
+				<button id="row6_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row6_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 416dp;" data-model="part6">
+				<div id="row7_num" class="a tn">07</div><div id="row7_name" class="a tm">{{Machine_text}}</div><div id="row7_scope" class="a scope"/>
+				<button id="row7_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row7_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 456dp;" data-model="part7">
+				<div id="row8_num" class="a tn">08</div><div id="row8_name" class="a tm">{{Machine_text}}</div><div id="row8_scope" class="a scope"/>
+				<button id="row8_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row8_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 496dp;" data-model="part8">
+				<div id="row9_num" class="a tn">09</div><div id="row9_name" class="a tm">{{Machine_text}}</div><div id="row9_scope" class="a scope"/>
+				<button id="row9_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row9_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 536dp;" data-model="part9">
+				<div id="row10_num" class="a tn">10</div><div id="row10_name" class="a tm">{{Machine_text}}</div><div id="row10_scope" class="a scope"/>
+				<button id="row10_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row10_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 576dp;" data-model="part10">
+				<div id="row11_num" class="a tn">11</div><div id="row11_name" class="a tm">{{Machine_text}}</div><div id="row11_scope" class="a scope"/>
+				<button id="row11_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row11_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 616dp;" data-model="part11">
+				<div id="row12_num" class="a tn">12</div><div id="row12_name" class="a tm">{{Machine_text}}</div><div id="row12_scope" class="a scope"/>
+				<button id="row12_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row12_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 656dp;" data-model="part12">
+				<div id="row13_num" class="a tn">13</div><div id="row13_name" class="a tm">{{Machine_text}}</div><div id="row13_scope" class="a scope"/>
+				<button id="row13_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row13_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 696dp;" data-model="part13">
+				<div id="row14_num" class="a tn">14</div><div id="row14_name" class="a tm">{{Machine_text}}</div><div id="row14_scope" class="a scope"/>
+				<button id="row14_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row14_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 736dp;" data-model="part14">
+				<div id="row15_num" class="a tn">15</div><div id="row15_name" class="a tm">{{Machine_text}}</div><div id="row15_scope" class="a scope"/>
+				<button id="row15_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row15_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+			<div class="a row" style="top: 776dp;" data-model="part15">
+				<div id="row16_num" class="a tn">16</div><div id="row16_name" class="a tm">{{Machine_text}}</div><div id="row16_scope" class="a scope"/>
+				<button id="row16_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="row16_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
+			</div>
+
+			<!-- SYN band, y 176, and the Hit screen -->
+			<div class="a band" style="top: 176dp;" data-model="partCurrent">
+				<div id="syn_title" class="a c4 w3 btitle">SYN</div>
+				<div id="syn_group1" class="a c4 w8 grp sym"><div class="line"/></div>
+				<vknob id="k_SYN1" class="a c4" param="SYN1"/><div id="n_SYN1" class="a c4 w1 kl">SYN1</div><div id="v_SYN1" class="a c4 w1 kv" data-class-edited="SYN1_value != SYN1_default">{{SYN1_value}}</div>
+				<vknob id="k_SYN2" class="a c5" param="SYN2"/><div id="n_SYN2" class="a c5 w1 kl">SYN2</div><div id="v_SYN2" class="a c5 w1 kv" data-class-edited="SYN2_value != SYN2_default">{{SYN2_value}}</div>
+				<vknob id="k_SYN3" class="a c6" param="SYN3"/><div id="n_SYN3" class="a c6 w1 kl">SYN3</div><div id="v_SYN3" class="a c6 w1 kv" data-class-edited="SYN3_value != SYN3_default">{{SYN3_value}}</div>
+				<vknob id="k_SYN4" class="a c7" param="SYN4"/><div id="n_SYN4" class="a c7 w1 kl">SYN4</div><div id="v_SYN4" class="a c7 w1 kv" data-class-edited="SYN4_value != SYN4_default">{{SYN4_value}}</div>
+				<vknob id="k_SYN5" class="a c8" param="SYN5"/><div id="n_SYN5" class="a c8 w1 kl">SYN5</div><div id="v_SYN5" class="a c8 w1 kv" data-class-edited="SYN5_value != SYN5_default">{{SYN5_value}}</div>
+				<vknob id="k_SYN6" class="a c9" param="SYN6"/><div id="n_SYN6" class="a c9 w1 kl">SYN6</div><div id="v_SYN6" class="a c9 w1 kv" data-class-edited="SYN6_value != SYN6_default">{{SYN6_value}}</div>
+				<vknob id="k_SYN7" class="a c10" param="SYN7"/><div id="n_SYN7" class="a c10 w1 kl">SYN7</div><div id="v_SYN7" class="a c10 w1 kv" data-class-edited="SYN7_value != SYN7_default">{{SYN7_value}}</div>
+				<vknob id="k_SYN8" class="a c11" param="SYN8"/><div id="n_SYN8" class="a c11 w1 kl">SYN8</div><div id="v_SYN8" class="a c11 w1 kv" data-class-edited="SYN8_value != SYN8_default">{{SYN8_value}}</div>
+				<div id="screen_hit" class="a screen">
+					<div id="screen_hit_title" class="a stitle"><span class="label">Hit</span><span class="right hint">Not played yet</span></div>
+				</div>
+			</div>
+			<div id="rule_391" class="a rule edit" style="top: 391dp;"/>
+
+			<!-- EFX band, y 392, and the Filter and EQ screen -->
+			<div class="a band" style="top: 392dp;" data-model="partCurrent">
+				<div id="efx_title" class="a c4 w3 btitle">EFX</div>
+				<div id="efx_group1" class="a c4 w2 grp"><span>AM</span><div class="line"/></div>
+				<div id="efx_group2" class="a c6 w2 grp"><span>EQ</span><div class="line"/></div>
+				<div id="efx_group3" class="a c8 w3 grp"><span>Filter</span><div class="line"/></div>
+				<vknob id="k_AMD" class="a c4" param="AMD"/><div id="n_AMD" class="a c4 w1 kl">AMD</div><div id="v_AMD" class="a c4 w1 kv" data-class-edited="AMD_value != AMD_default">{{AMD_value}}</div>
+				<vknob id="k_AMF" class="a c5" param="AMF"/><div id="n_AMF" class="a c5 w1 kl">AMF</div><div id="v_AMF" class="a c5 w1 kv" data-class-edited="AMF_value != AMF_default">{{AMF_value}}</div>
+				<vknob id="k_EQF" class="a c6" param="EQF"/><div id="n_EQF" class="a c6 w1 kl">EQF</div><div id="v_EQF" class="a c6 w1 kv" data-class-edited="EQF_value != EQF_default">{{EQF_value}}</div>
+				<vknob id="k_EQG" class="a c7" param="EQG" bipolar="1"/><div id="n_EQG" class="a c7 w1 kl">EQG</div><div id="v_EQG" class="a c7 w1 kv" data-class-edited="EQG_value != EQG_default">{{EQG_value}}</div>
+				<vknob id="k_FLTF" class="a c8" param="FLTF"/><div id="n_FLTF" class="a c8 w1 kl">FLTF</div><div id="v_FLTF" class="a c8 w1 kv" data-class-edited="FLTF_value != FLTF_default">{{FLTF_value}}</div>
+				<vknob id="k_FLTW" class="a c9" param="FLTW"/><div id="n_FLTW" class="a c9 w1 kl">FLTW</div><div id="v_FLTW" class="a c9 w1 kv" data-class-edited="FLTW_value != FLTW_default">{{FLTW_value}}</div>
+				<vknob id="k_FLTQ" class="a c10" param="FLTQ"/><div id="n_FLTQ" class="a c10 w1 kl">FLTQ</div><div id="v_FLTQ" class="a c10 w1 kv" data-class-edited="FLTQ_value != FLTQ_default">{{FLTQ_value}}</div>
+				<vknob id="k_SRR" class="a c11" param="SRR"/><div id="n_SRR" class="a c11 w1 kl">SRR</div><div id="v_SRR" class="a c11 w1 kv" data-class-edited="SRR_value != SRR_default">{{SRR_value}}</div>
+				<div id="screen_filter" class="a screen">
+					<div id="screen_filter_title" class="a stitle"><span class="label">Filter and EQ</span></div>
+				</div>
+			</div>
+			<div id="rule_607" class="a rule edit" style="top: 607dp;"/>
+
+			<!-- ROUTING band, y 608, and the LFO screen -->
+			<div class="a band" style="top: 608dp;" data-model="partCurrent">
+				<div id="routing_title" class="a c4 w3 btitle">ROUTING</div>
+				<div id="routing_group1" class="a c4 w3 grp"><span>Channel</span><div class="line"/></div>
+				<div id="routing_group2" class="a c7 w2 grp"><span>Sends</span><div class="line"/></div>
+				<div id="routing_group3" class="a c9 w3 grp"><span>LFO</span><div class="line"/></div>
+				<vknob id="k_DIST" class="a c4" param="DIST"/><div id="n_DIST" class="a c4 w1 kl">DIST</div><div id="v_DIST" class="a c4 w1 kv" data-class-edited="DIST_value != DIST_default">{{DIST_value}}</div>
+				<vknob id="k_VOL" class="a c5" param="VOL"/><div id="n_VOL" class="a c5 w1 kl">VOL</div><div id="v_VOL" class="a c5 w1 kv" data-class-edited="VOL_value != VOL_default">{{VOL_value}}</div>
+				<vknob id="k_PAN" class="a c6" param="PAN" bipolar="1"/><div id="n_PAN" class="a c6 w1 kl">PAN</div><div id="v_PAN" class="a c6 w1 kv" data-class-edited="PAN_value != PAN_default">{{PAN_value}}</div>
+				<vknob id="k_DEL" class="a c7" param="DEL"/><div id="n_DEL" class="a c7 w1 kl">DEL</div><div id="v_DEL" class="a c7 w1 kv" data-class-edited="DEL_value != DEL_default">{{DEL_value}}</div>
+				<vknob id="k_REV" class="a c8" param="REV"/><div id="n_REV" class="a c8 w1 kl">REV</div><div id="v_REV" class="a c8 w1 kv" data-class-edited="REV_value != REV_default">{{REV_value}}</div>
+				<vknob id="k_LFOS" class="a c9" param="LFOS"/><div id="n_LFOS" class="a c9 w1 kl">LFOS</div><div id="v_LFOS" class="a c9 w1 kv" data-class-edited="LFOS_value != LFOS_default">{{LFOS_value}}</div>
+				<vknob id="k_LFOD" class="a c10" param="LFOD"/><div id="n_LFOD" class="a c10 w1 kl">LFOD</div><div id="v_LFOD" class="a c10 w1 kv" data-class-edited="LFOD_value != LFOD_default">{{LFOD_value}}</div>
+				<vknob id="k_LFOM" class="a c11" param="LFOM"/><div id="n_LFOM" class="a c11 w1 kl">LFOM</div><div id="v_LFOM" class="a c11 w1 kv" data-class-edited="LFOM_value != LFOM_default">{{LFOM_value}}</div>
+				<div id="screen_lfo" class="a screen">
+					<div id="screen_lfo_title" class="a stitle"><span class="label code">LFO</span><span id="lfo_target" class="word">{{LfoParam_text}} on track {{LfoTrack_text}}<vglyph class="down" shape="down"/></span><span id="lfo_assign" class="right word">Assign</span></div>
+					<div id="lfo_shape1_label" class="a label lfol lr1">Shape 1</div>
+					<button id="lfo_shape1_0" class="a chip ch0 lr1" param="LfoShape1" isToggle="1" valueOn="0">TRI</button>
+					<button id="lfo_shape1_1" class="a chip ch1 lr1" param="LfoShape1" isToggle="1" valueOn="1">SAW</button>
+					<button id="lfo_shape1_2" class="a chip ch2 lr1" param="LfoShape1" isToggle="1" valueOn="2">SQR</button>
+					<button id="lfo_shape1_3" class="a chip ch3 lr1" param="LfoShape1" isToggle="1" valueOn="3">RMP</button>
+					<button id="lfo_shape1_4" class="a chip ch4 lr1" param="LfoShape1" isToggle="1" valueOn="4">EXP</button>
+					<button id="lfo_shape1_5" class="a chip ch5 lr1" param="LfoShape1" isToggle="1" valueOn="5">RND</button>
+					<div id="lfo_shape2_label" class="a label lfol lr2">Shape 2</div>
+					<button id="lfo_shape2_0" class="a chip ch0 lr2" param="LfoShape2" isToggle="1" valueOn="0">TRI</button>
+					<button id="lfo_shape2_1" class="a chip ch1 lr2" param="LfoShape2" isToggle="1" valueOn="1">SAW</button>
+					<button id="lfo_shape2_2" class="a chip ch2 lr2" param="LfoShape2" isToggle="1" valueOn="2">SQR</button>
+					<button id="lfo_shape2_3" class="a chip ch3 lr2" param="LfoShape2" isToggle="1" valueOn="3">RMP</button>
+					<button id="lfo_shape2_4" class="a chip ch4 lr2" param="LfoShape2" isToggle="1" valueOn="4">EXP</button>
+					<button id="lfo_shape2_5" class="a chip ch5 lr2" param="LfoShape2" isToggle="1" valueOn="5">RND</button>
+					<div id="lfo_mode_label" class="a label lfol lr3">Mode</div>
+					<button id="lfo_mode_0" class="a chip ch0 lr3" param="LfoMode" isToggle="1" valueOn="0">FREE</button>
+					<button id="lfo_mode_1" class="a chip ch1 lr3" param="LfoMode" isToggle="1" valueOn="1">TRIG</button>
+					<button id="lfo_mode_2" class="a chip ch2 lr3" param="LfoMode" isToggle="1" valueOn="2">HOLD</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- ===== Mix and Master tabs: ticket 18 ===== -->
+		<div id="page_mix" class="layer" tabgroup="view" tabpage="1"/>
+		<div id="page_master" class="layer" tabgroup="view" tabpage="2"/>
+	</body>
+</rml>

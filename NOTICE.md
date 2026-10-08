@@ -6,5 +6,9 @@ gearmulator-md-drums is built from Gearmulator (The Usual Suspects, GNU GPL v3, 
 The GNU GPL v3 and the GNU AGPL v3 may be combined (section 13 of each). The combined work, the plug-in built from
 this repository, is distributed under the GNU AGPL v3; each part keeps its own licence and copyright notices.
 
+MD Drums' skin bundles four faces of Inter 4.1 (The Inter Project Authors, SIL Open Font License 1.1,
+`source/elektron/md/mdDrumsPlugin/skins/mdDrums/Inter-OFL.txt`), reduced to Latin-1 with tabular digits and a legacy
+kerning table by `.scratch/md-drums-editor/tools/make_inter.py`. The font keeps its own licence.
+
 Elektron's firmware is not part of this repository: the plug-in needs the user's own Machinedrum flash image.
 "Elektron" and "Machinedrum" are trademarks of Elektron Music Machines MAQ AB, used only to name the hardware.

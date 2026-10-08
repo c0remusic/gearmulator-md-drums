@@ -117,12 +117,19 @@ namespace
 		return *d;
 	}
 
-	// The minimal skin opens, its document as large as the v22 grid, every parameter bound; MD_DRUMS_EDITOR_PNG names a
-	// file for a picture of it
+	// The v22 skin opens by default (mdDrumsSkinTest checks it); the minimal skin, chosen, binds every parameter until
+	// the v22 one does (ticket 18). MD_DRUMS_EDITOR_PNG names a file for a picture of the minimal skin.
 	void editor(mdDrums::Processor& _processor)
 	{
 		_processor.setForceSoftwareRendererForSession(true);
 		auto& state = _processor.getOrCreateEditorState();
+		require(state.getCurrentSkin().filename == "mdDrums.rml", "the default skin is " + state.getCurrentSkin().filename);
+		const auto& skins = state.getIncludedSkins();
+		const auto minimal = std::find_if(skins.begin(), skins.end(), [](const jucePluginEditorLib::Skin& _skin)
+		{
+			return _skin.filename == "mdDrumsMinimal.rml";
+		});
+		require(minimal != skins.end() && state.loadSkin(*minimal), "the minimal skin does not load");
 		auto* editor = dynamic_cast<mdDrums::Editor*>(state.getEditor());
 		require(editor != nullptr, "the processor did not create the editor");
 		auto* component = editor->getRmlComponent();

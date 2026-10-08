@@ -90,6 +90,11 @@ mesurées avant et après. Pas de tag.
   `scale` de TUS ; rendu à la demande à la fréquence de l'écran, cible 2 frames entrée→pixel en GL3, 33 ms au
   garde-fou en logiciel ; audit des boîtes contre celles exportées de la maquette + règles du HANDOFF ; skin statique
   complet (onglets, Kits, overlays) en deux tickets, 17 puis 18, le minimal retiré au 18.
+- [Socle du skin v22 et onglet Track](issues/17-socle-skin-onglet-track.md) : skin v22 par défaut ; Inter en 4 TTF
+  (chiffres seuls gelés tabulaires, `tnum` élargissant aussi tiret et espace ; table `kern` recopiée du GPOS) ;
+  `<vknob>` et `<vglyph>` sur canvas ; 213 boîtes identiques à la maquette, 159 baselines sur le pas de 4 (ligne de
+  22 px pour un texte de 14 px sur 24) ; 464 paramètres de l'onglet atteignables ; entrée→pixel en logiciel 4-8 ms
+  pour un drag, 7-10 ms pour un changement de Track ; GL3 et CPU dans Live à mesurer.
 
 ## Not yet specified
 

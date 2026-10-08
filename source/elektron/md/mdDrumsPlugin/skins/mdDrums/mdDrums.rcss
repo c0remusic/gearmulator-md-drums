@@ -1,0 +1,127 @@
+/* MD Drums v22 (Design/HANDOFF.md), written by hand. Window pixels in dp; every box, padding and text baseline on a
+   multiple of 4 (mdDrumsSkinTest checks them against the mockup's boxes, Design/v22-boxes.txt).
+
+   Colours (HANDOFF, "Colour"): chrome #1b1c1e, surface #26272a, display #151618, line #3a3c40, rule #55585e,
+   tick #3c3e43, ink #f2f2f2, ink-dim #a7aaaf, ink-faint #8e9197, track #6e7177, accent #6fd1c4, on-accent #10201e,
+   mute #ff7a5c. vknob and vglyph draw with the same values. */
+
+body.mdd { background-color: #1b1c1e; color: #f2f2f2; font-family: Inter; font-size: 14dp; font-weight: 400; }
+.mdd * { white-space: nowrap; }
+/* Boxes are the HANDOFF's, borders and padding inside them */
+.inset, .tab span, .play, .toggle, .screen { box-sizing: border-box; }
+
+/* ---- The grid: 16 columns of 64, gutters and margins of 16. Column c starts at 16 + 80 (c - 1). ---- */
+.a { position: absolute; }
+.c1 { left: 16dp; } .c2 { left: 96dp; } .c3 { left: 176dp; } .c4 { left: 256dp; } .c5 { left: 336dp; }
+.c6 { left: 416dp; } .c7 { left: 496dp; } .c8 { left: 576dp; } .c9 { left: 656dp; } .c10 { left: 736dp; }
+.c11 { left: 816dp; } .c12 { left: 896dp; } .c13 { left: 976dp; } .c14 { left: 1056dp; } .c15 { left: 1136dp; }
+.c16 { left: 1216dp; }
+.w1 { width: 64dp; } .w2 { width: 144dp; } .w3 { width: 224dp; } .w4 { width: 304dp; } .w8 { width: 624dp; }
+/* Containers that only place their children (and hold a data model): no box, so they never take a click */
+.layer { position: absolute; left: 0dp; top: 0dp; width: 0dp; height: 0dp; }
+
+/* ---- Text ---- */
+.label { font-size: 12dp; font-weight: 500; color: #a7aaaf; line-height: 16dp; }
+.code { font-weight: 600; letter-spacing: 1dp; }
+.hint { font-size: 12dp; color: #8e9197; }
+.meta { font-size: 14dp; color: #a7aaaf; }
+.meta b { font-weight: 400; color: #f2f2f2; }
+.meta .code { color: #f2f2f2; font-size: 12dp; margin-right: 8dp; }
+.inset { padding-left: 16dp; }
+.r24 { height: 24dp; line-height: 24dp; }
+
+/* ---- Top bar: y 0-56, its rule at 55 ---- */
+.rule { height: 1dp; background-color: #55585e; }
+.rule.full { left: 0dp; width: 1296dp; }
+.rule.edit { left: 248dp; width: 1048dp; }
+.bar { top: 0dp; height: 56dp; line-height: 56dp; }
+.logo { font-size: 14dp; font-weight: 700; letter-spacing: 2dp; line-height: 54dp; }
+.logo span { font-weight: 400; color: #a7aaaf; margin-left: 4dp; letter-spacing: 0dp; }
+.tab { font-size: 14dp; font-weight: 500; color: #a7aaaf; text-align: left; cursor: pointer; }
+.tab span { display: inline-block; height: 56dp; line-height: 58dp; border-bottom: 2dp transparent; }
+.tab:hover, .tab:checked { color: #f2f2f2; }
+/* The open tab's mark: 2 px of accent under its text only, over the bar's rule */
+.tab:checked span { border-bottom-color: #6fd1c4; }
+/* 14 px text on a 24 px row: a 22 px line puts its baseline on the 4 px step, as the mockup's 2-3 px of padding did */
+.size { top: 16dp; height: 24dp; line-height: 22dp; font-size: 14dp; cursor: pointer; }
+.size .label { color: #8e9197; margin-right: 8dp; }
+.size:hover .label { color: #a7aaaf; }
+.mainlabel { top: 16dp; height: 16dp; }
+.meter { top: 32dp; height: 8dp; }
+.meter .bar1, .meter .bar2 { position: absolute; left: 0dp; width: 64dp; height: 2dp; background-color: #6e7177; }
+.meter .bar1 { top: 1dp; }
+.meter .bar2 { top: 5dp; }
+.meter .fill { position: absolute; left: 0dp; top: 0dp; width: 0dp; height: 2dp; background-color: #6fd1c4; }
+
+/* ---- Track tab ---- */
+.surface { left: 248dp; top: 176dp; width: 1048dp; height: 648dp; background-color: #26272a; }
+
+/* Head band: y 56-176, its rule at 175 across the window */
+.kit { left: 16dp; top: 84dp; width: 168dp; height: 24dp; line-height: 22dp; font-size: 14dp; overflow: hidden; cursor: pointer; }
+.kit .label { color: #8e9197; margin-right: 8dp; }
+.kit .num { font-size: 12dp; color: #a7aaaf; margin-right: 8dp; }
+.kitsave { left: 192dp; top: 84dp; width: 40dp; height: 24dp; line-height: 22dp; text-align: right; color: #8e9197; }
+.tracks { top: 124dp; }
+.caption { top: 84dp; }
+.step { top: 84dp; width: 24dp; height: 24dp; line-height: 22dp; text-align: center; color: #a7aaaf; cursor: pointer; }
+.step:hover { color: #f2f2f2; }
+.step.prev { left: 336dp; }
+.step.next { left: 360dp; }
+.machine { top: 108dp; height: 40dp; line-height: 40dp; font-size: 34dp; cursor: pointer; }
+/* Relative: the glyph's canvas fills the glyph, not the nearest positioned box */
+vglyph { display: inline-block; position: relative; }
+vglyph.chevron { width: 12dp; height: 12dp; margin-left: 12dp; color: #a7aaaf; }
+.machine:hover vglyph.chevron { color: #f2f2f2; }
+vglyph.down { width: 8dp; height: 8dp; margin-left: 4dp; color: #a7aaaf; }
+.family { top: 84dp; height: 24dp; line-height: 22dp; }
+.output { top: 124dp; height: 24dp; line-height: 22dp; }
+.velocitylabel { top: 84dp; height: 24dp; line-height: 24dp; }
+.velocity { top: 112dp; height: 32dp; line-height: 32dp; font-size: 22dp; cursor: pointer; }
+.velocitybar { top: 144dp; height: 4dp; background-color: #3a3c40; }
+.velocitybar .fill { position: absolute; left: 0dp; top: 0dp; height: 4dp; background-color: #a7aaaf; }
+.play { top: 84dp; width: 64dp; height: 64dp; border: 1dp #6e7177; cursor: pointer; }
+.play:hover { border-color: #f2f2f2; }
+.play:active { background-color: #26272a; }
+.play vglyph { position: absolute; left: 22dp; top: 21dp; width: 18dp; height: 20dp; color: #f2f2f2; }
+
+/* Track list: rows of 40 from y 176, columns 1-3; the shown row lit to the gutter's middle */
+.row { left: 0dp; width: 0dp; height: 0dp; }
+.rowsel { left: 0dp; width: 248dp; height: 40dp; background-color: #26272a; }
+.rowmark { left: 0dp; width: 4dp; height: 24dp; background-color: #6fd1c4; }
+.tn { left: 16dp; top: 8dp; width: 24dp; height: 24dp; line-height: 24dp; font-size: 12dp; color: #a7aaaf; cursor: pointer; }
+.tm { left: 48dp; top: 8dp; width: 84dp; height: 24dp; line-height: 22dp; font-size: 14dp; letter-spacing: 1dp; color: #a7aaaf; overflow: hidden; cursor: pointer; }
+.tn:hover, .tm:hover, .tn.tsel, .tm.tsel { color: #f2f2f2; }
+.scope { left: 136dp; top: 8dp; width: 32dp; height: 24dp; }
+.toggle { top: 8dp; width: 24dp; height: 24dp; line-height: 22dp; border: 1dp #6e7177; text-align: center; font-size: 12dp; font-weight: 600; color: #a7aaaf; cursor: pointer; }
+.toggle:hover { border-color: #a7aaaf; color: #f2f2f2; }
+.toggle.mute { left: 176dp; }
+.toggle.solo { left: 208dp; }
+.toggle.mute:checked { background-color: #ff7a5c; border-color: #ff7a5c; color: #111111; }
+.toggle.solo:checked, .toggle.out:checked { background-color: #f2f2f2; border-color: #f2f2f2; color: #111111; }
+
+/* Bands: 216 px from y 176, 392 and 608; content 28 px from the rules: title (+28), groups (+60), knobs (+84), names
+   (+156), values (+172). Knob k on column 3 + k. */
+.band { left: 0dp; width: 0dp; height: 0dp; }
+.btitle { top: 28dp; height: 24dp; line-height: 24dp; font-size: 22dp; font-weight: 600; letter-spacing: 1.5dp; }
+.grp { top: 60dp; height: 16dp; line-height: 16dp; font-size: 12dp; font-weight: 600; display: flex; align-items: center; }
+.grp .line { flex: 1; height: 1dp; margin-left: 8dp; background-color: #55585e; }
+.grp.sym .line { margin-left: 0dp; }
+vknob { top: 84dp; width: 64dp; height: 64dp; drag: drag; cursor: pointer; }
+.kl { top: 156dp; height: 16dp; line-height: 16dp; text-align: center; font-size: 12dp; font-weight: 500; letter-spacing: 1dp; color: #a7aaaf; }
+.kv { top: 172dp; height: 16dp; line-height: 14dp; text-align: center; font-size: 14dp; color: #8e9197; }
+.kv.edited { color: #f2f2f2; }
+.unused { opacity: 0.35; }
+
+/* Screens: columns 12-16 to the window's edge, 400 x 216 each, 16 px of room inside */
+.screen { left: 896dp; top: 0dp; width: 400dp; height: 216dp; background-color: #151618; border-left: 1dp #55585e; }
+.stitle { left: 15dp; top: 16dp; width: 368dp; height: 24dp; line-height: 22dp; }
+.stitle .right { position: absolute; right: 0dp; top: 0dp; }
+/* Word controls on a screen's title: the row's full height, so that their hover fill is */
+.word { display: inline-block; vertical-align: top; height: 24dp; line-height: 22dp; font-size: 14dp; color: #f2f2f2; padding: 0dp 4dp; cursor: pointer; }
+.word:hover { background-color: #26272a; }
+.lfol { left: 15dp; width: 48dp; height: 16dp; margin-top: 4dp; }
+.chip { width: 44dp; height: 24dp; line-height: 24dp; text-align: center; font-size: 12dp; font-weight: 500; letter-spacing: 1dp; color: #a7aaaf; cursor: pointer; }
+.chip:hover { color: #f2f2f2; background-color: #26272a; }
+.chip:checked { background-color: #6fd1c4; color: #10201e; }
+.ch0 { left: 67dp; } .ch1 { left: 115dp; } .ch2 { left: 163dp; } .ch3 { left: 211dp; } .ch4 { left: 259dp; } .ch5 { left: 307dp; }
+.lr1 { top: 112dp; } .lr2 { top: 144dp; } .lr3 { top: 176dp; }
