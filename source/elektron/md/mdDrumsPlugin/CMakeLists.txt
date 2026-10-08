@@ -11,6 +11,7 @@ set(SOURCES
 	mdDrumsEditor.cpp mdDrumsEditor.h
 	mdDrumsGlyph.cpp mdDrumsGlyph.h
 	mdDrumsKnob.cpp mdDrumsKnob.h
+	mdDrumsMeterView.cpp mdDrumsMeterView.h
 	mdDrumsProcessor.cpp mdDrumsProcessor.h
 	mdDrumsTrackView.cpp mdDrumsTrackView.h
 	parameterDescriptions_mddrums.json

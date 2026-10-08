@@ -1,6 +1,10 @@
 #pragma once
 
+#include "mdDrumsTelemetry.h"
+
 #include "jucePluginEditorLib/pluginProcessor.h"
+
+#include <memory>
 
 namespace mdDrums
 {
@@ -27,11 +31,15 @@ namespace mdDrums
 		// Where the flash image was looked for, for the dialog when it is missing
 		std::vector<std::string> romFolders() const;
 
+		// What the editor shows of the sound, which every Device this Processor creates writes (ticket 16)
+		Telemetry& getTelemetry() const { return *m_telemetry; }
+
 	private:
 		// Main, then the 16 Outs, off until the host enables them
 		static BusesProperties buses();
 		bool isBusesLayoutSupported(const BusesLayout& _layouts) const override;
 
+		std::shared_ptr<Telemetry> m_telemetry = std::make_shared<Telemetry>();
 		float m_bpm = 0.0f;
 	};
 }

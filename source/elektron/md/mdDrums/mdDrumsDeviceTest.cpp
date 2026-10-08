@@ -2,7 +2,7 @@
 // Kit 1, plays notes 36-51 and drops the others, takes the Machinedrum's CCs and SysEx from the editor and ignores the
 // host's, answers ASSIGN MACHINE with the new machine's SYN1-8 as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
 // across a state round trip, and renders with notes and CCs without allocating. It reports the note-to-sound latency
-// at 44.1 and 48 kHz.
+// at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of one core.
 
 #include "mdDrumsDevice.h"
 
@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -94,11 +95,13 @@ namespace
 	{
 		static constexpr uint32_t Block = 512;
 
-		Rig(const std::vector<uint8_t>& _flash, const float _rate) : hostRate(_rate)
+		Rig(const std::vector<uint8_t>& _flash, const float _rate, const bool _telemetry = true) : hostRate(_rate)
 		{
 			synthLib::DeviceCreateParams params;
 			params.romData = _flash;
-			device = std::make_unique<mdDrums::Device>(params);
+			if(_telemetry)
+				telemetry = std::make_shared<mdDrums::Telemetry>();
+			device = std::make_unique<mdDrums::Device>(params, telemetry);
 			plugin = std::make_unique<synthLib::Plugin>(device.get(), [](synthLib::Device*) {});
 			plugin->reserveMidiEventCapacity();
 			plugin->setHostSamplerate(_rate, 44100.0f);
@@ -152,6 +155,7 @@ namespace
 		void settle() { listen(0, static_cast<uint32_t>(rate() * 2 / Block)); }
 		float rate() const { return hostRate; }
 
+		std::shared_ptr<mdDrums::Telemetry> telemetry;
 		std::unique_ptr<mdDrums::Device> device;
 		std::unique_ptr<synthLib::Plugin> plugin;
 		std::array<std::vector<float>, 18> buffers;
@@ -344,6 +348,88 @@ namespace
 		std::printf("32 blocks with a note, a CC and an LFO message each: no allocation\n");
 	}
 
+	// The Telemetry the editor reads (ticket 16): a note's Track and Main peak while the other Tracks stay silent, and
+	// its Hit is counted; a muted Track's Hit is not. Then what writing it costs, 16 Tracks struck every 64th of a
+	// second: the Device's own peak pass over 18 outputs, timed alone (at most 1 % of one core), and the whole Device
+	// with and without it, side by side, for information.
+	void telemetry(const std::vector<uint8_t>& _flash)
+	{
+		{
+			Rig rig(_flash, 44100.0f);
+			rig.settle();
+			auto& t = *rig.telemetry;
+			for(int output = 0; output < mdDrums::Telemetry::OutputCount; ++output)
+				t.takePeak(output);
+			const auto before = t.hits(0);
+			rig.send(MidiEventSource::Host, {0x90, 36, 100});
+			rig.listen(0, 20);
+			const auto main = std::max(t.takePeak(0), t.takePeak(1)), own = t.takePeak(2);
+			float others = 0;
+			for(int output = 3; output < mdDrums::Telemetry::OutputCount; ++output)
+				others = std::max(others, t.takePeak(output));
+			std::printf("telemetry: note 36, Main peak %.4f, Out 01 %.4f, the other Outs %.4f, Hits of track 1 %u -> %u\n",
+				main, own, others, before, t.hits(0));
+			require(main > 0.01f && own > 0.01f && others == 0.0f, "the peaks do not follow the note");
+			require(t.hits(0) == before + 1, "the Hit was not counted");
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 1));
+			rig.send(MidiEventSource::Host, {0x90, 36, 100});
+			rig.listen(0, 4);
+			require(t.hits(0) == before + 1, "a muted Track's Hit was counted");
+		}
+
+		// The peak pass alone: what Device::render adds after the engine, over 18 outputs of 512 samples
+		{
+			std::vector<std::vector<float>> outputs(mdDrums::Telemetry::OutputCount, std::vector<float>(Rig::Block));
+			uint32_t random = 0x2468aceu;
+			for(auto& output : outputs)
+				for(auto& value : output)
+				{
+					random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+					value = static_cast<float>(static_cast<int32_t>(random)) / 2147483648.0f;
+				}
+			mdDrums::Telemetry t;
+			constexpr int blocks = 20000;
+			const auto start = std::chrono::steady_clock::now();
+			for(int b = 0; b < blocks; ++b)
+				for(int output = 0; output < mdDrums::Telemetry::OutputCount; ++output)
+				{
+					float peak = 0.0f;
+					for(const auto value : outputs[static_cast<size_t>(output)])
+						peak = std::max(peak, std::abs(value));
+					t.raisePeak(output, peak * (1.0f + static_cast<float>(b & 1)));
+					if(output == 0 && (b & 63) == 0)
+						t.takePeak(0);
+				}
+			const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+			const auto audio = blocks * static_cast<double>(Rig::Block) / 44100.0;
+			std::printf("telemetry: the peak pass costs %.3f %% of one core\n", seconds / audio * 100.0);
+			require(seconds / audio <= 0.01, "the telemetry costs more than 1 % of one core");
+		}
+
+		// The whole Device with and without it, block by block side by side
+		{
+			Rig with(_flash, 44100.0f, true), without(_flash, 44100.0f, false);
+			with.settle();
+			without.settle();
+			double withSeconds = 0, withoutSeconds = 0;
+			constexpr uint32_t blocks = 700;
+			for(uint32_t b = 0; b < blocks; ++b)
+			{
+				for(auto* rig : {&with, &without})
+				{
+					rig->send(MidiEventSource::Host, {0x90, static_cast<uint8_t>(36 + b % 16), 100});
+					const auto start = std::chrono::steady_clock::now();
+					rig->process();
+					const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+					(rig == &with ? withSeconds : withoutSeconds) += seconds;
+				}
+			}
+			const auto audio = blocks * static_cast<double>(Rig::Block) / 44100.0;
+			std::printf("telemetry: the Device, 16 tracks struck, %.2f %% of one core with it, %.2f %% without\n",
+				withSeconds / audio * 100.0, withoutSeconds / audio * 100.0);
+		}
+	}
+
 	// Note to sound through the Plugin: TRX-BD on track 1, 48 notes at pseudo-random samples of 512-sample host blocks,
 	// to the first nonzero sample
 	void latency(const std::vector<uint8_t>& _flash, const float _rate)
@@ -395,6 +481,7 @@ int main()
 		allocations(flash);
 		latency(flash, 44100.0f);
 		latency(flash, 48000.0f);
+		telemetry(flash);
 		std::printf("mdDrumsDeviceTest: PASS\n");
 		return 0;
 	}

@@ -2,6 +2,7 @@
 
 #include "mdDrumsGlyph.h"
 #include "mdDrumsKnob.h"
+#include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
 
@@ -23,14 +24,19 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_meterView.reset();
 		m_trackView.reset();
 	}
 
 	void Editor::create()
 	{
 		jucePluginEditorLib::Editor::create();
-		if(findChild("page_track", false))
-			m_trackView = std::make_unique<TrackView>(*this);
+		if(!findChild("page_track", false))
+			return;
+		m_trackView = std::make_unique<TrackView>(*this);
+		// Only an mdDrums::Processor makes this editor
+		m_meterView = std::make_unique<MeterView>(*this, static_cast<Processor&>(getProcessor()).getTelemetry(),
+			getAcceleratedRefreshRateHz());
 	}
 
 	int Editor::getAcceleratedRefreshRateHz() const

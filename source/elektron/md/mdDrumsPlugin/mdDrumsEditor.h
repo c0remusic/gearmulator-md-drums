@@ -7,6 +7,7 @@
 
 namespace mdDrums
 {
+	class MeterView;
 	class Processor;
 	class TrackView;
 
@@ -28,9 +29,11 @@ namespace mdDrums
 		void onRmlContextCreated(juceRmlUi::RmlComponent& _rmlComponent, Rml::Context& _context) override;
 
 		TrackView* getTrackView() const { return m_trackView.get(); }
+		MeterView* getMeterView() const { return m_meterView.get(); }
 
 	private:
 		std::unique_ptr<TrackView> m_trackView;
+		std::unique_ptr<MeterView> m_meterView;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

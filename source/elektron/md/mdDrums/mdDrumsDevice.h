@@ -2,6 +2,7 @@
 
 #include "mdDrumsEngine.h"
 #include "mdDrumsMessages.h"
+#include "mdDrumsTelemetry.h"
 
 #include "synthLib/device.h"
 
@@ -26,8 +27,9 @@ namespace mdDrums
 		static constexpr uint32_t InternalLatency = Engine::SampleAccurateDelay + 4;
 
 		// _params.romData: the 8 MB Machinedrum UW flash image with OS 1.63. Throws synthLib::DeviceException without
-		// a usable one.
-		explicit Device(const synthLib::DeviceCreateParams& _params);
+		// a usable one. _telemetry takes its outputs' peaks and its Hits (none without it); the Device shares it, so that it
+		// stays valid while the Device lives, whoever goes first.
+		explicit Device(const synthLib::DeviceCreateParams& _params, std::shared_ptr<Telemetry> _telemetry = {});
 		~Device() override;
 
 		float getSamplerate() const override { return static_cast<float>(Engine::SampleRate); }
@@ -68,6 +70,7 @@ namespace mdDrums
 		void queueOut(const synthLib::SMidiEvent& _event);
 
 		std::unique_ptr<Engine> m_engine;
+		std::shared_ptr<Telemetry> m_telemetry;
 		bool m_valid = false;
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;

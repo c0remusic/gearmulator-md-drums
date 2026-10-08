@@ -6,6 +6,7 @@
 #include "synthLib/deviceException.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace mdDrums
@@ -36,7 +37,8 @@ namespace mdDrums
 		}
 	}
 
-	Device::Device(const synthLib::DeviceCreateParams& _params) : synthLib::Device(_params)
+	Device::Device(const synthLib::DeviceCreateParams& _params, std::shared_ptr<Telemetry> _telemetry)
+		: synthLib::Device(_params), m_telemetry(std::move(_telemetry))
 	{
 		const auto kit = messages::factoryKit(_params.romData);
 		try
@@ -139,6 +141,19 @@ namespace mdDrums
 		for(size_t channel = 0; channel < OutputCount; ++channel)
 			outputs[channel] = _outputs[channel] ? _outputs[channel] + _offset : nullptr;
 		m_engine->render(outputs.data(), _count);
+		if(!m_telemetry)
+			return;
+		for(int channel = 0; channel < OutputCount; ++channel)
+		{
+			const auto* samples = outputs[static_cast<size_t>(channel)];
+			if(!samples)
+				continue;
+			float peak = 0.0f;
+			for(size_t i = 0; i < _count; ++i)
+				peak = std::max(peak, std::abs(samples[i]));
+			if(peak > 0.0f)
+				m_telemetry->raisePeak(channel, peak);
+		}
 	}
 
 	void Device::queueOut(const synthLib::SMidiEvent& _event)
@@ -159,8 +174,13 @@ namespace mdDrums
 		if(status == synthLib::M_NOTEON && _event.c > 0)
 		{
 			const auto track = static_cast<int>(_event.b) - FirstNote;
-			if(track >= 0 && track < Engine::TrackCount)
-				m_engine->trigger(track, _event.c);
+			if(track < 0 || track >= Engine::TrackCount)
+				return;
+			const auto struck = m_engine->trigger(track, _event.c);
+			if(m_telemetry)
+				for(int t = 0; t < Engine::TrackCount; ++t)
+					if(struck & (1u << t))
+						m_telemetry->hit(t);
 			return;
 		}
 		if(status == synthLib::M_CONTROLCHANGE && _event.source != synthLib::MidiEventSource::Host)

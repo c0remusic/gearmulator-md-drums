@@ -8,6 +8,7 @@ add_library(mdDrums STATIC
 	mdDrumsDevice.cpp mdDrumsDevice.h
 	mdDrumsEngine.cpp mdDrumsEngine.h
 	mdDrumsMessages.cpp mdDrumsMessages.h
+	mdDrumsTelemetry.h
 )
 target_include_directories(mdDrums PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mdDrums PUBLIC mdEngine mdProtocol synthLib)

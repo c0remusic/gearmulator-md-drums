@@ -108,6 +108,9 @@ mesurées avant et après. Pas de tag.
   écrite par le Device sans verrou ; Controller vérité du Kit, MIDI out pour SYN1-8 seulement ; mètres des 18 sorties
   du Device (chute 20 dB/s, −60 à 0 dBFS), scopes tenus par l'éditeur ; écran Hit en capture live progressive (min/max
   de 8 échantillons, échelle fixe ±0,5) ; LFO sans valeur live ; ≤ 1 % d'un cœur côté audio ; tickets 20, 21, 22.
+- [Télémétrie, mètres et scopes](issues/20-telemetrie-metres-scopes.md) : `Telemetry` partagée Processor-Device
+  (crêtes, Hits) ; `MeterView` sur canvas à la fréquence de l'écran ; passe de crête 0,027 % d'un cœur, Device 20,01 %
+  contre 19,92 % ; mètres, chute, lumières et scopes vérifiés au pixel.
 
 ## Not yet specified
 

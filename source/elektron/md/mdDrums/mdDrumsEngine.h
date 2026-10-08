@@ -56,7 +56,8 @@ namespace mdDrums
 		// A muted track is silent and drops its Hits, firing neither its Link nor its Choke
 		void setMute(int _track, bool _mute);
 		void setTempo(double _bpm);
-		void trigger(int _track, int _velocity);			// 1-127
+		// 1-127; the Tracks it strikes (bit n = Track n + 1): the Track and its Link, none of them muted
+		uint32_t trigger(int _track, int _velocity);
 
 		// On (the default), every Hit sounds the same time after its trigger: the engine's block wait, 0 to 31 samples,
 		// becomes a constant 31. Off, a Hit sounds at the engine's next block, as the Machinedrum does.

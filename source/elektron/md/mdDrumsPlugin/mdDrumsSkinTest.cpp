@@ -7,12 +7,15 @@
 //   text overflows its box;
 // - each of the 576 host parameters has a control in the skin, Track by Track;
 // - input to pixel: a knob dragged and a list row clicked show on the next frame, and the event, RmlUi's update and
-//   the software render take 33 ms at most. MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
+//   the software render take 33 ms at most;
+// - the meters and Hit lights follow the Processor's Telemetry (ticket 20).
+// MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsKnob.h"
+#include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
 
@@ -402,6 +405,61 @@ namespace
 		_f.editor->setCurrentPart(0);
 	}
 
+	bool isAccent(const juce::Colour _c)
+	{
+		return std::abs(_c.getRed() - 0x6f) < 12 && std::abs(_c.getGreen() - 0xd1) < 12 && std::abs(_c.getBlue() - 0xc4) < 12;
+	}
+
+	// The meters and the Hit lights (ticket 20), from the Processor's Telemetry: peaks shown on the next frame on the
+	// -60 to 0 dBFS scale, falling 20 dB a second; a Hit lights its Track's numbers for 140 ms
+	void meters(Fixture& _f)
+	{
+		auto* view = _f.editor->getMeterView();
+		require(view != nullptr, "the editor has no meter view");
+		auto& telemetry = _f.processor.getTelemetry();
+		_f.showView("mix");
+		const double now = 1.0e6;
+		view->update(now);
+		telemetry.raisePeak(0, 1.0f);		// Main left at 0 dBFS
+		telemetry.raisePeak(1, 0.1f);		// right at -20
+		telemetry.raisePeak(2, 0.5f);		// Track 1 at -6
+		telemetry.hit(0);
+		view->update(now + 10);
+		_f.frame();
+		const auto strip = _f.box(*_f.find("strip1_meter")), main = _f.box(*_f.find("main_meter"));
+		const auto stripTop = strip.y + strip.h * (1.0f - view->level(2));
+		std::printf("meters: Track 1 at %.3f (top at y %.1f), Main %.3f and %.3f\n", view->level(2), stripTop,
+			view->level(0), view->level(1));
+		require(std::abs(view->level(2) - 0.9f) < 0.01f && std::abs(view->level(1) - 0.6667f) < 0.01f, "the scale is not -60 to 0 dBFS");
+		require(isAccent(_f.pixel(strip.x + 2, stripTop + 6)) && !isAccent(_f.pixel(strip.x + 2, stripTop - 6)),
+			"the strip's meter does not show its level");
+		require(isAccent(_f.pixel(main.x + 60, main.y + 2)) && !isAccent(_f.pixel(main.x + 50, main.y + 6))
+			&& isAccent(_f.pixel(main.x + 30, main.y + 6)), "the Main meter does not show its levels");
+		require(_f.find("strip1_num")->IsClassSet("trig") && _f.find("row1_num")->IsClassSet("trig"),
+			"a Hit does not light its Track's numbers");
+		view->update(now + 10 + 200);
+		require(!_f.find("strip1_num")->IsClassSet("trig"), "a Hit's light lasts past 140 ms");
+		view->update(now + 10 + 1000);
+		std::printf("meters: Track 1 a second later at %.3f\n", view->level(2));
+		require(std::abs(view->level(2) - (60.0f - 26.0f) / 60.0f) < 0.01f, "the meters do not fall 20 dB a second");
+
+		// The list's scopes: half a second of Track 1 at -6 dBFS, read at 60 Hz, fills the right half of its scope
+		_f.showView("track");
+		double t = now + 2000;
+		for(int i = 0; i < 30; ++i, t += 1000.0 / 60.0)
+		{
+			telemetry.raisePeak(2, 0.5f);
+			view->update(t);
+		}
+		_f.frame();
+		const auto scope = _f.box(*_f.find("row1_scope"));
+		const auto centre = scope.y + scope.h * 0.5f;
+		const auto right = _f.pixel(scope.x + scope.w - 3, centre).getBrightness();
+		const auto left = _f.pixel(scope.x + 2, centre).getBrightness();
+		std::printf("scopes: Track 1's right end %.2f, left end %.2f bright\n", right, left);
+		require(right > 0.5f && left < 0.3f, "the scope does not show the last second of its Track");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		for(const auto& view : readViews())
@@ -442,7 +500,8 @@ int main()
 
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
-			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel}})
+			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
+			{"meters", meters}})
 		{
 			try
 			{

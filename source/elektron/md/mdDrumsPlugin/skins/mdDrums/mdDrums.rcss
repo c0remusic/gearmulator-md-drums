@@ -228,3 +228,6 @@ vknob.sk { top: 728dp; width: 28dp; height: 28dp; }
 .skn { top: 764dp; width: 28dp; height: 16dp; line-height: 16dp; text-align: center; font-size: 12dp; font-weight: 500; letter-spacing: 1dp; color: #a7aaaf; }
 .skv { top: 780dp; width: 28dp; height: 16dp; line-height: 14dp; text-align: center; font-size: 14dp; color: #8e9197; }
 .skv.edited { color: #f2f2f2; }
+
+/* A struck Track's number, in the list, in Mix and among the sends: accent for 140 ms (MeterView) */
+.tn.trig, .sn.trig { color: #6fd1c4; }

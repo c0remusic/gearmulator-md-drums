@@ -94,7 +94,7 @@ namespace mdDrums
 		params.romName = g_flashName;
 		params.romData = std::move(flash);
 		params.homePath = getDataFolder();
-		return new Device(params);
+		return new Device(params, m_telemetry);
 	}
 
 	pluginLib::Controller* Processor::createController()

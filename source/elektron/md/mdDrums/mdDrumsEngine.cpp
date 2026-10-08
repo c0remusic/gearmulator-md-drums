@@ -266,24 +266,30 @@ namespace mdDrums
 		m_state->engine.host().setTempo(_bpm);
 	}
 
-	void Engine::trigger(const int _track, const int _velocity)
+	uint32_t Engine::trigger(const int _track, const int _velocity)
 	{
 		if(_track < 0 || _track >= TrackCount)
-			return;
+			return 0;
 		auto& state = *m_state;
 		auto& host = state.engine.host();
 		host.trigger(_track, std::clamp(_velocity, 1, 127));
-		if(!state.sampleAccurate || host.muted(_track))
-			return;
+		if(host.muted(_track))
+			return 0;
+		const auto link = host.link(_track);
+		const bool linked = link < TrackCount && link != _track && !host.muted(link);
+		const uint32_t struck = (1u << _track) | (linked ? 1u << link : 0u);
+		if(!state.sampleAccurate)
+			return struck;
 
 		// The Hit lands BlockSize - used samples from now: its Track waits the rest of the 31, and so does its Link,
 		// which the engine hits in the same block. Its Choke's target is cut as late after the choke as this Hit sounds.
 		const auto delay = static_cast<int>(state.used) - 1;
 		state.pending[_track] = delay;
-		if(const auto link = host.link(_track); link < TrackCount && link != _track && !host.muted(link))
+		if(linked)
 			state.pending[link] = delay;
 		if(const auto choke = host.choke(_track); choke < TrackCount && choke != _track)
 			state.chokeDelay[choke] = delay;
+		return struck;
 	}
 
 	void Engine::setSampleAccurate(const bool _on)
