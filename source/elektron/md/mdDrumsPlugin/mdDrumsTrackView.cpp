@@ -2,6 +2,7 @@
 
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsLfoView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "jucePluginEditorLib/pluginProcessor.h"
@@ -19,6 +20,7 @@ namespace mdDrums
 	namespace
 	{
 		constexpr int g_window = 1296;
+		constexpr const char* g_listenKey = "listenWhileChoosing";
 
 		std::string twoDigits(const int _value)
 		{
@@ -86,14 +88,16 @@ namespace mdDrums
 			setOverlay(m_overlay == Overlay::Browser ? Overlay::None : Overlay::Browser);
 		});
 		m_editor.addClick("browser_keep", [this](Rml::Event&) { setOverlay(Overlay::None); });
-		m_editor.addClick("browser_cancel", [this](Rml::Event&)
-		{
-			// Back to the machine the browser opened on
-			auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
-			if(machine && m_machineBeforeBrowser >= 0 && machine->getUnnormalizedValue() != m_machineBeforeBrowser)
-				machine->setUnnormalizedValueNotifyingHost(m_machineBeforeBrowser, pluginLib::Parameter::Origin::Ui);
-			setOverlay(Overlay::None);
-		});
+		m_editor.addClick("browser_cancel", [this](Rml::Event&) { escape(); });
+		// A machine chosen (its cell has set Machine by then: its own listener came first) plays the Track when listening
+		for(int id = 0; id < 256; ++id)
+			m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
+			{
+				if(isListening())
+					static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, ListenVelocity);
+			});
+		m_editor.addClick("preview_listen", [this](Rml::Event&) { setListening(!isListening()); });
+		setListening(isListening());
 		m_editor.addClick("lfo_target", [this](Rml::Event&)
 		{
 			setOverlay(m_overlay == Overlay::LfoMenu ? Overlay::None : Overlay::LfoMenu);
@@ -136,8 +140,39 @@ namespace mdDrums
 		updateSize();
 	}
 
+	bool TrackView::escape()
+	{
+		if(m_overlay == Overlay::None)
+			return false;
+		if(m_overlay == Overlay::Browser)
+		{
+			// Back to the machine the browser opened on
+			auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+			if(machine && m_machineBeforeBrowser >= 0 && machine->getUnnormalizedValue() != m_machineBeforeBrowser)
+				machine->setUnnormalizedValueNotifyingHost(m_machineBeforeBrowser, pluginLib::Parameter::Origin::Ui);
+		}
+		setOverlay(Overlay::None);
+		return true;
+	}
+
+	bool TrackView::isListening() const
+	{
+		return m_editor.getProcessor().getConfig().getBoolValue(g_listenKey, true);
+	}
+
+	void TrackView::setListening(const bool _on) const
+	{
+		m_editor.getProcessor().getConfig().setValue(g_listenKey, _on);
+		if(auto* box = find("preview_listen"))
+			box->SetClass("on", _on);
+	}
+
 	void TrackView::setOverlay(const Overlay _overlay)
 	{
+		// An overlay takes ASSIGN's place
+		if(_overlay != Overlay::None)
+			if(auto* lfo = m_editor.getLfoView())
+				lfo->disarm();
 		if(_overlay == Overlay::Browser && m_overlay != Overlay::Browser)
 		{
 			const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
@@ -233,7 +268,8 @@ namespace mdDrums
 			const auto unused = name.empty();
 			if(auto* label = find("n" + suffix))
 			{
-				label->SetInnerRML(unused ? "—" : name);
+				// In a span, as the other names: an LFO's underline runs under the name only (LfoView)
+				label->SetInnerRML("<span>" + (unused ? std::string("—") : name) + "</span>");
 				label->SetClass("unused", unused);
 			}
 			for(const auto& prefix : {"k", "v"})

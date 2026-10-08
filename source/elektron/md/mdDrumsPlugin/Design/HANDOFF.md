@@ -282,7 +282,13 @@ the engine.
   machine, the 24 parameters and the velocity on a worker thread (22-27 ms a render, about 88 MB more; keep only the
   latest request). The mockup's model (DEC, HOLD, PTCH, STRT, END reshaping a recorded hit) is not for the plug-in.
 - **Filter and EQ, LFO screens:** the mockup's curves are models; draw the engine's responses where it can give them,
-  the MD's LFO shapes from its own tables.
+  the MD's LFO shapes from its own tables. Done in ticket 22 of the editor map: the response comes from the mixer DSP's
+  own coefficient words (`mdDrums/mdDrumsFilterResponse.*`), 0 dB being an untouched Track at 1 kHz, so the open
+  filter shows its own fall (-2.2 dB at 10 kHz, -4.7 dB at 20 kHz); the EQ's point sits on the curve at the angle of
+  its poles (a boost) or its zeros (a cut). The LFO is the OS's own routines ported (`mdDrums/mdDrumsLfo.*`), which
+  correct the mockup: LFOD 127 swings about 126 steps each way, the saw falls twice a period, RMP and EXP fall once
+  from each Hit, RND takes 8 steps a period at half the swing, LFOM fades shape 1 into shape 2 inverted, and the value
+  moves once a tick (125 Hz). The plot starts on a Hit of the Track and runs free after it, HOLD included.
 - **Outputs:** add `t<n>_out`; the track leaves the main mix when it is on, whatever the host does with the bus; name
   the buses "Out 01" to "Out 16" (they are "Track 1" to "Track 16" today) so that Live lists what the editor shows.
 - **Master effects:** mdEngine has none yet. Echo and reverb take every track's DEL and REV sends, tracks on their own

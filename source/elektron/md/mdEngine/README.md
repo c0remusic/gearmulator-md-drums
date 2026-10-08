@@ -30,6 +30,9 @@ later versions can be compared file by file. Their documentation is in `.scratch
   tracks itself (`mdDrums/mdDrumsEngine.cpp`): `Mixer::gains` and `Mixer::mainSample` are `process`'s own gain and
   output steps, split out (bit-exact, `process` uses them); `HostModel::muted` and `choked` read a track's mute and
   Choke flags; `EngineT::mixOn = false` skips the mixer.
+- `engine/MdEngine.h`, `engine/TrackFx.*`: `EngineT` keeps `TrackFx::Tables` behind a `shared_ptr` and hands it out
+  (`tables()`), and `TrackFx::eqWords` keeps the EQ's coefficient words of the last block, so that MD Drums' editor
+  draws the filter's and the EQ's response from the words the DSP computes (`mdDrums/mdDrumsFilterResponse.*`).
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

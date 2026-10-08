@@ -23,8 +23,9 @@ namespace mdDrums
 	// The v22 skin's behaviour until the slices that give it more (tickets 17 and 18): the shown Track, chosen by a click
 	// on a list row, a Mix strip, a send or by ‹ ›, and what the views say about it (its row and strip lit, "Track 01",
 	// the machine's family, where it plays, the machine's names for SYN1-8 and in the LFO's menu); the overlays opened
-	// and closed (the machine browser, the LFO's target menu, the Kits); and the Size control, which steps the window
-	// through 75, 100, 125 and 150 % on TUS's own "scale" setting. Everything runs on the message thread.
+	// and closed (the machine browser, the LFO's target menu, the Kits; Esc closes them, the browser as Cancel), and the
+	// browser's "Listen while choosing", with which a machine chosen plays the Track; and the Size control, which steps
+	// the window through 75, 100, 125 and 150 % on TUS's own "scale" setting. Everything runs on the message thread.
 	class TrackView
 	{
 	public:
@@ -39,6 +40,7 @@ namespace mdDrums
 		static constexpr std::array<int, 4> Scales{75, 100, 125, 150};
 		static constexpr int RowHeight = 40;
 		static constexpr int ListTop = 176;
+		static constexpr uint8_t ListenVelocity = 100;
 
 		explicit TrackView(Editor& _editor);
 		~TrackView();
@@ -52,6 +54,12 @@ namespace mdDrums
 
 		Overlay getOverlay() const { return m_overlay; }
 		void setOverlay(Overlay _overlay);
+		// Esc: closes the open overlay, the browser as Cancel does; false when none is open
+		bool escape();
+
+		// The browser's "Listen while choosing", kept in the plug-in's settings: on, a machine chosen plays the Track
+		bool isListening() const;
+		void setListening(bool _on) const;
 
 	private:
 		void onPartChanged(uint8_t _part);

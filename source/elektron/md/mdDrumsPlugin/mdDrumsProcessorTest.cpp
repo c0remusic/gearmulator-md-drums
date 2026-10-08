@@ -1,8 +1,8 @@
 // MD Drums' processor as a host drives it, at 44.1 and 48 kHz: 576 host parameters in the order and with the IDs the
 // port froze, a note 36-51 sounding its Track and other notes nothing, host automation of a Track's machine reaching
 // the Device, SYN1 named after the machine, the Out parameter taking a Track off Main whatever the host does with its
-// bus, and the state bringing back the Device's Kit and mixer and the parameters with them. It reports the note-to-
-// sound latency through the whole plug-in.
+// bus, and the state bringing back the Device's Kit and mixer and the parameters with them; a Track played from the
+// editor sounds the machine chosen just before. It reports the note-to-sound latency through the whole plug-in.
 
 #include "mdDrumsProcessor.h"
 
@@ -243,6 +243,35 @@ int main()
 			require(syn1.startsWith("PTCH "), "SYN1 does not show its name on EFM-BD");
 			require(parameter(processor, "SYN1", 0).getUnnormalizedValue() == device(processor).kit().parameters[0][0],
 				"SYN1 does not follow the machine's default");
+
+			// The editor plays a Track (Listen while choosing): a machine chosen, the Track played at once, sounds the
+			// machine chosen, its note reaching the Device after the machine in the same block
+			{
+				juce::AudioBuffer<float> buffer(host.getTotalNumOutputChannels(), g_block);
+				juce::MidiBuffer midi;
+				const auto blocks = static_cast<int>(rate / g_block);
+				for(int i = 0; i < blocks; ++i)
+					process(processor, buffer, midi);
+				parameter(processor, "Machine", 0).setUnnormalizedValueNotifyingHost(28, pluginLib::Parameter::Origin::Ui);
+				dynamic_cast<mdDrums::Controller&>(processor.getController()).audition(0, 100);
+				double energy = 0;
+				for(int i = 0; i < blocks; ++i)
+				{
+					process(processor, buffer, midi);
+					for(int s = 0; s < g_block; ++s)
+					{
+						const auto value = std::max(std::abs(buffer.getSample(0, s)), std::abs(buffer.getSample(1, s)));
+						energy += double(value) * value;
+					}
+				}
+				// The same machine at its defaults, struck by the host
+				const auto host36 = play(processor, 36, 0, rate);
+				std::printf("%.0f Hz: TRX-B2 chosen and played from the editor: energy %.3f; struck by the host %.3f, EFM-BD %.3f\n",
+					rate, energy, host36.energy, after.energy);
+				require(device(processor).kit().machine(0) == 28, "the machine chosen did not reach the Device");
+				require(std::abs(energy - host36.energy) < host36.energy * 0.02, "the editor's note did not sound the machine chosen");
+				automate(processor, "Machine", 0, 32);
+			}
 
 			// Out: track 1 leaves Main whether or not the host takes its bus
 			automate(processor, "Out", 0, 1);

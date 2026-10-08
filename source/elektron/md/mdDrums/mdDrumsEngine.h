@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "MachineRunner.h"
+#include "TrackFx.h"
 
 #include "mdProtocol/mdlfosettings.h"
 
@@ -49,6 +50,8 @@ namespace mdDrums
 		Engine& operator=(const Engine&) = delete;
 
 		const std::vector<md::engine::MachineInfo>& machines() const;
+		// The OS's tables the Tracks' effects read, immutable: the editor measures the filter and the EQ with them
+		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const;
 
 		void setMachine(int _track, uint8_t _machineId);
 		void setParam(int _track, int _param, int _value);	// 0-127

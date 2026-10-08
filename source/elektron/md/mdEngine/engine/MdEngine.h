@@ -35,7 +35,7 @@ namespace md::engine
 		// _osImage: the OS file's section 0 (the ColdFire OS), decompressed. Constructs TVoices with just the
 		// firmware (VoiceEngine's own constructor).
 		EngineT(const fw::Firmware& _fw, std::vector<uint8_t> _osImage)
-			: m_tables(_fw), m_mixer(m_tables)
+			: m_tables(std::make_shared<const TrackFx::Tables>(_fw)), m_mixer(*m_tables)
 		{
 			m_os = std::make_unique<MachineRunner>(std::move(_osImage));
 			m_voices = std::make_unique<TVoices>(_fw);
@@ -46,7 +46,7 @@ namespace md::engine
 		// count). Only ever instantiated for a TVoices whose constructor actually takes (firmware, _voicesArg).
 		template<class TVoicesArg>
 		EngineT(const fw::Firmware& _fw, std::vector<uint8_t> _osImage, TVoicesArg _voicesArg)
-			: m_tables(_fw), m_mixer(m_tables)
+			: m_tables(std::make_shared<const TrackFx::Tables>(_fw)), m_mixer(*m_tables)
 		{
 			m_os = std::make_unique<MachineRunner>(std::move(_osImage));
 			m_voices = std::make_unique<TVoices>(_fw, _voicesArg);
@@ -57,6 +57,8 @@ namespace md::engine
 
 		HostModel<TVoices>& host() { return *m_host; }
 		const MachineRunner& os() const { return *m_os; }
+		// md-drums: the OS's tables that TrackFx and the Mixer read, immutable, for whoever runs a TrackFx of its own
+		const std::shared_ptr<const TrackFx::Tables>& tables() const { return m_tables; }
 		TVoices& voices() { return *m_voices; }
 
 		// md-drums: the UW sample bank the ROM machines play (fw::loadRomBankFromFlash). The OS's boot copies it from
@@ -143,12 +145,12 @@ namespace md::engine
 			m_host = std::make_unique<HostModel<TVoices>>(*m_os, *m_voices);
 			for(auto& s : m_state)
 				TrackFx::init(s);
-			m_fxs.push_back(std::make_unique<TrackFx>(m_tables));
+			m_fxs.push_back(std::make_unique<TrackFx>(*m_tables));
 			if constexpr(kParallel)
 			{
 				// Each group's thread runs the effects of its own tracks right after its voices render.
 				for(int g = 1; g < m_voices->groupCount(); ++g)
-					m_fxs.push_back(std::make_unique<TrackFx>(m_tables));
+					m_fxs.push_back(std::make_unique<TrackFx>(*m_tables));
 				m_voices->setPost([this](int _g, const typename TVoices::Block& _blk)
 				{
 					for(int t = 0; t < kTracks; ++t)
@@ -161,7 +163,7 @@ namespace md::engine
 		std::unique_ptr<MachineRunner> m_os;
 		std::unique_ptr<TVoices> m_voices;
 		std::unique_ptr<HostModel<TVoices>> m_host;
-		TrackFx::Tables m_tables;
+		std::shared_ptr<const TrackFx::Tables> m_tables;	// md-drums: shared, so that the editor measures with them (tables())
 		std::vector<std::unique_ptr<TrackFx>> m_fxs;	// one per voice group (one when not parallel)
 		Output* m_out = nullptr;
 		Mixer m_mixer;

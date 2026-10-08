@@ -8,14 +8,18 @@
 // - each of the 576 host parameters has a control in the skin, Track by Track;
 // - input to pixel: a knob dragged and a list row clicked show on the next frame, and the event, RmlUi's update and
 //   the software render take 33 ms at most;
-// - the meters and Hit lights follow the Processor's Telemetry (ticket 20), and so does the Hit screen (ticket 21).
+// - the meters and Hit lights follow the Processor's Telemetry (ticket 20), and so does the Hit screen (ticket 21);
+// - the Filter and EQ and LFO screens draw what the shown Track's parameters give, an LFO's target is underlined, ASSIGN
+//   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22).
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsFilterView.h"
 #include "mdDrumsHitView.h"
 #include "mdDrumsKnob.h"
+#include "mdDrumsLfoView.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
@@ -504,6 +508,219 @@ namespace
 		require(!view->playing(), "the playhead stays after the Hit");
 	}
 
+	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
+	{
+		auto* p = _f.processor.getController().getParameter(_name, _part);
+		require(p != nullptr, std::string("no parameter ") + _name);
+		p->setUnnormalizedValueNotifyingHost(_value, pluginLib::Parameter::Origin::Ui);
+		// A parameter tells the views later, from the message loop, which the test does not run
+		_f.editor->getFilterView()->refresh();
+		_f.editor->getLfoView()->refresh();
+	}
+
+	// A click as the mouse makes it, at an element's centre
+	void click(Fixture& _f, const std::string& _id)
+	{
+		auto* element = _f.find(_id);
+		require(element != nullptr, "no element " + _id);
+		const auto b = _f.box(*element);
+		const auto r = _f.dp();
+		auto& context = _f.context();
+		context.ProcessMouseMove(juce::roundToInt((b.x + b.w * 0.5f) * r), juce::roundToInt((b.y + b.h * 0.5f) * r), 0);
+		context.ProcessMouseButtonDown(0, 0);
+		context.ProcessMouseButtonUp(0, 0);
+	}
+
+	// The texts the screens' views write, on the 4 px steps like the mockup's
+	void viewBaselines(Fixture& _f, const std::vector<std::string>& _ids)
+	{
+		auto& document = *_f.component->getDocument();
+		for(const auto& id : _ids)
+		{
+			auto* element = _f.find(id);
+			require(element != nullptr, "no element " + id);
+			auto probe = document.CreateElement("span");
+			probe->SetProperty("display", "inline-block");
+			probe->SetProperty("width", "0dp");
+			probe->SetProperty("height", "0dp");
+			auto* p = element->AppendChild(std::move(probe));
+			_f.layout();
+			const auto y = p->GetAbsoluteOffset(Rml::BoxArea::Border).y / _f.dp();
+			element->RemoveChild(p);
+			require(std::abs(y - std::round(y / 4.0f) * 4.0f) <= 0.5f, id + "'s baseline at " + std::to_string(y));
+		}
+	}
+
+	// The brightest accent of a 3 x 3 patch: a 2 px stroke anti-aliased lands on whole pixels or between them
+	bool accentNear(Fixture& _f, const float _x, const float _y)
+	{
+		for(int dy = -1; dy <= 1; ++dy)
+			for(int dx = -1; dx <= 1; ++dx)
+				if(isAccent(_f.pixel(_x + dx, _y + dy)))
+					return true;
+		return false;
+	}
+
+	// The Filter and EQ screen (ticket 22): the response the shown Track's EQ and filter give, on the next frame
+	void filterScreen(Fixture& _f)
+	{
+		auto* view = _f.editor->getFilterView();
+		require(view != nullptr && view->response() != nullptr, "the editor has no Filter and EQ view with the engine's tables");
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		const auto screen = _f.box(*_f.find("screen_filter"));
+		// The canvas starts after the screen's rule
+		const auto at = [&](const double _hz, const double _db) { return std::make_pair(screen.x + 1 + mdDrums::FilterView::xOf(_hz), screen.y + mdDrums::FilterView::yOf(_db)); };
+
+		// Untouched: 0 dB at 1 kHz, -4.7 dB at 20 kHz
+		for(const auto& [name, value] : std::vector<std::pair<const char*, int>>{{"EQF", 64}, {"EQG", 64}, {"FLTF", 0},
+			{"FLTW", 127}, {"FLTQ", 0}, {"SRR", 0}})
+			set(_f, name, 0, value);
+		_f.frame();
+		const auto [x1k, y1k] = at(1000.0, view->response()->gain(1000.0));
+		const auto [x20k, y20k] = at(19000.0, view->response()->gain(19000.0));
+		std::printf("filter screen untouched: %.2f dB at 1 kHz (y %.1f), %.2f dB at 19 kHz (y %.1f)\n", view->response()->gain(1000.0),
+			y1k, view->response()->gain(19000.0), y20k);
+		require(accentNear(_f, x1k, y1k) && accentNear(_f, x20k, y20k), "the untouched response is not drawn");
+		require(!_f.find("filter_srr")->IsVisible(true), "SRR 0 shows a note");
+
+		// FLTF 64 and FLTQ 127: the high-pass's peak, +18 dB at 327 Hz; the EQ boosted at EQF 32, its point on the curve
+		set(_f, "FLTF", 0, 64);
+		set(_f, "FLTQ", 0, 127);
+		set(_f, "EQF", 0, 100);
+		set(_f, "EQG", 0, 127);
+		set(_f, "SRR", 0, 12);
+		_f.frame();
+		const auto peak = view->response()->gain(327.0);
+		const auto [xp, yp] = at(327.0, peak);
+		const auto centre = view->response()->eqCentre();
+		const auto [xe, ye] = at(centre, view->response()->gain(centre));
+		const auto point = _f.pixel(xe, ye).getBrightness();
+		std::printf("filter screen FLTF 64 FLTQ 127: %.1f dB at 327 Hz (x %.0f y %.1f); EQ point at %.0f Hz (x %.0f y %.1f) %.2f bright; note \"%s\"\n",
+			peak, xp, yp, centre, xe, ye, point, _f.find("filter_srr")->GetInnerRML().c_str());
+		require(peak > 15.0 && accentNear(_f, xp, yp), "the resonant peak is not drawn");
+		require(point > 0.9f, "the EQ's point is not drawn in ink on the curve");
+		require(_f.find("filter_srr")->GetInnerRML() == "SRR 12" && _f.find("filter_srr")->IsVisible(true), "SRR 12's note");
+		viewBaselines(_f, {"filter_tick1", "filter_tick2", "filter_tick3", "filter_zero", "filter_srr"});
+	}
+
+	// The LFO screen (ticket 22): the wave its target takes, zoomed on what it reaches; the names it underlines
+	void lfoScreen(Fixture& _f)
+	{
+		auto* view = _f.editor->getLfoView();
+		require(view != nullptr, "the editor has no LFO view");
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		// Track 1's LFO on its own FLTF at 64, a triangle at full depth
+		for(const auto& [name, value] : std::vector<std::pair<const char*, int>>{{"LfoTrack", 0}, {"LfoParam", 12},
+			{"LfoShape1", 0}, {"LfoShape2", 0}, {"LfoMode", 0}, {"LFOS", 64}, {"LFOD", 127}, {"LFOM", 0}, {"FLTF", 64}})
+			set(_f, name, 0, value);
+		_f.frame();
+		const auto screen = _f.box(*_f.find("screen_lfo"));
+		int top = 0, foot = 0;
+		for(float x = screen.x + 68; x < screen.x + 384; x += 1.0f)
+		{
+			top += isAccent(_f.pixel(x, screen.y + 49));
+			foot += isAccent(_f.pixel(x, screen.y + 103));
+		}
+		std::printf("lfo screen: TRI at LFOD 127 on FLTF 64 reaches %s to %s, %zu ticks; accent pixels %d at its top, %d at its foot\n",
+			_f.find("lfo_low")->GetInnerRML().c_str(), _f.find("lfo_high")->GetInnerRML().c_str(), view->trace().words.size(), top, foot);
+		require(_f.find("lfo_high")->GetInnerRML() == "127" && _f.find("lfo_low")->GetInnerRML() == "0", "the values the wave reaches");
+		require(top > 3 && foot > 3, "the wave does not fill the plot");
+		require(!_f.find("lfo_none")->IsVisible(true), "a wave with depth says there is none");
+		viewBaselines(_f, {"lfo_high", "lfo_low"});
+
+		// The name it modulates, underlined: ink, with a 2 px accent rule 4 px under its baseline (y 560)
+		auto* label = _f.find("n_FLTF");
+		require(label->IsClassSet("lfo") && !_f.find("n_FLTW")->IsClassSet("lfo"), "FLTF is not underlined, or FLTW is");
+		const auto lb = _f.box(*label);
+		std::vector<int> rows;
+		for(int y = 556; y < 572; ++y)
+			if(isAccent(_f.pixel(lb.x + 32, static_cast<float>(y))))
+				rows.push_back(y);
+		std::printf("lfo underline under FLTF: rows");
+		for(const auto y : rows)
+			std::printf(" %d", y);
+		std::printf("\n");
+		require(rows == std::vector<int>{564, 565}, "the underline is not 2 px, 4 px under the name's baseline");
+
+		// No depth: no wave, the reason instead; no underline. Then the depth back, for the pictures
+		set(_f, "LFOD", 0, 0);
+		_f.frame();
+		require(_f.find("lfo_none")->IsVisible(true) && !_f.find("lfo_high")->IsVisible(true), "LFOD 0 does not say so");
+		require(!label->IsClassSet("lfo"), "a name stays underlined without depth");
+		viewBaselines(_f, {"lfo_none"});
+		set(_f, "LFOD", 0, 127);
+	}
+
+	// ASSIGN (ticket 22): armed, its knobs ringed and the title asking; a knob of another Track gives the LFO its target
+	// and its own Track shows again; Esc disarms it, as it closes the overlays
+	void assign(Fixture& _f)
+	{
+		auto* view = _f.editor->getLfoView();
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		auto& controller = _f.processor.getController();
+		set(_f, "LfoTrack", 0, 0);
+		set(_f, "LfoParam", 0, 12);
+		click(_f, "lfo_assign");
+		_f.frame();
+		auto* knob = dynamic_cast<mdDrums::Knob*>(_f.find("k_DIST"));
+		const auto kb = _f.box(*knob);
+		const bool ring = isAccent(_f.pixel(kb.x + 32, kb.y - 0.5f)) || isAccent(_f.pixel(kb.x + 32, kb.y - 1.0f));
+		std::printf("assign: armed %d, \"%s\", asking %d, DIST a target %d, its ring %s\n", view->isArmed(),
+			_f.find("lfo_assign")->GetInnerRML().c_str(), _f.find("lfo_assigning")->IsVisible(true), knob->isTarget(),
+			ring ? "drawn" : "missing");
+		require(view->isArmed() && _f.find("lfo_assign")->GetInnerRML() == "Cancel" && _f.find("lfo_assign")->IsClassSet("on"),
+			"Assign does not arm");
+		require(_f.find("lfo_assigning")->IsVisible(true) && !_f.find("lfo_target")->IsVisible(true), "the title does not ask for a knob");
+		require(knob->isTarget() && ring, "the knobs are not targets with their rings");
+
+		// Track 3 shown, its DIST clicked: LFO 1 on track 3's DIST, track 1 shown again, disarmed
+		click(_f, "row3_num");
+		require(controller.getCurrentPart() == 2 && view->isArmed(), "showing another Track disarmed ASSIGN");
+		click(_f, "k_DIST");
+		_f.frame();
+		const auto lfoTrack = controller.getParameter("LfoTrack", 0)->getUnnormalizedValue();
+		const auto lfoParam = controller.getParameter("LfoParam", 0)->getUnnormalizedValue();
+		std::printf("assign: picked LFO 1 on track %d parameter %d, track %d shown, armed %d, DIST %d\n", lfoTrack + 1, lfoParam,
+			controller.getCurrentPart() + 1, view->isArmed(), controller.getParameter("DIST", 2)->getUnnormalizedValue());
+		require(lfoTrack == 2 && lfoParam == 16, "the knob clicked is not the LFO's target");
+		require(controller.getCurrentPart() == 0 && !view->isArmed() && !knob->isTarget(), "the LFO's Track is not shown again");
+		require(controller.getParameter("DIST", 2)->getUnnormalizedValue() == 0, "the knob clicked moved");
+
+		// Esc: disarms, back to the LFO's Track; then closes the browser as Cancel
+		click(_f, "lfo_assign");
+		click(_f, "row5_num");
+		_f.context().ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
+		require(!view->isArmed() && controller.getCurrentPart() == 0, "Esc does not disarm ASSIGN");
+		_f.editor->getTrackView()->setOverlay(mdDrums::TrackView::Overlay::Browser);
+		_f.context().ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
+		require(_f.editor->getTrackView()->getOverlay() == mdDrums::TrackView::Overlay::None, "Esc does not close the browser");
+		std::printf("assign: Esc disarms and closes the browser\n");
+		set(_f, "LfoTrack", 0, 0);
+		set(_f, "LfoParam", 0, 12);
+	}
+
+	// Listen while choosing (ticket 22): ticked by default, kept in the settings; a machine chosen plays the Track
+	void listen(Fixture& _f)
+	{
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto* tracks = _f.editor->getTrackView();
+		_f.showView("browser");
+		require(tracks->isListening() && _f.find("preview_listen")->IsClassSet("on"), "Listen while choosing is not ticked");
+		const auto pending = controller.pendingAuditions();
+		click(_f, "mach_17");
+		require(controller.getParameter("Machine", 0)->getUnnormalizedValue() == 17, "the cell did not choose its machine");
+		require((controller.pendingAuditions() & 1) && !(pending & 1), "a machine chosen does not play the Track");
+		click(_f, "preview_listen");
+		require(!tracks->isListening() && !_f.find("preview_listen")->IsClassSet("on"), "the box does not untick");
+		click(_f, "preview_listen");
+		require(tracks->isListening(), "the box does not tick again");
+		std::printf("listen: a machine chosen plays the Track, the box ticks and unticks\n");
+		click(_f, "browser_cancel");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		for(const auto& view : readViews())
@@ -542,7 +759,8 @@ int main()
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
-			{"meters", meters}, {"hit screen", hitScreen}})
+			{"meters", meters}, {"hit screen", hitScreen}, {"filter screen", filterScreen}, {"lfo screen", lfoScreen},
+			{"assign", assign}, {"listen", listen}})
 		{
 			try
 			{

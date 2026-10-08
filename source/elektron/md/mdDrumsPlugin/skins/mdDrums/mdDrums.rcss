@@ -234,3 +234,25 @@ vknob.sk { top: 728dp; width: 28dp; height: 28dp; }
 
 /* The Hit screen's graduation words: 12 px on a baseline 16 px over the screen's foot (mdDrumsHitView.cpp) */
 .tick { top: 188dp; height: 16dp; line-height: 16dp; display: none; }
+
+/* The Filter and EQ screen's words: the graduations' 4 px after their lines on the axis' baseline, "0 dB" 4 px over its
+   line (y 107), placed by mdDrumsFilterView.cpp */
+.ftick { top: 188dp; height: 16dp; line-height: 16dp; }
+.zerodb { left: 19dp; top: 92dp; height: 16dp; line-height: 16dp; }
+
+/* The LFO screen: the values its wave reaches, in the label column at the plot's top (baseline y 660) and foot (716);
+   "LFOD 0: no modulation" on the plot's middle row (688); ASSIGN armed, its title and Cancel in accent */
+.lfov { left: 15dp; height: 16dp; line-height: 16dp; display: none; }
+.lfov.high { top: 40dp; }
+.lfov.low { top: 96dp; }
+.lfonone { left: 67dp; top: 68dp; height: 16dp; line-height: 16dp; display: none; }
+.asking { display: none; }
+.stitle .word.on { color: #6fd1c4; }
+/* Over the plot, which the screen's canvas draws */
+.lfomenu { z-index: 1; }
+
+/* A name an LFO modulates: ink, underlined 2 px in accent 4 px under its baseline (the mockup's text-decoration) */
+.kl.lfo span { color: #f2f2f2; border-bottom: 2dp #6fd1c4; padding-bottom: 1dp; }
+
+/* Listen while choosing, ticked */
+.pvauto.on .box { background-color: #f2f2f2; border-color: #f2f2f2; }

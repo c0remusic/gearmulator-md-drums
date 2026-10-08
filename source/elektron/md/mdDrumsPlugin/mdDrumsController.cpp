@@ -7,6 +7,8 @@
 
 #include "synthLib/plugin.h"
 
+#include <algorithm>
+
 namespace mdDrums
 {
 	namespace
@@ -156,6 +158,30 @@ namespace mdDrums
 				++sent;
 			}
 		}
+
+		// The Tracks the editor plays, after every change published before them
+		auto tracks = m_auditions.exchange(0, std::memory_order_acquire);
+		while(tracks)
+		{
+			const auto track = lowestBit(tracks);
+			tracks &= tracks - 1;
+			synthLib::SMidiEvent note(synthLib::MidiEventSource::Editor, synthLib::M_NOTEON,
+				static_cast<uint8_t>(FirstNote + track), m_auditionVelocity[track].load(std::memory_order_relaxed));
+			if(sent >= _maximum || !getProcessor().tryAddRealtimeMidiEvent(note))
+			{
+				m_auditions.fetch_or(static_cast<uint32_t>(tracks | (1ull << track)), std::memory_order_release);
+				return;
+			}
+			++sent;
+		}
+	}
+
+	void Controller::audition(const uint8_t _track, const uint8_t _velocity)
+	{
+		if(_track >= TrackCount)
+			return;
+		m_auditionVelocity[_track].store(std::clamp<uint8_t>(_velocity, 1, 127), std::memory_order_relaxed);
+		m_auditions.fetch_or(1u << _track, std::memory_order_release);
 	}
 
 	bool Controller::parseSysexMessage(const pluginLib::SysEx&, synthLib::MidiEventSource)

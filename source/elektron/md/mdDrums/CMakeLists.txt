@@ -7,6 +7,8 @@ project(mdDrums)
 add_library(mdDrums STATIC
 	mdDrumsDevice.cpp mdDrumsDevice.h
 	mdDrumsEngine.cpp mdDrumsEngine.h
+	mdDrumsFilterResponse.cpp mdDrumsFilterResponse.h
+	mdDrumsLfo.cpp mdDrumsLfo.h
 	mdDrumsMessages.cpp mdDrumsMessages.h
 	mdDrumsTelemetry.h
 )
@@ -27,4 +29,11 @@ if(BUILD_TESTING)
 	add_test(NAME mdDrumsDeviceTest COMMAND mdDrumsDeviceTest)
 	set_tests_properties(mdDrumsDeviceTest PROPERTIES LABELS "FirmwareTest;AudioIo;Midi" SKIP_RETURN_CODE 77 TIMEOUT 120)
 	set_property(TARGET mdDrumsDeviceTest PROPERTY FOLDER "Elektron/test")
+
+	# What the editor's Filter and EQ and LFO screens compute: the LFO's port against the OS's routines, the response
+	add_executable(mdDrumsScreensTest mdDrumsScreensTest.cpp)
+	target_link_libraries(mdDrumsScreensTest PRIVATE mdDrums)
+	add_test(NAME mdDrumsScreensTest COMMAND mdDrumsScreensTest)
+	set_tests_properties(mdDrumsScreensTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 120)
+	set_property(TARGET mdDrumsScreensTest PROPERTY FOLDER "Elektron/test")
 endif()

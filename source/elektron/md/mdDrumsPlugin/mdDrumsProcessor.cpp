@@ -94,7 +94,9 @@ namespace mdDrums
 		params.romName = g_flashName;
 		params.romData = std::move(flash);
 		params.homePath = getDataFolder();
-		return new Device(params, m_telemetry);
+		auto* device = new Device(params, m_telemetry);
+		std::atomic_store(&m_fxTables, device->fxTables());
+		return device;
 	}
 
 	pluginLib::Controller* Processor::createController()
@@ -104,13 +106,13 @@ namespace mdDrums
 
 	void Processor::processBpm(const float _bpm)
 	{
-		if(std::abs(_bpm - m_bpm) < 0.005f)
+		if(std::abs(_bpm - m_bpm.load(std::memory_order_relaxed)) < 0.005f)
 			return;
 		const auto message = messages::tempo(_bpm);
 		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
 		event.assignRawData(message.bytes.data(), message.size, synthLib::MidiEventSource::Editor, 0);
 		if(tryAddRealtimeMidiEvent(event))
-			m_bpm = _bpm;
+			m_bpm.store(_bpm, std::memory_order_relaxed);
 	}
 
 	void Processor::loadChunkData(baseLib::ChunkReader& _cr)

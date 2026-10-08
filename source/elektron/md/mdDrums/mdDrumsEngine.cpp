@@ -216,6 +216,11 @@ namespace mdDrums
 		return m_state->engine.os().machines();
 	}
 
+	std::shared_ptr<const md::engine::TrackFx::Tables> Engine::fxTables() const
+	{
+		return m_state->engine.tables();
+	}
+
 	void Engine::setMachine(const int _track, const uint8_t _machineId)
 	{
 		m_state->engine.host().setMachine(_track, _machineId);

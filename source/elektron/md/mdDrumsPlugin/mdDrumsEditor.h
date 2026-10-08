@@ -7,7 +7,9 @@
 
 namespace mdDrums
 {
+	class FilterView;
 	class HitView;
+	class LfoView;
 	class MeterView;
 	class Processor;
 	class TrackView;
@@ -32,11 +34,18 @@ namespace mdDrums
 		TrackView* getTrackView() const { return m_trackView.get(); }
 		MeterView* getMeterView() const { return m_meterView.get(); }
 		HitView* getHitView() const { return m_hitView.get(); }
+		FilterView* getFilterView() const { return m_filterView.get(); }
+		LfoView* getLfoView() const { return m_lfoView.get(); }
+
+		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else closes the open overlay
+		bool escape() const;
 
 	private:
 		std::unique_ptr<TrackView> m_trackView;
 		std::unique_ptr<MeterView> m_meterView;
 		std::unique_ptr<HitView> m_hitView;
+		std::unique_ptr<FilterView> m_filterView;
+		std::unique_ptr<LfoView> m_lfoView;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

@@ -2,6 +2,8 @@
 
 #include "juceRmlUi/rmlElemKnob.h"
 
+#include <functional>
+
 namespace juce
 {
 	class Graphics;
@@ -42,15 +44,25 @@ namespace mdDrums
 
 		bool isEdited() const;
 
+		// ASSIGN (HANDOFF.md, "LFO"): a target wears a 1 px accent ring outside its box, 2 px under the mouse, and a click
+		// on it calls _onPick instead of moving it (nor does the drag that follows). An empty function makes it a knob again.
+		void setTarget(std::function<void()> _onPick);
+		bool isTarget() const { return static_cast<bool>(m_onPick); }
+
 	private:
 		void step(float _steps);
 		void updateSpeed();
 		void repaint() const;
 		void paint(const juce::Image& _image, juce::Graphics& _g) const;
 		void paintFader(juce::Graphics& _g, float _dp) const;
+		void paintRing(juce::Graphics& _g) const;
 
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
+		juceRmlUi::ElemCanvas* m_ring = nullptr;
 		bool m_bipolar = false;
 		bool m_fader = false;
+		std::function<void()> m_onPick;
+		bool m_hover = false;
+		bool m_swallowDrag = false;
 	};
 }

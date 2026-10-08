@@ -44,6 +44,12 @@ namespace mdDrums
 		// Where a host parameter's value waits to be sent: its slot, or -1 for none
 		static int slotOf(uint8_t _page, uint8_t _part, uint8_t _index);
 
+		// Plays a Track from the editor, from any thread: its note goes to the Device at the next audio block, after the
+		// parameter changes published before it (a machine just chosen sounds, not the one before)
+		void audition(uint8_t _track, uint8_t _velocity);
+		uint32_t pendingAuditions() const { return m_auditions.load(std::memory_order_relaxed); }	// bit n: Track n + 1
+		static constexpr uint8_t FirstNote = 36;
+
 	protected:
 		pluginLib::Parameter* createParameter(pluginLib::Controller& _controller, const pluginLib::Description& _description,
 			uint8_t _part, int _uid, const pluginLib::Parameter::PartFormatter& _formatter) override;
@@ -64,6 +70,8 @@ namespace mdDrums
 		std::array<Address, ParameterCount> m_addresses{};
 		std::array<std::atomic<int32_t>, ParameterCount> m_values{};
 		std::array<std::atomic<uint64_t>, (ParameterCount + 63) / 64> m_dirty{};
+		std::atomic<uint32_t> m_auditions{0};	// bit n: Track n + 1 waits to be played
+		std::array<std::atomic<uint8_t>, TrackCount> m_auditionVelocity{};
 		std::vector<uint8_t> m_loadedState;
 	};
 }

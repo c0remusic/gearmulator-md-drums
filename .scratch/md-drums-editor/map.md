@@ -114,17 +114,19 @@ mesurées avant et après. Pas de tag.
 - [Écran Hit](issues/21-ecran-hit.md) : capture à deux emplacements par Track, contrôlée par identifiant ; identique à
   la sortie solo depuis la note plus 31 ; `HitView` progressif avec fenêtre ajustée et tête de lecture ; 16 captures
   à la fois 0,23 % d'un cœur.
+- [Écrans Filter/EQ et LFO, ASSIGN, écoute](issues/22-ecrans-filtre-lfo-assign.md) : réponse depuis les mots de
+  coefficients du DSP (pas d'impulsion : le passe-haut bas sonne des secondes), à 0,054 dB de la chaîne, 46 µs la
+  courbe ; LFO porté des routines de l'OS, 0 différence sur 2 259 ticks et 670 Hits ; ASSIGN par anneau sur les knobs,
+  Esc pour ASSIGN et les overlays ; noms soulignés ; écoute ordonnée après la machine choisie (`Controller::audition`).
 
 ## Not yet specified
 
-- **Tranches de construction après le skin** : skin statique fait (17, 18), gigue réglée (19), lecture du moteur
-  fixée (16) : tickets 20 (télémétrie, mètres, scopes), 21 (écran Hit), 22 (écrans Filter/EQ et LFO, ASSIGN, écoute
-  du browser) ; restent les Kits et leur Bank (après le ticket 10) et Push (après le ticket 11).
+- **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
+  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22) faits ; restent les Kits et leur Bank (après le
+  ticket 10) et Push (après le ticket 11). Pas encore placés : la touche play et Espace (« plays the shown track »),
+  la molette et ↑ ↓ sur le nom de machine, Ctrl+S, le second moteur de l'écran Hit (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
-- **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui
-  descend deux fois par période, RMP et EXP en one-shot relancés à chaque Hit, RND à 8 pas, LFOM qui fond vers la
-  forme 2 inversée. À reprendre avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
   décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
   applique le dump `$52`) ; sinon une graine.
