@@ -33,7 +33,9 @@ body.mdd { background-color: #1b1c1e; color: #f2f2f2; font-family: Inter; font-s
 /* ---- Top bar: y 0-56, its rule at 55 ---- */
 .rule { height: 1dp; background-color: #55585e; }
 .rule.full { left: 0dp; width: 1296dp; }
-.rule.edit { left: 248dp; width: 1048dp; }
+/* The editing area starts at column 3's end (x 240), not the gutter's middle as in the mockup: 16 px between it and
+   knob 1, as between knob 8 and the screens (the user, 2026-10-08) */
+.rule.edit { left: 240dp; width: 1056dp; }
 .bar { top: 0dp; height: 56dp; line-height: 56dp; }
 .logo { font-size: 14dp; font-weight: 700; letter-spacing: 2dp; line-height: 54dp; }
 .logo span { font-weight: 400; color: #a7aaaf; margin-left: 4dp; letter-spacing: 0dp; }
@@ -54,7 +56,7 @@ body.mdd { background-color: #1b1c1e; color: #f2f2f2; font-family: Inter; font-s
 .meter .fill { position: absolute; left: 0dp; top: 0dp; width: 0dp; height: 2dp; background-color: #6fd1c4; }
 
 /* ---- Track tab ---- */
-.surface { left: 248dp; top: 176dp; width: 1048dp; height: 648dp; background-color: #26272a; }
+.surface { left: 240dp; top: 176dp; width: 1056dp; height: 648dp; background-color: #26272a; }
 
 /* Head band: y 56-176, its rule at 175 across the window */
 .kit { left: 16dp; top: 84dp; width: 168dp; height: 24dp; line-height: 22dp; font-size: 14dp; overflow: hidden; cursor: pointer; }
@@ -84,9 +86,9 @@ vglyph.down { width: 8dp; height: 8dp; margin-left: 4dp; color: #a7aaaf; }
 .play:active { background-color: #26272a; }
 .play vglyph { position: absolute; left: 22dp; top: 21dp; width: 18dp; height: 20dp; color: #f2f2f2; }
 
-/* Track list: rows of 40 from y 176, columns 1-3; the shown row lit to the gutter's middle */
+/* Track list: rows of 40 from y 176, columns 1-3; the shown row lit to the editing area */
 .row { left: 0dp; width: 0dp; height: 0dp; }
-.rowsel { left: 0dp; width: 248dp; height: 40dp; background-color: #26272a; }
+.rowsel { left: 0dp; width: 240dp; height: 40dp; background-color: #26272a; }
 .rowmark { left: 0dp; width: 4dp; height: 24dp; background-color: #6fd1c4; }
 .tn { left: 16dp; top: 8dp; width: 24dp; height: 24dp; line-height: 24dp; font-size: 12dp; color: #a7aaaf; cursor: pointer; }
 .tm { left: 48dp; top: 8dp; width: 84dp; height: 24dp; line-height: 22dp; font-size: 14dp; letter-spacing: 1dp; color: #a7aaaf; overflow: hidden; cursor: pointer; }

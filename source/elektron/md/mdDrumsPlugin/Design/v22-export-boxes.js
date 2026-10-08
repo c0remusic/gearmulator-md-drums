@@ -2,7 +2,7 @@
 // map): window pixels at 100 %, under keys the skin gives its elements as IDs. Serve this folder over HTTP, open
 // v22-test.html, leave it as it starts (Track tab, track 01, arrows "caption", play "key"), run this file's text in its
 // console (await (await fetch("v22-export-boxes.js")).text().then(eval)) and save the object as v22-boxes.txt: a line
-// per key, "key x y width height", sorted by y then x.
+// per key, "key x y width height", sorted by y then x. Keep the changes v22-boxes.txt's header names.
 (() => {
 	const ui = document.querySelector(".ui");
 	const origin = ui.getBoundingClientRect(), scale = origin.width / 1296;

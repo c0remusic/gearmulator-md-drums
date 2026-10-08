@@ -17,8 +17,11 @@ Fidelity: flat. There are no rendered assets: every control is drawn from vector
   baseline onto the step; the boxes stay on the grid.
 - **Room:** 16 px at the window's four edges and inside every screen; 28 px on both sides of every rule. Backgrounds,
   rules and screens run to the window's edges.
+- **Changed after approval (2026-10-08, the user):** the Track tab's editing area (its surface, the bands' rules and the
+  shown row's background) starts at x 240, column 3's end, not at the gutter's middle (248) as the mockup draws it:
+  16 px between it and knob 1, as between knob 8 and the screens. `v22-boxes.txt` carries the change.
 - **Vertical structure (Track tab):** top bar y 0-56 (rule at y 55); head band y 56-176 (rule at y 175, across the
-  window); three bands of 216 px at y 176, 392 and 608 (rules at y 391 and 607, from x 248 to the right edge); the
+  window); three bands of 216 px at y 176, 392 and 608 (rules at y 391 and 607, from x 240 to the right edge); the
   last band ends at the window's foot (824).
 
 All coordinates below are window pixels at 100 %, `x, y, width, height`.
@@ -59,7 +62,7 @@ Rows of 40 px from y 176 (row `i` at `176 + 40 * i`); in each row, 24 px tall ce
 
 | Element | Box (row 1) | Notes |
 |---|---|---|
-| Shown row's background | 0, 176, 248, 40 | panel colour, to the gutter's middle |
+| Shown row's background | 0, 176, 240, 40 | panel colour, to the editing area |
 | Shown row's mark | 0, 184, 4, 24 | accent |
 | Number | 16, 184, 24, 24 | 12 px; click plays the track and shows it; accent for 140 ms on a hit |
 | Machine | 48, 184, 84, 24 | 14 px tracked 1 px; click shows the track |

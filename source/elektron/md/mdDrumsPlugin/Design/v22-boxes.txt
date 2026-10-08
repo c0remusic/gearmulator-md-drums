@@ -1,3 +1,5 @@
+# The v22 mockup's boxes (v22-export-boxes.js), "key x y width height" in window pixels. Changed since: surface,
+# row_sel_bg, rule_391 and rule_607 start at x 240, not 248 (16 px on both sides of the knobs; the user, 2026-10-08).
 logo 16 0 224 56
 tab_track 256 0 64 56
 tab_mix 336 0 64 56
@@ -20,8 +22,8 @@ tracks_label 16 124 224 24
 output 896 124 224 24
 velocity_bar 1136 144 64 4
 rule_175 0 175 1296 1
-row_sel_bg 0 176 248 40
-surface 248 176 1048 648
+row_sel_bg 0 176 240 40
+surface 240 176 1056 648
 screen_hit 896 176 400 216
 row_sel_mark 0 184 4 24
 row1_num 16 184 24 24
@@ -81,7 +83,7 @@ row6_name 48 384 84 24
 row6_scope 136 384 32 24
 row6_mute 176 384 24 24
 row6_solo 208 384 24 24
-rule_391 248 391 1048 1
+rule_391 240 391 1056 1
 screen_filter 896 392 400 216
 screen_filter_title 912 408 368 24
 efx_title 256 420 224 24
@@ -137,7 +139,7 @@ row11_name 48 584 84 24
 row11_scope 136 584 32 24
 row11_mute 176 584 24 24
 row11_solo 208 584 24 24
-rule_607 248 607 1048 1
+rule_607 240 607 1056 1
 screen_lfo 896 608 400 216
 row12_num 16 624 24 24
 row12_name 48 624 84 24
