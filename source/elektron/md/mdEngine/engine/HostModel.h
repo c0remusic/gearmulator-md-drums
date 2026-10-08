@@ -6,7 +6,8 @@
 // It also produces each track's inputs to the mixer DSP (DSP1): the 9 effect words (Y:$200+$40k) and the
 // 5 mix words (Y:$100+5k), computed as the tick routine does ($20b1f6-$20b302).
 //
-// Not yet modelled: parameter locks and trigger groups (sequencer features).
+// Not yet modelled: parameter locks (a sequencer feature). Trig and mute groups (Links and Chokes) are the Kit's and
+// act on every Hit (md-drums).
 #pragma once
 #include <algorithm>
 #include <array>
@@ -35,8 +36,22 @@ namespace md::engine
 		void setParam(int _track, int _param, int _value);	// 0-127, smoothed like the MD
 		int param(int _track, int _param) const { return m_raw[_track][_param]; }
 		void setTempo(double _bpm);							// tempo factor for tempo-synced LFOs and E12/ROM retrig
-		// velocity 1-127; accent: the sequencer's accented step (velocity becomes 128 + 2 x accent amount)
+		// velocity 1-127; accent: the sequencer's accented step (velocity becomes 128 + 2 x accent amount). A muted track
+		// drops its Hit, as the OS's note handler does ($20ccf6), and so fires neither its Link nor its Choke.
 		void trigger(int _track, int _velocity = 100, bool _accent = false);
+
+		// md-drums: Links and Chokes, the Kit's trig and mute groups, played as OS 1.63 plays them
+		// (.scratch/md-drums-editor/research/06-groupes.md). A Hit of _track also hits its Link, at the same velocity
+		// and in the same block, one step only (the Link's own Link does not fire), and silences its Choke until that
+		// track's own next Hit: a higher track in the Hit's block, a lower one at the next tick, as the OS orders its
+		// tick; a track struck while choked stays silent until the next tick. kOff, or any value past the tracks,
+		// switches one off; a self-reference does nothing. A muted Link drops the Hit it is given, as a muted track
+		// drops its own.
+		static constexpr uint8_t kOff = 0xff;
+		void setLink(int _track, int _target);
+		void setChoke(int _track, int _target);
+		uint8_t link(int _track) const { return m_link[_track]; }
+		uint8_t choke(int _track) const { return m_choke[_track]; }
 		void setAccentAmount(int _amount) { m_accentAmount = std::clamp(_amount, 0, 127); }
 
 		// Caps how many tracks can be simultaneously active (most-recently-triggered N; a new distinct
@@ -58,7 +73,8 @@ namespace md::engine
 		void setSilenceRelease(int _threshold, int _blocks) { m_releaseThreshold = _threshold; m_releaseBlocks = _blocks; }
 		uint32_t silenceReleases() const { return m_releases; }	// voices freed this way so far (stats)
 
-		// Track level (kit LEV, 0-127; smoothed by the OS's level slew $100029e), mute, output routing
+		// Track level (kit LEV, 0-127; smoothed by the OS's level slew $100029e, and set at once by every Hit, as the
+		// OS's trigger path does at $20b022), mute (the track's mix words 0, and its Hits dropped), output routing
 		// (DSP1's per-track route word; 6 = the main outputs, the MD's default).
 		void setLevel(int _track, int _level);
 		void setMute(int _track, bool _mute) { m_mute[_track] = _mute; }
@@ -95,6 +111,8 @@ namespace md::engine
 
 	private:
 		void silenceVoice(int _track);	// forces a voice to the OS's empty machine (GND--), for voice stealing
+		void hit(int _track, int _velocity, bool _accent);	// one track's part of a trigger (the note handler's)
+		void applyChoke(int _track);	// the tick's mute-group step for a triggered track ($20b3a2)
 
 		MachineRunner& m_os;
 		TVoices& m_voices;
@@ -119,5 +137,8 @@ namespace md::engine
 		int m_releaseThreshold = -1, m_releaseBlocks = 0;	// silence release, off (see setSilenceRelease)
 		std::array<int, kTracks> m_quiet{};	// consecutive quiet blocks per sounding voice
 		uint32_t m_releases = 0;
+		std::array<uint8_t, kTracks> m_link{};
+		std::array<uint8_t, kTracks> m_choke{};
+		std::array<bool, kTracks> m_choked{};	// the OS's group-mute flag ($1001510), apart from the user mute
 	};
 }

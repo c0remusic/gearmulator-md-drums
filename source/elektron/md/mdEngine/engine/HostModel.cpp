@@ -36,6 +36,8 @@ namespace md::engine
 		setTempo(125.0);
 		m_pendingMachine.fill(-1);
 		m_route.fill(6);
+		m_link.fill(kOff);
+		m_choke.fill(kOff);
 		for(int t = 0; t < kTracks; ++t)
 		{
 			m_os.poke8(kLevelTarget + static_cast<uint32_t>(t), 100);
@@ -99,7 +101,32 @@ namespace md::engine
 	}
 
 	template<class TVoices>
+	void HostModel<TVoices>::setLink(const int _track, const int _target)
+	{
+		m_link[_track] = _target >= 0 && _target < kTracks ? static_cast<uint8_t>(_target) : kOff;
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::setChoke(const int _track, const int _target)
+	{
+		m_choke[_track] = _target >= 0 && _target < kTracks ? static_cast<uint8_t>(_target) : kOff;
+	}
+
+	template<class TVoices>
 	void HostModel<TVoices>::trigger(const int _track, const int _velocity, const bool _accent)
+	{
+		if(m_mute[_track])
+			return;
+		hit(_track, _velocity, _accent);
+		// The note handler gives the trig group's track the same velocity and accent ($20cf8c), and the tick fires it
+		// in the same tick from the handler's own flags only, so its own trig group does not fire ($20add8)
+		const auto link = m_link[_track];
+		if(link < kTracks && link != _track && !m_mute[link])
+			hit(link, _velocity, _accent);
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::hit(const int _track, const int _velocity, const bool _accent)
 	{
 		bool wasSounding = false;
 		// Voice budget: the tracks that have sounded (and so keep costing DSP time until silenced) are kept in trigger
@@ -152,6 +179,9 @@ namespace md::engine
 		m_trigger[_track] = true;
 		m_velocity[_track] = static_cast<uint8_t>(std::clamp(_velocity, 1, 127));
 		m_accent[_track] = _accent;
+		// The tick's trigger path snaps the level to the Kit's, smoothed value and target alike ($20b022)
+		const auto track = static_cast<uint32_t>(_track);
+		m_os.poke16(kLevel + 2 * track, static_cast<uint16_t>(m_os.peek8(kLevelTarget + track) << 7));
 		// The OS's track trigger ($20cdf0) flags the track's own LFO; the tick's trigger path acts on it.
 		m_os.poke8(kLfo + kLfoStride * static_cast<uint32_t>(_track) + 5, 1);
 		// The tick routine's trigger path: a pending machine is applied now, loading the kit values straight into
@@ -209,7 +239,27 @@ namespace md::engine
 			}
 		}
 		updateMixer(_track);
+		if(m_trigger[_track])
+			applyChoke(_track);
 		m_trigger[_track] = false;
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::applyChoke(const int _track)
+	{
+		// The tick's mute-group step ($20b3a2), after the track's own words: those took its flag as it was, so a track
+		// struck while choked stays silent until the next tick gives it words again
+		const auto target = m_choke[_track];
+		if(target < kTracks && target != _track)
+		{
+			m_choked[target] = true;
+			// A higher track's words come later in the same tick, a lower one's at the next tick. Between ticks only
+			// the struck tracks are updated: a higher target's words are given at once.
+			if(target > _track && !m_trigger[target])
+				updateMixer(target);
+		}
+		// With a self-reference, the flag is set then cleared: nothing
+		m_choked[_track] = false;
 	}
 
 	template<class TVoices>
@@ -223,7 +273,7 @@ namespace md::engine
 		for(int k = 0; k < 9; ++k)
 			m.fx[k] = a6[8 + k];	// sent unchanged by $1000702
 		m.mix[0] = m_route[_track];
-		if(m_mute[_track])
+		if(m_mute[_track] || m_choked[_track])
 		{
 			m.mix[1] = m.mix[2] = m.mix[3] = m.mix[4] = 0;
 			return;

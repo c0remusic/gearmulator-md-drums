@@ -5,6 +5,8 @@
 
 #include "firmwareBench.h"
 
+#include "mdProtocol/mdkit.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -177,6 +179,119 @@ namespace
 		std::printf("DSP2 P $%06x-$%06x: %u words\n", _from, _to, _to - _from);
 	}
 
+	// Links and Chokes (trig and mute groups) as the firmware plays them, for comparison with another engine: on one
+	// booted machine, the tracks of g_groupTracks take their machines and hitParameters, then each scenario of
+	// g_groupScenarios plays its notes and records a second of outputs A to F from its first note on. Writes, per
+	// scenario, its index, its sample count and the six outputs (32-bit unsigned, then 32-bit floats; little-endian).
+	// The routing of each scenario sends the tracks it plays to their own outputs, out of the master effects.
+	void groups(const char* _path, const std::string& _file)
+	{
+		using namespace md::automation;
+		Bench bench(_path, 0);
+		const auto threshold = std::max(1e-4f, bootUntilNotesPlay(bench) * 8.0f);
+		std::vector<uint8_t> bytes;
+		const auto append32 = [&](const uint32_t _value)
+		{
+			for(int shift = 0; shift < 32; shift += 8)
+				bytes.push_back(static_cast<uint8_t>(_value >> shift));
+		};
+		const auto sendSysex = [&](const std::optional<sysex::Message>& _message)
+		{
+			require(_message.has_value(), "no SysEx for a group scenario");
+			bench.sysex(std::vector<uint8_t>(_message->begin(), _message->end()));
+		};
+		const auto sendCc = [&](const ParameterChange& _change)
+		{
+			const auto cc = encodeParameterChange(md::MachineModel::Machinedrum, _change, 0);
+			require(cc.has_value(), "no CC for a group scenario");
+			bench.note((*cc)[0], (*cc)[1], (*cc)[2], 0);
+		};
+		const auto settle = [&](const uint32_t _blocks)
+		{
+			for(uint32_t block = 0; block < _blocks; ++block)
+				bench.process();
+		};
+
+		// No LFO of Kit 1 reaches the tracks played: every LFO at zero depth (LFOD)
+		for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+			sendCc({machinedrum::Routing, track, 6, 0});
+		for(const auto& track : g_groupTracks)
+		{
+			sendSysex(sysex::assignMachine(md::MachineModel::Machinedrum, track.track, track.machine));
+			settle(4);
+			const auto parameters = hitParameters(track.machine);
+			for(uint8_t parameter = 0; parameter < parameters.size(); ++parameter)
+				sendCc({static_cast<uint8_t>(parameter / 8), track.track, static_cast<uint8_t>(parameter % 8),
+					parameters[parameter]});
+			sendCc({machinedrum::Level, track.track, 0, g_hitLevel});
+		}
+		settle(172 * 2);
+
+		for(uint32_t index = 0; index < g_groupScenarios.size(); ++index)
+		{
+			const auto& scenario = g_groupScenarios[index];
+			for(uint8_t output = 0; output < scenario.outputs.size(); ++output)
+				if(scenario.outputs[output] != g_noTrack)
+					sendSysex(sysex::trackRouting(scenario.outputs[output], static_cast<sysex::TrackOutput>(output)));
+			for(const auto& group : scenario.links)
+				sendSysex(sysex::linkChange(group[0], group[1]));
+			for(const auto& group : scenario.chokes)
+				sendSysex(sysex::chokeChange(group[0], group[1]));
+			for(const auto track : scenario.muted)
+				sendCc({machinedrum::Mute, track, 0, 1});
+			uint32_t quiet = 0;
+			for(uint32_t block = 0; block < 172 || quiet < 16; ++block)
+			{
+				require(block < 172 * 10, "the machine never fell silent");
+				quiet = bench.process() < threshold ? quiet + 1 : 0;
+			}
+
+			std::vector<std::vector<float>> channels(6);
+			const auto start = bench.frame();
+			for(uint32_t block = 0; block < 172; ++block)
+			{
+				const auto frame = bench.frame() - start;
+				for(const auto& note : scenario.notes)
+					if(note.frame >= frame && note.frame < frame + g_block)
+						bench.note(0x90, g_trackNotes[note.track], note.velocity, static_cast<uint32_t>(note.frame - frame));
+				bench.process();
+				for(size_t channel = 0; channel < channels.size(); ++channel)
+					channels[channel].insert(channels[channel].end(), bench.outputs()[channel].begin(),
+						bench.outputs()[channel].end());
+			}
+			for(const auto& note : scenario.notes)
+				bench.note(0x80, g_trackNotes[note.track], 0, 0);
+			// Back to the main outputs, so that what still rings stays out of the next scenario's outputs
+			for(const auto track : scenario.outputs)
+				if(track != g_noTrack)
+					sendSysex(sysex::trackRouting(track, sysex::TrackOutput::Main));
+			for(const auto track : scenario.muted)
+				sendCc({machinedrum::Mute, track, 0, 0});
+			for(const auto& group : scenario.links)
+				sendSysex(sysex::linkChange(group[0], sysex::MdKit::Off));
+			for(const auto& group : scenario.chokes)
+				sendSysex(sysex::chokeChange(group[0], sysex::MdKit::Off));
+
+			append32(index);
+			append32(static_cast<uint32_t>(channels[0].size()));
+			for(const auto& channel : channels)
+			{
+				const auto* data = reinterpret_cast<const uint8_t*>(channel.data());
+				bytes.insert(bytes.end(), data, data + channel.size() * sizeof(float));
+			}
+			std::printf("scenario %u %s:", index, scenario.name);
+			for(size_t channel = 0; channel < channels.size(); ++channel)
+			{
+				float peak = 0;
+				for(const auto value : channels[channel])
+					peak = std::max(peak, std::abs(value));
+				std::printf(" %c %.4f", static_cast<char>('A' + channel), peak);
+			}
+			std::printf("\n");
+		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the group scenarios");
+	}
+
 	void run(const char* _path)
 	{
 		// Which notes on the base channel (channel 1) trigger a track, and what the firmware sends back.
@@ -266,6 +381,9 @@ int main(int argc, char** argv)
 				machines.push_back(static_cast<uint16_t>(std::atoi(argv[i])));
 			hits(path, argv[2], machines);
 		}
+		// --groups <file>: the Link and Choke scenarios of g_groupScenarios, for comparison with another engine.
+		else if(argc > 2 && std::string(argv[1]) == "--groups")
+			groups(path, argv[2]);
 		// --dsp2 <file> <from> <to>: DSP2's P memory after the boot, addresses in hexadecimal.
 		else if(argc > 4 && std::string(argv[1]) == "--dsp2")
 			dsp2(path, argv[2], static_cast<uint32_t>(std::stoul(argv[3], nullptr, 16)),

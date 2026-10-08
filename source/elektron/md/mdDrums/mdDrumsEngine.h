@@ -49,9 +49,17 @@ namespace mdDrums
 		void setMachine(int _track, uint8_t _machineId);
 		void setParam(int _track, int _param, int _value);	// 0-127
 		void setLevel(int _track, int _level);				// 0-127
+		// A muted track is silent and drops its Hits, firing neither its Link nor its Choke
 		void setMute(int _track, bool _mute);
 		void setTempo(double _bpm);
 		void trigger(int _track, int _velocity);			// 1-127
+
+		// The Kit's Links and Chokes (trig and mute groups): a Hit of _track also hits _target at the same velocity, or
+		// silences _target until its own next Hit, as OS 1.63 plays them (md::engine::HostModel::setLink). NoTrack,
+		// or any track out of range, switches one off.
+		static constexpr int NoTrack = -1;
+		void setLink(int _track, int _target);
+		void setChoke(int _track, int _target);
 
 		// Outputs: the dry main mix (no master effects) left and right, then each track alone (after its effects
 		// and VOL, before PAN: the MD's individual-output formula).

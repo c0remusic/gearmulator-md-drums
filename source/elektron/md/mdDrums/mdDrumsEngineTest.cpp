@@ -1,5 +1,6 @@
 // mdDrums::Engine as MD Drums drives it: it finds the flash image, plays a trigger within one 32-sample block,
-// scales the velocity, plays the UW bank's samples, and renders all 16 tracks playing faster than real time.
+// scales the velocity, plays the UW bank's samples, and renders all 16 tracks playing faster than real time. It
+// reports the note-to-sound latency and its jitter, and plays Links, Chokes and Mute as the Machinedrum does.
 
 #include "mdDrumsEngine.h"
 
@@ -51,6 +52,44 @@ namespace
 		std::vector<float> left(44100 * 2), right(44100 * 2);
 		_engine.render(left.data(), right.data(), left.size());
 	}
+
+	// Note to sound: 48 notes at pseudo-random samples of the host's blocks (256), each the samples from the note to
+	// the first one that is not 0, as the plug-in renders up to a note's offset and triggers there.
+	void latency(mdDrums::Engine& _engine)
+	{
+		constexpr size_t hostBlock = 256;
+		std::vector<float> left(44100), right(44100);
+		uint32_t random = 0x16305eedu;
+		int minimum = 1 << 30, maximum = 0;
+		double sum = 0;
+		for(int note = 0; note < 48; ++note)
+		{
+			settle(_engine);
+			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+			const auto offset = random % hostBlock;
+			_engine.render(left.data(), right.data(), offset);
+			_engine.trigger(0, 100);
+			// Then the host's blocks from the note on: the rest of this one, then whole ones
+			for(size_t done = 0, count = hostBlock - offset; done < left.size(); done += count, count = hostBlock)
+			{
+				count = std::min(count, left.size() - done);
+				_engine.render(left.data() + done, right.data() + done, count);
+			}
+			int first = -1;
+			for(size_t i = 0; i < left.size() && first < 0; ++i)
+				if(left[i] != 0.0f || right[i] != 0.0f)
+					first = static_cast<int>(i);
+			require(first >= 0, "a note stayed silent");
+			minimum = std::min(minimum, first);
+			maximum = std::max(maximum, first);
+			sum += first;
+		}
+		std::printf("note to sound (TRXBD, 48 notes): %d-%d samples, mean %.1f (%.2f ms), jitter %d (%.2f ms)\n",
+			minimum, maximum, sum / 48, sum / 48 * 1000.0 / 44100.0, maximum - minimum,
+			(maximum - minimum) * 1000.0 / 44100.0);
+		// The rest of the engine's block, then TRX-BD's voice, which sounds a block after its trigger, from its 5th sample
+		require(maximum <= mdDrums::Engine::BlockSize * 2 + 5, "a note took more than two blocks to sound");
+	}
 }
 
 int main()
@@ -85,6 +124,14 @@ int main()
 		std::printf("TRXBD velocity 40: peak %.4f\n", soft);
 		require(soft < loud * 0.8f && soft > 0.0f, "the velocity does not scale the level");
 
+		// On an engine of its own: 48 Hits leave their track's voice in another state than the tests below expect
+		{
+			mdDrums::Engine fresh(flash);
+			fresh.setMachine(0, machineId(fresh, "TRXBD"));
+			fresh.setLevel(0, 100);
+			latency(fresh);
+		}
+
 		// Track 1 on its own output: it leaves the main mix and sounds there alone.
 		{
 			settle(engine);
@@ -107,6 +154,75 @@ int main()
 			require(peak(0) == 0.0f && peak(1) == 0.0f, "a separated track still plays in the main mix");
 			require(peak(2) > 0.01f, "a separated track is silent on its own output");
 			require(peak(3) == 0.0f, "another track's output carries track 1");
+			engine.setSeparateOutputs(0);
+		}
+
+		// Links, Chokes and Mute, on tracks 2 to 6, each on its own output (mdEngineFirmwareTest compares them with
+		// the firmware's)
+		{
+			for(int track = 1; track < 6; ++track)
+			{
+				engine.setMachine(track, machineId(engine, "EFMCB"));
+				engine.setLevel(track, 100);
+			}
+			engine.setSeparateOutputs(0x3e);
+			settle(engine);
+			std::vector<std::vector<float>> buffers(mdDrums::Engine::OutputCount, std::vector<float>(4410));
+			std::array<float*, mdDrums::Engine::OutputCount> outputs{};
+			for(int i = 0; i < mdDrums::Engine::OutputCount; ++i)
+				outputs[i] = buffers[i].data();
+			const auto peak = [&](const int _track, const size_t _from = 0)
+			{
+				float result = 0;
+				for(size_t i = _from; i < buffers[2 + _track].size(); ++i)
+					result = std::max(result, std::abs(buffers[2 + _track][i]));
+				return result;
+			};
+
+			// A Link: track 2 also hits track 3, whose own Link to track 4 does not fire
+			engine.setLink(1, 2);
+			engine.setLink(2, 3);
+			engine.trigger(1, 100);
+			engine.render(outputs.data(), 4410);
+			std::printf("Link 2 to 3: track 2 %.4f, track 3 %.4f, track 4 %.4f\n", peak(1), peak(2), peak(3));
+			require(peak(1) > 0.01f && std::abs(peak(2) - peak(1)) < 1e-6f, "a Link did not hit its target as hard");
+			require(peak(3) == 0.0f, "a Link went two steps");
+			engine.setLink(1, mdDrums::Engine::NoTrack);
+			engine.setLink(2, mdDrums::Engine::NoTrack);
+
+			// A Choke: track 4 sounding, track 3's Hit silences it within the Hit's block and until its own next Hit
+			settle(engine);
+			engine.setChoke(2, 3);
+			engine.trigger(3, 100);
+			engine.render(outputs.data(), 4410);
+			const auto before = peak(3);
+			engine.trigger(2, 100);
+			engine.render(outputs.data(), 4410);
+			std::printf("Choke 3 to 4: track 4 %.4f before, %.4f after the first block\n", before,
+				peak(3, mdDrums::Engine::BlockSize));
+			require(before > 0.01f && peak(3, mdDrums::Engine::BlockSize) == 0.0f, "a Choke did not silence its target");
+			engine.trigger(3, 100);
+			engine.render(outputs.data(), 4410);
+			require(peak(3) > 0.01f, "a choked track stayed silent after its own Hit");
+			engine.setChoke(2, mdDrums::Engine::NoTrack);
+
+			// Mute: track 6 drops its Hits, firing neither its Link nor its Choke
+			settle(engine);
+			engine.trigger(1, 100);
+			engine.render(outputs.data(), 441);
+			engine.setMute(5, true);
+			engine.setLink(5, 4);
+			engine.setChoke(5, 1);
+			engine.trigger(5, 100);
+			engine.render(outputs.data(), 4410);
+			std::printf("muted track 6 struck: track 6 %.4f, its Link %.4f, its Choke %.4f\n", peak(5), peak(4), peak(1));
+			require(peak(5) == 0.0f && peak(4) == 0.0f, "a muted track's Hit sounded");
+			require(peak(1) > 0.01f, "a muted track's Choke fired");
+			engine.setMute(5, false);
+			engine.setLink(5, mdDrums::Engine::NoTrack);
+			engine.setChoke(5, mdDrums::Engine::NoTrack);
+			for(int track = 1; track < 6; ++track)
+				engine.setLevel(track, 0);
 			engine.setSeparateOutputs(0);
 		}
 

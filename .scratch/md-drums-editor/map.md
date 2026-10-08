@@ -22,7 +22,8 @@ mesurées avant et après. Pas de tag.
 - Garde-fou du `CLAUDE.md` avant chaque commit et push ; chaque tranche ajoute ses tests au garde-fou. Push sans
   demander une fois vert. Jamais de tag.
 - **Latence** : tout changement du chemin de rendu (port, master) rapporte latence note→son et gigue, avant et après
-  (0,48 ms mesurée sur le moteur aujourd'hui).
+  (`mdDrumsEngineTest` : 1,16 ms en moyenne, gigue 0,68 ms, sur TRX-BD depuis la note ; les 0,48 ms de départ
+  comptaient depuis le bloc de 32 de la note).
 - **Fluidité** : chaque clic et drag instantané, mesuré entrée→pixel ; jamais `Plugin::withDeviceLocked` par frame
   ou par clic.
 - Recherches : un doc par ticket dans `research/` à côté de cette carte (pas de branche `research/*`).
@@ -73,6 +74,10 @@ mesurées avant et après. Pas de tag.
   par `git mv` ; `MdKit` garde chaque octet du dump, `mdKitDump` écrit la version 04 ; 32 Kits d'usine aller-retour
   champ pour champ, dumps du firmware octet pour octet, Kit écrit accepté et renvoyé tel quel par le firmware ;
   `$65`/`$66` avec OFF = $7f vérifiés sur firmware.
+- [Links et Chokes dans mdEngine](issues/15-links-chokes-mdengine.md) : joués comme l'OS (Link à un niveau, Choke
+  au même tick ou au suivant, Track étouffée refrappée muette jusqu'au tick suivant, Mute qui perd les Hits, level
+  recalé à chaque Hit) ; identiques au firmware sauf deux instants fixés par son UC (coupe un bloc plus tard, tick
+  suivant à 11 blocs contre 3 à 11) ; latence inchangée, 1,16 ms en moyenne sur TRX-BD mesurée depuis la note.
 
 ## Not yet specified
 

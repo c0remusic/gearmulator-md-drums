@@ -128,6 +128,18 @@ namespace mdDrums
 		m_state->engine.host().setMute(_track, _mute);
 	}
 
+	void Engine::setLink(const int _track, const int _target)
+	{
+		if(_track >= 0 && _track < TrackCount)
+			m_state->engine.host().setLink(_track, _target);
+	}
+
+	void Engine::setChoke(const int _track, const int _target)
+	{
+		if(_track >= 0 && _track < TrackCount)
+			m_state->engine.host().setChoke(_track, _target);
+	}
+
 	void Engine::setTempo(const double _bpm)
 	{
 		m_state->engine.host().setTempo(_bpm);
