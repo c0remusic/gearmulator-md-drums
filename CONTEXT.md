@@ -29,6 +29,11 @@ _Avoid_: model, instrument
 One trigger of a Track and the sound it makes.
 _Avoid_: note, trig (the firmware sequencer's word)
 
+**Lock**:
+A value of one Track parameter that a single Hit plays in place of the Kit's; the Track's next Hit without one plays the
+Kit's value again.
+_Avoid_: p-lock, parameter lock, automation
+
 **Link**:
 A Track's Hit that also hits another Track, at the same velocity; it goes one step only, so the other Track's own
 Link does not fire.
