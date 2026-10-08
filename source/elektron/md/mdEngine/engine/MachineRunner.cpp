@@ -1,6 +1,8 @@
 #include <algorithm>
 #include "MachineRunner.h"
 
+#include <iterator>
+
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -142,9 +144,9 @@ namespace md::engine
 		m_fault.clear();
 		auto& cpu = *m_cpu;
 		uint32_t sp = kStackTop;
-		// C calling convention: arguments pushed right to left, then the return address
-		std::vector<uint32_t> args(_args);
-		for(auto it = args.rbegin(); it != args.rend(); ++it) { sp -= 4; poke32(sp, *it); }
+		// C calling convention: arguments pushed right to left, then the return address (md-drums: from the list itself,
+		// without a vector, as this runs on the audio thread)
+		for(auto it = std::rbegin(_args); it != std::rend(_args); ++it) { sp -= 4; poke32(sp, *it); }
 		sp -= 4; poke32(sp, kReturnSentinel);
 		cpu.setAReg(7, sp);
 		cpu.setPC(_address);

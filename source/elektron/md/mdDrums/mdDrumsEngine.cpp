@@ -140,6 +140,19 @@ namespace mdDrums
 			m_state->engine.host().setChoke(_track, _target);
 	}
 
+	void Engine::setLfo(const int _track, const md::LfoSettings& _lfo)
+	{
+		if(_track >= 0 && _track < TrackCount)
+			m_state->engine.host().setLfo(_track, _lfo.track, _lfo.parameter, _lfo.shape1, _lfo.shape2, _lfo.update);
+	}
+
+	void Engine::loadLfo(const int _track, const uint8_t* _block)
+	{
+		static_assert(LfoBytes == md::engine::HostModel<>::kLfoBytes);
+		if(_track >= 0 && _track < TrackCount)
+			m_state->engine.host().loadLfo(_track, _block);
+	}
+
 	void Engine::setTempo(const double _bpm)
 	{
 		m_state->engine.host().setTempo(_bpm);

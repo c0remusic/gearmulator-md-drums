@@ -10,6 +10,8 @@
 
 #include "MachineRunner.h"
 
+#include "mdProtocol/mdlfosettings.h"
+
 namespace mdDrums
 {
 	// The Machinedrum's engines without its OS (mdEngine), as a plug-in drives them: 16 tracks, each with a
@@ -60,6 +62,12 @@ namespace mdDrums
 		static constexpr int NoTrack = -1;
 		void setLink(int _track, int _target);
 		void setChoke(int _track, int _target);
+
+		// A track's LFO: the fields SET LFO PARAM ($62) sets, or a Kit's whole 36-byte block (the settings, then the
+		// running LFO's state), which a Kit load copies into the running LFO as the OS does
+		static constexpr int LfoBytes = 36;
+		void setLfo(int _track, const md::LfoSettings& _lfo);
+		void loadLfo(int _track, const uint8_t* _block);
 
 		// Outputs: the dry main mix (no master effects) left and right, then each track alone (after its effects
 		// and VOL, before PAN: the MD's individual-output formula).

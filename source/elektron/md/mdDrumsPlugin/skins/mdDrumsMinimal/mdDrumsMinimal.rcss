@@ -1,0 +1,14 @@
+/* MD Drums' minimal skin (gen_minimal.py writes the document, this style is written by hand there too) */
+.mdd { background-color: #1a1b1d; color: #e8e6e1; font-family: Roboto; font-size: 12dp; }
+.mddTitle { height: 28dp; line-height: 28dp; font-size: 20dp; font-weight: bold; }
+.mddNote { height: 28dp; line-height: 28dp; color: #8a8d93; }
+.mddSection { height: 24dp; line-height: 24dp; font-size: 14dp; font-weight: bold; }
+.mddHead { height: 20dp; line-height: 20dp; font-size: 10dp; text-align: center; color: #8a8d93; }
+.mddRow { border-bottom: 1dp #2e3034; }
+.mddTrack { height: 24dp; line-height: 24dp; font-weight: bold; }
+.mddMachine { color: #e8e6e1; line-height: 24dp; }
+.mddNum { height: 24dp; line-height: 24dp; text-align: center; white-space: nowrap; color: #e8e6e1; cursor: pointer;
+	decorator: none; background-color: transparent; border-width: 0dp; box-shadow: none; }
+.mddNum:hover { color: #ff6b1f; }
+.mddToggle { width: 20dp; height: 20dp; background-color: #2e3034; border-radius: 3dp; }
+.mddToggle:checked { background-color: #ff6b1f; }

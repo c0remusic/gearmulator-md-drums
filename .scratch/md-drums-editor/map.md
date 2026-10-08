@@ -78,6 +78,12 @@ mesurées avant et après. Pas de tag.
   au même tick ou au suivant, Track étouffée refrappée muette jusqu'au tick suivant, Mute qui perd les Hits, level
   recalé à chaque Hit) ; identiques au firmware sauf deux instants fixés par son UC (coupe un bloc plus tard, tick
   suivant à 11 blocs contre 3 à 11) ; latence inchangée, 1,16 ms en moyenne sur TRX-BD mesurée depuis la note.
+- [Port du processor MD Drums sur la pile TUS](issues/07-port-pile-tus.md) : `mdDrums::Device` parle le MIDI de la MD
+  et démarre sur le Kit 1 d'usine ; Controller à slots atomiques vidés au bloc audio suivant ; état = dump `$52` +
+  masques, relu par le Controller sans toucher le Device ; **576 paramètres, pas 592** (34 par Track : le contrat en
+  comptait 35), IDs figés ; skin minimal généré ; un Kit chargé recopie ses blocs LFO de 36 octets dans le LFO
+  courant, mot $0000029a compris (effet sur le LFO RND figé non mesuré) ; latence identique à 44,1 kHz (1,16 ms),
+  +8,6 échantillons à 48 kHz (resampler Legacy, désormais rapporté).
 
 ## Not yet specified
 

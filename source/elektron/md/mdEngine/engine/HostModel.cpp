@@ -38,6 +38,7 @@ namespace md::engine
 		m_route.fill(6);
 		m_link.fill(kOff);
 		m_choke.fill(kOff);
+		m_activeOrder.reserve(kTracks);	// no allocation when a trigger reorders it
 		for(int t = 0; t < kTracks; ++t)
 		{
 			m_os.poke8(kLevelTarget + static_cast<uint32_t>(t), 100);
@@ -79,6 +80,14 @@ namespace md::engine
 		m_os.poke8(base + 2, static_cast<uint8_t>(std::clamp(_shape1, 0, 7)));
 		m_os.poke8(base + 3, static_cast<uint8_t>(std::clamp(_shape2, 0, 7)));
 		m_os.poke8(base + 4, static_cast<uint8_t>(std::clamp(_type, 0, 3)));
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::loadLfo(const int _track, const uint8_t* _block)
+	{
+		const uint32_t base = kLfo + kLfoStride * static_cast<uint32_t>(_track);
+		for(uint32_t i = 0; i < static_cast<uint32_t>(kLfoBytes); ++i)
+			m_os.poke8(base + i, _block[i]);
 	}
 
 	template<class TVoices>

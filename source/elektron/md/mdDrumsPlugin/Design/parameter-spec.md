@@ -1,44 +1,31 @@
 # MD Drums: parameter spec
 
-Read from `mdDrumsProcessor.cpp` (`createLayout`, 2026-10-06). IDs are part of saved Live sets: keep them.
+Since the port to the TUS stack (ticket 07, 2026-10-08) the parameters are `parameterDescriptions_mddrums.json`, which
+`.scratch/md-drums-editor/tools/gen_minimal.py` writes. Their JUCE IDs are pluginLib's `page_part_index`
+(`Parameter::genId`), frozen from the port's first push: append parameters, never renumber. The earlier `t<n>_<name>`
+IDs are gone (no Live set needed keeping them, ADR 0001).
 
-Per track `n` = 1..16 (27 parameters, 432 in all):
+576 host parameters, in this order: per Track (part 0-15, named "Track n"), 34; then the 32 master effects ("Master",
+part 0, `NonPartSensitive`).
 
-| ID | Name | Type | Range | Default | Notes |
-|---|---|---|---|---|---|
-| `t<n>_machine` | Machine | int | 0-191 | TRX-BD..TRX-S2, EFM-BD, EFM-SD | Machine id in the OS's table (~135 used); shown by name |
-| `t<n>_SYN1`..`t<n>_SYN8` | SYN1-8 | int | 0-127 | 64 | Named per machine ("PTCH", "DEC"...) |
-| `t<n>_AMD` | AMD | int | 0-127 | 0 | Amplitude modulation depth |
-| `t<n>_AMF` | AMF | int | 0-127 | 0 | Amplitude modulation frequency |
-| `t<n>_EQF` | EQF | int | 0-127 | 64 | EQ frequency |
-| `t<n>_EQG` | EQG | int | 0-127 | 64 | EQ gain |
-| `t<n>_FLTF` | FLTF | int | 0-127 | 0 | Filter base |
-| `t<n>_FLTW` | FLTW | int | 0-127 | 127 | Filter width |
-| `t<n>_FLTQ` | FLTQ | int | 0-127 | 0 | Filter resonance |
-| `t<n>_SRR` | SRR | int | 0-127 | 0 | Sample rate reduction |
-| `t<n>_DIST` | DIST | int | 0-127 | 0 | Distortion |
-| `t<n>_VOL` | VOL | int | 0-127 | 100 | Volume |
-| `t<n>_PAN` | PAN | int | 0-127 | 64 | Pan |
-| `t<n>_DEL` | DEL | int | 0-127 | 0 | Delay send (no master effects yet) |
-| `t<n>_REV` | REV | int | 0-127 | 0 | Reverb send (no master effects yet) |
-| `t<n>_LFOS` | LFOS | int | 0-127 | 64 | LFO speed |
-| `t<n>_LFOD` | LFOD | int | 0-127 | 0 | LFO depth |
-| `t<n>_LFOM` | LFOM | int | 0-127 | 0 | LFO mix |
-| `t<n>_level` | Level | int | 0-127 | 100 | Kit level |
-| `t<n>_mute` | Mute | bool | | off | |
+| Page | Index | Name (`param=` in a skin) | Range | Message to the Device (ADR 0002) |
+|---|---|---|---|---|
+| 5 | 0 | Machine | 0-191, by name | ASSIGN MACHINE `$5B` (an id the Machinedrum lacks sends nothing) |
+| 0 | 0-7 | SYN1 … SYN8 | 0-127, named per machine ("PTCH 64") | CC, channels 1-4 |
+| 1 | 0-7 | AMD AMF EQF EQG FLTF FLTW FLTQ SRR | 0-127 | CC |
+| 2 | 0-7 | DIST VOL PAN DEL REV LFOS LFOD LFOM | 0-127 | CC |
+| 6 | 0-4 | LfoTrack, LfoParam, LfoShape1, LfoShape2, LfoMode | 1-16, 24 names, TRI SAW SQR RMP EXP RND, FREE TRIG HOLD | SET LFO PARAM `$62` |
+| 3 | 0 | Level | 0-127 | CC 8-11 |
+| 4 | 0 | Mute | Off, On | CC 12-15 |
+| 7 | 0 | Solo | Off, On | MD Drums' own `F0 7D 4D 44 44 01` |
+| 7 | 1 | Out | Main, Out | MD Drums' own `F0 7D 4D 44 44 02`: the Track leaves Main for "Out nn", whatever the host does with the bus |
+| 8 | 0-7 | EchoTIME MOD MFRQ FB FLTF FLTW MONO LEV | 0-127 | `$5D` |
+| 8 | 8-15 | ReverbDVOL PRED DEC DAMP HP LP GATE LEV | 0-127 | `$5E` |
+| 8 | 16-23 | EqLF LG HF HG PF PG PQ GAIN | 0-127 | `$5F` |
+| 8 | 24-31 | DynamixATCK REL TRHD RTIO KNEE HP OUTG MIX | 0-127 | `$60` |
 
-Proposed in v2 (not in the code yet; `HostModel::setLfo` takes them, and new IDs append to the list):
+The master effects are kept in the Kit and silent until ticket 09 builds them. Links and Chokes are Kit values sent as
+`$65` and `$66`, not host parameters.
 
-| ID | Name | Type | Range | Default | Notes |
-|---|---|---|---|---|---|
-| `t<n>_lfoTrack` | LFO dest track | int | 1-16 | n | The MD's LFO can modulate another track |
-| `t<n>_lfoParam` | LFO dest param | int | 0-23 | 12 (FLTF) | One of the 24 track parameters |
-| `t<n>_lfoShape1` | LFO shape 1 | choice | TRI SAW SQR RMP EXP RND | TRI | |
-| `t<n>_lfoShape2` | LFO shape 2 | choice | same | TRI | LFOM mixes shape 1 into shape 2 |
-| `t<n>_lfoMode` | LFO mode | choice | FREE TRIG HOLD | FREE | TRIG restarts on the track's note; HOLD samples at it |
-| `t<n>_solo` | Solo | bool | | off | v6: any soloed track mutes the tracks that are not (the engine's mutes) |
-
-The Machinedrum's own pages: SYN = SYN1-8, EFX = AMD..SRR, ROUTING = DIST..LFOM (8 encoders each).
-
-Outputs: main stereo, plus "Track 1".."Track 16" mono, enabled by the host (not parameters).
-Notes 36-51 trigger tracks 1-16 (not parameters; the UI may flash a track on trigger).
+Outputs: "Main" stereo, then "Out 01" to "Out 16" mono, off until the host enables them. Notes 36-51 on any channel
+trigger Tracks 1-16 with velocity; the host's other MIDI does nothing.

@@ -92,6 +92,10 @@ namespace md::engine
 		// destination track and parameter (0-23), two shapes, type (bit 0 TRIG: restart on the track's trigger,
 		// bit 1 HOLD: output only updated at a trigger; 0 = FREE).
 		void setLfo(int _track, int _destTrack, int _destParam, int _shape1, int _shape2, int _type);
+		// md-drums: a Kit's whole 36-byte LFO block (settings, then the running LFO's state), copied into the running
+		// LFO as the OS's LOAD KIT does ($20a042)
+		static constexpr int kLfoBytes = 36;
+		void loadLfo(int _track, const uint8_t* _block);
 
 		// Control ticks: the MD runs its tick as fast as the ColdFire gets through it (~120 Hz measured in
 		// gearmulator-md-mm, varying with load). Default: one tick every 11 blocks of 32 samples (125.3 Hz).
