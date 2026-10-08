@@ -66,6 +66,42 @@ namespace md::engine
 	}
 
 	template<class TVoices>
+	void HostModel<TVoices>::lock(const int _track, const int _param, const int _value)
+	{
+		if(_track < 0 || _track >= kTracks || _param < 0 || _param >= kParams)
+			return;
+		m_lockPending[_track] |= 1u << _param;
+		m_lockPendingValue[_track][_param] = static_cast<uint8_t>(std::clamp(_value, 0, 127));
+	}
+
+	template<class TVoices>
+	uint8_t HostModel<TVoices>::target(const int _track, const int _param) const
+	{
+		return (m_locked[_track] >> _param) & 1 ? m_lockValue[_track][_param] : m_raw[_track][_param];
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::applyLocks(const int _track)
+	{
+		// The Hit's locks, and the Kit's value back on what the last Hit locked: straight into the smoothing target, the
+		// smoothed array and the voice array, as a pending machine is (no glide)
+		const auto changed = m_locked[_track] | m_lockPending[_track];
+		m_locked[_track] = m_lockPending[_track];
+		m_lockValue[_track] = m_lockPendingValue[_track];
+		const auto track = static_cast<uint32_t>(_track);
+		for(int p = 0; p < kParams; ++p)
+		{
+			if(!((changed >> p) & 1))
+				continue;
+			const auto value = target(_track, p);
+			const auto param = static_cast<uint32_t>(p);
+			m_os.poke8(kRaw + 24 * track + param, value);
+			m_os.poke16(kWork + kTrackStride * track + 2 * param, static_cast<uint16_t>(value << 7));
+			m_os.poke16(kVoiceParams + kTrackStride * track + 2 * param, static_cast<uint16_t>(value << 7));
+		}
+	}
+
+	template<class TVoices>
 	void HostModel<TVoices>::setTempo(const double _bpm)
 	{
 		m_os.poke32(kTempo, static_cast<uint32_t>(std::lround(std::clamp(_bpm, 30.0, 300.0) * 24.0)));
@@ -303,7 +339,7 @@ namespace md::engine
 	{
 		for(int t = 0; t < kTracks; ++t)
 			for(int p = 0; p < kParams; ++p)
-				m_os.poke8(kRaw + 24 * static_cast<uint32_t>(t) + static_cast<uint32_t>(p), m_raw[t][p]);
+				m_os.poke8(kRaw + 24 * static_cast<uint32_t>(t) + static_cast<uint32_t>(p), target(t, p));
 
 		const auto tv0 = timingOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 		for(int t = 0; t < kTracks; ++t)
@@ -330,6 +366,11 @@ namespace md::engine
 		// Ticks on a fixed block schedule; a trigger between ticks updates just its voice, so it starts on this
 		// block rather than waiting for the next tick.
 		const auto t0 = timingOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+		// md-drums: the block's Hits take their locks before any voice is updated, whichever came first; the rest drop
+		for(int t = 0; t < kTracks; ++t)
+			if(m_trigger[t])
+				applyLocks(t);
+		m_lockPending.fill(0);
 		if(m_blockCount++ % m_blocksPerTick == 0)
 			tick();
 		else

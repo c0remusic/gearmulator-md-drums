@@ -26,6 +26,11 @@ later versions can be compared file by file. Their documentation is in `.scratch
 - `engine/HostModel.*`: the Kit's trig and mute groups (Links and Chokes, `setLink`, `setChoke`), played as OS
   1.63's note handler ($20cc48) and tick ($20ad9a) play them; a muted track drops its Hits, as the note handler does
   ($20ccf6); every Hit sets the track's smoothed level to its Kit level, as the tick's trigger path does ($20b022).
+- `engine/HostModel.*`: parameter locks from outside (`lock`, md-drums' ADR 0003), which upstream leaves out with the
+  sequencer. A Hit's locks go where the tick's trigger path applies the OS's own, with a pending machine: straight
+  into the smoothing target, the smoothed array and the voice array, held as the target until the track's next Hit,
+  which puts the Kit's values back the same way. A lock with no Hit of its track in its block is dropped. Not
+  compared with the firmware's sequencer.
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

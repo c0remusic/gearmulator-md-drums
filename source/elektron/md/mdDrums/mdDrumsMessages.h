@@ -93,4 +93,11 @@ namespace mdDrums::messages
 	std::optional<Raw> parameterMessage(uint8_t _page, uint8_t _track, uint8_t _index, int _value);
 	// A host parameter's value in a Device state; empty for a parameter MD Drums does not have
 	std::optional<int> parameterValue(const State& _state, uint8_t _page, uint8_t _track, uint8_t _index);
+
+	// A Lock's value from its note's velocity (ADR 0003): velocity 0 is a note-off, so 1-127 stretch onto 0-127,
+	// rounded: 1-63 give 0-62 and 64-127 themselves. Both ends and the centre are there; 63 cannot be locked.
+	constexpr uint8_t lockValue(const uint8_t _velocity)
+	{
+		return static_cast<uint8_t>(_velocity >= 64 ? _velocity : _velocity ? _velocity - 1 : 0);
+	}
 }
