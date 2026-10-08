@@ -8,12 +8,13 @@
 // - each of the 576 host parameters has a control in the skin, Track by Track;
 // - input to pixel: a knob dragged and a list row clicked show on the next frame, and the event, RmlUi's update and
 //   the software render take 33 ms at most;
-// - the meters and Hit lights follow the Processor's Telemetry (ticket 20).
+// - the meters and Hit lights follow the Processor's Telemetry (ticket 20), and so does the Hit screen (ticket 21).
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsHitView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
@@ -460,6 +461,49 @@ namespace
 		require(right > 0.5f && left < 0.3f, "the scope does not show the last second of its Track");
 	}
 
+	// The Hit screen (ticket 21): a capture the Telemetry holds shows on the next frame: its note, the window that fits
+	// it, its waveform in ink, the playhead while it grows, the graduations' words
+	void hitScreen(Fixture& _f)
+	{
+		auto* view = _f.editor->getHitView();
+		require(view != nullptr, "the editor has no Hit view");
+		auto& telemetry = _f.processor.getTelemetry();
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		const double now = 2.0e6;
+		view->update(now);
+		require(_f.find("hit_note")->GetInnerRML() == "Not played yet", "the Hit screen's note before a Hit");
+
+		// A Hit decaying from 0.4 over 200 columns, 600 columns in (0.109 s): audible for 0.127 s, so a window of 0.2 s
+		telemetry.beginCapture(0, 110);
+		for(int c = 0; c < 600; ++c)
+		{
+			const auto a = static_cast<int16_t>(0.4f * std::exp(-c / 200.0f) * 32767.0f);
+			telemetry.addColumn(0, static_cast<int16_t>(-a), a);
+		}
+		view->update(now + 10);
+		_f.frame();
+		const auto screen = _f.box(*_f.find("screen_hit"));
+		const auto left = screen.x + 16, width = screen.w - 32, top = screen.y + 48, mid = screen.y + (216 - 36 + 48) / 2.0f;
+		const auto playhead = left + static_cast<float>(600 * 8 / 44100.0 / view->window()) * width;
+		const auto ink = _f.pixel(left + 1, mid - 30).getBrightness();
+		const bool accentHead = isAccent(_f.pixel(playhead, top + 4));
+		std::printf("hit screen: window %.1f s, note \"%s\", waveform %.2f bright, playhead at x %.0f %s\n", view->window(),
+			_f.find("hit_note")->GetInnerRML().c_str(), ink, playhead, accentHead ? "drawn" : "missing");
+		require(view->window() == 0.2, "the window does not fit the Hit");
+		require(_f.find("hit_note")->GetInnerRML() == "Last hit, velocity 110", "the Hit screen's note");
+		require(view->playing() && accentHead, "no playhead while the Hit plays");
+		require(ink > 0.85f, "the Hit's waveform is not drawn in ink");
+		auto* tick2 = _f.find("hit_tick2");
+		auto* tick5 = _f.find("hit_tick5");
+		require(tick2->GetInnerRML() == "50 ms" && tick2->IsVisible(true) && !tick5->IsVisible(true),
+			"the graduations do not follow the window");
+
+		// The capture stops growing: the playhead goes
+		view->update(now + 200);
+		require(!view->playing(), "the playhead stays after the Hit");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		for(const auto& view : readViews())
@@ -495,13 +539,10 @@ int main()
 		std::printf("document %dx%d, dp ratio %.2f\n", static_cast<int>(size.x), static_cast<int>(size.y), f.dp());
 		require(size.x == 1296 && size.y == 824, "the document is not 1296 x 824");
 
-		if(const auto* png = std::getenv("MD_DRUMS_SKIN_PNG"))
-			pictures(f, png);
-
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
-			{"meters", meters}})
+			{"meters", meters}, {"hit screen", hitScreen}})
 		{
 			try
 			{
@@ -512,6 +553,9 @@ int main()
 				failures += "\n  " + name + ": " + e.what();
 			}
 		}
+		// After the checks: the views as they left them (the Hit screen with its capture)
+		if(const auto* png = std::getenv("MD_DRUMS_SKIN_PNG"); png && *png)
+			pictures(f, png);
 		if(!failures.empty())
 		{
 			std::cout << "mdDrumsSkinTest: FAIL" << failures << '\n';

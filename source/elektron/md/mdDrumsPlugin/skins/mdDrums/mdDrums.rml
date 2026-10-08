@@ -126,7 +126,10 @@
 						<vknob id="k_SYN7" class="a c10" param="SYN7"/><div id="n_SYN7" class="a c10 w1 kl">SYN7</div><div id="v_SYN7" class="a c10 w1 kv" data-class-edited="SYN7_value != SYN7_default">{{SYN7_value}}</div>
 						<vknob id="k_SYN8" class="a c11" param="SYN8"/><div id="n_SYN8" class="a c11 w1 kl">SYN8</div><div id="v_SYN8" class="a c11 w1 kv" data-class-edited="SYN8_value != SYN8_default">{{SYN8_value}}</div>
 						<div id="screen_hit" class="a screen">
-							<div id="screen_hit_title" class="a stitle"><span class="label">Hit</span><span class="right hint">Not played yet</span></div>
+							<div id="screen_hit_title" class="a stitle"><span class="label">Hit</span><span id="hit_note" class="right hint">Not played yet</span></div>
+							<!-- The graduations' words, placed by mdDrumsHitView.cpp -->
+							<span id="hit_tick1" class="a hint tick"/><span id="hit_tick2" class="a hint tick"/><span id="hit_tick3" class="a hint tick"/><span id="hit_tick4" class="a hint tick"/>
+							<span id="hit_tick5" class="a hint tick"/><span id="hit_tick6" class="a hint tick"/><span id="hit_tick7" class="a hint tick"/><span id="hit_tick8" class="a hint tick"/>
 						</div>
 					</div>
 					<div id="rule_391" class="a rule edit" style="top: 391dp;"/>

@@ -111,6 +111,9 @@ mesurées avant et après. Pas de tag.
 - [Télémétrie, mètres et scopes](issues/20-telemetrie-metres-scopes.md) : `Telemetry` partagée Processor-Device
   (crêtes, Hits) ; `MeterView` sur canvas à la fréquence de l'écran ; passe de crête 0,027 % d'un cœur, Device 20,01 %
   contre 19,92 % ; mètres, chute, lumières et scopes vérifiés au pixel.
+- [Écran Hit](issues/21-ecran-hit.md) : capture à deux emplacements par Track, contrôlée par identifiant ; identique à
+  la sortie solo depuis la note plus 31 ; `HitView` progressif avec fenêtre ajustée et tête de lecture ; 16 captures
+  à la fois 0,23 % d'un cœur.
 
 ## Not yet specified
 

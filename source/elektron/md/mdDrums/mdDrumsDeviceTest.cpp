@@ -5,6 +5,7 @@
 // at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of one core.
 
 #include "mdDrumsDevice.h"
+#include "mdDrumsTelemetry.h"
 
 #include "mdProtocol/mdautomation.h"
 
@@ -349,9 +350,9 @@ namespace
 	}
 
 	// The Telemetry the editor reads (ticket 16): a note's Track and Main peak while the other Tracks stay silent, and
-	// its Hit is counted; a muted Track's Hit is not. Then what writing it costs, 16 Tracks struck every 64th of a
-	// second: the Device's own peak pass over 18 outputs, timed alone (at most 1 % of one core), and the whole Device
-	// with and without it, side by side, for information.
+	// its Hit is counted; a muted Track's Hit is not; the Hit's capture is the Track's output from where the Hit sounds.
+	// Then what writing it costs: the Device's own peak pass over 18 outputs and 16 captures at once, timed alone (at
+	// most 1 % of one core), and the whole Device with and without it, side by side, for information.
 	void telemetry(const std::vector<uint8_t>& _flash)
 	{
 		{
@@ -377,6 +378,38 @@ namespace
 			require(t.hits(0) == before + 1, "a muted Track's Hit was counted");
 		}
 
+		// The Hit capture (ticket 21): from the sample the Hit sounds, the note plus 31, min/max columns of 8 samples of
+		// the Track's own output exactly as it was rendered
+		{
+			Rig rig(_flash, 44100.0f);
+			rig.settle();
+			constexpr uint32_t offset = 100;
+			rig.send(MidiEventSource::Host, {0x90, 36, 110}, offset);
+			std::vector<float> own;
+			for(int b = 0; b < 8; ++b)
+			{
+				rig.process();
+				own.insert(own.end(), rig.buffers[2].begin(), rig.buffers[2].end());
+			}
+			mdDrums::Telemetry::Capture capture;
+			require(rig.telemetry->readCapture(0, false, capture), "no capture of the Hit");
+			const size_t start = offset + mdDrums::Engine::SampleAccurateDelay;
+			const auto full = std::min<size_t>(static_cast<size_t>(capture.count), (own.size() - start) / mdDrums::Telemetry::ColumnSamples);
+			size_t wrong = 0;
+			float peak = 0;
+			for(size_t c = 0; c < full; ++c)
+			{
+				const auto first = own.begin() + static_cast<ptrdiff_t>(start + c * mdDrums::Telemetry::ColumnSamples);
+				const auto [low, high] = std::minmax_element(first, first + mdDrums::Telemetry::ColumnSamples);
+				const auto toColumn = [](const float _v) { return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L)); };
+				wrong += capture.columns[c][0] != toColumn(*low) || capture.columns[c][1] != toColumn(*high);
+				peak = std::max({peak, std::abs(*low), std::abs(*high)});
+			}
+			std::printf("capture: Hit of velocity %u, %d columns, %zu compared with Out 01 from the note plus 31, %zu differ,"
+				" peak %.3f\n", capture.velocity, capture.count, full, wrong, peak);
+			require(capture.velocity == 110 && full > 400 && wrong == 0 && peak > 0.01f, "the capture is not the Track's output");
+		}
+
 		// The peak pass alone: what Device::render adds after the engine, over 18 outputs of 512 samples
 		{
 			std::vector<std::vector<float>> outputs(mdDrums::Telemetry::OutputCount, std::vector<float>(Rig::Block));
@@ -387,10 +420,12 @@ namespace
 					random ^= random << 13; random ^= random >> 17; random ^= random << 5;
 					value = static_cast<float>(static_cast<int32_t>(random)) / 2147483648.0f;
 				}
-			mdDrums::Telemetry t;
+			auto telemetry = std::make_unique<mdDrums::Telemetry>();	// too large for the stack with its captures
+			auto& t = *telemetry;
 			constexpr int blocks = 20000;
 			const auto start = std::chrono::steady_clock::now();
 			for(int b = 0; b < blocks; ++b)
+			{
 				for(int output = 0; output < mdDrums::Telemetry::OutputCount; ++output)
 				{
 					float peak = 0.0f;
@@ -400,9 +435,23 @@ namespace
 					if(output == 0 && (b & 63) == 0)
 						t.takePeak(0);
 				}
+				// And the worst case of the Hit captures: all 16 Tracks capturing, struck again as each capture fills
+				for(int track = 0; track < mdDrums::Telemetry::TrackCount; ++track)
+				{
+					if(b % 68 == 0)
+						t.beginCapture(track, 100);
+					const auto& samples = outputs[2 + static_cast<size_t>(track)];
+					for(size_t i = 0; i < samples.size(); i += mdDrums::Telemetry::ColumnSamples)
+					{
+						const auto [low, high] = std::minmax_element(samples.begin() + static_cast<ptrdiff_t>(i),
+							samples.begin() + static_cast<ptrdiff_t>(i + mdDrums::Telemetry::ColumnSamples));
+						t.addColumn(track, static_cast<int16_t>(*low * 32767.0f), static_cast<int16_t>(*high * 32767.0f));
+					}
+				}
+			}
 			const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 			const auto audio = blocks * static_cast<double>(Rig::Block) / 44100.0;
-			std::printf("telemetry: the peak pass costs %.3f %% of one core\n", seconds / audio * 100.0);
+			std::printf("telemetry: the peak pass and 16 captures cost %.3f %% of one core\n", seconds / audio * 100.0);
 			require(seconds / audio <= 0.01, "the telemetry costs more than 1 % of one core");
 		}
 

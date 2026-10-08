@@ -1,6 +1,7 @@
 #include "mdDrumsEditor.h"
 
 #include "mdDrumsGlyph.h"
+#include "mdDrumsHitView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
@@ -24,6 +25,7 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_hitView.reset();
 		m_meterView.reset();
 		m_trackView.reset();
 	}
@@ -35,8 +37,9 @@ namespace mdDrums
 			return;
 		m_trackView = std::make_unique<TrackView>(*this);
 		// Only an mdDrums::Processor makes this editor
-		m_meterView = std::make_unique<MeterView>(*this, static_cast<Processor&>(getProcessor()).getTelemetry(),
-			getAcceleratedRefreshRateHz());
+		auto& telemetry = static_cast<Processor&>(getProcessor()).getTelemetry();
+		m_meterView = std::make_unique<MeterView>(*this, telemetry, getAcceleratedRefreshRateHz());
+		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz());
 	}
 
 	int Editor::getAcceleratedRefreshRateHz() const

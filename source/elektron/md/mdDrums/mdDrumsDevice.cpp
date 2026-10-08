@@ -141,18 +141,50 @@ namespace mdDrums
 		for(size_t channel = 0; channel < OutputCount; ++channel)
 			outputs[channel] = _outputs[channel] ? _outputs[channel] + _offset : nullptr;
 		m_engine->render(outputs.data(), _count);
-		if(!m_telemetry)
-			return;
-		for(int channel = 0; channel < OutputCount; ++channel)
+		if(m_telemetry)
 		{
-			const auto* samples = outputs[static_cast<size_t>(channel)];
-			if(!samples)
+			for(int channel = 0; channel < OutputCount; ++channel)
+			{
+				const auto* samples = outputs[static_cast<size_t>(channel)];
+				if(!samples)
+					continue;
+				float peak = 0.0f;
+				for(size_t i = 0; i < _count; ++i)
+					peak = std::max(peak, std::abs(samples[i]));
+				if(peak > 0.0f)
+					m_telemetry->raisePeak(channel, peak);
+			}
+			capture(outputs, _count);
+		}
+		m_position += static_cast<int64_t>(_count);
+	}
+
+	void Device::capture(const std::array<float*, Engine::OutputCount>& _outputs, const size_t _count)
+	{
+		const auto toColumn = [](const float _v)
+		{
+			return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L));
+		};
+		for(int track = 0; track < Engine::TrackCount; ++track)
+		{
+			auto& c = m_captures[static_cast<size_t>(track)];
+			const auto* samples = _outputs[2 + static_cast<size_t>(track)];
+			if(!c.active || !samples)
 				continue;
-			float peak = 0.0f;
 			for(size_t i = 0; i < _count; ++i)
-				peak = std::max(peak, std::abs(samples[i]));
-			if(peak > 0.0f)
-				m_telemetry->raisePeak(channel, peak);
+			{
+				if(m_position + static_cast<int64_t>(i) < c.start)
+					continue;
+				const auto value = samples[i];
+				c.low = c.filled ? std::min(c.low, value) : value;
+				c.high = c.filled ? std::max(c.high, value) : value;
+				if(++c.filled < Telemetry::ColumnSamples)
+					continue;
+				c.filled = 0;
+				c.active = m_telemetry->addColumn(track, toColumn(c.low), toColumn(c.high));
+				if(!c.active)
+					break;
+			}
 		}
 	}
 
@@ -177,10 +209,17 @@ namespace mdDrums
 			if(track < 0 || track >= Engine::TrackCount)
 				return;
 			const auto struck = m_engine->trigger(track, _event.c);
-			if(m_telemetry)
-				for(int t = 0; t < Engine::TrackCount; ++t)
-					if(struck & (1u << t))
-						m_telemetry->hit(t);
+			if(!m_telemetry)
+				return;
+			// Each struck Track counts a Hit and starts a capture where the Hit sounds
+			for(int t = 0; t < Engine::TrackCount; ++t)
+			{
+				if(!(struck & (1u << t)))
+					continue;
+				m_telemetry->hit(t);
+				m_telemetry->beginCapture(t, _event.c);
+				m_captures[static_cast<size_t>(t)] = {true, m_position + Engine::SampleAccurateDelay, 0, 0.0f, 0.0f};
+			}
 			return;
 		}
 		if(status == synthLib::M_CONTROLCHANGE && _event.source != synthLib::MidiEventSource::Host)

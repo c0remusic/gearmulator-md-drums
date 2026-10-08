@@ -67,11 +67,24 @@ namespace mdDrums
 		void reportMachines();
 		void applyMixer();
 		void render(const synthLib::TAudioOutputs& _outputs, size_t _offset, size_t _count);
+		void capture(const std::array<float*, Engine::OutputCount>& _outputs, size_t _count);
 		void queueOut(const synthLib::SMidiEvent& _event);
 
 		std::unique_ptr<Engine> m_engine;
 		std::shared_ptr<Telemetry> m_telemetry;
 		bool m_valid = false;
+
+		// The Hit captures being written (Telemetry::beginCapture): from the sample a Hit sounds, a column of 8 samples at
+		// a time, until the capture is full or the Track's next Hit starts another
+		struct Capture
+		{
+			bool active = false;
+			int64_t start = 0;	// the sample the Hit sounds
+			int filled = 0;		// samples in the column being made
+			float low = 0.0f, high = 0.0f;
+		};
+		std::array<Capture, Engine::TrackCount> m_captures{};
+		int64_t m_position = 0;	// samples rendered so far
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 

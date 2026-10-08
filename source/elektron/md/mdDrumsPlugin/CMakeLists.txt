@@ -10,6 +10,7 @@ set(SOURCES
 	mdDrumsController.cpp mdDrumsController.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
 	mdDrumsGlyph.cpp mdDrumsGlyph.h
+	mdDrumsHitView.cpp mdDrumsHitView.h
 	mdDrumsKnob.cpp mdDrumsKnob.h
 	mdDrumsMeterView.cpp mdDrumsMeterView.h
 	mdDrumsProcessor.cpp mdDrumsProcessor.h

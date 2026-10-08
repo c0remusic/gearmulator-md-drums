@@ -7,6 +7,7 @@
 
 namespace mdDrums
 {
+	class HitView;
 	class MeterView;
 	class Processor;
 	class TrackView;
@@ -30,10 +31,12 @@ namespace mdDrums
 
 		TrackView* getTrackView() const { return m_trackView.get(); }
 		MeterView* getMeterView() const { return m_meterView.get(); }
+		HitView* getHitView() const { return m_hitView.get(); }
 
 	private:
 		std::unique_ptr<TrackView> m_trackView;
 		std::unique_ptr<MeterView> m_meterView;
+		std::unique_ptr<HitView> m_hitView;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState
