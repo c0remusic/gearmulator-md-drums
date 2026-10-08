@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MD Drums v22 boxes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v22-ui.css">
+<style>
+	body { margin: 0; background: #0e0f10; font: 14px/1.5 "Inter", system-ui, sans-serif; }
+	.frame { width: 1296px; height: 824px; }
+</style>
+</head>
+<body>
+<!-- The mockup as v22-test.html starts it, then v22-export-boxes.js's text in #out (see that file) -->
+<div class="frame" data-view="TRACK" data-arrows="caption" data-play="key" data-font="'Inter', sans-serif"></div>
+<pre id="out"></pre>
+<script src="v6-machines.js"></script>
+<script src="v22-hits.js"></script>
+<script src="v22-ui.js"></script>
+<script>
+	MD.start();
+	fetch("v22-export-boxes.js").then(r => r.text()).then(eval)
+		.then(text => document.getElementById("out").textContent = text)
+		.catch(e => document.getElementById("out").textContent = "ERROR " + e.message);
+</script>
+</body>
+</html>

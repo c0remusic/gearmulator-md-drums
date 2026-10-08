@@ -20,6 +20,8 @@ namespace mdDrums
 	// canvas of its own, sharp at every scale, and repaints only when its value, range, default or size change. It keeps
 	// ElemKnob's binding (param=), drag and double-click to the default, at the HANDOFF's pace: 1.5 px a step, Shift
 	// four times finer; the wheel moves 2 steps (1 with Shift), the arrow keys 1 (10 with Shift) on the focused knob.
+	// With the "fader" attribute it is the Mix's level fader instead: a 2 px rail and a 48 x 8 cap at the value, dragged
+	// by the height of its box for the whole range (its "speed" attribute).
 	class Knob final : public juceRmlUi::ElemKnob
 	{
 	public:
@@ -45,8 +47,10 @@ namespace mdDrums
 		void updateSpeed();
 		void repaint() const;
 		void paint(const juce::Image& _image, juce::Graphics& _g) const;
+		void paintFader(juce::Graphics& _g, float _dp) const;
 
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
 		bool m_bipolar = false;
+		bool m_fader = false;
 	};
 }

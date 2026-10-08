@@ -127,3 +127,104 @@ vknob { top: 84dp; width: 64dp; height: 64dp; drag: drag; cursor: pointer; }
 .chip:checked { background-color: #6fd1c4; color: #10201e; }
 .ch0 { left: 67dp; } .ch1 { left: 115dp; } .ch2 { left: 163dp; } .ch3 { left: 211dp; } .ch4 { left: 259dp; } .ch5 { left: 307dp; }
 .lr1 { top: 112dp; } .lr2 { top: 144dp; } .lr3 { top: 176dp; }
+
+/* ---- Overlays: hidden until the view opens them (mdDrumsTrackView.cpp) ---- */
+.overlay { display: none; }
+.col { position: absolute; top: 0dp; width: 0dp; height: 0dp; }
+.w5 { width: 384dp; }
+/* A title row: a 22 px title, then 14 px words; and the actions at its right, 24 px apart */
+/* 24 px lines here: the 22 px title sets the baseline, which a 22 px line would put 1 px over the step */
+.bhead { height: 24dp; line-height: 24dp; font-size: 14dp; color: #8e9197; }
+.bhead span { margin-right: 12dp; }
+.bhead .big, .pvname .big { font-size: 22dp; font-weight: 600; color: #f2f2f2; }
+.bact { width: 384dp; height: 24dp; line-height: 22dp; text-align: right; font-size: 14dp; color: #a7aaaf; }
+.bact .act { margin-left: 24dp; cursor: pointer; }
+.act:hover { color: #f2f2f2; }
+.keep, .kact .load { color: #f2f2f2; font-weight: 600; }
+
+/* Kits: 64 Slots in four columns of 16 rows of 40, the chosen one's panel on columns 13-16 */
+#kits_title, #kits_actions { top: 124dp; }
+.slotsel { left: 0dp; width: 248dp; height: 40dp; background-color: #26272a; }
+.slot { width: 224dp; height: 24dp; line-height: 22dp; font-size: 14dp; color: #8e9197; cursor: pointer; }
+.slot .num, .kitm .num { display: inline-block; width: 24dp; margin-right: 8dp; font-size: 12dp; letter-spacing: 0dp; color: #8e9197; }
+.slot:hover { color: #f2f2f2; }
+.kitssep { left: 968dp; top: 176dp; width: 1dp; height: 648dp; background-color: #3a3c40; }
+.kitcaption { top: 184dp; width: 304dp; height: 24dp; line-height: 24dp; }
+.kitpname { top: 208dp; width: 304dp; height: 32dp; line-height: 32dp; font-size: 22dp; font-weight: 600; }
+.kittracks { top: 256dp; width: 304dp; }
+.kitm { width: 144dp; height: 24dp; line-height: 22dp; font-size: 14dp; letter-spacing: 1dp; color: #a7aaaf; }
+.kact { top: 496dp; width: 304dp; height: 24dp; line-height: 22dp; font-size: 14dp; color: #a7aaaf; }
+.kact .act { margin-right: 24dp; cursor: pointer; }
+.kitnote { top: 528dp; width: 304dp; height: 16dp; line-height: 16dp; }
+
+/* The machine browser, over the bands: families on columns 4-10, ROM on 12-16 over the preview */
+#browser_title, #browser_actions { top: 208dp; }
+.fam { top: 248dp; }
+.fam .count { margin-left: 8dp; font-weight: 500; color: #8e9197; }
+.kind { top: 264dp; height: 16dp; line-height: 16dp; font-size: 12dp; color: #a7aaaf; }
+.mach { box-sizing: border-box; width: 64dp; height: 24dp; line-height: 22dp; font-size: 14dp; letter-spacing: 1dp; color: #a7aaaf; border-bottom: 2dp transparent; cursor: pointer; }
+.mach:hover { color: #f2f2f2; }
+.mach:checked { color: #f2f2f2; border-bottom-color: #f2f2f2; }
+.fam.preview { top: 528dp; }
+.pvname { top: 552dp; height: 24dp; line-height: 24dp; }
+.pvname .big { margin-right: 8dp; }
+.pvauto { top: 584dp; height: 16dp; line-height: 14dp; font-size: 14dp; color: #a7aaaf; cursor: pointer; }
+.pvauto .box { display: inline-block; width: 16dp; height: 16dp; margin-right: 8dp; border: 1dp #6e7177; vertical-align: top; }
+
+/* The LFO's target menu, over the LFO screen: 80 px of labels, then cells of 36 */
+.lfomenu { left: -1dp; top: 0dp; width: 400dp; height: 216dp; background-color: #151618; }
+.mhead { left: 16dp; top: 16dp; width: 368dp; height: 24dp; line-height: 22dp; }
+.mhead .label { margin-right: 8dp; }
+.mhead .right { position: absolute; right: 0dp; top: 0dp; }
+.mlabel { left: 16dp; width: 80dp; height: 16dp; margin-top: 4dp; }
+.mt { width: 36dp; height: 24dp; line-height: 24dp; text-align: center; font-size: 12dp; color: #a7aaaf; cursor: pointer; }
+.mt:hover { color: #f2f2f2; background-color: #26272a; }
+.mt:checked { background-color: #6fd1c4; color: #10201e; }
+.mt.off { color: #6e7177; }
+.m0 { left: 96dp; } .m1 { left: 132dp; } .m2 { left: 168dp; } .m3 { left: 204dp; } .m4 { left: 240dp; } .m5 { left: 276dp; }
+.m6 { left: 312dp; } .m7 { left: 348dp; }
+.mr0 { top: 48dp; } .mr1 { top: 72dp; } .mr2 { top: 104dp; } .mr3 { top: 128dp; } .mr4 { top: 152dp; }
+
+/* ---- Mix tab: strip t on column t ---- */
+.mixsurface, .mastersurface { left: 0dp; top: 56dp; width: 1296dp; height: 768dp; background-color: #26272a; }
+.stripsel { top: 56dp; height: 768dp; background-color: #1b1c1e; }
+.stripbar { top: 56dp; height: 4dp; background-color: #6fd1c4; }
+.sep { top: 56dp; width: 1dp; height: 768dp; background-color: #3a3c40; }
+.strip, .send { top: 0dp; width: 0dp; height: 0dp; }
+.sn { height: 16dp; line-height: 16dp; text-align: center; font-size: 12dp; color: #a7aaaf; cursor: pointer; }
+.sn:hover { color: #f2f2f2; }
+.sn.on { color: #6fd1c4; }
+.sm { height: 24dp; line-height: 22dp; text-align: center; font-size: 14dp; letter-spacing: 1dp; cursor: pointer; }
+.strip .sn { top: 84dp; }
+.strip .sm { top: 100dp; }
+vknob.pan { top: 132dp; }
+.panlabel { top: 196dp; text-align: center; }
+.vu { top: 228dp; width: 4dp; height: 492dp; background-color: #151618; }
+.vu .fill { position: absolute; left: 0dp; bottom: 0dp; width: 4dp; height: 0dp; background-color: #6fd1c4; }
+vknob.fader { top: 228dp; width: 64dp; height: 492dp; }
+.level { top: 728dp; height: 16dp; line-height: 14dp; text-align: center; font-size: 14dp; }
+.strip .toggle { top: 752dp; }
+.strip .toggle.mute { left: 4dp; }
+.strip .toggle.solo { left: 36dp; }
+.strip .toggle.out { left: 4dp; top: 784dp; width: 56dp; }
+
+/* ---- Master tab: effects of 272 px (title +28, what it is +60, groups +116, knobs +140, names +212, values +228),
+   then the sends ---- */
+.fx { width: 0dp; height: 0dp; }
+.fxrole { top: 60dp; height: 24dp; line-height: 22dp; }
+.fxgrp { top: 116dp; }
+vknob.fxk { top: 140dp; }
+.fxn { top: 212dp; }
+.fxv { top: 228dp; }
+.k0 { left: 0dp; } .k1 { left: 80dp; } .k2 { left: 160dp; } .k3 { left: 240dp; } .k4 { left: 320dp; } .k5 { left: 400dp; }
+.k6 { left: 480dp; } .k7 { left: 560dp; }
+.sendstitle { top: 628dp; }
+.sendsrole { top: 628dp; width: 1024dp; }
+.send .sn { top: 676dp; }
+.send .sm { top: 692dp; }
+vknob.sk { top: 728dp; width: 28dp; height: 28dp; }
+.del { left: 0dp; }
+.rev { left: 36dp; }
+.skn { top: 764dp; width: 28dp; height: 16dp; line-height: 16dp; text-align: center; font-size: 12dp; font-weight: 500; letter-spacing: 1dp; color: #a7aaaf; }
+.skv { top: 780dp; width: 28dp; height: 16dp; line-height: 14dp; text-align: center; font-size: 14dp; color: #8e9197; }
+.skv.edited { color: #f2f2f2; }

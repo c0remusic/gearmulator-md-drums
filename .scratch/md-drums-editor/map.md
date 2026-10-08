@@ -94,13 +94,18 @@ mesurées avant et après. Pas de tag.
   (chiffres seuls gelés tabulaires, `tnum` élargissant aussi tiret et espace ; table `kern` recopiée du GPOS) ;
   `<vknob>` et `<vglyph>` sur canvas ; 213 boîtes identiques à la maquette, 159 baselines sur le pas de 4 (ligne de
   22 px pour un texte de 14 px sur 24) ; 464 paramètres de l'onglet atteignables ; entrée→pixel en logiciel 4-8 ms
-  pour un drag, 7-10 ms pour un changement de Track ; GL3 et CPU dans Live à mesurer.
+  pour un drag, 7-10 ms pour un changement de Track ; GL3 et CPU dans Live à mesurer. Après lui, la zone d'édition
+  part de x 240 (16 px de chaque côté des knobs, choix de l'utilisateur).
+- [Mix, Master, Kits et overlays](issues/18-mix-master-kits-overlays.md) : skin v22 complet et statique, minimal et
+  générateur retirés ; fader = `vknob` en variante ; browser et menu LFO en boutons radio liés à Machine, LfoTrack,
+  LfoParam ; 881 boîtes de six vues identiques à la maquette, 685 baselines sur le pas de 4, 576 paramètres sur 576
+  atteignables ; clic 13-17 ms entrée→pixel en logiciel.
 
 ## Not yet specified
 
-- **Tranches de construction après le skin** : le skin statique est découpé (17 socle et Track, 18 Mix, Master, Kits
-  et overlays) ; restent les tranches de comportement en C++ (écrans, browser de machines, menu LFO, Kits, écran hit,
-  Push), chacune un ticket `task` quand la lecture du moteur par l'éditeur (16) a fixé sa forme.
+- **Tranches de construction après le skin** : skin statique fait (17, 18) ; ticket 19 (gigue note→son à zéro)
+  ensuite ; restent les tranches de comportement en C++ (écrans, mètres, ASSIGN, Kits et leur Bank, écran hit, Push),
+  chacune un ticket `task` quand la lecture du moteur par l'éditeur (16) a fixé sa forme.
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui

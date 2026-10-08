@@ -1,20 +1,23 @@
-// MD Drums' v22 skin against the approved mockup (Design/HANDOFF.md, ticket 17 of the editor map), with the software
-// renderer at 100 %:
+// MD Drums' v22 skin against the approved mockup (Design/HANDOFF.md, tickets 17 and 18 of the editor map), with the
+// software renderer at 100 %, view by view (the Track, Mix and Master tabs, the Kits, the machine browser, the LFO's
+// target menu):
 // - every box exported from the mockup (Design/v22-boxes.txt, by v22-export-boxes.js) is the box of the skin's
 //   element of the same ID, to half a pixel;
 // - every text baseline among them sits on a multiple of 4 (a 0 x 0 inline-block probe on the text's line), and no
 //   text overflows its box;
-// - every Track parameter the Track tab shows is bound to a control, Track by Track;
+// - each of the 576 host parameters has a control in the skin, Track by Track;
 // - input to pixel: a knob dragged and a list row clicked show on the next frame, and the event, RmlUi's update and
-//   the software render take 33 ms at most. MD_DRUMS_SKIN_PNG names a file for a picture of the tab.
+//   the software render take 33 ms at most. MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsProcessor.h"
+#include "mdDrumsTrackView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
+#include "juceRmlPlugin/rmlParameterBinding.h"
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/juceRmlLookAndFeel.h"
 #include "juceRmlUi/rmlInterfaces.h"
@@ -59,33 +62,55 @@ namespace
 		float x = 0, y = 0, w = 0, h = 0;
 	};
 
-	std::vector<std::pair<std::string, Box>> readBoxes()
+	struct View
+	{
+		std::string name;
+		std::vector<std::pair<std::string, Box>> boxes;
+	};
+
+	// v22-boxes.txt: "[view]" starts a view, then "key x y width height"; "#" lines are comments
+	std::vector<View> readViews()
 	{
 		const std::string path = std::string(MD_DRUMS_DESIGN_DIR) + "/v22-boxes.txt";
 		std::ifstream file(path);
 		require(file.good(), "cannot read " + path);
-		std::vector<std::pair<std::string, Box>> boxes;
+		std::vector<View> views;
 		std::string line;
 		while(std::getline(file, line))
 		{
+			if(line.empty() || line[0] == '#')
+				continue;
+			if(line[0] == '[')
+			{
+				views.push_back({line.substr(1, line.find(']') - 1), {}});
+				continue;
+			}
 			std::istringstream in(line);
 			std::string key;
 			Box b;
-			if(in >> key >> b.x >> b.y >> b.w >> b.h)
-				boxes.emplace_back(key, b);
+			if(!views.empty() && in >> key >> b.x >> b.y >> b.w >> b.h)
+				views.back().boxes.emplace_back(key, b);
 		}
-		return boxes;
+		return views;
 	}
 
 	// The mockup's elements that carry text, by their keys
 	bool hasText(const std::string& _key)
 	{
-		if(_key.rfind("k_", 0) == 0 || _key.rfind("rule_", 0) == 0 || _key.find("_scope") != std::string::npos)
+		if(_key.rfind("k_", 0) == 0 || _key.rfind("rule_", 0) == 0 || _key.find("_scope") != std::string::npos
+			|| _key.rfind("strip_sep", 0) == 0)
 			return false;
 		if(_key.rfind("screen_", 0) == 0)
 			return _key.find("_title") != std::string::npos;
-		static const std::set<std::string> boxesOnly{"surface", "row_sel_bg", "row_sel_mark", "main_meter",
-			"velocity_bar", "play", "syn_group1"};
+		for(const auto* suffix : {"_pan", "_meter", "_fader", "surface"})
+		{
+			const std::string s(suffix);
+			if(_key.size() >= s.size() && _key.compare(_key.size() - s.size(), s.size(), s) == 0)
+				return false;
+		}
+		static const std::set<std::string> boxesOnly{"row_sel_bg", "row_sel_mark", "main_meter", "velocity_bar", "play",
+			"syn_group1", "strip_sel_bg", "strip_sel_bar", "slot_sel_bg", "slot_play_mark", "kits_sep", "kit_note",
+			"lfomenu"};
 		return boxesOnly.count(_key) == 0;
 	}
 
@@ -105,7 +130,7 @@ namespace
 			require(editor != nullptr, "the processor did not create the editor");
 			component = editor->getRmlComponent();
 			require(component && component->getContext() && component->getDocument(), "the editor has no RmlUi document");
-			require(editor->findChild("page_track", false) != nullptr, "the default skin is not the v22 one");
+			require(editor->getTrackView() != nullptr, "the default skin is not the v22 one");
 			component->setLookAndFeel(&lookAndFeel);
 		}
 
@@ -118,6 +143,23 @@ namespace
 		Rml::Context& context() const { return *component->getContext(); }
 
 		Rml::Element* find(const std::string& _id) const { return editor->findChild(_id, false); }
+
+		void layout() const
+		{
+			juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
+			context().Update();
+		}
+
+		// A view of v22-boxes.txt: its tab, and its overlay open
+		void showView(const std::string& _view) const
+		{
+			using Overlay = mdDrums::TrackView::Overlay;
+			const auto* tabElement = find(_view == "mix" ? "strip1_num" : _view == "master" ? "echo_title" : "caption");
+			require(tabElement && editor->selectTabWithElement(tabElement), "no tab for the view " + _view);
+			editor->getTrackView()->setOverlay(_view == "kits" ? Overlay::Kits : _view == "browser" ? Overlay::Browser
+				: _view == "lfomenu" ? Overlay::LfoMenu : Overlay::None);
+			layout();
+		}
 
 		// One frame: RmlUi's update, then the software render into an image
 		void frame()
@@ -153,90 +195,102 @@ namespace
 		return text;
 	}
 
+	// Elements as wide as their text in the mockup: on their row, and ending 16 px inside the screen where they do
+	void textSized(Fixture& _f, const char* _key, const float _y, const float _right, std::vector<std::string>& _wrong)
+	{
+		auto* element = _f.find(_key);
+		require(element != nullptr, std::string("no element ") + _key);
+		const auto b = _f.box(*element);
+		if(std::abs(b.y - _y) > 0.5f || std::abs(b.h - 24) > 0.5f)
+			_wrong.push_back(std::string(_key) + ": " + describe(b) + ", not on its title's row");
+		if(_right > 0 && std::abs(b.x + b.w - _right) > 0.5f)
+			_wrong.push_back(std::string(_key) + " ends at " + std::to_string(b.x + b.w));
+	}
+
 	void boxes(Fixture& _f)
 	{
-		const auto expected = readBoxes();
-		require(expected.size() > 200, "the mockup's boxes are missing");
-		size_t matched = 0;
+		size_t matched = 0, total = 0;
 		std::vector<std::string> wrong;
-		for(const auto& [key, want] : expected)
+		for(const auto& view : readViews())
 		{
-			auto* element = _f.find(key);
-			if(!element)
+			_f.showView(view.name);
+			for(const auto& [key, want] : view.boxes)
 			{
-				wrong.push_back(key + ": no element");
-				continue;
+				++total;
+				auto* element = _f.find(key);
+				if(!element)
+				{
+					wrong.push_back(view.name + " " + key + ": no element");
+					continue;
+				}
+				const auto got = _f.box(*element);
+				if(std::abs(got.x - want.x) > 0.5f || std::abs(got.y - want.y) > 0.5f || std::abs(got.w - want.w) > 0.5f
+					|| std::abs(got.h - want.h) > 0.5f)
+					wrong.push_back(view.name + " " + key + ": " + describe(got) + ", the mockup " + describe(want));
+				else
+					++matched;
 			}
-			const auto got = _f.box(*element);
-			if(std::abs(got.x - want.x) > 0.5f || std::abs(got.y - want.y) > 0.5f || std::abs(got.w - want.w) > 0.5f
-				|| std::abs(got.h - want.h) > 0.5f)
-				wrong.push_back(key + ": " + describe(got) + ", the mockup " + describe(want));
-			else
-				++matched;
+			if(view.name == "track")
+			{
+				textSized(_f, "lfo_target", 624, 0, wrong);
+				textSized(_f, "lfo_assign", 624, 1280, wrong);
+			}
+			else if(view.name == "lfomenu")
+				textSized(_f, "lfomenu_done", 624, 1280, wrong);
 		}
-
-		// As wide as their text in the mockup: the LFO's target and Assign on the title row, Assign ending 16 px inside
-		for(const auto* key : {"lfo_target", "lfo_assign"})
-		{
-			auto* element = _f.find(key);
-			require(element != nullptr, std::string("no element ") + key);
-			const auto b = _f.box(*element);
-			if(std::abs(b.y - 624) > 0.5f || std::abs(b.h - 24) > 0.5f)
-				wrong.push_back(std::string(key) + ": " + describe(b) + ", not on the LFO title's row");
-		}
-		const auto assign = _f.box(*_f.find("lfo_assign"));
-		if(std::abs(assign.x + assign.w - 1280) > 0.5f)
-			wrong.push_back("lfo_assign ends at " + std::to_string(assign.x + assign.w) + ", not 1280");
-
-		std::printf("boxes: %zu of %zu as the mockup's\n", matched, expected.size());
+		_f.showView("track");
+		std::printf("boxes: %zu of %zu as the mockup's\n", matched, total);
 		for(const auto& w : wrong)
 			std::printf("  %s\n", w.c_str());
+		require(total > 800, "the mockup's boxes are missing");
 		require(wrong.empty(), "boxes differ from the mockup's");
 	}
 
 	void baselines(Fixture& _f)
 	{
 		auto& document = *_f.component->getDocument();
-		std::vector<std::pair<std::string, Rml::Element*>> probes;
-		for(const auto& [key, want] : readBoxes())
-		{
-			if(!hasText(key))
-				continue;
-			auto* element = _f.find(key);
-			if(!element)
-				continue;
-			// In a flex row (a group's name and its rule) the text is the first item's
-			if(element->GetComputedValues().display() == Rml::Style::Display::Flex && element->GetNumChildren())
-				element = element->GetChild(0);
-			auto probe = document.CreateElement("span");
-			probe->SetProperty("display", "inline-block");
-			probe->SetProperty("width", "0dp");
-			probe->SetProperty("height", "0dp");
-			probes.emplace_back(key, element->AppendChild(std::move(probe)));
-		}
-		{
-			juceRmlUi::RmlInterfaces::ScopedAccess access(*_f.component);
-			_f.context().Update();
-		}
-
+		size_t texts = 0;
 		std::vector<std::string> off, overflow;
-		for(const auto& [key, probe] : probes)
+		for(const auto& view : readViews())
 		{
-			const auto y = probe->GetAbsoluteOffset(Rml::BoxArea::Border).y / _f.dp();
-			const auto step = std::round(y / 4.0f) * 4.0f;
-			if(std::abs(y - step) > 0.5f)
+			_f.showView(view.name);
+			std::vector<std::pair<std::string, Rml::Element*>> probes;
+			for(const auto& [key, want] : view.boxes)
 			{
-				char text[64];
-				(void)std::snprintf(text, sizeof(text), "%s: %.2f", key.c_str(), y);
-				off.push_back(text);
+				if(!hasText(key))
+					continue;
+				auto* element = _f.find(key);
+				if(!element)
+					continue;
+				// In a flex row (a group's name and its rule) the text is the first item's
+				if(element->GetComputedValues().display() == Rml::Style::Display::Flex && element->GetNumChildren())
+					element = element->GetChild(0);
+				auto probe = document.CreateElement("span");
+				probe->SetProperty("display", "inline-block");
+				probe->SetProperty("width", "0dp");
+				probe->SetProperty("height", "0dp");
+				probes.emplace_back(key, element->AppendChild(std::move(probe)));
 			}
-			auto* element = probe->GetParentNode();
-			if(element->GetScrollWidth() > element->GetClientWidth() + 0.5f)
-				overflow.push_back(key);
-			element->RemoveChild(probe);
+			_f.layout();
+			for(const auto& [key, probe] : probes)
+			{
+				++texts;
+				const auto y = probe->GetAbsoluteOffset(Rml::BoxArea::Border).y / _f.dp();
+				const auto step = std::round(y / 4.0f) * 4.0f;
+				if(std::abs(y - step) > 0.5f)
+				{
+					char text[96];
+					(void)std::snprintf(text, sizeof(text), "%s %s: %.2f", view.name.c_str(), key.c_str(), y);
+					off.push_back(text);
+				}
+				auto* element = probe->GetParentNode();
+				if(element->GetScrollWidth() > element->GetClientWidth() + 0.5f)
+					overflow.push_back(view.name + " " + key);
+				element->RemoveChild(probe);
+			}
 		}
-		std::printf("baselines: %zu texts, %zu off the 4 px steps, %zu overflowing\n", probes.size(), off.size(),
-			overflow.size());
+		_f.showView("track");
+		std::printf("baselines: %zu texts, %zu off the 4 px steps, %zu overflowing\n", texts, off.size(), overflow.size());
 		for(const auto& o : off)
 			std::printf("  baseline %s\n", o.c_str());
 		for(const auto& o : overflow)
@@ -245,30 +299,33 @@ namespace
 		require(overflow.empty(), "texts overflow their boxes");
 	}
 
-	// The Track tab's controls, Track by Track: Machine, the 24 parameters, LFO shapes and mode, Mute, Solo
+	// Each of the 576 host parameters has a control: the ones bound to the shown Track, once that Track is shown
 	void bound(Fixture& _f)
 	{
-		static const std::vector<std::string> names{"Machine", "SYN1", "SYN2", "SYN3", "SYN4", "SYN5", "SYN6", "SYN7",
-			"SYN8", "AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR", "DIST", "VOL", "PAN", "DEL", "REV",
-			"LFOS", "LFOD", "LFOM", "LfoShape1", "LfoShape2", "LfoMode", "Mute", "Solo"};
-		size_t bound = 0, wanted = 0;
+		auto& controller = _f.processor.getController();
+		auto* binding = _f.editor->getRmlParameterBinding();
+		size_t bound = 0, total = 0;
 		for(uint8_t t = 0; t < mdDrums::Controller::TrackCount; ++t)
 		{
 			_f.editor->setCurrentPart(t);
-			for(const auto& name : names)
-			{
-				if(name == "Machine")
-					continue;	// the head band shows it; the browser (a later slice) sets it
-				++wanted;
-				if(!_f.editor->findChildreByParam(name, t).empty())
-					++bound;
-				else
-					std::printf("  track %d: %s has no control\n", t + 1, name.c_str());
-			}
+			for(const auto& [index, parameters] : controller.getExposedParameters())
+				for(auto* p : parameters)
+				{
+					if(p->getPart() != t)
+						continue;
+					++total;
+					std::vector<Rml::Element*> elements;
+					binding->getElementsForParameter(elements, p, false);
+					if(!elements.empty())
+						++bound;
+					else
+						std::printf("  track %d: %s has no control\n", t + 1, p->getDescription().name.c_str());
+				}
 		}
 		_f.editor->setCurrentPart(0);
-		std::printf("bound: %zu of %zu Track parameters have a control on the Track tab\n", bound, wanted);
-		require(bound == wanted, "a Track parameter has no control");
+		std::printf("bound: %zu of %zu host parameters have a control\n", bound, total);
+		require(total == mdDrums::Controller::ParameterCount, "not every host parameter was counted");
+		require(bound == total, "a host parameter has no control");
 	}
 
 	using Clock = std::chrono::steady_clock;
@@ -280,6 +337,7 @@ namespace
 
 	void inputToPixel(Fixture& _f)
 	{
+		_f.showView("track");
 		auto& context = _f.context();
 		const auto r = _f.dp();
 		auto* knob = dynamic_cast<mdDrums::Knob*>(_f.find("k_FLTF"));
@@ -343,6 +401,21 @@ namespace
 		require(ms <= 33.0, "a click on a row took over 33 ms to reach the pixels");
 		_f.editor->setCurrentPart(0);
 	}
+
+	void pictures(Fixture& _f, const std::string& _prefix)
+	{
+		for(const auto& view : readViews())
+		{
+			_f.showView(view.name);
+			for(int i = 0; i < 3; ++i)
+				_f.frame();
+			juce::FileOutputStream out{juce::File(juce::String(_prefix + view.name + ".png"))};
+			out.setPosition(0);
+			out.truncate();
+			juce::PNGImageFormat().writeImageToStream(_f.image, out);
+		}
+		_f.showView("track");
+	}
 }
 
 int main()
@@ -365,12 +438,7 @@ int main()
 		require(size.x == 1296 && size.y == 824, "the document is not 1296 x 824");
 
 		if(const auto* png = std::getenv("MD_DRUMS_SKIN_PNG"))
-		{
-			juce::FileOutputStream out{juce::File(juce::String(png))};
-			out.setPosition(0);
-			out.truncate();
-			juce::PNGImageFormat().writeImageToStream(f.image, out);
-		}
+			pictures(f, png);
 
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{

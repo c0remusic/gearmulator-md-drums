@@ -110,9 +110,12 @@ namespace mdDrums
 	void Knob::onPropertyChanged(const std::string& _key)
 	{
 		ElemKnob::onPropertyChanged(_key);
-		if(_key != "bipolar")
+		if(_key == "bipolar")
+			m_bipolar = getProperty<int>("bipolar", 0) != 0;
+		else if(_key == "fader")
+			m_fader = getProperty<int>("fader", 0) != 0;
+		else
 			return;
-		m_bipolar = getProperty<int>("bipolar", 0) != 0;
 		repaint();
 	}
 
@@ -131,8 +134,9 @@ namespace mdDrums
 
 	void Knob::updateSpeed()
 	{
-		// ElemKnob's speed is the drag for a full sweep
-		SetAttribute("speed", std::max(1.0f, getRange()) * PixelsPerStep);
+		// ElemKnob's speed is the drag for a full sweep; a fader's is its height, set in the skin
+		if(!m_fader)
+			SetAttribute("speed", std::max(1.0f, getRange()) * PixelsPerStep);
 	}
 
 	void Knob::repaint() const
@@ -149,6 +153,11 @@ namespace mdDrums
 			return;
 		const auto* context = GetContext();
 		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
+		if(m_fader)
+		{
+			paintFader(_g, dp);
+			return;
+		}
 
 		// The mockup's geometry (v22-ui.js, knobSvg): radius size/2 - 3, the pointer from 35 % of it to 5 px short of it
 		const auto centre = size * 0.5f;
@@ -182,5 +191,20 @@ namespace mdDrums
 		const auto sin = std::sin(angle), cos = std::cos(angle);
 		_g.setColour(edited ? g_ink : g_inkDim);
 		_g.drawLine(centre + inner * sin, centre - inner * cos, centre + outer * sin, centre - outer * cos, 2.0f * dp);
+	}
+
+	void Knob::paintFader(juce::Graphics& _g, const float _dp) const
+	{
+		// HANDOFF.md, Mix: the rail a 2 px --track stroke at x + 39 of the strip's column, the cap 48 x 8 ink at x + 16,
+		// its foot at the value's height less 4 px (the mockup's bottom: calc(level / 127 - 4px))
+		const auto height = static_cast<float>(m_canvas->getPaintSize().y);
+		const auto range = getRange();
+		const auto value = getValue() == UninitializedValue ? getDefaultValue() : getValue();
+		const auto fraction = range > 0.0f ? std::clamp((value - getMinValue()) / range, 0.0f, 1.0f) : 0.0f;
+		_g.setColour(g_track);
+		_g.fillRect(39.0f * _dp, 0.0f, 2.0f * _dp, height);
+		const auto foot = height - fraction * height + 4.0f * _dp;
+		_g.setColour(g_ink);
+		_g.fillRect(16.0f * _dp, foot - 8.0f * _dp, 48.0f * _dp, 8.0f * _dp);
 	}
 }

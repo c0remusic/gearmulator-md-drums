@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 # MD Drums: the Machinedrum's engines without its OS (mdDrums, mdEngine) as an instrument plug-in on the TUS stack
 # (ADR 0001). Its Device speaks the Machinedrum's MIDI (ADR 0002); its Controller comes from
-# parameterDescriptions_mddrums.json. Its skins: the v22 editor (skins/mdDrums, written by hand, ticket 17) and the
-# minimal one (skins/mdDrumsMinimal, from .scratch/md-drums-editor/tools/gen_minimal.py) until ticket 18. Its own name
+# parameterDescriptions_mddrums.json and its skin is the v22 editor (skins/mdDrums), both written by hand. Its own name
 # and codes: it never replaces md-mm's "Gearmulator MD".
 project(mdDrumsPlugin VERSION ${CMAKE_PROJECT_VERSION})
 
@@ -17,14 +16,10 @@ set(SOURCES
 	parameterDescriptions_mddrums.json
 	skins/mdDrums/mdDrums.rml
 	skins/mdDrums/mdDrums.rcss
-	skins/mdDrumsMinimal/mdDrumsMinimal.rml
-	skins/mdDrumsMinimal/mdDrumsMinimal.rcss
 )
 
 set(ASSETS parameterDescriptions_mddrums.json)
-# The first skin is the default one
 addSkin("MD Drums" "MD Drums" "skins/mdDrums" "mdDrums.rml")
-addSkin("MD Drums" "mdDrumsMinimal" "skins/mdDrumsMinimal" "mdDrumsMinimal.rml")
 buildSkinHeader()
 
 juce_add_binary_data(mdDrumsPlugin_BinaryData SOURCES ${ASSETS} ${ASSETS_SKINS})

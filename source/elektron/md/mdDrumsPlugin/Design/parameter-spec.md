@@ -1,7 +1,7 @@
 # MD Drums: parameter spec
 
-Since the port to the TUS stack (ticket 07, 2026-10-08) the parameters are `parameterDescriptions_mddrums.json`, which
-`.scratch/md-drums-editor/tools/gen_minimal.py` writes. Their JUCE IDs are pluginLib's `page_part_index`
+Since the port to the TUS stack (ticket 07, 2026-10-08) the parameters are `parameterDescriptions_mddrums.json`, edited
+by hand since ticket 18 (its generator went with the minimal skin). Their JUCE IDs are pluginLib's `page_part_index`
 (`Parameter::genId`), frozen from the port's first push: append parameters, never renumber. The earlier `t<n>_<name>`
 IDs are gone (no Live set needed keeping them, ADR 0001).
 

@@ -117,19 +117,13 @@ namespace
 		return *d;
 	}
 
-	// The v22 skin opens by default (mdDrumsSkinTest checks it); the minimal skin, chosen, binds every parameter until
-	// the v22 one does (ticket 18). MD_DRUMS_EDITOR_PNG names a file for a picture of the minimal skin.
+	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
+	// control); MD_DRUMS_EDITOR_PNG names a file for a picture of it
 	void editor(mdDrums::Processor& _processor)
 	{
 		_processor.setForceSoftwareRendererForSession(true);
 		auto& state = _processor.getOrCreateEditorState();
 		require(state.getCurrentSkin().filename == "mdDrums.rml", "the default skin is " + state.getCurrentSkin().filename);
-		const auto& skins = state.getIncludedSkins();
-		const auto minimal = std::find_if(skins.begin(), skins.end(), [](const jucePluginEditorLib::Skin& _skin)
-		{
-			return _skin.filename == "mdDrumsMinimal.rml";
-		});
-		require(minimal != skins.end() && state.loadSkin(*minimal), "the minimal skin does not load");
 		auto* editor = dynamic_cast<mdDrums::Editor*>(state.getEditor());
 		require(editor != nullptr, "the processor did not create the editor");
 		auto* component = editor->getRmlComponent();
@@ -138,13 +132,8 @@ namespace
 		component->getContext()->Update();
 		const auto size = component->getDocumentSize();
 		require(size.x == 1296 && size.y == 824, "the document is " + std::to_string(size.x) + "x" + std::to_string(size.y));
-		size_t bound = 0;
-		for(const auto& [index, parameters] : _processor.getController().getExposedParameters())
-			for(auto* p : parameters)
-				if(editor->findChildByParam(p->getDescription().name, p->getPart(), false))
-					++bound;
-		std::printf("editor: %dx%d, %zu of 576 parameters bound\n", static_cast<int>(size.x), static_cast<int>(size.y), bound);
-		require(bound == 576, "the skin does not bind every parameter");
+		std::printf("editor: %dx%d, skin %s\n", static_cast<int>(size.x), static_cast<int>(size.y),
+			state.getCurrentSkin().filename.c_str());
 
 		if(const auto* png = std::getenv("MD_DRUMS_EDITOR_PNG"))
 		{
