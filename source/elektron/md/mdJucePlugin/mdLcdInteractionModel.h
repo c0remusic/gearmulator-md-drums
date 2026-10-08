@@ -4,7 +4,7 @@
 #include <optional>
 
 #include "mdLib/mdfrontpanel.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 // Recognition and native-LCD geometry for the deliberately small set of LCD
 // fields whose semantics have been qualified against the original firmware.

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mdautomation.h"
-#include "mdlivekit.h"
+#include "mdlfosettings.h"
 
 #include <array>
 #include <cstdint>

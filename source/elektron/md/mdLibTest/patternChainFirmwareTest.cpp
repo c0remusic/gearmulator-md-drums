@@ -43,10 +43,10 @@
 
 #include "mdLib/mdchainplayer.h"
 #include "mdLib/mdhardware.h"
-#include "mdLib/mdmachines.h"
+#include "mdProtocol/mdmachines.h"
 #include "mdLib/mdmidiprotocol.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include "baseLib/filesystem.h"
 

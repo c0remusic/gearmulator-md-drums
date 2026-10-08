@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "jucePluginEditorLib/skin.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 namespace mdJucePlugin
 {

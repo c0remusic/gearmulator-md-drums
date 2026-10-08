@@ -2,7 +2,7 @@
 
 #include <array>
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 #include "dsp56kEmu/dsp.h"
 
 namespace md

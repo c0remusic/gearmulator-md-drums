@@ -1,6 +1,6 @@
 #include "mdromdata.h"
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 

@@ -1,9 +1,9 @@
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
 #include "mdLib/mdhostsync.h"
-#include "mdLib/mdmachines.h"
+#include "mdProtocol/mdmachines.h"
 #include "mdLib/mdmmpatternwriter.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 #include "synthLib/midiBufferParser.h"
 
 #include <algorithm>

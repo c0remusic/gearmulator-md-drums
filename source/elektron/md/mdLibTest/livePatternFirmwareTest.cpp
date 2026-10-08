@@ -13,8 +13,8 @@
 #include "mdLib/mdlivepattern.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdsysexautomation.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 

@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 namespace md
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include <string_view>
 

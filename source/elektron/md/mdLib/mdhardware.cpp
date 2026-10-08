@@ -4,7 +4,7 @@
 #include "mdrampacking.h"
 #include "mdtransportpolicy.h"
 
-#include "mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 #include "synthLib/realtimeInstrumentation.h"
 
 #include <algorithm>
@@ -21,7 +21,7 @@
 #include <utility>
 
 #include "mdromloader.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "dsp56kEmu/jitblockinfo.h"
 #include "dsp56kBase/threadtools.h"

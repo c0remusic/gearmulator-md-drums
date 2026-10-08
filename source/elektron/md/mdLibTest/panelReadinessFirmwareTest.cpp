@@ -1,7 +1,7 @@
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdstate.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 

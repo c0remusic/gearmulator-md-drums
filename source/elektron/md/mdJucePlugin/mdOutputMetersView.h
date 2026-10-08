@@ -1,7 +1,7 @@
 #pragma once
 
-#include "mdLib/mdsysexautomation.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdsysexautomation.h"
+#include "mdProtocol/mdtypes.h"
 
 #include <array>
 #include <cstdint>

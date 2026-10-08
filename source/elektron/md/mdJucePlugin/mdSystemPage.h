@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mdLib/mdhostsync.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/performanceReport.h"
 

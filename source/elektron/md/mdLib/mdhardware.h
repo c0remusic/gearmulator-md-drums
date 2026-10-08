@@ -31,7 +31,7 @@
 #include "mdtransportsignal.h"
 #include "mdturbomidi.h"
 #include "mdtransportdiagnostics.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/audioTypes.h"
 #include "synthLib/midiTypes.h"

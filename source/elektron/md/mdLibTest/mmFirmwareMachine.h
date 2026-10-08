@@ -9,7 +9,7 @@
 #include "mdLib/mddevice.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdmidiprotocol.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <memory>
 #include <stdexcept>

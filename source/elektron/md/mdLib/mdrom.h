@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mdromdata.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 namespace md
 {

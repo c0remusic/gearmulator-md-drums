@@ -1,5 +1,5 @@
 #include "jucePluginLib/parameterdescriptions.h"
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdRealtimeQueue.h"
 
 #include <array>

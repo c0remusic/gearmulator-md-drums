@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 
-#include "mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 namespace md
 {

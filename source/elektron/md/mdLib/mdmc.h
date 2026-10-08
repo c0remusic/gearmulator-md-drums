@@ -19,7 +19,7 @@
 #include "mdflash.h"
 #include "mdsim.h"
 #include "mdturbomidi.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/midiBufferParser.h"
 

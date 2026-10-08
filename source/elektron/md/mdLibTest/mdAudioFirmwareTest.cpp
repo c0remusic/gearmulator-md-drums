@@ -1,6 +1,6 @@
 #include "mdLib/mddevice.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 #include "synthLib/plugin.h"

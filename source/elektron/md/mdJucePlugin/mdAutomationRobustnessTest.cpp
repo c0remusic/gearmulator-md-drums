@@ -1,6 +1,6 @@
 #include "mdAutomationTestSupport.h"
 
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 #include "synthLib/midiTypes.h"
 
 #include "juce_events/juce_events.h"

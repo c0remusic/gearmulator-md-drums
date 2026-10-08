@@ -88,4 +88,10 @@ struct RomBank {
 };
 RomBank loadRomBankFromFlash(const std::vector<uint8_t>& flash);
 
+// md-drums: the factory image of the first 512 KiB of patch memory that the bootloader's factory reset depacks into
+// it, container section 4 for a UW machine, section 3 otherwise (flash $1fc0-$2034). It holds the working Kit at
+// +$0a and the 64 stored Kits, 16 factory ones then 48 empty, as $460-byte records from +$8ca. Empty when the
+// flash holds no such section.
+std::vector<uint8_t> loadPatchImageFromFlash(const std::vector<uint8_t>& flash, bool uw = true);
+
 } // namespace md::fw

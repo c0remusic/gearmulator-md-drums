@@ -3,7 +3,7 @@
 #include "mdLib/mddevice.h"
 #include "mdLib/mdhostsync.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 #include "baseLib/filesystem.h"
 
 #include <algorithm>

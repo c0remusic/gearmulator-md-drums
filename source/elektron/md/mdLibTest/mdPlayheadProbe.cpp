@@ -11,12 +11,12 @@
 
 #include "mmFirmwareMachine.h"
 
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdlivepattern.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include "baseLib/filesystem.h"
 

@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 #include "mdsysexfile.h"
 #include "mdturbomidiprotocol.h"
 

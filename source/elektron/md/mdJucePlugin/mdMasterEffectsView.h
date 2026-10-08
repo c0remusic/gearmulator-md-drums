@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <array>
 #include <cstdint>

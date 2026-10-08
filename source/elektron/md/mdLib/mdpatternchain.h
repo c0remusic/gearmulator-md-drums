@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include <array>
 #include <cstddef>

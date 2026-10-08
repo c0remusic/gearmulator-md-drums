@@ -69,6 +69,10 @@ mesurées avant et après. Pas de tag.
 - [synthLib à 18 sorties](issues/14-synthlib-18-sorties.md) : `synthLib::MaxAudioOutputs` = 18 ; les 18 canaux
   sortent alignés à la latence rapportée dans les trois modes ; Legacy confirmé à 0,67 ms à 48 kHz et gardé par
   défaut (5,8 % d'un cœur à 48 kHz pour 18 canaux, contre 27,9 % en MameHq).
+- [Bibliothèque mdProtocol et writer de dump de kit](issues/13-bibliotheque-mdprotocol.md) : codecs sortis de `mdLib`
+  par `git mv` ; `MdKit` garde chaque octet du dump, `mdKitDump` écrit la version 04 ; 32 Kits d'usine aller-retour
+  champ pour champ, dumps du firmware octet pour octet, Kit écrit accepté et renvoyé tel quel par le firmware ;
+  `$65`/`$66` avec OFF = $7f vérifiés sur firmware.
 
 ## Not yet specified
 

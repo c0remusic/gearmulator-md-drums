@@ -1,5 +1,5 @@
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include <cstdint>
 #include <iostream>

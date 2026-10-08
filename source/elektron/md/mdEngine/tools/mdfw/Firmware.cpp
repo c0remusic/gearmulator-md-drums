@@ -258,4 +258,17 @@ RomBank loadRomBankFromFlash(const std::vector<uint8_t>& flash)
     return bank;
 }
 
+std::vector<uint8_t> loadPatchImageFromFlash(const std::vector<uint8_t>& flash, const bool uw)
+{
+    constexpr size_t kOsStart = 0x4000, kOsEnd = 0x100000, kImageSize = 0x80000;
+    if (flash.size() < kOsEnd) return {};
+    FlashImage img;
+    img.base = kOsStart;
+    img.bytes.assign(flash.begin() + kOsStart, flash.begin() + kOsEnd);
+    auto c = parseContainer(img);
+    const size_t index = uw ? 4 : 3;
+    if (c.sections.size() <= index || !c.sections[index].sumOk || c.sections[index].data.size() != kImageSize) return {};
+    return std::move(c.sections[index].data);
+}
+
 } // namespace md::fw

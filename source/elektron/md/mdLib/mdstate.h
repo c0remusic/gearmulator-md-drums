@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/deviceTypes.h"
 

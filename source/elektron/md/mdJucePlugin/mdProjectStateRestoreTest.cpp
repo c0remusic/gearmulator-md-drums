@@ -5,7 +5,7 @@
 #include "mdLib/mdmemorymap.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdstate.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/binarystream.h"
 #include "juce_audio_utils/juce_audio_utils.h"

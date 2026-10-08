@@ -4,11 +4,11 @@
 
 #include "hitParameters.h"
 
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdLib/mddevice.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdsysexautomation.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 #include "synthLib/plugin.h"

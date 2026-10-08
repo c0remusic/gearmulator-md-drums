@@ -1,12 +1,12 @@
 #pragma once
 
 #include "jucePluginLib/controller.h"
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdLib/mdautomationsync.h"
 #include "mdLib/mdlivekit.h"
-#include "mdLib/mdmachines.h"
-#include "mdLib/mdsysexautomation.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdmachines.h"
+#include "mdProtocol/mdsysexautomation.h"
+#include "mdProtocol/mdtypes.h"
 #include "mdRealtimeQueue.h"
 
 #include <array>

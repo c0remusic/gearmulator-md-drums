@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "mdLib/mdmachines.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdmachines.h"
+#include "mdProtocol/mdtypes.h"
 
 namespace Rml
 {

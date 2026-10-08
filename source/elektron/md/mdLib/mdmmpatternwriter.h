@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mdhostsync.h"
-#include "mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <atomic>
 #include <cstdint>

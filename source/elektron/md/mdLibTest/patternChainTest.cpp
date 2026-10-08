@@ -5,7 +5,7 @@
 #include "mdLib/mdchainplayer.h"
 #include "mdLib/mdmidiprotocol.h"
 #include "mdLib/mdpatternchain.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <cstdio>
 #include <stdexcept>

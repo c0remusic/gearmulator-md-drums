@@ -1,13 +1,107 @@
 #include "mdsysexautomation.h"
 
 #include "mdmachines.h"
+#include "mdsysexcodec.h"
 
 #include <algorithm>
 #include <bitset>
 #include <utility>
 
+namespace md::automation::sysex::codec
+{
+	uint8_t product(const MachineModel _model)
+	{
+		return _model == MachineModel::Monomachine ? 0x03 : 0x02;
+	}
+
+	bool hasHeader(const MachineModel _model, const MessageView _message,
+		const uint8_t _command)
+	{
+		return _message.size() >= 8 && _message[0] == 0xf0
+			&& _message[1] == 0x00 && _message[2] == 0x20
+			&& _message[3] == 0x3c && _message[4] == product(_model)
+			&& _message[5] == 0x00 && _message[6] == _command
+			&& _message.back() == 0xf7;
+	}
+
+	bool validDump(const MachineModel _model, const MessageView _message,
+		const uint8_t _command)
+	{
+		if(_message.size() < 13 || !hasHeader(_model, _message, _command))
+			return false;
+		if(std::any_of(_message.begin() + 1, _message.end() - 1,
+			[](const uint8_t _value) { return _value > 0x7f; }))
+			return false;
+
+		const auto checksumPosition = _message.size() - 5;
+		uint32_t sum = 0;
+		for(size_t i = 9; i < checksumPosition; ++i)
+			sum += _message[i];
+		const auto checksum = static_cast<uint16_t>(
+			(_message[checksumPosition] << 7) | _message[checksumPosition + 1]);
+		if((sum & 0x3fff) != checksum)
+			return false;
+
+		const auto length = static_cast<uint16_t>(
+			(_message[checksumPosition + 2] << 7) | _message[checksumPosition + 3]);
+		return length == _message.size() - 10;
+	}
+
+	void append7Bit(std::vector<uint8_t>& _out, const uint8_t* _data, const size_t _count)
+	{
+		for(size_t position = 0; position < _count; position += 7)
+		{
+			const auto count = std::min<size_t>(7, _count - position);
+			uint8_t highBits = 0;
+			for(size_t bit = 0; bit < count; ++bit)
+			{
+				if(_data[position + bit] & 0x80)
+					highBits |= static_cast<uint8_t>(1u << (6u - bit));
+			}
+			_out.push_back(highBits);
+			for(size_t bit = 0; bit < count; ++bit)
+				_out.push_back(static_cast<uint8_t>(_data[position + bit] & 0x7f));
+		}
+	}
+
+	bool read7Bit(const MessageView _message, size_t& _position, const size_t _count, uint8_t* _out)
+	{
+		for(size_t done = 0; done < _count;)
+		{
+			if(_position >= _message.size())
+				return false;
+			const auto highBits = _message[_position++];
+			for(uint8_t bit = 0; bit < 7 && done < _count; ++bit, ++done)
+			{
+				if(_position >= _message.size())
+					return false;
+				auto value = _message[_position++];
+				if(highBits & (1u << (6u - bit)))
+					value |= 0x80;
+				_out[done] = value;
+			}
+		}
+		return true;
+	}
+
+	void finishDump(Message& _message)
+	{
+		uint32_t sum = 0;
+		for(size_t i = 9; i < _message.size(); ++i)
+			sum += _message[i];
+		const auto length = _message.size() - 5;
+		_message.push_back(static_cast<uint8_t>((sum >> 7) & 0x7f));
+		_message.push_back(static_cast<uint8_t>(sum & 0x7f));
+		_message.push_back(static_cast<uint8_t>((length >> 7) & 0x7f));
+		_message.push_back(static_cast<uint8_t>(length & 0x7f));
+		_message.push_back(0xf7);
+	}
+}
+
 namespace md::automation::sysex
 {
+	using namespace codec;
+
 	namespace
 	{
 		constexpr uint8_t g_globalDump = 0x50;
@@ -26,49 +120,11 @@ namespace md::automation::sysex
 		constexpr uint8_t g_setStatus = 0x71;
 		constexpr uint8_t g_statusResponse = 0x72;
 
-		uint8_t product(const MachineModel _model)
-		{
-			return _model == MachineModel::Monomachine ? 0x03 : 0x02;
-		}
-
 		Message request(const MachineModel _model, const uint8_t _command,
 			const uint8_t _value)
 		{
 			return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00,
 				_command, static_cast<uint8_t>(_value & 0x7f), 0xf7};
-		}
-
-		bool hasHeader(const MachineModel _model, const MessageView _message,
-			const uint8_t _command)
-		{
-			return _message.size() >= 8 && _message[0] == 0xf0
-				&& _message[1] == 0x00 && _message[2] == 0x20
-				&& _message[3] == 0x3c && _message[4] == product(_model)
-				&& _message[5] == 0x00 && _message[6] == _command
-				&& _message.back() == 0xf7;
-		}
-
-		bool validDump(const MachineModel _model, const MessageView _message,
-			const uint8_t _command)
-		{
-			if(_message.size() < 13 || !hasHeader(_model, _message, _command))
-				return false;
-			if(std::any_of(_message.begin() + 1, _message.end() - 1,
-				[](const uint8_t _value) { return _value > 0x7f; }))
-				return false;
-
-			const auto checksumPosition = _message.size() - 5;
-			uint32_t sum = 0;
-			for(size_t i = 9; i < checksumPosition; ++i)
-				sum += _message[i];
-			const auto checksum = static_cast<uint16_t>(
-				(_message[checksumPosition] << 7) | _message[checksumPosition + 1]);
-			if((sum & 0x3fff) != checksum)
-				return false;
-
-			const auto length = static_cast<uint16_t>(
-				(_message[checksumPosition + 2] << 7) | _message[checksumPosition + 3]);
-			return length == _message.size() - 10;
 		}
 
 		bool validStatusValue(const MachineModel _model,
@@ -143,25 +199,6 @@ namespace md::automation::sysex
 			return decoded;
 		}
 
-		// Appends _count bytes in 7-bit groups: each group of up to seven bytes is
-		// preceded by their top bits, MSB first. The inverse of read7Bit.
-		void append7Bit(std::vector<uint8_t>& _out, const uint8_t* _data, const size_t _count)
-		{
-			for(size_t position = 0; position < _count; position += 7)
-			{
-				const auto count = std::min<size_t>(7, _count - position);
-				uint8_t highBits = 0;
-				for(size_t bit = 0; bit < count; ++bit)
-				{
-					if(_data[position + bit] & 0x80)
-						highBits |= static_cast<uint8_t>(1u << (6u - bit));
-				}
-				_out.push_back(highBits);
-				for(size_t bit = 0; bit < count; ++bit)
-					_out.push_back(static_cast<uint8_t>(_data[position + bit] & 0x7f));
-			}
-		}
-
 		// Inverse of decodeMonomachinePayload: run-length pass, then 7-bit groups.
 		std::vector<uint8_t> encodeMonomachinePayload(const std::vector<uint8_t>& _decoded)
 		{
@@ -190,42 +227,6 @@ namespace md::automation::sysex
 			packed.reserve(rle.size() + rle.size() / 7 + 1);
 			append7Bit(packed, rle.data(), rle.size());
 			return packed;
-		}
-
-		// Reads _count bytes packed in 7-bit groups (a byte of top bits, MSB first,
-		// then up to seven bytes) starting at _position, which it advances.
-		bool read7Bit(const MessageView _message, size_t& _position, const size_t _count, uint8_t* _out)
-		{
-			for(size_t done = 0; done < _count;)
-			{
-				if(_position >= _message.size())
-					return false;
-				const auto highBits = _message[_position++];
-				for(uint8_t bit = 0; bit < 7 && done < _count; ++bit, ++done)
-				{
-					if(_position >= _message.size())
-						return false;
-					auto value = _message[_position++];
-					if(highBits & (1u << (6u - bit)))
-						value |= 0x80;
-					_out[done] = value;
-				}
-			}
-			return true;
-		}
-
-		// Appends checksum, length and F7 to a dump that ends with its payload.
-		void finishDump(Message& _message)
-		{
-			uint32_t sum = 0;
-			for(size_t i = 9; i < _message.size(); ++i)
-				sum += _message[i];
-			const auto length = _message.size() - 5;
-			_message.push_back(static_cast<uint8_t>((sum >> 7) & 0x7f));
-			_message.push_back(static_cast<uint8_t>(sum & 0x7f));
-			_message.push_back(static_cast<uint8_t>((length >> 7) & 0x7f));
-			_message.push_back(static_cast<uint8_t>(length & 0x7f));
-			_message.push_back(0xf7);
 		}
 
 		// Machinedrum Global: raw bytes follow the 7-bit packed key map. In the

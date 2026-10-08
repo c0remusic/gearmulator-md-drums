@@ -2,7 +2,7 @@
 
 #include "mdController.h"
 
-#include "mdLib/mdmachines.h"
+#include "mdProtocol/mdmachines.h"
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlEventListener.h"

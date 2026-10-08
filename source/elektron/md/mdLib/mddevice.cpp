@@ -3,7 +3,7 @@
 #include "mdenv.h"
 #include "mdstate.h"
 #include "mdromloader.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "baseLib/filesystem.h"
 #include "synthLib/realtimeInstrumentation.h"

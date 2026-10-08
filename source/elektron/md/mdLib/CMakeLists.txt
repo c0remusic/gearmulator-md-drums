@@ -9,7 +9,6 @@ add_library(mdLib STATIC)
 
 set(SOURCES
 	mdasyncrender.cpp mdasyncrender.h
-	mdautomation.cpp mdautomation.h
 	mdautomationsync.cpp mdautomationsync.h
 	mdchainplayer.cpp mdchainplayer.h
 	mddevice.cpp mddevice.h
@@ -22,13 +21,11 @@ set(SOURCES
 	mdhostsync.cpp mdhostsync.h
 	mdlibrary.cpp mdlibrary.h
 	mdlivepattern.cpp mdlivepattern.h
-	mdmachines.cpp mdmachines.h
 	mdmmpatternwriter.cpp mdmmpatternwriter.h
 	mdmachinestatus.h
 	mdmc.cpp mdmc.h
 	mdmemorymap.h
 	mdmidiprotocol.h
-	mdsysexautomation.cpp mdsysexautomation.h
 	mdrealtimemidiqueue.h
 	mdpanel.cpp mdpanel.h
 	mdpatternchain.cpp mdpatternchain.h
@@ -42,7 +39,6 @@ set(SOURCES
 	mdsysextransfer.h
 	mdsyseximport.h
 	mdturbomidi.cpp mdturbomidi.h mdturbomidiprotocol.h mdturbomidisenderpolicy.h
-	mdtypes.h
 	mdtimedhostrx.h
 	mdtimedlinkring.h
 	mdtransportdiagnostics.h
@@ -52,7 +48,7 @@ set(SOURCES
 target_sources(mdLib PRIVATE ${SOURCES})
 source_group("source" FILES ${SOURCES})
 
-target_link_libraries(mdLib PUBLIC hardwareLib dsp56kEmu)
+target_link_libraries(mdLib PUBLIC hardwareLib dsp56kEmu mdProtocol)
 target_compile_definitions(mdLib PUBLIC
 	MD_TRANSPORT_DIAGNOSTICS=$<BOOL:${MD_TRANSPORT_DIAGNOSTICS}>)
 

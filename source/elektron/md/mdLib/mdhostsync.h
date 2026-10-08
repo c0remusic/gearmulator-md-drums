@@ -1,8 +1,8 @@
 #pragma once
 
 #include "mdpanel.h"
-#include "mdsysexautomation.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdsysexautomation.h"
+#include "mdProtocol/mdtypes.h"
 
 #include <atomic>
 #include <cstdint>

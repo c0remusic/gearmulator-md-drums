@@ -30,7 +30,7 @@
 #include "mdTrackActivity.h"
 #include "mdTrackRoutingView.h"
 #include "mdUnreadValues.h"
-#include "mdLib/mdmachines.h"
+#include "mdProtocol/mdmachines.h"
 
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/DataModelHandle.h"

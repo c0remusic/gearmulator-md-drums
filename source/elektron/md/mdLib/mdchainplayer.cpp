@@ -1,7 +1,7 @@
 #include "mdchainplayer.h"
 
 #include "mdmidiprotocol.h"
-#include "mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 namespace md
 {

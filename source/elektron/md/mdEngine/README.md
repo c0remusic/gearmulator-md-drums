@@ -21,6 +21,8 @@ later versions can be compared file by file. Their documentation is in `.scratch
 - `tools/mdfw/Firmware.*` and `engine/MdEngine.h`: `loadRomBankFromFlash` redoes what OS 1.63's boot does with the
   UW sample bank in the flash (`$20d20e`), and `EngineT::loadRomBank` writes the result into the voice DSP, which
   upstream leaves without it: the ROM machines play their samples.
+- `tools/mdfw/Firmware.*`: `loadPatchImageFromFlash` returns the factory patch-memory image (container section 4
+  on a UW, 3 otherwise) that the bootloader's factory reset depacks, with the 16 factory Kits.
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

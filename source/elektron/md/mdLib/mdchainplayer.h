@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mdpatternchain.h"
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/midiTypes.h"
 

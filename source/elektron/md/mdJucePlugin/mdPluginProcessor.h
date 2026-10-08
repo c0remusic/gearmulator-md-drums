@@ -8,7 +8,7 @@
 #include "mdLib/mdlibrary.h"
 #include "mdLib/mdlivepattern.h"
 #include "mdLib/mdmmpatternwriter.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 #include "synthLib/performanceReport.h"
 
 #include <atomic>

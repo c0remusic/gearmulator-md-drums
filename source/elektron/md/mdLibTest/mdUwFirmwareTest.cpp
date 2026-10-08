@@ -1,7 +1,7 @@
 #include "mdLib/mddevice.h"
 #include "mdLib/mdhardware.h"
 #include "mdLib/mdpanel.h"
-#include "mdLib/mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 #include "synthLib/plugin.h"
 

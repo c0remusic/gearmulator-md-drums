@@ -1,9 +1,9 @@
 #include "mdController.h"
 
 #include "mdPluginProcessor.h"
-#include "mdLib/mdautomation.h"
+#include "mdProtocol/mdautomation.h"
 #include "mdLib/mddevice.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <algorithm>
 #include <bitset>

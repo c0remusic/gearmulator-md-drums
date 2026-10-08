@@ -3,7 +3,7 @@
 #include "mdLaneInput.h"
 #include "mdPatternCommands.h"
 
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include <array>
 #include <cstdint>

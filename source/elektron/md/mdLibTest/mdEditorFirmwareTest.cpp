@@ -14,10 +14,10 @@
 // a model without its firmware is skipped, 77 when neither ran.
 
 #include "mdLib/mdhardware.h"
-#include "mdLib/mdmachines.h"
+#include "mdProtocol/mdmachines.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdromloader.h"
-#include "mdLib/mdsysexautomation.h"
+#include "mdProtocol/mdsysexautomation.h"
 
 #include "baseLib/filesystem.h"
 

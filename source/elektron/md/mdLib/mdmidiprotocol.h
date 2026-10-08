@@ -4,7 +4,7 @@
 #include <array>
 #include <cstdint>
 
-#include "mdtypes.h"
+#include "mdProtocol/mdtypes.h"
 
 namespace md::midiProtocol
 {
