@@ -52,6 +52,9 @@ namespace md::engine
 		void setChoke(int _track, int _target);
 		uint8_t link(int _track) const { return m_link[_track]; }
 		uint8_t choke(int _track) const { return m_choke[_track]; }
+		// md-drums: a track's user mute, and whether a Choke holds it silent until its next Hit
+		bool muted(int _track) const { return m_mute[_track]; }
+		bool choked(int _track) const { return m_choked[_track]; }
 		void setAccentAmount(int _amount) { m_accentAmount = std::clamp(_amount, 0, 127); }
 
 		// Caps how many tracks can be simultaneously active (most-recently-triggered N; a new distinct

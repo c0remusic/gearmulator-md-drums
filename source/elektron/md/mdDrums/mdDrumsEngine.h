@@ -16,7 +16,9 @@ namespace mdDrums
 {
 	// The Machinedrum's engines without its OS (mdEngine), as a plug-in drives them: 16 tracks, each with a
 	// machine, the 24 track parameters and a level, triggered by notes, rendered at the engine's own 44.1 kHz.
-	// A change or a trigger takes effect at the next 32-sample block the engine renders.
+	// A change takes effect at the next 32-sample block the engine renders. A Hit sounds SampleAccurateDelay samples
+	// after its trigger, wherever the trigger falls in a block, its voice's own start aside: its Track's share of the mix
+	// waits the rest of the block (setSampleAccurate).
 	class Engine
 	{
 	public:
@@ -55,6 +57,12 @@ namespace mdDrums
 		void setMute(int _track, bool _mute);
 		void setTempo(double _bpm);
 		void trigger(int _track, int _velocity);			// 1-127
+
+		// On (the default), every Hit sounds the same time after its trigger: the engine's block wait, 0 to 31 samples,
+		// becomes a constant 31. Off, a Hit sounds at the engine's next block, as the Machinedrum does.
+		static constexpr int SampleAccurateDelay = BlockSize - 1;
+		void setSampleAccurate(bool _on);
+		bool isSampleAccurate() const;
 
 		// The Kit's Links and Chokes (trig and mute groups): a Hit of _track also hits _target at the same velocity, or
 		// silences _target until its own next Hit, as OS 1.63 plays them (md::engine::HostModel::setLink). NoTrack,

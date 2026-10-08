@@ -37,6 +37,12 @@ namespace md::engine
 
 		static int frameChannel(int _route);
 
+		// md-drums: one main-routed track's six gains as process() computes them (L R, REV L R, DEL L R), from its mix
+		// words; _dryMute leaves L R at 0. False for a track routed elsewhere than the main outputs. A main mix is then
+		// mainSample() of the sum of mpy(gain, sample) over the tracks, in any order: the sum wraps as the DSP's does.
+		bool gains(const std::array<uint32_t, 5>& _mix, bool _dryMute, std::array<int32_t, 6>& _gains) const;
+		static int32_t mainSample(int64_t _sum);
+
 		// One track on its own (no pan, no sends): the individual-output formula, sample x VOL << 4 limited (24-bit).
 		// _volWord: the track's mix word 1 (HostModel::MixerInput::mix[1]).
 		static int32_t solo(int32_t _sample, uint32_t _volWord);

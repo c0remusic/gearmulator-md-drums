@@ -22,8 +22,8 @@ mesurées avant et après. Pas de tag.
 - Garde-fou du `CLAUDE.md` avant chaque commit et push ; chaque tranche ajoute ses tests au garde-fou. Push sans
   demander une fois vert. Jamais de tag.
 - **Latence** : tout changement du chemin de rendu (port, master) rapporte latence note→son et gigue, avant et après
-  (`mdDrumsEngineTest` : 1,16 ms en moyenne, gigue 0,68 ms, sur TRX-BD depuis la note ; les 0,48 ms de départ
-  comptaient depuis le bloc de 32 de la note).
+  (`mdDrumsEngineTest` : depuis le ticket 19, 1,52 ms sans gigue sur TRX-BD à 44,1 kHz, 35 échantillons déclarés ;
+  avant, 1,16 ms en moyenne et 0,68 ms de gigue ; les 0,48 ms de départ comptaient depuis le bloc de 32 de la note).
 - **Fluidité** : chaque clic et drag instantané, mesuré entrée→pixel ; jamais `Plugin::withDeviceLocked` par frame
   ou par clic.
 - Recherches : un doc par ticket dans `research/` à côté de cette carte (pas de branche `research/*`).
@@ -100,12 +100,16 @@ mesurées avant et après. Pas de tag.
   générateur retirés ; fader = `vknob` en variante ; browser et menu LFO en boutons radio liés à Machine, LfoTrack,
   LfoParam ; 881 boîtes de six vues identiques à la maquette, 685 baselines sur le pas de 4, 576 paramètres sur 576
   atteignables ; clic 13-17 ms entrée→pixel en logiciel.
+- [Gigue note→son à zéro](issues/19-gigue-note-son.md) : retard par Track sur ses contributions au mix (gains, sends,
+  sortie solo), 31 moins l'attente du bloc ; somme modulo 56 bits comme le DSP, identique au mixeur du moteur ; Link
+  au même retard, Choke coupé au retard du Hit ; TRX-BD 37-67 → 67-67 échantillons à 44,1 kHz (gigue 0), 53-87 →
+  86-87 à 48 kHz ; latence déclarée 21 → 35 ; CPU inchangé.
 
 ## Not yet specified
 
-- **Tranches de construction après le skin** : skin statique fait (17, 18) ; ticket 19 (gigue note→son à zéro)
-  ensuite ; restent les tranches de comportement en C++ (écrans, mètres, ASSIGN, Kits et leur Bank, écran hit, Push),
-  chacune un ticket `task` quand la lecture du moteur par l'éditeur (16) a fixé sa forme.
+- **Tranches de construction après le skin** : skin statique fait (17, 18), gigue réglée (19) ; restent les tranches
+  de comportement en C++ (écrans, mètres, ASSIGN, Kits et leur Bank, écran hit, Push), chacune un ticket `task` quand
+  la lecture du moteur par l'éditeur (16) a fixé sa forme.
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui

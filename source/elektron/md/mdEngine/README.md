@@ -26,6 +26,10 @@ later versions can be compared file by file. Their documentation is in `.scratch
 - `engine/HostModel.*`: the Kit's trig and mute groups (Links and Chokes, `setLink`, `setChoke`), played as OS
   1.63's note handler ($20cc48) and tick ($20ad9a) play them; a muted track drops its Hits, as the note handler does
   ($20ccf6); every Hit sets the track's smoothed level to its Kit level, as the tick's trigger path does ($20b022).
+- `engine/Mixer.*`, `engine/HostModel.h`, `engine/MdEngine.h`: for MD Drums' sample-accurate Hits, which mix the
+  tracks itself (`mdDrums/mdDrumsEngine.cpp`): `Mixer::gains` and `Mixer::mainSample` are `process`'s own gain and
+  output steps, split out (bit-exact, `process` uses them); `HostModel::muted` and `choked` read a track's mute and
+  Choke flags; `EngineT::mixOn = false` skips the mixer.
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

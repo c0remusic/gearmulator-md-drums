@@ -21,8 +21,9 @@ namespace mdDrums
 	public:
 		static constexpr int FirstNote = 36;
 		static constexpr int OutputCount = Engine::OutputCount;	// Main left and right, then Out 01 to 16
-		// The engine starts a Hit at its next 32-sample block: about 21 samples on average, a voice's own start aside
-		static constexpr uint32_t InternalLatency = 21;
+		// Every Hit sounds 31 samples after its note (Engine::SampleAccurateDelay), then its voice starts: 4 samples for
+		// most machines (TRX-SD, -CH, EFM, E12, P-I; 12 for ROM, 36 for TRX-BD, which sounds a block later; mdDrumsEngineTest)
+		static constexpr uint32_t InternalLatency = Engine::SampleAccurateDelay + 4;
 
 		// _params.romData: the 8 MB Machinedrum UW flash image with OS 1.63. Throws synthLib::DeviceException without
 		// a usable one.

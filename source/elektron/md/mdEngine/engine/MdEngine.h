@@ -77,6 +77,9 @@ namespace md::engine
 		// Optional stage timing (microseconds, accumulated): track effects, and the mix. The OS tick and the voice DSP
 		// are HostModel's (host().tickUs / dspUs).
 		uint32_t dryMute = 0;	// tracks kept out of the dry main mix (see Mixer::process); set by the caller between renders
+		// md-drums: false leaves Output::mix untouched, for a caller that mixes Output::tracks itself (mixer())
+		bool mixOn = true;
+		const Mixer& mixer() const { return m_mixer; }
 		bool timingOn = false;
 		double fxUs = 0, mixUs = 0;
 
@@ -119,6 +122,8 @@ namespace md::engine
 				in[t] = _out.tracks[t].data();
 				mix[t] = m_host->mixerInput(t).mix;
 			}
+			if(!mixOn)
+				return true;
 			if(!timingOn) { m_mixer.process(in.data(), mix.data(), _out.mix, dryMute); return true; }
 			const auto tf1 = std::chrono::steady_clock::now();
 			m_mixer.process(in.data(), mix.data(), _out.mix, dryMute);
