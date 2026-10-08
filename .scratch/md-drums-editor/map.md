@@ -13,9 +13,10 @@ mesurées avant et après. Pas de tag.
 
 - **Exécution dans la carte** (dérogation à « plan, don't do », décidée au cadrage du 2026-10-08) : les tickets
   `task` construisent. Un ticket par session, sauf la recherche.
-- Domaine : `CONTEXT.md` (glossaire : Track, Machine, Hit, Kit, Bank, Slot, Main, Out, Send, Master effects ;
-  MD Drums ≠ Gearmulator MD). Design approuvé : `source/elektron/md/mdDrumsPlugin/Design/HANDOFF.md` (v22).
-  Pile : `docs/adr/0001-md-drums-on-the-tus-stack.md`.
+- Domaine : `CONTEXT.md` (glossaire : Track, Machine, Hit, Link, Choke, Kit, Bank, Slot, Main, Out, Mute, Solo,
+  Send, Master effects ; MD Drums ≠ Gearmulator MD). Design approuvé :
+  `source/elektron/md/mdDrumsPlugin/Design/HANDOFF.md` (v22). Pile : `docs/adr/0001-md-drums-on-the-tus-stack.md` ;
+  Device : `docs/adr/0002-md-drums-device-speaks-machinedrum-midi.md`.
 - Skills : `grilling` + `domain-modeling` par défaut ; `codebase-design` pour les tickets de design ; `tdd` ou
   `implement` pour les tickets `task` ; `research` pour la recherche.
 - Garde-fou du `CLAUDE.md` avant chaque commit et push ; chaque tranche ajoute ses tests au garde-fou. Push sans
@@ -36,7 +37,8 @@ mesurées avant et après. Pas de tag.
   - Bank : un seul fichier, 64 Slots, dans le dossier data du plug-in ;
   - Push 2, en mode contrôleur ;
   - ordre : recherches en parallèle, contrat du Device, port, nouveaux paramètres, Track, Mix, Kits, Master, hit,
-    Push, installation et mesures.
+    Push, installation et mesures. Revu au ticket 06 : `mdProtocol`, `synthLib` à 18 et Links/Chokes avant le port,
+    qui emporte les nouveaux paramètres.
 
 ## Decisions so far
 
@@ -59,19 +61,25 @@ mesurées avant et après. Pas de tag.
   appel, aucun périphérique), entrées = buffers du `Mixer`, sortie Main en Y:$000 ; mémoire externe partagée
   (~9 Mo), init partielle du boot ; 32 octets du Kit vers Y:$150-$18C décodés via 4 routines de l'OS appelables ;
   ~9 740 instructions par bloc ; Dynamix retarde Main de 16 échantillons comme la machine. Lu, pas exécuté.
+- [Contrat du Device MD Drums](issues/06-contrat-device.md) : le Device parle le MIDI de la Machinedrum, étendu de
+  SysEx privée pour Solo, Out et tempo (ADR 0002) ; notes seules depuis l'hôte ; synchrone, 0 bloc, rien n'alloue ;
+  `synthLib` à 18 sorties ; resampler de la pile (Legacy, +0,67 ms hors 44,1 kHz) ; 592 paramètres figés au premier
+  push, pages 0-4 = CC de la MD ; état = dump `$52` + SysEx privée ; codecs dans `mdProtocol` ; Links et Chokes joués
+  comme l'OS ; Mute et Solo perdent les Hits.
 
 ## Not yet specified
 
-- **Tranches de construction après le port** : nouveaux paramètres et API moteur (Out, solo, LFO ×5, bus renommés
-  Out 01-16), onglet Track, Mix, Kits, Master, écran hit, Push. Chacune devient un ticket `task` quand le contrat du
-  Device et la fabrication du skin ont fixé leur forme.
+- **Tranches de construction après le port** : onglet Track, Mix, Kits, Master, écran hit, Push (les nouveaux
+  paramètres entrent dans le port, ticket 06). Chacune devient un ticket `task` quand la fabrication du skin (08) et
+  la lecture du moteur par l'éditeur (16) ont fixé leur forme.
+- **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
+  paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui
   descend deux fois par période, RMP et EXP en one-shot relancés à chaque Hit, RND à 8 pas, LFOM qui fond vers la
   forme 2 inversée. À reprendre avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
-  décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 10) ; sinon une graine.
-- **Lecture de l'état pour l'éditeur** sans verrou (snapshots du moteur, mètres, capture du hit) : forme dépendante
-  du Device.
+  décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
+  applique le dump `$52`) ; sinon une graine.
 - **Rendu RmlUi** (logiciel ou GL) et banc de mesure entrée→pixel.
 - **Tranche Kits** : writer et format de la Bank fixés par le ticket 04 ; reste la forme du chargement face à l'hôte
   (ticket 10) avant d'en faire un ticket `task`.

@@ -29,6 +29,15 @@ _Avoid_: model, instrument
 One trigger of a Track and the sound it makes.
 _Avoid_: note, trig (the firmware sequencer's word)
 
+**Link**:
+A Track's Hit that also hits another Track, at the same velocity; it goes one step only, so the other Track's own
+Link does not fire.
+_Avoid_: trig group, trig pos
+
+**Choke**:
+A Track's Hit that silences another Track at once, until that Track's next Hit.
+_Avoid_: mute group, choke group (Live's choke groups work both ways; a Choke goes one way)
+
 **Master effects**:
 The four effects after the Tracks: Echo (the Rhythm Echo), Reverb (the Gate Box), EQ and Dynamix.
 _Avoid_: FX, global effects
@@ -46,11 +55,19 @@ _Avoid_: master out, mix bus
 A Track's own mono output (Out 01 to Out 16); a Track on its Out leaves Main but still feeds its Sends.
 _Avoid_: separate output, Track bus
 
+**Mute**:
+A Track switched off: it drops its Hits, so it plays on neither Main, its Out nor its Sends and fires no Link or Choke,
+while what it already sent to the Echo and Reverb rings out.
+
+**Solo**:
+A Track singled out: while any Track has its Solo on, every Track without one is silent as if muted. Solos add up, and a
+muted Track stays silent with its Solo on.
+
 ### Kits
 
 **Kit**:
-The whole sound of the sixteen Tracks: their Machines, parameters, levels and LFOs, and the Master effects; not the
-mutes, solos or Outs.
+The whole sound of the sixteen Tracks: their Machines, parameters, levels, LFOs, Links and Chokes, and the Master
+effects; not the mutes, solos or Outs.
 _Avoid_: preset, patch
 
 **Bank**:

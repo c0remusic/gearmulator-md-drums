@@ -20,3 +20,7 @@ have to rebuild: parameter binding, MIDI Learn, skin loading, settings and the e
   from the first push of the port.
 - `mdLib` cannot be linked into MD Drums (Musashi's entry points serve one CPU class per executable, and `mdLib` brings
   the Microcontroller), so the Kit dump codec it holds moves to a library of its own.
+- `synthLib` carries 12 output channels at most (`TAudioOutputs`, the resampler, the bridge) and MD Drums renders 18
+  (Main and Out 01-16). We widen `synthLib` to 18 rather than pass the Outs around it, so that the stack's resampler
+  keeps them aligned with Main at every host rate. The stack also reports one block of latency by default; MD Drums'
+  Device renders synchronously and returns 0.
