@@ -6,12 +6,17 @@
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "jucePluginEditorLib/pluginProcessor.h"
+#include "juceRmlUi/juceRmlComponent.h"
+#include "juceRmlUi/rmlEventListener.h"
+#include "juceRmlUi/rmlHelper.h"
 
 #include "mdProtocol/mdmachines.h"
 
+#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/Element.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <map>
 
@@ -21,6 +26,7 @@ namespace mdDrums
 	{
 		constexpr int g_window = 1296;
 		constexpr const char* g_listenKey = "listenWhileChoosing";
+		constexpr const char* g_velocityKey = "playVelocity";
 
 		std::string twoDigits(const int _value)
 		{
@@ -91,13 +97,44 @@ namespace mdDrums
 		m_editor.addClick("browser_cancel", [this](Rml::Event&) { escape(); });
 		// A machine chosen (its cell has set Machine by then: its own listener came first) plays the Track when listening
 		for(int id = 0; id < 256; ++id)
-			m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
+			if(m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
 			{
 				if(isListening())
 					static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, ListenVelocity);
-			});
+			}))
+				m_machines.push_back(id);
 		m_editor.addClick("preview_listen", [this](Rml::Event&) { setListening(!isListening()); });
 		setListening(isListening());
+
+		// The play key plays as it goes down; the velocity follows a vertical drag, 1.5 px a step
+		if(auto* key = find("play"))
+			juceRmlUi::EventListener::Add(key, Rml::EventId::Mousedown, [this](Rml::Event&) { play(); });
+		if(auto* velocity = find("velocity"))
+		{
+			juceRmlUi::EventListener::Add(velocity, Rml::EventId::Mousedown, [this](Rml::Event& _event)
+			{
+				m_dragY = juceRmlUi::helper::getMousePos(_event).y;
+				m_dragFrom = getPlayVelocity();
+			});
+			juceRmlUi::EventListener::Add(velocity, Rml::EventId::Drag, [this, velocity](Rml::Event& _event)
+			{
+				const auto* context = velocity->GetContext();
+				const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
+				const auto steps = (m_dragY - juceRmlUi::helper::getMousePos(_event).y) / dp / PixelsPerVelocityStep;
+				setPlayVelocity(m_dragFrom + static_cast<int>(std::lround(steps)));
+			});
+		}
+		setPlayVelocity(getPlayVelocity());
+		// The wheel on the machine's name steps it
+		if(auto* machine = find("machine"))
+			juceRmlUi::EventListener::Add(machine, Rml::EventId::Mousescroll, [this](Rml::Event& _event)
+			{
+				const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
+				const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
+				if(delta != 0.0f)
+					stepMachine(delta > 0.0f ? 1 : -1);
+				_event.StopPropagation();
+			});
 		m_editor.addClick("lfo_target", [this](Rml::Event&)
 		{
 			setOverlay(m_overlay == Overlay::LfoMenu ? Overlay::None : Overlay::LfoMenu);
@@ -165,6 +202,110 @@ namespace mdDrums
 		m_editor.getProcessor().getConfig().setValue(g_listenKey, _on);
 		if(auto* box = find("preview_listen"))
 			box->SetClass("on", _on);
+	}
+
+	int TrackView::getPlayVelocity() const
+	{
+		return std::clamp(m_editor.getProcessor().getConfig().getIntValue(g_velocityKey, 100), 1, 127);
+	}
+
+	void TrackView::setPlayVelocity(const int _velocity) const
+	{
+		const auto velocity = std::clamp(_velocity, 1, 127);
+		m_editor.getProcessor().getConfig().setValue(g_velocityKey, velocity);
+		if(auto* value = find("velocity"))
+			value->SetInnerRML(std::to_string(velocity));
+		// The bar: 64 px at 127, as the mockup rounds it
+		if(auto* fill = find("velocity_fill"))
+			fill->SetProperty("width", dp(static_cast<int>(std::lround(velocity * 64.0 / 127.0))));
+	}
+
+	void TrackView::play() const
+	{
+		static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, static_cast<uint8_t>(getPlayVelocity()));
+	}
+
+	void TrackView::choose(const int _machine) const
+	{
+		auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+		if(!machine)
+			return;
+		machine->setUnnormalizedValueNotifyingHost(_machine, pluginLib::Parameter::Origin::Ui);
+		if(isListening())
+			static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, ListenVelocity);
+	}
+
+	void TrackView::stepMachine(const int _delta) const
+	{
+		if(m_machines.empty())
+			return;
+		const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+		const auto current = machine ? machine->getUnnormalizedValue() : 0;
+		const auto n = static_cast<int>(m_machines.size());
+		// A machine the browser does not offer steps from where it would sit among them
+		const auto at = static_cast<int>(std::lower_bound(m_machines.begin(), m_machines.end(), current) - m_machines.begin());
+		const auto offered = at < n && m_machines[static_cast<size_t>(at)] == current;
+		const auto next = _delta > 0 ? (offered ? at + 1 : at) : at - 1;
+		choose(m_machines[static_cast<size_t>((next % n + n) % n)]);
+	}
+
+	void TrackView::stepFamily(const int _delta) const
+	{
+		if(m_machines.empty())
+			return;
+		const auto familyName = [](const int _id)
+		{
+			const auto* family = md::machines::familyOf(md::MachineModel::Machinedrum, static_cast<uint16_t>(_id));
+			return family ? std::string(family->name) : std::string();
+		};
+		// The browser's families in its order, each by its first machine
+		std::vector<std::pair<std::string, int>> families;
+		for(const auto id : m_machines)
+			if(families.empty() || families.back().first != familyName(id))
+				families.emplace_back(familyName(id), id);
+		const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+		const auto current = familyName(machine ? machine->getUnnormalizedValue() : 0);
+		const auto n = static_cast<int>(families.size());
+		int at = 0;
+		while(at < n && families[static_cast<size_t>(at)].first != current)
+			++at;
+		const auto next = at < n ? at + _delta : (_delta > 0 ? 0 : n - 1);
+		choose(families[static_cast<size_t>((next % n + n) % n)].second);
+	}
+
+	bool TrackView::key(Rml::Event& _event)
+	{
+		const auto key = juceRmlUi::helper::getKeyIdentifier(_event);
+		auto* context = m_editor.getRmlComponent() ? m_editor.getRmlComponent()->getContext() : nullptr;
+		const auto* focus = context ? context->GetFocusElement() : nullptr;
+		if(key == Rml::Input::KI_SPACE)
+		{
+			// Every element takes the focus when clicked: only a text field keeps Space for itself
+			if(focus && (focus->GetTagName() == "input" || focus->GetTagName() == "textarea"))
+				return false;
+			play();
+			return true;
+		}
+		const bool up = key == Rml::Input::KI_UP, down = key == Rml::Input::KI_DOWN;
+		if(m_overlay == Overlay::Browser)
+		{
+			if(up || down)
+				stepMachine(down ? 1 : -1);
+			else if(key == Rml::Input::KI_LEFT || key == Rml::Input::KI_RIGHT)
+				stepFamily(key == Rml::Input::KI_RIGHT ? 1 : -1);
+			else if(key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER)
+				setOverlay(Overlay::None);
+			else
+				return false;
+			return true;
+		}
+		const auto* machine = find("machine");
+		if((up || down) && focus && machine && (focus == machine || juceRmlUi::helper::isChildOf(machine, focus)))
+		{
+			stepMachine(down ? 1 : -1);
+			return true;
+		}
+		return false;
 	}
 
 	void TrackView::setOverlay(const Overlay _overlay)

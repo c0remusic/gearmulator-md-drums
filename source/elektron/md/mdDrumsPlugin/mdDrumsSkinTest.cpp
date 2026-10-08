@@ -10,7 +10,9 @@
 //   the software render take 33 ms at most;
 // - the meters and Hit lights follow the Processor's Telemetry (ticket 20), and so does the Hit screen (ticket 21);
 // - the Filter and EQ and LFO screens draw what the shown Track's parameters give, an LFO's target is underlined, ASSIGN
-//   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22).
+//   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22);
+// - the play key and Space play the shown Track at the velocity a drag sets, the wheel and the arrows step its machine
+//   (ticket 23).
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
@@ -721,6 +723,84 @@ namespace
 		click(_f, "browser_cancel");
 	}
 
+	// Playing the Track and stepping its machine (ticket 23): the play key and Space at the head band's velocity, which a
+	// drag sets; the wheel on the machine's name; the browser's arrows and Enter
+	void playAndStep(Fixture& _f)
+	{
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto* tracks = _f.editor->getTrackView();
+		const auto flush = [&] { controller.processRealtimeParameterChanges(256); };
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		flush();
+		require(_f.find("velocity")->GetInnerRML() == "100" && std::abs(_f.box(*_f.find("velocity_fill")).w - 50.0f) < 0.5f,
+			"the velocity does not start at 100");
+
+		// A drag up of 15 px: 10 steps
+		auto& context = _f.context();
+		const auto r = _f.dp();
+		const auto vb = _f.box(*_f.find("velocity"));
+		const auto vx = vb.x + vb.w * 0.5f, vy = vb.y + vb.h * 0.5f;
+		context.ProcessMouseMove(juce::roundToInt(vx * r), juce::roundToInt(vy * r), 0);
+		context.ProcessMouseButtonDown(0, 0);
+		for(int i = 1; i <= 5; ++i)
+			context.ProcessMouseMove(juce::roundToInt(vx * r), juce::roundToInt((vy - 3.0f * i) * r), 0);
+		context.ProcessMouseButtonUp(0, 0);
+		_f.layout();
+		const auto fill = _f.box(*_f.find("velocity_fill")).w;
+		std::printf("velocity: dragged 15 px up to %s, its bar %.0f px\n", _f.find("velocity")->GetInnerRML().c_str(), fill);
+		require(tracks->getPlayVelocity() == 110 && _f.find("velocity")->GetInnerRML() == "110" && std::abs(fill - 55.0f) < 0.5f,
+			"the drag did not set the velocity 1.5 px a step");
+
+		// The play key, as it goes down, and Space: the shown Track at that velocity
+		auto* play = _f.find("play");
+		const auto pb = _f.box(*play);
+		context.ProcessMouseMove(juce::roundToInt((pb.x + 32) * r), juce::roundToInt((pb.y + 32) * r), 0);
+		context.ProcessMouseButtonDown(0, 0);
+		require((controller.pendingAuditions() & 1) && controller.auditionVelocity(0) == 110, "the play key does not play the Track");
+		context.ProcessMouseButtonUp(0, 0);
+		flush();
+		_f.editor->setCurrentPart(3);
+		context.ProcessKeyDown(Rml::Input::KI_SPACE, 0);
+		require((controller.pendingAuditions() & 8) && controller.auditionVelocity(3) == 110, "Space does not play the shown Track");
+		flush();
+		_f.editor->setCurrentPart(0);
+		std::printf("play: the key and Space play the shown Track at 110\n");
+
+		// The wheel down on the machine's name: the browser's next machine, and the Track plays
+		auto* machine = controller.getParameter("Machine", 0);
+		set(_f, "Machine", 0, 28);
+		flush();
+		const auto mb = _f.box(*_f.find("machine"));
+		context.ProcessMouseMove(juce::roundToInt((mb.x + 40) * r), juce::roundToInt((mb.y + 20) * r), 0);
+		context.ProcessMouseWheel(Rml::Vector2f(0.0f, 1.0f), 0);
+		const auto wheeled = machine->getUnnormalizedValue();
+		context.ProcessMouseWheel(Rml::Vector2f(0.0f, -1.0f), 0);
+		std::printf("machine: the wheel steps TRX-B2 to %d and back to %d\n", wheeled, machine->getUnnormalizedValue());
+		require(wheeled == 32 && machine->getUnnormalizedValue() == 28, "the wheel does not step the machine in the browser's order");
+		require(controller.pendingAuditions() & 1, "a machine stepped does not play the Track while listening");
+		flush();
+
+		// The browser: down, right (the next family's first), up, Enter keeps
+		tracks->setOverlay(mdDrums::TrackView::Overlay::Browser);
+		context.ProcessKeyDown(Rml::Input::KI_DOWN, 0);
+		const auto down = machine->getUnnormalizedValue();
+		context.ProcessKeyDown(Rml::Input::KI_RIGHT, 0);
+		const auto right = machine->getUnnormalizedValue();
+		context.ProcessKeyDown(Rml::Input::KI_LEFT, 0);
+		context.ProcessKeyDown(Rml::Input::KI_LEFT, 0);
+		const auto left = machine->getUnnormalizedValue();
+		context.ProcessKeyDown(Rml::Input::KI_RETURN, 0);
+		std::printf("browser keys: down %d, right %d, left twice %d, Enter keeps: overlay %d\n", down, right, left,
+			static_cast<int>(tracks->getOverlay()));
+		require(down == 32 && right == 48 && left == 16, "the browser's arrows do not step machines and families");
+		require(tracks->getOverlay() == mdDrums::TrackView::Overlay::None && machine->getUnnormalizedValue() == 16,
+			"Enter does not keep the machine");
+		flush();
+		set(_f, "Machine", 0, 28);
+		tracks->setPlayVelocity(100);
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		for(const auto& view : readViews())
@@ -760,7 +840,7 @@ int main()
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
 			{"meters", meters}, {"hit screen", hitScreen}, {"filter screen", filterScreen}, {"lfo screen", lfoScreen},
-			{"assign", assign}, {"listen", listen}})
+			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}})
 		{
 			try
 			{

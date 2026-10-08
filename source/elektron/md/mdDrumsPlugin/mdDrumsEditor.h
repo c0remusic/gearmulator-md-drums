@@ -37,7 +37,8 @@ namespace mdDrums
 		FilterView* getFilterView() const { return m_filterView.get(); }
 		LfoView* getLfoView() const { return m_lfoView.get(); }
 
-		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else closes the open overlay
+		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else closes the open overlay. The other
+		// keys go to TrackView::key first (Space, the browser's arrows and Enter, the machine's arrows)
 		bool escape() const;
 
 	private:

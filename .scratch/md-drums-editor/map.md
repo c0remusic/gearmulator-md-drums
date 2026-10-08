@@ -118,13 +118,17 @@ mesurées avant et après. Pas de tag.
   coefficients du DSP (pas d'impulsion : le passe-haut bas sonne des secondes), à 0,054 dB de la chaîne, 46 µs la
   courbe ; LFO porté des routines de l'OS, 0 différence sur 2 259 ticks et 670 Hits ; ASSIGN par anneau sur les knobs,
   Esc pour ASSIGN et les overlays ; noms soulignés ; écoute ordonnée après la machine choisie (`Controller::audition`).
+- [Jouer la Track, vélocité, pas à pas sur la machine](issues/23-jouer-et-choisir.md) : touche play à l'appui et
+  Espace à la vélocité de la bande (drag 1,5 px par pas, gardée dans les réglages) ; molette et flèches sur le nom de
+  machine, flèches et Enter dans le browser, dans l'ordre de ses cellules. Ajouté après le ticket 22 : déjà spécifié
+  par le HANDOFF, sans ticket.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
-  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22) faits ; restent les Kits et leur Bank (après le
-  ticket 10) et Push (après le ticket 11). Pas encore placés : la touche play et Espace (« plays the shown track »),
-  la molette et ↑ ↓ sur le nom de machine, Ctrl+S, le second moteur de l'écran Hit (ticket 12).
+  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23) faits ; restent les Kits
+  et leur Bank, Ctrl+S compris (après le ticket 10), Push (après le ticket 11) et le second moteur de l'écran Hit et de
+  l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un

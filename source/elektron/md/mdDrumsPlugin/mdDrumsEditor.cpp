@@ -61,7 +61,9 @@ namespace mdDrums
 				auto* root = document->GetParentNode() ? document->GetParentNode() : document;
 				juceRmlUi::EventListener::Add(root, Rml::EventId::Keydown, [this](Rml::Event& _event)
 				{
-					if(juceRmlUi::helper::getKeyIdentifier(_event) == Rml::Input::KI_ESCAPE && escape())
+					const bool handled = juceRmlUi::helper::getKeyIdentifier(_event) == Rml::Input::KI_ESCAPE ? escape()
+						: !juceRmlUi::helper::getKeyModCommand(_event) && m_trackView && m_trackView->key(_event);
+					if(handled)
 						_event.StopPropagation();
 				}, true);
 			}

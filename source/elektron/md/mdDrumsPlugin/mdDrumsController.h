@@ -48,6 +48,10 @@ namespace mdDrums
 		// parameter changes published before it (a machine just chosen sounds, not the one before)
 		void audition(uint8_t _track, uint8_t _velocity);
 		uint32_t pendingAuditions() const { return m_auditions.load(std::memory_order_relaxed); }	// bit n: Track n + 1
+		uint8_t auditionVelocity(const uint8_t _track) const
+		{
+			return _track < TrackCount ? m_auditionVelocity[_track].load(std::memory_order_relaxed) : 0;
+		}
 		static constexpr uint8_t FirstNote = 36;
 
 	protected:

@@ -78,7 +78,7 @@ vglyph.down { width: 8dp; height: 8dp; margin-left: 4dp; color: #a7aaaf; }
 .family { top: 84dp; height: 24dp; line-height: 22dp; }
 .output { top: 124dp; height: 24dp; line-height: 22dp; }
 .velocitylabel { top: 84dp; height: 24dp; line-height: 24dp; }
-.velocity { top: 112dp; height: 32dp; line-height: 32dp; font-size: 22dp; cursor: pointer; }
+.velocity { top: 112dp; height: 32dp; line-height: 32dp; font-size: 22dp; cursor: pointer; drag: drag; }
 .velocitybar { top: 144dp; height: 4dp; background-color: #3a3c40; }
 .velocitybar .fill { position: absolute; left: 0dp; top: 0dp; height: 4dp; background-color: #a7aaaf; }
 .play { top: 84dp; width: 64dp; height: 64dp; border: 1dp #6e7177; cursor: pointer; }
