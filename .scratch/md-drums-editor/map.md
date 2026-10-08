@@ -84,12 +84,18 @@ mesurées avant et après. Pas de tag.
   comptait 35), IDs figés ; skin minimal généré ; un Kit chargé recopie ses blocs LFO de 36 octets dans le LFO
   courant, mot $0000029a compris (effet sur le LFO RND figé non mesuré) ; latence identique à 44,1 kHz (1,16 ms),
   +8,6 échantillons à 48 kHz (resampler Legacy, désormais rapporté).
+- [Fabrication du skin v22](issues/08-fabrication-skin.md) : RML et RCSS écrits à la main (classes de grille,
+  décalages relatifs), JSON des paramètres aussi ; comportement en vues C++ par ID ; knob `vknob` sous-classe
+  d'`ElemKnob` dessinée sur `ElemCanvas` ; Inter 4.1 en 4 TTF à chiffres tabulaires gelés ; Size 75-150 % sur la clé
+  `scale` de TUS ; rendu à la demande à la fréquence de l'écran, cible 2 frames entrée→pixel en GL3, 33 ms au
+  garde-fou en logiciel ; audit des boîtes contre celles exportées de la maquette + règles du HANDOFF ; skin statique
+  complet (onglets, Kits, overlays) en deux tickets, 17 puis 18, le minimal retiré au 18.
 
 ## Not yet specified
 
-- **Tranches de construction après le port** : onglet Track, Mix, Kits, Master, écran hit, Push (les nouveaux
-  paramètres entrent dans le port, ticket 06). Chacune devient un ticket `task` quand la fabrication du skin (08) et
-  la lecture du moteur par l'éditeur (16) ont fixé leur forme.
+- **Tranches de construction après le skin** : le skin statique est découpé (17 socle et Track, 18 Mix, Master, Kits
+  et overlays) ; restent les tranches de comportement en C++ (écrans, browser de machines, menu LFO, Kits, écran hit,
+  Push), chacune un ticket `task` quand la lecture du moteur par l'éditeur (16) a fixé sa forme.
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui
@@ -98,7 +104,6 @@ mesurées avant et après. Pas de tag.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
   décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
   applique le dump `$52`) ; sinon une graine.
-- **Rendu RmlUi** (logiciel ou GL) et banc de mesure entrée→pixel.
 - **Tranche Kits** : writer et format de la Bank fixés par le ticket 04 ; reste la forme du chargement face à l'hôte
   (ticket 10) avant d'en faire un ticket `task`.
 - **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
