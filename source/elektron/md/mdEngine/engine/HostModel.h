@@ -57,6 +57,9 @@ namespace md::engine
 		void setChoke(int _track, int _target);
 		uint8_t link(int _track) const { return m_link[_track]; }
 		uint8_t choke(int _track) const { return m_choke[_track]; }
+		// md-drums: a track's user mute, and whether a Choke holds it silent until its next Hit
+		bool muted(int _track) const { return m_mute[_track]; }
+		bool choked(int _track) const { return m_choked[_track]; }
 		void setAccentAmount(int _amount) { m_accentAmount = std::clamp(_amount, 0, 127); }
 
 		// Caps how many tracks can be simultaneously active (most-recently-triggered N; a new distinct
@@ -84,6 +87,22 @@ namespace md::engine
 		void setLevel(int _track, int _level);
 		void setMute(int _track, bool _mute) { m_mute[_track] = _mute; }
 		void setRouting(int _track, int _route) { m_route[_track] = static_cast<uint8_t>(_route); }
+
+		// md-drums: the master effects' 32 Kit bytes (0-127), in the Kit dump's order: Gate Box DVOL PRED DEC DAMP HP LP
+		// GATE LEV, Echo TIME MOD MFRQ FB FLTF FLTW MONO LEV, EQ LF LG HF HG PF PG PQ GAIN, Dynamix ATCK REL TRHD RTIO KNEE
+		// HP OUTG MIX. Smoothed by the OS's level slew, as the track levels; each tick then computes one effect's DSP
+		// words in turn, with the OS's own code (the tick routine's bodies at $20b4ae, $20b604, $20b74e, $20b940).
+		static constexpr int kMasterParams = 32;
+		void setMaster(int _index, int _value);
+		int master(int _index) const;
+		struct MasterWords
+		{
+			uint32_t y = 0;					// the first Y address: $150 Echo, $17a Dynamix, $170 EQ, $185 Gate Box
+			int count = 0;
+			std::array<uint32_t, 11> words{};
+		};
+		// The words the last tick computed, once (as the OS sends a block once): false when there are none
+		bool takeMasterWords(MasterWords& _out);
 
 		// Per-track inputs to the mixer DSP, as of the last tick.
 		struct MixerInput
@@ -149,6 +168,8 @@ namespace md::engine
 		std::array<uint8_t, kTracks> m_link{};
 		std::array<uint8_t, kTracks> m_choke{};
 		std::array<bool, kTracks> m_choked{};	// the OS's group-mute flag ($1001510), apart from the user mute
+		MasterWords m_masterWords;
+		bool m_masterPending = false;
 
 		// md-drums: locks (bit n = parameter n) waiting for a Hit in the block about to render, and those the track's
 		// last Hit plays; the smoothing target is the lock's value on a locked parameter, the Kit's elsewhere

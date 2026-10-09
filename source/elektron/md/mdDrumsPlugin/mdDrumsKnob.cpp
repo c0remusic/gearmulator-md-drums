@@ -27,12 +27,53 @@ namespace mdDrums
 	Knob::Knob(Rml::CoreInstance& _coreInstance, const Rml::String& _tag) : ElemKnob(_coreInstance, _tag)
 	{
 		AddEventListener(Rml::EventId::Keydown, this);
+		AddEventListener(Rml::EventId::Mouseover, this);
+		AddEventListener(Rml::EventId::Mouseout, this);
 		SetAttribute("speedScaleShift", ShiftScale);
 	}
 
 	Knob::~Knob()
 	{
 		RemoveEventListener(Rml::EventId::Keydown, this);
+		RemoveEventListener(Rml::EventId::Mouseover, this);
+		RemoveEventListener(Rml::EventId::Mouseout, this);
+	}
+
+	void Knob::setTarget(std::function<void()> _onPick)
+	{
+		m_onPick = std::move(_onPick);
+		if(!m_ring && m_onPick)
+		{
+			// The ring lies outside the knob's box: a canvas of its own, 2 px larger each way
+			m_ring = juceRmlUi::ElemCanvas::create(this);
+			m_ring->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
+			m_ring->SetProperty(Rml::PropertyId::Left, Rml::Property(-2.0f, Rml::Unit::DP));
+			m_ring->SetProperty(Rml::PropertyId::Top, Rml::Property(-2.0f, Rml::Unit::DP));
+			m_ring->SetProperty(Rml::PropertyId::Width, Rml::Property(68.0f, Rml::Unit::DP));
+			m_ring->SetProperty(Rml::PropertyId::Height, Rml::Property(68.0f, Rml::Unit::DP));
+			m_ring->setPixelAligned(true);
+			m_ring->setClearEveryFrame(true);
+			m_ring->setRepaintGraphicsCallback([this](const juce::Image&, juce::Graphics& _g) { paintRing(_g); });
+		}
+		if(!m_onPick)
+			m_hover = false;
+		if(m_ring)
+		{
+			m_ring->SetProperty(Rml::PropertyId::Display, m_onPick ? Rml::Style::Display::Block : Rml::Style::Display::None);
+			m_ring->repaint();
+		}
+	}
+
+	void Knob::paintRing(juce::Graphics& _g) const
+	{
+		// HANDOFF.md, "LFO": the mockup's box-shadow, 0 0 0 1px (2px hovered) around the knob's circle
+		const auto* context = GetContext();
+		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
+		const auto centre = 34.0f * dp;
+		const auto width = (m_hover ? 2.0f : 1.0f) * dp;
+		const auto radius = 32.0f * dp + width * 0.5f;
+		_g.setColour(juce::Colour(0xff6fd1c4));
+		_g.drawEllipse(centre - radius, centre - radius, radius * 2.0f, radius * 2.0f, width);
 	}
 
 	void Knob::OnUpdate()
@@ -50,7 +91,42 @@ namespace mdDrums
 
 	void Knob::ProcessEvent(Rml::Event& _event)
 	{
-		switch(_event.GetId())
+		const auto id = _event.GetId();
+		if(m_onPick)
+		{
+			switch(id)
+			{
+			case Rml::EventId::Mousedown:
+				{
+					// The pick may make every knob a knob again, this one included
+					const auto pick = m_onPick;
+					m_swallowDrag = true;
+					_event.StopPropagation();
+					pick();
+					return;
+				}
+			case Rml::EventId::Mouseover:
+			case Rml::EventId::Mouseout:
+				m_hover = id == Rml::EventId::Mouseover;
+				if(m_ring)
+					m_ring->repaint();
+				return;
+			case Rml::EventId::Drag:
+			case Rml::EventId::Dblclick:
+			case Rml::EventId::Mousescroll:
+			case Rml::EventId::Keydown:
+				_event.StopPropagation();
+				return;
+			default:
+				break;
+			}
+		}
+		if(id == Rml::EventId::Mousedown)
+			m_swallowDrag = false;
+		else if(m_swallowDrag && (id == Rml::EventId::Drag || id == Rml::EventId::Dblclick))
+			return;
+
+		switch(id)
 		{
 		case Rml::EventId::Mousescroll:
 			{

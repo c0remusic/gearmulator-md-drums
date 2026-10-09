@@ -117,16 +117,19 @@
 					<div class="a band" style="top: 176dp;" data-model="partCurrent">
 						<div id="syn_title" class="a c4 w3 btitle">SYN</div>
 						<div id="syn_group1" class="a c4 w8 grp sym"><div class="line"/></div>
-						<vknob id="k_SYN1" class="a c4" param="SYN1"/><div id="n_SYN1" class="a c4 w1 kl">SYN1</div><div id="v_SYN1" class="a c4 w1 kv" data-class-edited="SYN1_value != SYN1_default">{{SYN1_value}}</div>
-						<vknob id="k_SYN2" class="a c5" param="SYN2"/><div id="n_SYN2" class="a c5 w1 kl">SYN2</div><div id="v_SYN2" class="a c5 w1 kv" data-class-edited="SYN2_value != SYN2_default">{{SYN2_value}}</div>
-						<vknob id="k_SYN3" class="a c6" param="SYN3"/><div id="n_SYN3" class="a c6 w1 kl">SYN3</div><div id="v_SYN3" class="a c6 w1 kv" data-class-edited="SYN3_value != SYN3_default">{{SYN3_value}}</div>
-						<vknob id="k_SYN4" class="a c7" param="SYN4"/><div id="n_SYN4" class="a c7 w1 kl">SYN4</div><div id="v_SYN4" class="a c7 w1 kv" data-class-edited="SYN4_value != SYN4_default">{{SYN4_value}}</div>
-						<vknob id="k_SYN5" class="a c8" param="SYN5"/><div id="n_SYN5" class="a c8 w1 kl">SYN5</div><div id="v_SYN5" class="a c8 w1 kv" data-class-edited="SYN5_value != SYN5_default">{{SYN5_value}}</div>
-						<vknob id="k_SYN6" class="a c9" param="SYN6"/><div id="n_SYN6" class="a c9 w1 kl">SYN6</div><div id="v_SYN6" class="a c9 w1 kv" data-class-edited="SYN6_value != SYN6_default">{{SYN6_value}}</div>
-						<vknob id="k_SYN7" class="a c10" param="SYN7"/><div id="n_SYN7" class="a c10 w1 kl">SYN7</div><div id="v_SYN7" class="a c10 w1 kv" data-class-edited="SYN7_value != SYN7_default">{{SYN7_value}}</div>
-						<vknob id="k_SYN8" class="a c11" param="SYN8"/><div id="n_SYN8" class="a c11 w1 kl">SYN8</div><div id="v_SYN8" class="a c11 w1 kv" data-class-edited="SYN8_value != SYN8_default">{{SYN8_value}}</div>
+						<vknob id="k_SYN1" class="a c4" param="SYN1"/><div id="n_SYN1" class="a c4 w1 kl"><span>SYN1</span></div><div id="v_SYN1" class="a c4 w1 kv" data-class-edited="SYN1_value != SYN1_default">{{SYN1_value}}</div>
+						<vknob id="k_SYN2" class="a c5" param="SYN2"/><div id="n_SYN2" class="a c5 w1 kl"><span>SYN2</span></div><div id="v_SYN2" class="a c5 w1 kv" data-class-edited="SYN2_value != SYN2_default">{{SYN2_value}}</div>
+						<vknob id="k_SYN3" class="a c6" param="SYN3"/><div id="n_SYN3" class="a c6 w1 kl"><span>SYN3</span></div><div id="v_SYN3" class="a c6 w1 kv" data-class-edited="SYN3_value != SYN3_default">{{SYN3_value}}</div>
+						<vknob id="k_SYN4" class="a c7" param="SYN4"/><div id="n_SYN4" class="a c7 w1 kl"><span>SYN4</span></div><div id="v_SYN4" class="a c7 w1 kv" data-class-edited="SYN4_value != SYN4_default">{{SYN4_value}}</div>
+						<vknob id="k_SYN5" class="a c8" param="SYN5"/><div id="n_SYN5" class="a c8 w1 kl"><span>SYN5</span></div><div id="v_SYN5" class="a c8 w1 kv" data-class-edited="SYN5_value != SYN5_default">{{SYN5_value}}</div>
+						<vknob id="k_SYN6" class="a c9" param="SYN6"/><div id="n_SYN6" class="a c9 w1 kl"><span>SYN6</span></div><div id="v_SYN6" class="a c9 w1 kv" data-class-edited="SYN6_value != SYN6_default">{{SYN6_value}}</div>
+						<vknob id="k_SYN7" class="a c10" param="SYN7"/><div id="n_SYN7" class="a c10 w1 kl"><span>SYN7</span></div><div id="v_SYN7" class="a c10 w1 kv" data-class-edited="SYN7_value != SYN7_default">{{SYN7_value}}</div>
+						<vknob id="k_SYN8" class="a c11" param="SYN8"/><div id="n_SYN8" class="a c11 w1 kl"><span>SYN8</span></div><div id="v_SYN8" class="a c11 w1 kv" data-class-edited="SYN8_value != SYN8_default">{{SYN8_value}}</div>
 						<div id="screen_hit" class="a screen">
-							<div id="screen_hit_title" class="a stitle"><span class="label">Hit</span><span class="right hint">Not played yet</span></div>
+							<div id="screen_hit_title" class="a stitle"><span class="label">Hit</span><span id="hit_note" class="right hint">Not played yet</span></div>
+							<!-- The graduations' words, placed by mdDrumsHitView.cpp -->
+							<span id="hit_tick1" class="a hint tick"/><span id="hit_tick2" class="a hint tick"/><span id="hit_tick3" class="a hint tick"/><span id="hit_tick4" class="a hint tick"/>
+							<span id="hit_tick5" class="a hint tick"/><span id="hit_tick6" class="a hint tick"/><span id="hit_tick7" class="a hint tick"/><span id="hit_tick8" class="a hint tick"/>
 						</div>
 					</div>
 					<div id="rule_391" class="a rule edit" style="top: 391dp;"/>
@@ -137,16 +140,19 @@
 						<div id="efx_group1" class="a c4 w2 grp"><span>AM</span><div class="line"/></div>
 						<div id="efx_group2" class="a c6 w2 grp"><span>EQ</span><div class="line"/></div>
 						<div id="efx_group3" class="a c8 w3 grp"><span>Filter</span><div class="line"/></div>
-						<vknob id="k_AMD" class="a c4" param="AMD"/><div id="n_AMD" class="a c4 w1 kl">AMD</div><div id="v_AMD" class="a c4 w1 kv" data-class-edited="AMD_value != AMD_default">{{AMD_value}}</div>
-						<vknob id="k_AMF" class="a c5" param="AMF"/><div id="n_AMF" class="a c5 w1 kl">AMF</div><div id="v_AMF" class="a c5 w1 kv" data-class-edited="AMF_value != AMF_default">{{AMF_value}}</div>
-						<vknob id="k_EQF" class="a c6" param="EQF"/><div id="n_EQF" class="a c6 w1 kl">EQF</div><div id="v_EQF" class="a c6 w1 kv" data-class-edited="EQF_value != EQF_default">{{EQF_value}}</div>
-						<vknob id="k_EQG" class="a c7" param="EQG" bipolar="1"/><div id="n_EQG" class="a c7 w1 kl">EQG</div><div id="v_EQG" class="a c7 w1 kv" data-class-edited="EQG_value != EQG_default">{{EQG_value}}</div>
-						<vknob id="k_FLTF" class="a c8" param="FLTF"/><div id="n_FLTF" class="a c8 w1 kl">FLTF</div><div id="v_FLTF" class="a c8 w1 kv" data-class-edited="FLTF_value != FLTF_default">{{FLTF_value}}</div>
-						<vknob id="k_FLTW" class="a c9" param="FLTW"/><div id="n_FLTW" class="a c9 w1 kl">FLTW</div><div id="v_FLTW" class="a c9 w1 kv" data-class-edited="FLTW_value != FLTW_default">{{FLTW_value}}</div>
-						<vknob id="k_FLTQ" class="a c10" param="FLTQ"/><div id="n_FLTQ" class="a c10 w1 kl">FLTQ</div><div id="v_FLTQ" class="a c10 w1 kv" data-class-edited="FLTQ_value != FLTQ_default">{{FLTQ_value}}</div>
-						<vknob id="k_SRR" class="a c11" param="SRR"/><div id="n_SRR" class="a c11 w1 kl">SRR</div><div id="v_SRR" class="a c11 w1 kv" data-class-edited="SRR_value != SRR_default">{{SRR_value}}</div>
+						<vknob id="k_AMD" class="a c4" param="AMD"/><div id="n_AMD" class="a c4 w1 kl"><span>AMD</span></div><div id="v_AMD" class="a c4 w1 kv" data-class-edited="AMD_value != AMD_default">{{AMD_value}}</div>
+						<vknob id="k_AMF" class="a c5" param="AMF"/><div id="n_AMF" class="a c5 w1 kl"><span>AMF</span></div><div id="v_AMF" class="a c5 w1 kv" data-class-edited="AMF_value != AMF_default">{{AMF_value}}</div>
+						<vknob id="k_EQF" class="a c6" param="EQF"/><div id="n_EQF" class="a c6 w1 kl"><span>EQF</span></div><div id="v_EQF" class="a c6 w1 kv" data-class-edited="EQF_value != EQF_default">{{EQF_value}}</div>
+						<vknob id="k_EQG" class="a c7" param="EQG" bipolar="1"/><div id="n_EQG" class="a c7 w1 kl"><span>EQG</span></div><div id="v_EQG" class="a c7 w1 kv" data-class-edited="EQG_value != EQG_default">{{EQG_value}}</div>
+						<vknob id="k_FLTF" class="a c8" param="FLTF"/><div id="n_FLTF" class="a c8 w1 kl"><span>FLTF</span></div><div id="v_FLTF" class="a c8 w1 kv" data-class-edited="FLTF_value != FLTF_default">{{FLTF_value}}</div>
+						<vknob id="k_FLTW" class="a c9" param="FLTW"/><div id="n_FLTW" class="a c9 w1 kl"><span>FLTW</span></div><div id="v_FLTW" class="a c9 w1 kv" data-class-edited="FLTW_value != FLTW_default">{{FLTW_value}}</div>
+						<vknob id="k_FLTQ" class="a c10" param="FLTQ"/><div id="n_FLTQ" class="a c10 w1 kl"><span>FLTQ</span></div><div id="v_FLTQ" class="a c10 w1 kv" data-class-edited="FLTQ_value != FLTQ_default">{{FLTQ_value}}</div>
+						<vknob id="k_SRR" class="a c11" param="SRR"/><div id="n_SRR" class="a c11 w1 kl"><span>SRR</span></div><div id="v_SRR" class="a c11 w1 kv" data-class-edited="SRR_value != SRR_default">{{SRR_value}}</div>
 						<div id="screen_filter" class="a screen">
-							<div id="screen_filter_title" class="a stitle"><span class="label">Filter and EQ</span></div>
+							<div id="screen_filter_title" class="a stitle"><span class="label">Filter and EQ</span><span id="filter_srr" class="right hint"/></div>
+							<!-- The graduations' words, placed by mdDrumsFilterView.cpp -->
+							<span id="filter_tick1" class="a hint ftick">100</span><span id="filter_tick2" class="a hint ftick">1k</span><span id="filter_tick3" class="a hint ftick">10k</span>
+							<span id="filter_zero" class="a hint zerodb">0 dB</span>
 						</div>
 					</div>
 					<div id="rule_607" class="a rule edit" style="top: 607dp;"/>
@@ -157,16 +163,18 @@
 						<div id="routing_group1" class="a c4 w3 grp"><span>Channel</span><div class="line"/></div>
 						<div id="routing_group2" class="a c7 w2 grp"><span>Sends</span><div class="line"/></div>
 						<div id="routing_group3" class="a c9 w3 grp"><span>LFO</span><div class="line"/></div>
-						<vknob id="k_DIST" class="a c4" param="DIST"/><div id="n_DIST" class="a c4 w1 kl">DIST</div><div id="v_DIST" class="a c4 w1 kv" data-class-edited="DIST_value != DIST_default">{{DIST_value}}</div>
-						<vknob id="k_VOL" class="a c5" param="VOL"/><div id="n_VOL" class="a c5 w1 kl">VOL</div><div id="v_VOL" class="a c5 w1 kv" data-class-edited="VOL_value != VOL_default">{{VOL_value}}</div>
-						<vknob id="k_PAN" class="a c6" param="PAN" bipolar="1"/><div id="n_PAN" class="a c6 w1 kl">PAN</div><div id="v_PAN" class="a c6 w1 kv" data-class-edited="PAN_value != PAN_default">{{PAN_value}}</div>
-						<vknob id="k_DEL" class="a c7" param="DEL"/><div id="n_DEL" class="a c7 w1 kl">DEL</div><div id="v_DEL" class="a c7 w1 kv" data-class-edited="DEL_value != DEL_default">{{DEL_value}}</div>
-						<vknob id="k_REV" class="a c8" param="REV"/><div id="n_REV" class="a c8 w1 kl">REV</div><div id="v_REV" class="a c8 w1 kv" data-class-edited="REV_value != REV_default">{{REV_value}}</div>
-						<vknob id="k_LFOS" class="a c9" param="LFOS"/><div id="n_LFOS" class="a c9 w1 kl">LFOS</div><div id="v_LFOS" class="a c9 w1 kv" data-class-edited="LFOS_value != LFOS_default">{{LFOS_value}}</div>
-						<vknob id="k_LFOD" class="a c10" param="LFOD"/><div id="n_LFOD" class="a c10 w1 kl">LFOD</div><div id="v_LFOD" class="a c10 w1 kv" data-class-edited="LFOD_value != LFOD_default">{{LFOD_value}}</div>
-						<vknob id="k_LFOM" class="a c11" param="LFOM"/><div id="n_LFOM" class="a c11 w1 kl">LFOM</div><div id="v_LFOM" class="a c11 w1 kv" data-class-edited="LFOM_value != LFOM_default">{{LFOM_value}}</div>
+						<vknob id="k_DIST" class="a c4" param="DIST"/><div id="n_DIST" class="a c4 w1 kl"><span>DIST</span></div><div id="v_DIST" class="a c4 w1 kv" data-class-edited="DIST_value != DIST_default">{{DIST_value}}</div>
+						<vknob id="k_VOL" class="a c5" param="VOL"/><div id="n_VOL" class="a c5 w1 kl"><span>VOL</span></div><div id="v_VOL" class="a c5 w1 kv" data-class-edited="VOL_value != VOL_default">{{VOL_value}}</div>
+						<vknob id="k_PAN" class="a c6" param="PAN" bipolar="1"/><div id="n_PAN" class="a c6 w1 kl"><span>PAN</span></div><div id="v_PAN" class="a c6 w1 kv" data-class-edited="PAN_value != PAN_default">{{PAN_value}}</div>
+						<vknob id="k_DEL" class="a c7" param="DEL"/><div id="n_DEL" class="a c7 w1 kl"><span>DEL</span></div><div id="v_DEL" class="a c7 w1 kv" data-class-edited="DEL_value != DEL_default">{{DEL_value}}</div>
+						<vknob id="k_REV" class="a c8" param="REV"/><div id="n_REV" class="a c8 w1 kl"><span>REV</span></div><div id="v_REV" class="a c8 w1 kv" data-class-edited="REV_value != REV_default">{{REV_value}}</div>
+						<vknob id="k_LFOS" class="a c9" param="LFOS"/><div id="n_LFOS" class="a c9 w1 kl"><span>LFOS</span></div><div id="v_LFOS" class="a c9 w1 kv" data-class-edited="LFOS_value != LFOS_default">{{LFOS_value}}</div>
+						<vknob id="k_LFOD" class="a c10" param="LFOD"/><div id="n_LFOD" class="a c10 w1 kl"><span>LFOD</span></div><div id="v_LFOD" class="a c10 w1 kv" data-class-edited="LFOD_value != LFOD_default">{{LFOD_value}}</div>
+						<vknob id="k_LFOM" class="a c11" param="LFOM"/><div id="n_LFOM" class="a c11 w1 kl"><span>LFOM</span></div><div id="v_LFOM" class="a c11 w1 kv" data-class-edited="LFOM_value != LFOM_default">{{LFOM_value}}</div>
 						<div id="screen_lfo" class="a screen">
-							<div id="screen_lfo_title" class="a stitle"><span class="label code">LFO</span><span id="lfo_target" class="word">{{LfoParam_text}} on track {{LfoTrack_text}}<vglyph class="down" shape="down"/></span><span id="lfo_assign" class="right word">Assign</span></div>
+							<div id="screen_lfo_title" class="a stitle"><span class="label code">LFO</span><span id="lfo_target" class="word">{{LfoParam_text}} on track {{LfoTrack_text}}<vglyph class="down" shape="down"/></span><span id="lfo_assigning" class="word asking">Click a knob to modulate</span><span id="lfo_assign" class="right word">Assign</span></div>
+							<!-- What the wave reaches, or why there is none (mdDrumsLfoView.cpp) -->
+							<div id="lfo_high" class="a hint lfov high"/><div id="lfo_low" class="a hint lfov low"/><div id="lfo_none" class="a hint lfonone"/>
 							<div id="lfo_shape1_label" class="a label lfol lr1">Shape 1</div>
 							<button id="lfo_shape1_0" class="a chip ch0 lr1" param="LfoShape1" isToggle="1" valueOn="0">TRI</button>
 							<button id="lfo_shape1_1" class="a chip ch1 lr1" param="LfoShape1" isToggle="1" valueOn="1">SAW</button>
@@ -348,7 +356,7 @@
 			</div>
 
 			<!-- Kits, over the Track tab under the kit row (the kit row opens and closes them; a tab closes them): 64 Slots
-			     in four columns of 16 rows of 40, the chosen one's panel on columns 13-16. Static until the Kits slice. -->
+			     in four columns of 16 rows of 40, the chosen one's panel on columns 13-16. KitsView fills them from the Bank. -->
 			<div id="kits" class="layer overlay">
 				<div id="kits_title" class="a c1 w8 bhead"><span class="big">Kits</span><span>64 slots, kept by the plug-in</span></div>
 				<div id="kits_actions" class="a c12 bact"><span id="kits_import" class="act">Import .syx</span><span id="kits_export" class="act">Export .syx</span><span id="kits_done" class="act keep">Done</span></div>
@@ -429,28 +437,29 @@
 				<div id="kits_sep" class="a kitssep"/>
 				<div id="kit_caption" class="a c13 label kitcaption">Slot 01, playing</div>
 				<div id="kit_name_big" class="a c13 kitpname">Kit 01</div>
+				<input id="kit_name_edit" type="text" maxlength="16" class="a c13 kitpname kitedit"/>
 				<div id="kit_tracks" class="a c13 grp kittracks"><span>Tracks</span><div class="line"/></div>
 				<div class="col c13">
-					<div id="kitm1" class="a kitm" style="top: 280dp;" data-model="part0"><span class="num">01</span>{{Machine_text}}</div>
-					<div id="kitm2" class="a kitm" style="top: 304dp;" data-model="part1"><span class="num">02</span>{{Machine_text}}</div>
-					<div id="kitm3" class="a kitm" style="top: 328dp;" data-model="part2"><span class="num">03</span>{{Machine_text}}</div>
-					<div id="kitm4" class="a kitm" style="top: 352dp;" data-model="part3"><span class="num">04</span>{{Machine_text}}</div>
-					<div id="kitm5" class="a kitm" style="top: 376dp;" data-model="part4"><span class="num">05</span>{{Machine_text}}</div>
-					<div id="kitm6" class="a kitm" style="top: 400dp;" data-model="part5"><span class="num">06</span>{{Machine_text}}</div>
-					<div id="kitm7" class="a kitm" style="top: 424dp;" data-model="part6"><span class="num">07</span>{{Machine_text}}</div>
-					<div id="kitm8" class="a kitm" style="top: 448dp;" data-model="part7"><span class="num">08</span>{{Machine_text}}</div>
+					<div id="kitm1" class="a kitm" style="top: 280dp;"><span class="num">01</span>--</div>
+					<div id="kitm2" class="a kitm" style="top: 304dp;"><span class="num">02</span>--</div>
+					<div id="kitm3" class="a kitm" style="top: 328dp;"><span class="num">03</span>--</div>
+					<div id="kitm4" class="a kitm" style="top: 352dp;"><span class="num">04</span>--</div>
+					<div id="kitm5" class="a kitm" style="top: 376dp;"><span class="num">05</span>--</div>
+					<div id="kitm6" class="a kitm" style="top: 400dp;"><span class="num">06</span>--</div>
+					<div id="kitm7" class="a kitm" style="top: 424dp;"><span class="num">07</span>--</div>
+					<div id="kitm8" class="a kitm" style="top: 448dp;"><span class="num">08</span>--</div>
 				</div>
 				<div class="col c15">
-					<div id="kitm9" class="a kitm" style="top: 280dp;" data-model="part8"><span class="num">09</span>{{Machine_text}}</div>
-					<div id="kitm10" class="a kitm" style="top: 304dp;" data-model="part9"><span class="num">10</span>{{Machine_text}}</div>
-					<div id="kitm11" class="a kitm" style="top: 328dp;" data-model="part10"><span class="num">11</span>{{Machine_text}}</div>
-					<div id="kitm12" class="a kitm" style="top: 352dp;" data-model="part11"><span class="num">12</span>{{Machine_text}}</div>
-					<div id="kitm13" class="a kitm" style="top: 376dp;" data-model="part12"><span class="num">13</span>{{Machine_text}}</div>
-					<div id="kitm14" class="a kitm" style="top: 400dp;" data-model="part13"><span class="num">14</span>{{Machine_text}}</div>
-					<div id="kitm15" class="a kitm" style="top: 424dp;" data-model="part14"><span class="num">15</span>{{Machine_text}}</div>
-					<div id="kitm16" class="a kitm" style="top: 448dp;" data-model="part15"><span class="num">16</span>{{Machine_text}}</div>
+					<div id="kitm9" class="a kitm" style="top: 280dp;"><span class="num">09</span>--</div>
+					<div id="kitm10" class="a kitm" style="top: 304dp;"><span class="num">10</span>--</div>
+					<div id="kitm11" class="a kitm" style="top: 328dp;"><span class="num">11</span>--</div>
+					<div id="kitm12" class="a kitm" style="top: 352dp;"><span class="num">12</span>--</div>
+					<div id="kitm13" class="a kitm" style="top: 376dp;"><span class="num">13</span>--</div>
+					<div id="kitm14" class="a kitm" style="top: 400dp;"><span class="num">14</span>--</div>
+					<div id="kitm15" class="a kitm" style="top: 424dp;"><span class="num">15</span>--</div>
+					<div id="kitm16" class="a kitm" style="top: 448dp;"><span class="num">16</span>--</div>
 				</div>
-				<div id="kit_actions" class="a c13 kact"><span class="act load">Load</span><span class="act">Save here</span><span class="act">Rename</span><span class="act">Delete</span></div>
+				<div id="kit_actions" class="a c13 kact"><span id="kit_load" class="act load">Load</span><span id="kit_savehere" class="act">Save here</span><span id="kit_rename" class="act">Rename</span><span id="kit_delete" class="act">Delete</span><span id="kit_confirm" class="act confirm">Load anyway</span><span id="kit_cancel" class="act">Cancel</span></div>
 				<div id="kit_note" class="a c13 hint kitnote"></div>
 			</div>
 		</div>

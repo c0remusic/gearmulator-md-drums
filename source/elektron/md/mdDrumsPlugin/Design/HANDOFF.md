@@ -282,15 +282,23 @@ the engine.
   machine, the 24 parameters and the velocity on a worker thread (22-27 ms a render, about 88 MB more; keep only the
   latest request). The mockup's model (DEC, HOLD, PTCH, STRT, END reshaping a recorded hit) is not for the plug-in.
 - **Filter and EQ, LFO screens:** the mockup's curves are models; draw the engine's responses where it can give them,
-  the MD's LFO shapes from its own tables.
+  the MD's LFO shapes from its own tables. Done in ticket 22 of the editor map: the response comes from the mixer DSP's
+  own coefficient words (`mdDrums/mdDrumsFilterResponse.*`), 0 dB being an untouched Track at 1 kHz, so the open
+  filter shows its own fall (-2.2 dB at 10 kHz, -4.7 dB at 20 kHz); the EQ's point sits on the curve at the angle of
+  its poles (a boost) or its zeros (a cut). The LFO is the OS's own routines ported (`mdDrums/mdDrumsLfo.*`), which
+  correct the mockup: LFOD 127 swings about 126 steps each way, the saw falls twice a period, RMP and EXP fall once
+  from each Hit, RND takes 8 steps a period at half the swing, LFOM fades shape 1 into shape 2 inverted, and the value
+  moves once a tick (125 Hz). The plot starts on a Hit of the Track and runs free after it, HOLD included.
 - **Outputs:** add `t<n>_out`; the track leaves the main mix when it is on, whatever the host does with the bus; name
   the buses "Out 01" to "Out 16" (they are "Track 1" to "Track 16" today) so that Live lists what the editor shows.
 - **Master effects:** mdEngine has none yet. Echo and reverb take every track's DEL and REV sends, tracks on their own
   output included, and return on Main; EQ and DYNAMIX act on Main only. Defaults: the values in the table above.
 - **Kits:** a bank of 64 slots in the plug-in's data folder, shared by every set; the plug-in state keeps the kit
   played, its slot, its name and whether it changed. Import reads Machinedrum kit dumps with
-  `md::automation::sysex::parseKitDump` (one kit or a project's 64, into the empty slots from the chosen one on);
-  Export needs a kit dump writer, which does not exist yet. A kit holds machines, parameters, levels, LFOs and master
-  effects; not mutes, solos or outputs.
+  `md::automation::sysex::parseMdKit` (one kit or a project's 64, into the empty slots from the chosen one on);
+  Export writes the chosen slot with `mdKitDump`. A kit holds machines, parameters, levels, LFOs and master
+  effects; not mutes, solos or outputs. As built (ticket 26 of the editor map): `mdDrums/mdDrumsBank.*` (the file,
+  `Bank.syx`, 64 dumps of 1233 bytes, a Slot written in place), `mdDrumsKitsView.*`; Save is lit while the kit played
+  differs from its slot, whatever changed it (ticket 10).
 - **Not retained:** the head band's other arrow and play layouts (`v22-var-head.html`) and the three other LFO screens
   (`v22-var-lfo.html`) stay in the mockup for reference only.

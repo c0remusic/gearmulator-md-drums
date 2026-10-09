@@ -1,13 +1,23 @@
 #include "mdDrumsEditor.h"
 
+#include "mdDrumsFilterView.h"
 #include "mdDrumsGlyph.h"
+#include "mdDrumsHitView.h"
+#include "mdDrumsKitsView.h"
 #include "mdDrumsKnob.h"
+#include "mdDrumsLfoView.h"
+#include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
 
 #include "skins.h"
 
+#include "juceRmlUi/juceRmlComponent.h"
+#include "juceRmlUi/rmlEventListener.h"
+#include "juceRmlUi/rmlHelper.h"
+
 #include "RmlUi/Core/Context.h"
+#include "RmlUi/Core/ElementDocument.h"
 #include "RmlUi/Core/CoreInstance.h"
 #include "RmlUi/Core/ElementInstancer.h"
 #include "RmlUi/Core/Factory.h"
@@ -23,14 +33,58 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_kitsView.reset();
+		m_lfoView.reset();
+		m_filterView.reset();
+		m_hitView.reset();
+		m_meterView.reset();
 		m_trackView.reset();
 	}
 
 	void Editor::create()
 	{
 		jucePluginEditorLib::Editor::create();
-		if(findChild("page_track", false))
-			m_trackView = std::make_unique<TrackView>(*this);
+		if(!findChild("page_track", false))
+			return;
+		m_trackView = std::make_unique<TrackView>(*this);
+		// Only an mdDrums::Processor makes this editor
+		auto& processor = static_cast<Processor&>(getProcessor());
+		auto& telemetry = processor.getTelemetry();
+		m_meterView = std::make_unique<MeterView>(*this, telemetry, getAcceleratedRefreshRateHz());
+		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz());
+		m_filterView = std::make_unique<FilterView>(*this, processor.getFxTables());
+		m_lfoView = std::make_unique<LfoView>(*this);
+		m_kitsView = std::make_unique<KitsView>(*this);
+
+		// Esc on the context's root, in the capture phase: before the stack's listener on the document, even when the
+		// document itself has the key
+		if(auto* component = getRmlComponent())
+			if(auto* document = component->getDocument())
+			{
+				auto* root = document->GetParentNode() ? document->GetParentNode() : document;
+				juceRmlUi::EventListener::Add(root, Rml::EventId::Keydown, [this](Rml::Event& _event)
+				{
+					const auto key = juceRmlUi::helper::getKeyIdentifier(_event);
+					bool handled;
+					if(key == Rml::Input::KI_ESCAPE)
+						handled = escape();
+					else if(juceRmlUi::helper::getKeyModCommand(_event))
+						handled = key == Rml::Input::KI_S && m_kitsView && (m_kitsView->save(), true);
+					else
+						handled = (m_kitsView && m_kitsView->key(_event)) || (m_trackView && m_trackView->key(_event));
+					if(handled)
+						_event.StopPropagation();
+				}, true);
+			}
+	}
+
+	bool Editor::escape() const
+	{
+		if(m_lfoView && m_lfoView->escape())
+			return true;
+		if(m_kitsView && m_kitsView->escape())
+			return true;
+		return m_trackView && m_trackView->escape();
 	}
 
 	int Editor::getAcceleratedRefreshRateHz() const

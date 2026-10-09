@@ -59,7 +59,7 @@ namespace mdDrums
 
 	Processor::Processor(const bool _forTests)
 		: jucePluginEditorLib::Processor(buses(), configOptions(_forTests), properties(), !_forTests,
-			_forTests ? ConfigMode::Ephemeral : ConfigMode::Persistent)
+			_forTests ? ConfigMode::Ephemeral : ConfigMode::Persistent), m_forTests(_forTests)
 	{
 		getController();
 	}
@@ -67,6 +67,11 @@ namespace mdDrums
 	Processor::~Processor()
 	{
 		destroyEditorState();
+		if(m_forTests && m_bank)
+		{
+			std::error_code error;
+			std::filesystem::remove_all(m_bank->file().parent_path(), error);
+		}
 	}
 
 	jucePluginEditorLib::PluginEditorState* Processor::createEditorState()
@@ -90,11 +95,22 @@ namespace mdDrums
 			throw synthLib::DeviceException(synthLib::DeviceError::FirmwareMissing,
 				std::string("MD Drums needs the Machinedrum UW's 8 MB flash image with OS 1.63, ") + g_flashName + ".");
 
+		if(!m_bank)
+		{
+			const auto folder = m_forTests
+				? std::filesystem::temp_directory_path() / ("MDDrumsTest_" + juce::Uuid().toString().toStdString())
+				: std::filesystem::path(getDataFolder());
+			m_bank = std::make_unique<Bank>(folder / "Bank.syx", messages::factoryKits(flash));
+			m_bank->read();
+		}
+
 		synthLib::DeviceCreateParams params;
 		params.romName = g_flashName;
 		params.romData = std::move(flash);
 		params.homePath = getDataFolder();
-		return new Device(params);
+		auto* device = new Device(params, m_telemetry);
+		std::atomic_store(&m_fxTables, device->fxTables());
+		return device;
 	}
 
 	pluginLib::Controller* Processor::createController()
@@ -104,17 +120,29 @@ namespace mdDrums
 
 	void Processor::processBpm(const float _bpm)
 	{
-		if(std::abs(_bpm - m_bpm) < 0.005f)
+		if(std::abs(_bpm - m_bpm.load(std::memory_order_relaxed)) < 0.005f)
 			return;
 		const auto message = messages::tempo(_bpm);
 		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
 		event.assignRawData(message.bytes.data(), message.size, synthLib::MidiEventSource::Editor, 0);
 		if(tryAddRealtimeMidiEvent(event))
-			m_bpm = _bpm;
+			m_bpm.store(_bpm, std::memory_order_relaxed);
+	}
+
+	void Processor::saveChunkData(baseLib::BinaryStream& _s)
+	{
+		jucePluginEditorLib::Processor::saveChunkData(_s);
+		// The Bank's Slot the Kit played came from (its Kit is the Device's, in "MIDI")
+		baseLib::ChunkWriter cw(_s, "KSLT", 1);
+		_s.write<uint32_t>(static_cast<uint32_t>(dynamic_cast<Controller&>(getController()).playedSlot()));
 	}
 
 	void Processor::loadChunkData(baseLib::ChunkReader& _cr)
 	{
+		_cr.add("KSLT", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		{
+			dynamic_cast<Controller&>(getController()).setPlayedSlot(static_cast<int>(_stream.read<uint32_t>()));
+		});
 		// Before the stack's own "MIDI" reader (the first one registered wins): the Device's state, also handed to the
 		// Controller, which then follows it without touching the Device
 		_cr.add("MIDI", 1, [this](baseLib::BinaryStream& _stream, uint32_t)

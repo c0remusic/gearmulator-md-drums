@@ -9,8 +9,13 @@ project(mdDrumsPlugin VERSION ${CMAKE_PROJECT_VERSION})
 set(SOURCES
 	mdDrumsController.cpp mdDrumsController.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
+	mdDrumsFilterView.cpp mdDrumsFilterView.h
 	mdDrumsGlyph.cpp mdDrumsGlyph.h
+	mdDrumsHitView.cpp mdDrumsHitView.h
+	mdDrumsKitsView.cpp mdDrumsKitsView.h
 	mdDrumsKnob.cpp mdDrumsKnob.h
+	mdDrumsLfoView.cpp mdDrumsLfoView.h
+	mdDrumsMeterView.cpp mdDrumsMeterView.h
 	mdDrumsProcessor.cpp mdDrumsProcessor.h
 	mdDrumsTrackView.cpp mdDrumsTrackView.h
 	parameterDescriptions_mddrums.json

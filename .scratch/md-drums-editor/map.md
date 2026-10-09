@@ -22,8 +22,9 @@ mesurées avant et après. Pas de tag.
 - Garde-fou du `CLAUDE.md` avant chaque commit et push ; chaque tranche ajoute ses tests au garde-fou. Push sans
   demander une fois vert. Jamais de tag.
 - **Latence** : tout changement du chemin de rendu (port, master) rapporte latence note→son et gigue, avant et après
-  (`mdDrumsEngineTest` : 1,16 ms en moyenne, gigue 0,68 ms, sur TRX-BD depuis la note ; les 0,48 ms de départ
-  comptaient depuis le bloc de 32 de la note).
+  (`mdDrumsEngineTest` : depuis le ticket 19, 1,52 ms sans gigue sur TRX-BD à 44,1 kHz, 35 échantillons déclarés ;
+  depuis le ticket 24, Main 16 échantillons de plus, Dynamix, 51 déclarés ;
+  avant, 1,16 ms en moyenne et 0,68 ms de gigue ; les 0,48 ms de départ comptaient depuis le bloc de 32 de la note).
 - **Fluidité** : chaque clic et drag instantané, mesuré entrée→pixel ; jamais `Plugin::withDeviceLocked` par frame
   ou par clic.
 - Recherches : un doc par ticket dans `research/` à côté de cette carte (pas de branche `research/*`).
@@ -100,22 +101,62 @@ mesurées avant et après. Pas de tag.
   générateur retirés ; fader = `vknob` en variante ; browser et menu LFO en boutons radio liés à Machine, LfoTrack,
   LfoParam ; 881 boîtes de six vues identiques à la maquette, 685 baselines sur le pas de 4, 576 paramètres sur 576
   atteignables ; clic 13-17 ms entrée→pixel en logiciel.
+- [Gigue note→son à zéro](issues/19-gigue-note-son.md) : retard par Track sur ses contributions au mix (gains, sends,
+  sortie solo), 31 moins l'attente du bloc ; somme modulo 56 bits comme le DSP, identique au mixeur du moteur ; Link
+  au même retard, Choke coupé au retard du Hit ; TRX-BD 37-67 → 67-67 échantillons à 44,1 kHz (gigue 0), 53-87 →
+  86-87 à 48 kHz ; latence déclarée 21 → 35 ; CPU inchangé.
+- [Lecture du moteur par l'éditeur](issues/16-lecture-moteur-editeur.md) : `Telemetry` possédée par le Processor,
+  écrite par le Device sans verrou ; Controller vérité du Kit, MIDI out pour SYN1-8 seulement ; mètres des 18 sorties
+  du Device (chute 20 dB/s, −60 à 0 dBFS), scopes tenus par l'éditeur ; écran Hit en capture live progressive (min/max
+  de 8 échantillons, échelle fixe ±0,5) ; LFO sans valeur live ; ≤ 1 % d'un cœur côté audio ; tickets 20, 21, 22.
+- [Télémétrie, mètres et scopes](issues/20-telemetrie-metres-scopes.md) : `Telemetry` partagée Processor-Device
+  (crêtes, Hits) ; `MeterView` sur canvas à la fréquence de l'écran ; passe de crête 0,027 % d'un cœur, Device 20,01 %
+  contre 19,92 % ; mètres, chute, lumières et scopes vérifiés au pixel.
+- [Écran Hit](issues/21-ecran-hit.md) : capture à deux emplacements par Track, contrôlée par identifiant ; identique à
+  la sortie solo depuis la note plus 31 ; `HitView` progressif avec fenêtre ajustée et tête de lecture ; 16 captures
+  à la fois 0,23 % d'un cœur.
+- [Écrans Filter/EQ et LFO, ASSIGN, écoute](issues/22-ecrans-filtre-lfo-assign.md) : réponse depuis les mots de
+  coefficients du DSP (pas d'impulsion : le passe-haut bas sonne des secondes), à 0,054 dB de la chaîne, 46 µs la
+  courbe ; LFO porté des routines de l'OS, 0 différence sur 2 259 ticks et 670 Hits ; ASSIGN par anneau sur les knobs,
+  Esc pour ASSIGN et les overlays ; noms soulignés ; écoute ordonnée après la machine choisie (`Controller::audition`).
+- [Jouer la Track, vélocité, pas à pas sur la machine](issues/23-jouer-et-choisir.md) : touche play à l'appui et
+  Espace à la vélocité de la bande (drag 1,5 px par pas, gardée dans les réglages) ; molette et flèches sur le nom de
+  machine, flèches et Enter dans le browser, dans l'ordre de ses cellules. Ajouté après le ticket 22 : déjà spécifié
+  par le HANDOFF, sans ticket.
+- [Effets master dans le moteur](issues/09-effets-master-moteur.md) : second DSP56300 qui ne joue que P:$342-$970,
+  synchrone dans `EngineT::render` après le mixeur ; coefficients par les quatre corps de l'OS dans `MachineRunner`
+  (sorties en `rts`) ; Main 16 échantillons après les Outs, latence déclarée 35 → 51 ; plafond 30 % du temps réel sur
+  le thread audio dans les tests, validé dans Live ; bit-exact contre le firmware à paramètres fixes ;
+  `setMaster(0-31, 0-127)` sans bypass ; voix en parallèle mesurées à part (ticket 25).
+- [Effets master dans mdEngine et MD Drums](issues/24-effets-master.md) : `MasterEngine` (boot partiel du programme
+  DSP1, stub HI08) ; mots de l'OS par ses corps dans `MachineRunner`, identiques au firmware ; Main échantillon pour
+  échantillon le firmware sur 7 scénarios depuis l'état de son DSP1, insensible aux registres et au scratch ; latence
+  déclarée 51, Main 85 contre Out 67 à 44,1 kHz ; 16 Tracks et master 20 % d'un cœur ; traîne de quelques LSB sur Main
+  comme la machine, silence pris sous −100 dBFS.
+- [Voix en parallèle : mesure de rentabilité](issues/25-voix-en-parallele.md) : `ParallelVoiceEngine` pas rentable,
+  non activé ; thread audio 19,6-19,9 % aujourd'hui, 21,4-21,7 % à 2 groupes, 16,7-17,5 % à 4 pour un CPU total de
+  36,6-41,8 % ; Main différent dès 2 groupes ; mesure gardée (`mdDrumsParallelTest`, hors garde-fou).
+- [Chargement d'un Kit face à l'hôte](issues/10-chargement-kit-hote.md) : paramètres en `PresetChange` puis un
+  `notifyHostOfProgramChange` (comme TUS), l'automation de Live gagne ; Save allumé quand le Kit joué diffère de son
+  Slot, d'où que vienne l'écart ; Slot joué dans un chunk du Processor ; un set garde sa copie du Kit ; dump `$52`
+  entier vers le Device ; import dans les Slots vides sans boucler, export du Slot choisi ; écriture d'un Slot seul,
+  Bank relue avant ; CC SYN d'une machine notifiés sans geste ; Rename, Delete, Save here précisés ; ticket 26.
+- [Kits et Bank](issues/26-kits-et-bank.md) : `Bank.syx` de 64 dumps, amorcé des 16 Kits d'usine, Slot écrit en place
+  (deux instances sans perte) ; Kit joué et Slot dans le Controller (chunk « KSLT ») ; chargement en un dump ; nom par
+  message propre (`KitName`) ; overlay, Save, Ctrl+S, Import et Export dans `KitsView` ; Slot cliqué 8 ms
+  entrée→pixel ; undo de Live et Ctrl+S face à l'hôte à constater à l'installation.
 
 ## Not yet specified
 
-- **Tranches de construction après le skin** : skin statique fait (17, 18) ; ticket 19 (gigue note→son à zéro)
-  ensuite ; restent les tranches de comportement en C++ (écrans, mètres, ASSIGN, Kits et leur Bank, écran hit, Push),
-  chacune un ticket `task` quand la lecture du moteur par l'éditeur (16) a fixé sa forme.
+- **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
+  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
+  mesure des voix en parallèle (25), Kits et Bank (26) faits ; restent Push
+  (après le ticket 11) et le second moteur de l'écran Hit et de l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
-- **Écran LFO à corriger dans le HANDOFF** (d'après le ticket 05) : amplitude réelle ±126 à LFOD 127, scie qui
-  descend deux fois par période, RMP et EXP en one-shot relancés à chaque Hit, RND à 8 pas, LFOM qui fond vers la
-  forme 2 inversée. À reprendre avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
   décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
   applique le dump `$52`) ; sinon une graine.
-- **Tranche Kits** : writer et format de la Bank fixés par le ticket 04 ; reste la forme du chargement face à l'hôte
-  (ticket 10) avant d'en faire un ticket `task`.
 - **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
   ajoutés au garde-fou.
 

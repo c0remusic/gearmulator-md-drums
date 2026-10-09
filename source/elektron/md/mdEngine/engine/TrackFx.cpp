@@ -191,6 +191,7 @@ namespace md::engine
 		{ const Acc ob = b; b = mpy(y0, x0); pushC(lim(ob)); }
 		pushC(lim(a));
 		pushC(lim(b));
+		m_eqWords = c;
 		y1 = x[0x2a];
 		y[0x13] = y1;
 

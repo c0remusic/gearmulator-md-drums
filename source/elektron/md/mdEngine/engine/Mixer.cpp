@@ -21,6 +21,27 @@ namespace md::engine
 		return a1(sub(b, asr(acc(_route), 1)));
 	}
 
+	bool Mixer::gains(const std::array<uint32_t, 5>& _mix, const bool _dryMute, std::array<int32_t, 6>& _gains) const
+	{
+		if(sx24(_mix[0]) != kRouteMain)
+			return false;
+		const int32_t vol = sx24(_mix[1]);
+		Acc a = acc(sx24(_mix[2]));
+		if(a > acc(0x7ecccd)) a = acc(0x7fffff);
+		const auto idx = static_cast<uint32_t>(lim(asr(a, 10)));
+		const Acc gainR = mpy(m_t[0x148000 + idx], vol);	// sin
+		const Acc gainL = mpy(m_t[0x14a000 + idx], vol);	// cos
+		const int32_t l = lim(gainL), r = lim(gainR);
+		const int32_t rev = sx24(_mix[3]), del = sx24(_mix[4]);
+		_gains = {_dryMute ? 0 : l, _dryMute ? 0 : r, lim(mpy(rev, l)), lim(mpy(rev, r)), lim(mpy(del, l)), lim(mpy(del, r))};
+		return true;
+	}
+
+	int32_t Mixer::mainSample(const int64_t _sum)
+	{
+		return lim(asl(_sum, 3));
+	}
+
 	void Mixer::process(const int32_t* const* _tracks, const std::array<uint32_t, 5>* _mix, Output& _out, const uint32_t _dryMute) const
 	{
 		for(auto& f : _out.frame) f.fill(0);
@@ -37,12 +58,11 @@ namespace md::engine
 			if(!noSkip && std::all_of(_tracks[t], _tracks[t] + kBlock, [](const int32_t s) { return s == 0; }))
 				continue;
 			const auto& w = _mix[t];
-			const int route = sx24(w[0]);
-			const int32_t vol = sx24(w[1]);
-			if(route != kRouteMain)
+			if(!gains(w, (_dryMute >> t) & 1, g[n]))
 			{
 				// P:$2c2-$2d9: into the output frame, sample x VOL << 4 added to what is there, limited
-				const int ch = frameChannel(route);
+				const int ch = frameChannel(sx24(w[0]));
+				const int32_t vol = sx24(w[1]);
 				for(int i = 0; i < kBlock; ++i)
 				{
 					auto& o = _out.frame[i][ch];
@@ -50,15 +70,6 @@ namespace md::engine
 				}
 				continue;
 			}
-			Acc a = acc(sx24(w[2]));
-			if(a > acc(0x7ecccd)) a = acc(0x7fffff);
-			const auto idx = static_cast<uint32_t>(lim(asr(a, 10)));
-			const Acc gainR = mpy(m_t[0x148000 + idx], vol);	// sin
-			const Acc gainL = mpy(m_t[0x14a000 + idx], vol);	// cos
-			const int32_t l = lim(gainL), r = lim(gainR);
-			const int32_t rev = sx24(w[3]), del = sx24(w[4]);
-			const bool mute = (_dryMute >> t) & 1;
-			g[n] = {mute ? 0 : l, mute ? 0 : r, lim(mpy(rev, l)), lim(mpy(rev, r)), lim(mpy(del, l)), lim(mpy(del, r))};
 			mainIn[n++] = _tracks[t];
 		}
 
@@ -73,7 +84,7 @@ namespace md::engine
 					a = add(a, mpy(g[k][2 * p], mainIn[k][i]));
 					b = add(b, mpy(g[k][2 * p + 1], mainIn[k][i]));
 				}
-				(*outs[p])[i] = {lim(asl(a, 3)), lim(asl(b, 3))};
+				(*outs[p])[i] = {mainSample(a), mainSample(b)};
 			}
 	}
 }

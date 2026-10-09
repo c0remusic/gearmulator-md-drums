@@ -26,6 +26,22 @@ namespace md::engine
 		constexpr uint32_t kLevel = 0x1000d7c;		// smoothed track levels: 16 words (value << 7); then 32 master FX
 		constexpr uint32_t kLevelTarget = 0x1000f5c;	// their targets: 48 bytes (0-127)
 		constexpr uint32_t kLevelSmooth = 0x100029e;	// new = (3 old + target << 7) >> 2, all 48
+		constexpr uint32_t kMasterTarget = kLevelTarget + 16;	// md-drums: the 32 master bytes, after the 16 levels
+
+		// md-drums: the tick routine computes one master effect's DSP words per tick, inline, from the slewed bytes, into a
+		// staging area its DSP2 interrupt then sends ($20aa66). Each body, its exit turned into a return, is called alone.
+		struct MasterBody
+		{
+			uint32_t entry, exit, staging, y;
+			int count;
+		};
+		constexpr MasterBody kMasterBodies[4] = {
+			{0x20b4ae, 0x20b5f8, 0x1001af4, 0x150, 9},	// Echo
+			{0x20b604, 0x20b742, 0x1001b18, 0x17a, 11},	// Dynamix
+			{0x20b74e, 0x20b934, 0x1001b44, 0x170, 10},	// EQ
+			{0x20b940, 0x20ba4c, 0x1001b74, 0x185, 8},	// Gate Box
+		};
+		constexpr uint16_t kRts = 0x4e75;
 
 		bool isAudioMachine(const uint8_t _id) { return !(_id >= 0x60 && _id <= 0x7b); }	// MID/CTR: no audio
 	}
@@ -39,6 +55,10 @@ namespace md::engine
 		m_link.fill(kOff);
 		m_choke.fill(kOff);
 		m_activeOrder.reserve(kTracks);	// no allocation when a trigger reorders it
+		// md-drums: the master bodies return to the caller instead of running into the tick's epilogue (which mdEngine
+		// never calls)
+		for(const auto& body : kMasterBodies)
+			m_os.poke16(body.exit, kRts);
 		for(int t = 0; t < kTracks; ++t)
 		{
 			m_os.poke8(kLevelTarget + static_cast<uint32_t>(t), 100);
@@ -130,6 +150,29 @@ namespace md::engine
 	void HostModel<TVoices>::setLevel(const int _track, const int _level)
 	{
 		m_os.poke8(kLevelTarget + static_cast<uint32_t>(_track), static_cast<uint8_t>(std::clamp(_level, 0, 127)));
+	}
+
+	template<class TVoices>
+	void HostModel<TVoices>::setMaster(const int _index, const int _value)
+	{
+		if(_index >= 0 && _index < kMasterParams)
+			m_os.poke8(kMasterTarget + static_cast<uint32_t>(_index), static_cast<uint8_t>(std::clamp(_value, 0, 127)));
+	}
+
+	template<class TVoices>
+	int HostModel<TVoices>::master(const int _index) const
+	{
+		return _index >= 0 && _index < kMasterParams ? m_os.peek8(kMasterTarget + static_cast<uint32_t>(_index)) : 0;
+	}
+
+	template<class TVoices>
+	bool HostModel<TVoices>::takeMasterWords(MasterWords& _out)
+	{
+		if(!m_masterPending)
+			return false;
+		_out = m_masterWords;
+		m_masterPending = false;
+		return true;
 	}
 
 	template<class TVoices>
@@ -351,6 +394,16 @@ namespace md::engine
 		m_os.call(kLfoOsc, {});
 		m_os.call(kLfoApply, {});
 		m_os.call(kLevelSmooth, {});
+		// md-drums: then one master effect's words, in turn, as the tick routine does after the level slew ($20b4a2)
+		{
+			const auto& body = kMasterBodies[m_tickCount & 3];
+			m_os.call(body.entry, {});
+			m_masterWords.y = body.y;
+			m_masterWords.count = body.count;
+			for(int k = 0; k < body.count; ++k)
+				m_masterWords.words[static_cast<size_t>(k)] = m_os.peek32(body.staging + 4 * static_cast<uint32_t>(k)) & 0xffffff;
+			m_masterPending = true;
+		}
 		if(timingOn)
 		{
 			const auto tv2 = std::chrono::steady_clock::now();

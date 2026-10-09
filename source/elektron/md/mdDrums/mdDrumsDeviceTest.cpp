@@ -2,9 +2,11 @@
 // Kit 1, plays notes 36-51 and drops the others, takes the Machinedrum's CCs and SysEx from the editor and ignores the
 // host's, answers ASSIGN MACHINE with the new machine's SYN1-8 as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
 // across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It reports the
-// note-to-sound latency at 44.1 and 48 kHz.
+// note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of
+// one core.
 
 #include "mdDrumsDevice.h"
+#include "mdDrumsTelemetry.h"
 
 #include "mdProtocol/mdautomation.h"
 
@@ -12,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -94,11 +97,13 @@ namespace
 	{
 		static constexpr uint32_t Block = 512;
 
-		Rig(const std::vector<uint8_t>& _flash, const float _rate) : hostRate(_rate)
+		Rig(const std::vector<uint8_t>& _flash, const float _rate, const bool _telemetry = true) : hostRate(_rate)
 		{
 			synthLib::DeviceCreateParams params;
 			params.romData = _flash;
-			device = std::make_unique<mdDrums::Device>(params);
+			if(_telemetry)
+				telemetry = std::make_shared<mdDrums::Telemetry>();
+			device = std::make_unique<mdDrums::Device>(params, telemetry);
 			plugin = std::make_unique<synthLib::Plugin>(device.get(), [](synthLib::Device*) {});
 			plugin->reserveMidiEventCapacity();
 			plugin->setHostSamplerate(_rate, 44100.0f);
@@ -149,9 +154,25 @@ namespace
 			return peak;
 		}
 
+		// A second of host blocks; the peak of the 16 Outs, where nothing sounds but the Tracks (Main keeps a tail of a few
+		// LSB after a Hit, the master effects' EQ and Dynamix, as on the Machinedrum)
+		float listenOuts()
+		{
+			float peak = 0;
+			for(uint32_t b = 0; b < static_cast<uint32_t>(rate() / Block); ++b)
+			{
+				process();
+				for(size_t channel = 2; channel < buffers.size(); ++channel)
+					for(const auto value : buffers[channel])
+						peak = std::max(peak, std::abs(value));
+			}
+			return peak;
+		}
+
 		void settle() { listen(0, static_cast<uint32_t>(rate() * 2 / Block)); }
 		float rate() const { return hostRate; }
 
+		std::shared_ptr<mdDrums::Telemetry> telemetry;
 		std::unique_ptr<mdDrums::Device> device;
 		std::unique_ptr<synthLib::Plugin> plugin;
 		std::array<std::vector<float>, 18> buffers;
@@ -182,8 +203,8 @@ namespace
 		const auto loud = rig.listen(0);
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x9f, 60, 100});
-		const auto other = rig.listen(0);
-		std::printf("note 36: peak %.4f; note 60: peak %.4f\n", loud, other);
+		const auto other = rig.listenOuts();
+		std::printf("note 36: peak %.4f; note 60: peak of the Outs %.4f\n", loud, other);
 		require(loud > 0.01f && other == 0.0f, "notes 36-51 only");
 
 		// The host's CCs count for nothing; the editor's set the Kit
@@ -193,7 +214,7 @@ namespace
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 0));
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		require(rig.device->kit().levels[0] == 0 && rig.listen(0) == 0.0f, "the editor's level CC did not silence track 1");
+		require(rig.device->kit().levels[0] == 0 && rig.listen(2) == 0.0f, "the editor's level CC did not silence track 1");
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
 
 		// ASSIGN MACHINE: TRX-BD on track 1, its SYN1-8 defaults said back as CCs
@@ -224,17 +245,22 @@ namespace
 		require(changed.lfo(3).shape1 == md::LfoSettings::Random, "$62 did not reach the Kit");
 		require(changed.links[4] == 5 && changed.chokes[8] == sysex::MdKit::Off, "$65 or $66 did not reach the Kit");
 
-		// Mute drops the Hits, Solo silences the others, Out takes a track off Main onto its own output
+		// Mute drops the Hits, Solo silences the others, Out takes a track off Main onto its own output (its sends at 0 here:
+		// a Track on its Out still feeds the Echo and the Gate Box, whose returns are on Main)
 		rig.settle();
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 1));
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		const auto muted = rig.listen(0);
+		const auto muted = rig.listen(2);
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 0));
 		rig.send(MidiEventSource::Editor, mdDrums::messages::solo(1, true).message());
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		const auto soloElsewhere = rig.listen(0);
+		const auto soloElsewhere = rig.listen(2);
 		rig.send(MidiEventSource::Editor, mdDrums::messages::solo(1, false).message());
 		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, true).message());
+		const auto del = rig.device->kit().parameters[0][19], rev = rig.device->kit().parameters[0][20];
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, 0));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, 0));
+		rig.settle();
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
 		float mainPeak = 0, outPeak = 0;
@@ -250,7 +276,9 @@ namespace
 		std::printf("muted %.4f, another track soloed %.4f, on Out 01: Main %.4f, Out 01 %.4f\n", muted, soloElsewhere,
 			mainPeak, outPeak);
 		require(muted == 0.0f && soloElsewhere == 0.0f, "Mute or Solo let a Hit through");
-		require(mainPeak == 0.0f && outPeak > 0.01f, "Out did not move track 1 off Main");
+		require(mainPeak < 1e-5f && outPeak > 0.01f, "Out did not move track 1 off Main");
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, del));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, rev));
 
 		// The state: Kit and mixer, read back by another Device
 		std::vector<uint8_t> state;
@@ -480,38 +508,189 @@ namespace
 		std::printf("32 blocks with a note, a CC and an LFO message each: no allocation\n");
 	}
 
+	// The Telemetry the editor reads (ticket 16): a note's Track and Main peak while the other Tracks stay silent, and
+	// its Hit is counted; a muted Track's Hit is not; the Hit's capture is the Track's output from where the Hit sounds.
+	// Then what writing it costs: the Device's own peak pass over 18 outputs and 16 captures at once, timed alone (at
+	// most 1 % of one core), and the whole Device with and without it, side by side, for information.
+	void telemetry(const std::vector<uint8_t>& _flash)
+	{
+		{
+			Rig rig(_flash, 44100.0f);
+			rig.settle();
+			auto& t = *rig.telemetry;
+			for(int output = 0; output < mdDrums::Telemetry::OutputCount; ++output)
+				t.takePeak(output);
+			const auto before = t.hits(0);
+			rig.send(MidiEventSource::Host, {0x90, 36, 100});
+			rig.listen(0, 20);
+			const auto main = std::max(t.takePeak(0), t.takePeak(1)), own = t.takePeak(2);
+			float others = 0;
+			for(int output = 3; output < mdDrums::Telemetry::OutputCount; ++output)
+				others = std::max(others, t.takePeak(output));
+			std::printf("telemetry: note 36, Main peak %.4f, Out 01 %.4f, the other Outs %.4f, Hits of track 1 %u -> %u\n",
+				main, own, others, before, t.hits(0));
+			require(main > 0.01f && own > 0.01f && others == 0.0f, "the peaks do not follow the note");
+			require(t.hits(0) == before + 1, "the Hit was not counted");
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 1));
+			rig.send(MidiEventSource::Host, {0x90, 36, 100});
+			rig.listen(0, 4);
+			require(t.hits(0) == before + 1, "a muted Track's Hit was counted");
+		}
+
+		// The Hit capture (ticket 21): from the sample the Hit sounds, the note plus 31, min/max columns of 8 samples of
+		// the Track's own output exactly as it was rendered
+		{
+			Rig rig(_flash, 44100.0f);
+			rig.settle();
+			constexpr uint32_t offset = 100;
+			rig.send(MidiEventSource::Host, {0x90, 36, 110}, offset);
+			std::vector<float> own;
+			for(int b = 0; b < 8; ++b)
+			{
+				rig.process();
+				own.insert(own.end(), rig.buffers[2].begin(), rig.buffers[2].end());
+			}
+			mdDrums::Telemetry::Capture capture;
+			require(rig.telemetry->readCapture(0, false, capture), "no capture of the Hit");
+			const size_t start = offset + mdDrums::Engine::SampleAccurateDelay;
+			const auto full = std::min<size_t>(static_cast<size_t>(capture.count), (own.size() - start) / mdDrums::Telemetry::ColumnSamples);
+			size_t wrong = 0;
+			float peak = 0;
+			for(size_t c = 0; c < full; ++c)
+			{
+				const auto first = own.begin() + static_cast<ptrdiff_t>(start + c * mdDrums::Telemetry::ColumnSamples);
+				const auto [low, high] = std::minmax_element(first, first + mdDrums::Telemetry::ColumnSamples);
+				const auto toColumn = [](const float _v) { return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L)); };
+				wrong += capture.columns[c][0] != toColumn(*low) || capture.columns[c][1] != toColumn(*high);
+				peak = std::max({peak, std::abs(*low), std::abs(*high)});
+			}
+			std::printf("capture: Hit of velocity %u, %d columns, %zu compared with Out 01 from the note plus 31, %zu differ,"
+				" peak %.3f\n", capture.velocity, capture.count, full, wrong, peak);
+			require(capture.velocity == 110 && full > 400 && wrong == 0 && peak > 0.01f, "the capture is not the Track's output");
+		}
+
+		// The peak pass alone: what Device::render adds after the engine, over 18 outputs of 512 samples
+		{
+			std::vector<std::vector<float>> outputs(mdDrums::Telemetry::OutputCount, std::vector<float>(Rig::Block));
+			uint32_t random = 0x2468aceu;
+			for(auto& output : outputs)
+				for(auto& value : output)
+				{
+					random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+					value = static_cast<float>(static_cast<int32_t>(random)) / 2147483648.0f;
+				}
+			auto telemetry = std::make_unique<mdDrums::Telemetry>();	// too large for the stack with its captures
+			auto& t = *telemetry;
+			constexpr int blocks = 20000;
+			const auto start = std::chrono::steady_clock::now();
+			for(int b = 0; b < blocks; ++b)
+			{
+				for(int output = 0; output < mdDrums::Telemetry::OutputCount; ++output)
+				{
+					float peak = 0.0f;
+					for(const auto value : outputs[static_cast<size_t>(output)])
+						peak = std::max(peak, std::abs(value));
+					t.raisePeak(output, peak * (1.0f + static_cast<float>(b & 1)));
+					if(output == 0 && (b & 63) == 0)
+						t.takePeak(0);
+				}
+				// And the worst case of the Hit captures: all 16 Tracks capturing, struck again as each capture fills
+				for(int track = 0; track < mdDrums::Telemetry::TrackCount; ++track)
+				{
+					if(b % 68 == 0)
+						t.beginCapture(track, 100);
+					const auto& samples = outputs[2 + static_cast<size_t>(track)];
+					for(size_t i = 0; i < samples.size(); i += mdDrums::Telemetry::ColumnSamples)
+					{
+						const auto [low, high] = std::minmax_element(samples.begin() + static_cast<ptrdiff_t>(i),
+							samples.begin() + static_cast<ptrdiff_t>(i + mdDrums::Telemetry::ColumnSamples));
+						t.addColumn(track, static_cast<int16_t>(*low * 32767.0f), static_cast<int16_t>(*high * 32767.0f));
+					}
+				}
+			}
+			const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+			const auto audio = blocks * static_cast<double>(Rig::Block) / 44100.0;
+			std::printf("telemetry: the peak pass and 16 captures cost %.3f %% of one core\n", seconds / audio * 100.0);
+			require(seconds / audio <= 0.01, "the telemetry costs more than 1 % of one core");
+		}
+
+		// The whole Device with and without it, block by block side by side
+		{
+			Rig with(_flash, 44100.0f, true), without(_flash, 44100.0f, false);
+			with.settle();
+			without.settle();
+			double withSeconds = 0, withoutSeconds = 0;
+			constexpr uint32_t blocks = 700;
+			for(uint32_t b = 0; b < blocks; ++b)
+			{
+				for(auto* rig : {&with, &without})
+				{
+					rig->send(MidiEventSource::Host, {0x90, static_cast<uint8_t>(36 + b % 16), 100});
+					const auto start = std::chrono::steady_clock::now();
+					rig->process();
+					const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+					(rig == &with ? withSeconds : withoutSeconds) += seconds;
+				}
+			}
+			const auto audio = blocks * static_cast<double>(Rig::Block) / 44100.0;
+			std::printf("telemetry: the Device, 16 tracks struck, %.2f %% of one core with it, %.2f %% without\n",
+				withSeconds / audio * 100.0, withoutSeconds / audio * 100.0);
+		}
+	}
+
 	// Note to sound through the Plugin: TRX-BD on track 1, 48 notes at pseudo-random samples of 512-sample host blocks,
-	// to the first nonzero sample
+	// to the first sample of Main above -100 dBFS
 	void latency(const std::vector<uint8_t>& _flash, const float _rate)
 	{
 		Rig rig(_flash, _rate);
 		rig.send(MidiEventSource::Editor, *sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16));
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
+		// No sends: Main falls back below -100 dBFS between the notes (the master effects' EQ and Dynamix keep a tail of a
+		// few LSB, as on the Machinedrum)
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, 0));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, 0));
 		uint32_t random = 0x16305eedu;
-		int minimum = 1 << 30, maximum = 0;
-		double sum = 0;
+		struct Stats
+		{
+			int minimum = 1 << 30, maximum = 0;
+			double sum = 0;
+			void add(const int _first)
+			{
+				require(_first >= 0, "a note stayed silent");
+				minimum = std::min(minimum, _first);
+				maximum = std::max(maximum, _first);
+				sum += _first;
+			}
+		};
+		Stats main, out;
 		for(int note = 0; note < 48; ++note)
 		{
 			rig.listen(0, static_cast<uint32_t>(_rate / Rig::Block));
 			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
 			const auto offset = random % Rig::Block;
 			rig.send(MidiEventSource::Host, {0x90, 36, 100}, offset);
-			int first = -1;
-			for(uint32_t b = 0, position = 0; b < 8 && first < 0; ++b, position += Rig::Block)
+			int firstMain = -1, firstOut = -1;
+			for(uint32_t b = 0, position = 0; b < 8 && (firstMain < 0 || firstOut < 0); ++b, position += Rig::Block)
 			{
 				rig.process();
-				for(uint32_t s = 0; s < Rig::Block && first < 0; ++s)
-					if(rig.buffers[0][s] != 0.0f || rig.buffers[1][s] != 0.0f)
-						first = static_cast<int>(position + s) - static_cast<int>(offset);
+				for(uint32_t s = 0; s < Rig::Block; ++s)
+				{
+					const auto at = static_cast<int>(position + s) - static_cast<int>(offset);
+					if(firstMain < 0 && (std::abs(rig.buffers[0][s]) > 1e-5f || std::abs(rig.buffers[1][s]) > 1e-5f))
+						firstMain = at;
+					if(firstOut < 0 && rig.buffers[2][s] != 0.0f)
+						firstOut = at;
+				}
 			}
-			require(first >= 0, "a note stayed silent");
-			minimum = std::min(minimum, first);
-			maximum = std::max(maximum, first);
-			sum += first;
+			main.add(firstMain);
+			out.add(firstOut);
 		}
-		std::printf("note to sound at %.0f Hz (TRXBD, 48 notes): %d-%d samples, mean %.1f (%.2f ms), jitter %d (%.2f ms),"
-			" reported %u\n", _rate, minimum, maximum, sum / 48, sum / 48 * 1000.0 / _rate, maximum - minimum,
-			(maximum - minimum) * 1000.0 / _rate, rig.plugin->getLatencyMidiToOutput());
+		const auto ms = [&](const double _samples) { return _samples * 1000.0 / _rate; };
+		std::printf("note to sound at %.0f Hz (TRXBD, 48 notes), reported %u: Main %d-%d samples, mean %.1f (%.2f ms),"
+			" jitter %d (%.2f ms); Out 01 %d-%d samples, mean %.1f (%.2f ms), jitter %d\n", _rate,
+			rig.plugin->getLatencyMidiToOutput(), main.minimum, main.maximum, main.sum / 48, ms(main.sum / 48),
+			main.maximum - main.minimum, ms(main.maximum - main.minimum), out.minimum, out.maximum, out.sum / 48,
+			ms(out.sum / 48), out.maximum - out.minimum);
 	}
 }
 
@@ -532,6 +711,7 @@ int main()
 		allocations(flash);
 		latency(flash, 44100.0f);
 		latency(flash, 48000.0f);
+		telemetry(flash);
 		std::printf("mdDrumsDeviceTest: PASS\n");
 		return 0;
 	}

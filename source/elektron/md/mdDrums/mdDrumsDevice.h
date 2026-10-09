@@ -2,6 +2,7 @@
 
 #include "mdDrumsEngine.h"
 #include "mdDrumsMessages.h"
+#include "mdDrumsTelemetry.h"
 
 #include "synthLib/device.h"
 
@@ -23,12 +24,15 @@ namespace mdDrums
 		static constexpr int FirstNote = 36;
 		static constexpr int FirstLockNote = 64;	// SYN1 to LFOM, the engine's parameter order; velocity: lockValue()
 		static constexpr int OutputCount = Engine::OutputCount;	// Main left and right, then Out 01 to 16
-		// The engine starts a Hit at its next 32-sample block: about 21 samples on average, a voice's own start aside
-		static constexpr uint32_t InternalLatency = 21;
+		// Every Hit sounds 31 samples after its note (Engine::SampleAccurateDelay), then its voice starts: 4 samples for
+		// most machines (TRX-SD, -CH, EFM, E12, P-I; 12 for ROM, 36 for TRX-BD, which sounds a block later;
+		// mdDrumsEngineTest). The latency reported is Main's, which comes Engine::MasterDelay after the Outs.
+		static constexpr uint32_t InternalLatency = Engine::SampleAccurateDelay + 4 + Engine::MasterDelay;
 
 		// _params.romData: the 8 MB Machinedrum UW flash image with OS 1.63. Throws synthLib::DeviceException without
-		// a usable one.
-		explicit Device(const synthLib::DeviceCreateParams& _params);
+		// a usable one. _telemetry takes its outputs' peaks and its Hits (none without it); the Device shares it, so that it
+		// stays valid while the Device lives, whoever goes first.
+		explicit Device(const synthLib::DeviceCreateParams& _params, std::shared_ptr<Telemetry> _telemetry = {});
 		~Device() override;
 
 		float getSamplerate() const override { return static_cast<float>(Engine::SampleRate); }
@@ -51,6 +55,8 @@ namespace mdDrums
 
 		const md::automation::sysex::MdKit& kit() const { return m_kit; }
 		const messages::Mixer& mixer() const { return m_mixer; }
+		// The OS's tables the Tracks' effects read (Engine::fxTables), for the editor's Filter and EQ screen
+		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const { return m_engine ? m_engine->fxTables() : nullptr; }
 
 	protected:
 		void readMidiOut(std::vector<synthLib::SMidiEvent>& _midiOut) override;
@@ -66,10 +72,24 @@ namespace mdDrums
 		void reportMachines();
 		void applyMixer();
 		void render(const synthLib::TAudioOutputs& _outputs, size_t _offset, size_t _count);
+		void capture(const std::array<float*, Engine::OutputCount>& _outputs, size_t _count);
 		void queueOut(const synthLib::SMidiEvent& _event);
 
 		std::unique_ptr<Engine> m_engine;
+		std::shared_ptr<Telemetry> m_telemetry;
 		bool m_valid = false;
+
+		// The Hit captures being written (Telemetry::beginCapture): from the sample a Hit sounds, a column of 8 samples at
+		// a time, until the capture is full or the Track's next Hit starts another
+		struct Capture
+		{
+			bool active = false;
+			int64_t start = 0;	// the sample the Hit sounds
+			int filled = 0;		// samples in the column being made
+			float low = 0.0f, high = 0.0f;
+		};
+		std::array<Capture, Engine::TrackCount> m_captures{};
+		int64_t m_position = 0;	// samples rendered so far
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 

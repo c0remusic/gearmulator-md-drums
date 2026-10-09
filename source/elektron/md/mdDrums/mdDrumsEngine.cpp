@@ -1,5 +1,6 @@
 #include "mdDrumsEngine.h"
 
+#include "Dsp56.h"
 #include "MdEngine.h"
 #include "Firmware.h"
 
@@ -32,14 +33,143 @@ namespace mdDrums
 		}
 	}
 
+	// Sample-accurate Hits (ticket 19 of the editor map). The voice DSP starts a Hit at its next 32-sample block, 0 to 31
+	// samples after the note. Each Track's contributions to the mix (main left and right, its REV and DEL sends, its
+	// own output) go through a delay of 31 less that wait, set by its Hit, so that every Hit sounds 31 samples after its
+	// note, its own voice's start aside. The contributions are the products the mixer DSP sums (Mixer::gains): the
+	// level a Hit sets, PAN and the sends move with the Hit, and the sum wraps as the DSP's does, so equal delays give
+	// the engine's own mix, shifted.
 	struct Engine::State
 	{
-		explicit State(md::fw::FlashOs _os) : engine(_os.firmware, std::move(_os.osImage)) {}
+		explicit State(md::fw::FlashOs _os) : engine(_os.firmware, std::move(_os.osImage))
+		{
+			engine.mixOn = false;
+			engine.enableMaster(_os.firmware);
+			pending.fill(-1);
+			chokeDelay.fill(-1);
+		}
+
+		static constexpr int Ring = 64;	// a block, plus the longest delay
+		static constexpr int Mask = Ring - 1;
+		static constexpr int Channels = 6;	// main L R, REV L R, DEL L R
+
+		struct Lane
+		{
+			std::array<std::array<md::engine::d56::Acc, Channels>, Ring> mix{};
+			std::array<md::engine::d56::Acc, Ring> solo{};	// the Track's own output, before the limiter
+		};
 
 		md::engine::Engine engine;
 		md::engine::Engine::Output out;
-		size_t used = BlockSize;	// samples of out already handed out
+		size_t used = BlockSize;	// samples of the output block already handed out
+
+		bool sampleAccurate = true;
+		int64_t blockStart = 0;	// the engine's time at the next block it renders
+		std::array<int, TrackCount> delay{};
+		std::array<int, TrackCount> pending{};		// the delay a Hit set, from the block it lands in; -1 none
+		std::array<int, TrackCount> chokeDelay{};	// the delay of the Hit that chokes the Track; -1 none
+		std::array<bool, TrackCount> wasChoked{};
+		std::array<Lane, TrackCount> lanes{};
+
+		// The output block: the master effects' inputs (the dry main mix and the two sends), Main after them, each Track's
+		// own output
+		md::engine::Mixer::Stereo dry{};
+		md::engine::Mixer::Stereo rev{};
+		md::engine::Mixer::Stereo del{};
+		md::engine::Mixer::Stereo main{};
+		std::array<std::array<int32_t, BlockSize>, TrackCount> solo{};
+
+		void renderBlock();
 	};
+
+	void Engine::State::renderBlock()
+	{
+		using namespace md::engine::d56;
+		if(!engine.render(out))
+			throw std::runtime_error("Machinedrum engine fault: " + engine.fault());
+		const auto start = blockStart;
+		blockStart += BlockSize;
+		auto& host = engine.host();
+
+		for(int t = 0; t < TrackCount; ++t)
+		{
+			if(pending[t] >= 0)
+			{
+				delay[t] = pending[t];
+				pending[t] = -1;
+			}
+			// A Choke the engine has just applied: the tail the Track would still play once the choking Hit sounds goes
+			const auto choked = host.choked(t);
+			if(choked && !wasChoked[t] && chokeDelay[t] >= 0)
+			{
+				for(auto time = start + chokeDelay[t]; time < start + delay[t]; ++time)
+				{
+					lanes[t].mix[time & Mask] = {};
+					lanes[t].solo[time & Mask] = 0;
+				}
+				chokeDelay[t] = -1;
+			}
+			wasChoked[t] = choked;
+		}
+
+		for(int t = 0; t < TrackCount; ++t)
+		{
+			const auto& samples = out.tracks[t];
+			if(std::all_of(samples.begin(), samples.end(), [](const int32_t _s) { return _s == 0; }))
+				continue;
+			const auto& words = host.mixerInput(t).mix;
+			std::array<int32_t, Channels> gains{};
+			const bool main = engine.mixer().gains(words, (engine.dryMute >> t) & 1, gains);
+			const auto vol = sx24(words[1]);
+			auto& lane = lanes[t];
+			for(int i = 0; i < BlockSize; ++i)
+			{
+				const auto slot = (start + i + delay[t]) & Mask;
+				if(main)
+					for(int c = 0; c < Channels; ++c)
+						lane.mix[slot][c] = add(lane.mix[slot][c], mpy(gains[c], samples[i]));
+				// Mixer::solo, before its limiter
+				lane.solo[slot] = add(lane.solo[slot], asl(mpy(samples[i], vol), 4));
+			}
+		}
+
+		for(int i = 0; i < BlockSize; ++i)
+		{
+			const auto slot = (start + i) & Mask;
+			std::array<Acc, Channels> sum{};
+			for(int t = 0; t < TrackCount; ++t)
+			{
+				auto& lane = lanes[t];
+				for(int c = 0; c < Channels; ++c)
+					sum[c] = add(sum[c], lane.mix[slot][c]);
+				lane.mix[slot] = {};
+				solo[t][i] = lim(lane.solo[slot]);
+				lane.solo[slot] = 0;
+			}
+			dry[i] = {md::engine::Mixer::mainSample(sum[0]), md::engine::Mixer::mainSample(sum[1])};
+			rev[i] = {md::engine::Mixer::mainSample(sum[2]), md::engine::Mixer::mainSample(sum[3])};
+			del[i] = {md::engine::Mixer::mainSample(sum[4]), md::engine::Mixer::mainSample(sum[5])};
+		}
+		if(!engine.processMaster(dry, rev, del, main))
+			throw std::runtime_error("Machinedrum master effects fault: " + engine.fault());
+	}
+
+	const std::array<uint8_t, Engine::MasterCount>& Engine::masterDefaults()
+	{
+		// Gate Box DVOL PRED DEC DAMP HP LP GATE LEV, Rhythm Echo TIME MOD MFRQ FB FLTF FLTW MONO LEV, EQ LF LG HF HG PF PG
+		// PQ GAIN, Dynamix ATCK REL TRHD RTIO KNEE HP OUTG MIX
+		static const std::array<uint8_t, MasterCount> defaults{
+			0, 0, 68, 50, 1, 82, 71, 109,
+			16, 0, 32, 27, 0, 44, 0, 71,
+			64, 64, 64, 64, 64, 64, 64, 127,
+			127, 127, 127, 127, 127, 127, 0, 0};
+		return defaults;
+	}
+
+	void Engine::setMaster(const int _index, const int _value)
+	{
+		m_state->engine.host().setMaster(_index, _value);
+	}
 
 	const std::array<const char*, Engine::ParamCount>& Engine::paramNames()
 	{
@@ -99,13 +229,23 @@ namespace mdDrums
 				host.setParam(track, param, paramDefaults()[param]);
 			host.setLevel(track, DefaultLevel);
 		}
+		for(int index = 0; index < MasterCount; ++index)
+			host.setMaster(index, masterDefaults()[index]);
 	}
 
 	Engine::~Engine() = default;
 
+	static_assert(Engine::MasterDelay == md::engine::MasterEngine::MainDelay);
+	static_assert(Engine::MasterCount == md::engine::HostModel<>::kMasterParams);
+
 	const std::vector<md::engine::MachineInfo>& Engine::machines() const
 	{
 		return m_state->engine.os().machines();
+	}
+
+	std::shared_ptr<const md::engine::TrackFx::Tables> Engine::fxTables() const
+	{
+		return m_state->engine.tables();
 	}
 
 	void Engine::setMachine(const int _track, const uint8_t _machineId)
@@ -163,9 +303,46 @@ namespace mdDrums
 		m_state->engine.host().setTempo(_bpm);
 	}
 
-	void Engine::trigger(const int _track, const int _velocity)
+	uint32_t Engine::trigger(const int _track, const int _velocity)
 	{
-		m_state->engine.host().trigger(_track, std::clamp(_velocity, 1, 127));
+		if(_track < 0 || _track >= TrackCount)
+			return 0;
+		auto& state = *m_state;
+		auto& host = state.engine.host();
+		host.trigger(_track, std::clamp(_velocity, 1, 127));
+		if(host.muted(_track))
+			return 0;
+		const auto link = host.link(_track);
+		const bool linked = link < TrackCount && link != _track && !host.muted(link);
+		const uint32_t struck = (1u << _track) | (linked ? 1u << link : 0u);
+		if(!state.sampleAccurate)
+			return struck;
+
+		// The Hit lands BlockSize - used samples from now: its Track waits the rest of the 31, and so does its Link,
+		// which the engine hits in the same block. Its Choke's target is cut as late after the choke as this Hit sounds.
+		const auto delay = static_cast<int>(state.used) - 1;
+		state.pending[_track] = delay;
+		if(linked)
+			state.pending[link] = delay;
+		if(const auto choke = host.choke(_track); choke < TrackCount && choke != _track)
+			state.chokeDelay[choke] = delay;
+		return struck;
+	}
+
+	void Engine::setSampleAccurate(const bool _on)
+	{
+		auto& state = *m_state;
+		state.sampleAccurate = _on;
+		if(_on)
+			return;
+		state.delay.fill(0);
+		state.pending.fill(-1);
+		state.chokeDelay.fill(-1);
+	}
+
+	bool Engine::isSampleAccurate() const
+	{
+		return m_state->sampleAccurate;
 	}
 
 	void Engine::setSeparateOutputs(const uint32_t _tracks)
@@ -190,8 +367,7 @@ namespace mdDrums
 		{
 			if(state.used == BlockSize)
 			{
-				if(!state.engine.render(state.out))
-					throw std::runtime_error("Machinedrum engine fault: " + state.engine.fault());
+				state.renderBlock();
 				state.used = 0;
 			}
 			const auto count = std::min(_count - done, BlockSize - state.used);
@@ -199,17 +375,16 @@ namespace mdDrums
 			{
 				if(auto* output = _outputs[channel])
 					for(size_t i = 0; i < count; ++i)
-						output[done + i] = static_cast<float>(state.out.mix.main[state.used + i][channel]) * scale;
+						output[done + i] = static_cast<float>(state.main[state.used + i][channel]) * scale;
 			}
 			for(int track = 0; track < TrackCount; ++track)
 			{
 				auto* output = _outputs[2 + track];
 				if(!output)
 					continue;
-				const auto vol = state.engine.host().mixerInput(track).mix[1];
-				const auto& samples = state.out.tracks[track];
+				const auto& samples = state.solo[track];
 				for(size_t i = 0; i < count; ++i)
-					output[done + i] = static_cast<float>(md::engine::Mixer::solo(samples[state.used + i], vol)) * scale;
+					output[done + i] = static_cast<float>(samples[state.used + i]) * scale;
 			}
 			state.used += count;
 			done += count;

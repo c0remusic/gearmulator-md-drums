@@ -1,8 +1,8 @@
 // MD Drums' processor as a host drives it, at 44.1 and 48 kHz: 576 host parameters in the order and with the IDs the
 // port froze, a note 36-51 sounding its Track and other notes nothing, host automation of a Track's machine reaching
 // the Device, SYN1 named after the machine, the Out parameter taking a Track off Main whatever the host does with its
-// bus, and the state bringing back the Device's Kit and mixer and the parameters with them. It reports the note-to-
-// sound latency through the whole plug-in.
+// bus, and the state bringing back the Device's Kit and mixer and the parameters with them; a Track played from the
+// editor sounds the machine chosen just before. It reports the note-to-sound latency through the whole plug-in.
 
 #include "mdDrumsProcessor.h"
 
@@ -45,9 +45,13 @@ namespace
 
 	constexpr int g_block = 512;
 
+	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
+	// silent below -100 dBFS rather than at 0
+	constexpr float g_silence = 1e-5f;
+
 	struct Result
 	{
-		int first = -1;		// host samples from the note to the first nonzero sample of Main
+		int first = -1;		// host samples from the note to the first sample of Main above -100 dBFS
 		float peak = 0;		// Main
 		double energy = 0;
 		float outPeak = 0;	// Out 01, when the host enables it (channels 2 on)
@@ -78,7 +82,7 @@ namespace
 			{
 				const auto left = buffer.getSample(0, s), right = buffer.getSample(1, s);
 				const auto value = std::max(std::abs(left), std::abs(right));
-				if(result.first < 0 && value != 0.0f)
+				if(result.first < 0 && value > g_silence)
 					result.first = position + s - _offset;
 				result.peak = std::max(result.peak, value);
 				result.energy += double(value) * value;
@@ -115,6 +119,65 @@ namespace
 		const auto* d = dynamic_cast<const mdDrums::Device*>(_processor.getPlugin().getDevice());
 		require(d != nullptr, "the processor has no MD Drums Device");
 		return *d;
+	}
+
+	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
+	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
+	// new name reaches the Device; a machine changed tells the host its SYN1-8
+	void kits(mdDrums::Processor& _processor)
+	{
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
+		auto* bank = _processor.getBank();
+		require(bank != nullptr && bank->slot(3).has_value(), "no Bank, or no Kit in its Slot 4");
+		const auto kit = *bank->slot(3);
+		const auto mixer = device(_processor).mixer();
+		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
+		juce::MidiBuffer midi;
+		const auto block = [&]
+		{
+			process(_processor, buffer, midi);
+			_processor.getController().processPendingMidiMessages();
+		};
+
+		controller.loadKit(kit, 3);
+		block();
+		require(device(_processor).kit() == kit, "the Device does not play the Kit loaded");
+		require(device(_processor).mixer() == mixer, "loading a Kit changed the mixer");
+		require(controller.playedSlot() == 3 && controller.playedKit() == kit, "the Kit played is not the one loaded");
+		require(parameter(_processor, "Machine", 0).getUnnormalizedValue() == kit.machine(0)
+			&& parameter(_processor, "FLTF", 2).getUnnormalizedValue() == kit.parameters[2][12]
+			&& parameter(_processor, "Level", 5).getUnnormalizedValue() == kit.levels[5],
+			"the parameters do not follow the Kit loaded");
+		automate(_processor, "FLTF", 2, kit.parameters[2][12] == 99 ? 98 : 99);
+		require(controller.playedKit() != kit, "a parameter changed does not make the Kit differ from its Slot");
+
+		juce::MemoryBlock state;
+		static_cast<juce::AudioProcessor&>(_processor).getStateInformation(state);
+		mdDrums::Processor restored(true);
+		static_cast<juce::AudioProcessor&>(restored).setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+		const auto& restoredController = dynamic_cast<mdDrums::Controller&>(restored.getController());
+		require(restoredController.playedSlot() == 3 && restoredController.playedKit() == controller.playedKit(),
+			"the state did not bring back the Kit played and its Slot");
+
+		controller.renameKit("RENAMED");
+		block();
+		require(device(_processor).kit().displayName() == "RENAMED" && controller.playedKit().displayName() == "RENAMED",
+			"a new name did not reach the Device");
+
+		struct Counter final : juce::AudioProcessorParameter::Listener
+		{
+			int changes = 0;
+			void parameterValueChanged(int, float) override { ++changes; }
+			void parameterGestureChanged(int, bool) override {}
+		} counter;
+		auto& syn1 = parameter(_processor, "SYN1", 0);
+		syn1.addListener(&counter);
+		automate(_processor, "Machine", 0, kit.machine(0) == 17 ? 16 : 17);
+		syn1.removeListener(&counter);
+		require(counter.changes > 0, "the host was not told SYN1 after a machine change");
+		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
+			" the state; renamed; SYN1 told to the host %d time(s) after a machine change\n", kit.displayName().c_str(),
+			counter.changes);
 	}
 
 	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
@@ -223,13 +286,16 @@ int main()
 			require(parameter(processor, "Machine", 0).getUnnormalizedValue() == 28
 				&& parameter(processor, "Level", 0).getUnnormalizedValue() == device(processor).kit().levels[0],
 				"the parameters do not start as the Device");
+			// Track 1 without sends: no Echo or Gate Box tail on Main from one note to the next
+			automate(processor, "DEL", 0, 0);
+			automate(processor, "REV", 0, 0);
 
 			const auto kick = play(processor, 36, 200, rate);
 			const auto none = play(processor, 60, 200, rate);
 			std::printf("%.0f Hz: note 36 at sample 200: first sound %d samples later, peak %.4f; note 60: peak %.4f\n",
 				rate, kick.first, kick.peak, none.peak);
 			require(kick.first >= 0 && kick.peak > 0.01f, "note 36 is silent");
-			require(none.peak == 0.0f, "a note outside 36-51 sounded");
+			require(none.peak < g_silence, "a note outside 36-51 sounded");
 
 			// The host automates track 1's machine: TRX-B2 to EFM-BD (id 32)
 			const auto before = play(processor, 36, 0, rate);
@@ -244,6 +310,35 @@ int main()
 			require(parameter(processor, "SYN1", 0).getUnnormalizedValue() == device(processor).kit().parameters[0][0],
 				"SYN1 does not follow the machine's default");
 
+			// The editor plays a Track (Listen while choosing): a machine chosen, the Track played at once, sounds the
+			// machine chosen, its note reaching the Device after the machine in the same block
+			{
+				juce::AudioBuffer<float> buffer(host.getTotalNumOutputChannels(), g_block);
+				juce::MidiBuffer midi;
+				const auto blocks = static_cast<int>(rate / g_block);
+				for(int i = 0; i < blocks; ++i)
+					process(processor, buffer, midi);
+				parameter(processor, "Machine", 0).setUnnormalizedValueNotifyingHost(28, pluginLib::Parameter::Origin::Ui);
+				dynamic_cast<mdDrums::Controller&>(processor.getController()).audition(0, 100);
+				double energy = 0;
+				for(int i = 0; i < blocks; ++i)
+				{
+					process(processor, buffer, midi);
+					for(int s = 0; s < g_block; ++s)
+					{
+						const auto value = std::max(std::abs(buffer.getSample(0, s)), std::abs(buffer.getSample(1, s)));
+						energy += double(value) * value;
+					}
+				}
+				// The same machine at its defaults, struck by the host
+				const auto host36 = play(processor, 36, 0, rate);
+				std::printf("%.0f Hz: TRX-B2 chosen and played from the editor: energy %.3f; struck by the host %.3f, EFM-BD %.3f\n",
+					rate, energy, host36.energy, after.energy);
+				require(device(processor).kit().machine(0) == 28, "the machine chosen did not reach the Device");
+				require(std::abs(energy - host36.energy) < host36.energy * 0.02, "the editor's note did not sound the machine chosen");
+				automate(processor, "Machine", 0, 32);
+			}
+
 			// Out: track 1 leaves Main whether or not the host takes its bus
 			automate(processor, "Out", 0, 1);
 			const auto offMain = play(processor, 36, 0, rate);
@@ -254,7 +349,7 @@ int main()
 			const auto onOut = play(processor, 36, 0, rate);
 			std::printf("%.0f Hz: track 1 on its Out: Main %.4f without the bus, Main %.4f and Out 01 %.4f with it\n", rate,
 				offMain.peak, onOut.peak, onOut.outPeak);
-			require(offMain.peak == 0.0f && onOut.peak == 0.0f && onOut.outPeak > 0.01f,
+			require(offMain.peak < g_silence && onOut.peak < g_silence && onOut.outPeak > 0.01f,
 				"the Out parameter did not move track 1 off Main");
 			layout.outputBuses.getReference(1) = juce::AudioChannelSet::disabled();
 			require(host.setBusesLayout(layout), "the host cannot disable Out 01");
@@ -279,7 +374,10 @@ int main()
 
 			automate(processor, "Out", 0, 0);
 			if(rate == 44100.0)
+			{
+				kits(processor);
 				editor(processor);
+			}
 			latency(processor, rate);
 		}
 		std::cout << "mdDrumsProcessorTest: PASS\n";

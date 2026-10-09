@@ -6,6 +6,7 @@
 #include "synthLib/deviceException.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace mdDrums
@@ -36,7 +37,8 @@ namespace mdDrums
 		}
 	}
 
-	Device::Device(const synthLib::DeviceCreateParams& _params) : synthLib::Device(_params)
+	Device::Device(const synthLib::DeviceCreateParams& _params, std::shared_ptr<Telemetry> _telemetry)
+		: synthLib::Device(_params), m_telemetry(std::move(_telemetry))
 	{
 		const auto kit = messages::factoryKit(_params.romData);
 		try
@@ -139,6 +141,51 @@ namespace mdDrums
 		for(size_t channel = 0; channel < OutputCount; ++channel)
 			outputs[channel] = _outputs[channel] ? _outputs[channel] + _offset : nullptr;
 		m_engine->render(outputs.data(), _count);
+		if(m_telemetry)
+		{
+			for(int channel = 0; channel < OutputCount; ++channel)
+			{
+				const auto* samples = outputs[static_cast<size_t>(channel)];
+				if(!samples)
+					continue;
+				float peak = 0.0f;
+				for(size_t i = 0; i < _count; ++i)
+					peak = std::max(peak, std::abs(samples[i]));
+				if(peak > 0.0f)
+					m_telemetry->raisePeak(channel, peak);
+			}
+			capture(outputs, _count);
+		}
+		m_position += static_cast<int64_t>(_count);
+	}
+
+	void Device::capture(const std::array<float*, Engine::OutputCount>& _outputs, const size_t _count)
+	{
+		const auto toColumn = [](const float _v)
+		{
+			return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L));
+		};
+		for(int track = 0; track < Engine::TrackCount; ++track)
+		{
+			auto& c = m_captures[static_cast<size_t>(track)];
+			const auto* samples = _outputs[2 + static_cast<size_t>(track)];
+			if(!c.active || !samples)
+				continue;
+			for(size_t i = 0; i < _count; ++i)
+			{
+				if(m_position + static_cast<int64_t>(i) < c.start)
+					continue;
+				const auto value = samples[i];
+				c.low = c.filled ? std::min(c.low, value) : value;
+				c.high = c.filled ? std::max(c.high, value) : value;
+				if(++c.filled < Telemetry::ColumnSamples)
+					continue;
+				c.filled = 0;
+				c.active = m_telemetry->addColumn(track, toColumn(c.low), toColumn(c.high));
+				if(!c.active)
+					break;
+			}
+		}
 	}
 
 	void Device::queueOut(const synthLib::SMidiEvent& _event)
@@ -160,10 +207,25 @@ namespace mdDrums
 		{
 			const auto track = static_cast<int>(_event.b) - FirstNote;
 			const auto param = static_cast<int>(_event.b) - FirstLockNote;
-			if(track >= 0 && track < Engine::TrackCount)
-				m_engine->trigger(track, _event.c);
-			else if(param >= 0 && param < Engine::ParamCount)
+			if(param >= 0 && param < Engine::ParamCount)
+			{
 				m_engine->lock(_event.a & 0x0f, param, messages::lockValue(_event.c));
+				return;
+			}
+			if(track < 0 || track >= Engine::TrackCount)
+				return;
+			const auto struck = m_engine->trigger(track, _event.c);
+			if(!m_telemetry)
+				return;
+			// Each struck Track counts a Hit and starts a capture where the Hit sounds
+			for(int t = 0; t < Engine::TrackCount; ++t)
+			{
+				if(!(struck & (1u << t)))
+					continue;
+				m_telemetry->hit(t);
+				m_telemetry->beginCapture(t, _event.c);
+				m_captures[static_cast<size_t>(t)] = {true, m_position + Engine::SampleAccurateDelay, 0, 0.0f, 0.0f};
+			}
 			return;
 		}
 		if(status == synthLib::M_CONTROLCHANGE && _event.source != synthLib::MidiEventSource::Host)
@@ -215,6 +277,9 @@ namespace mdDrums
 			case messages::Command::Mixer:
 				m_mixer = own->mixer;
 				break;
+			case messages::Command::KitName:
+				m_kit.name = own->name;
+				return;
 			}
 			applyMixer();
 			return;
@@ -231,9 +296,12 @@ namespace mdDrums
 		{
 			if(!isMachinedrumSysex(_event, static_cast<uint8_t>(g_masterEffect + effect), 10))
 				continue;
-			// Kept in the Kit; the master effects play from ticket 09 on
 			if(s[7] < sysex::MasterEffectParameters)
-				m_kit.masterEffects[g_masterBlock[effect] * sysex::MasterEffectParameters + s[7]] = s[8];
+			{
+				const auto index = g_masterBlock[effect] * sysex::MasterEffectParameters + s[7];
+				m_kit.masterEffects[index] = s[8];
+				m_engine->setMaster(index, s[8]);
+			}
 			return;
 		}
 		if(isMachinedrumSysex(_event, g_lfoChange, 10))
@@ -324,6 +392,9 @@ namespace mdDrums
 			m_engine->setLink(track, m_kit.links[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.links[track]);
 			m_engine->setChoke(track, m_kit.chokes[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.chokes[track]);
 		}
+		// The dump keeps the master effects in the engine's order
+		for(int index = 0; index < Engine::MasterCount; ++index)
+			m_engine->setMaster(index, m_kit.masterEffects[static_cast<size_t>(index)]);
 	}
 
 	void Device::applyMixer()

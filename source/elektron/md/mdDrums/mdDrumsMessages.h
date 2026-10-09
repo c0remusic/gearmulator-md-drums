@@ -21,6 +21,7 @@ namespace mdDrums::messages
 		Out = 0x02,			// track, 0 (Main) or 1 (its own Out)
 		Tempo = 0x03,		// BPM x 100, three 7-bit bytes, high first
 		Mixer = 0x04,		// the mute, solo and Out masks, three 7-bit bytes each, high first (bit n = track n + 1)
+		KitName = 0x05,		// the Kit's 16 name bytes, NUL-padded, 7 bits each (the Machinedrum names a Kit in its dump only)
 	};
 
 	struct Mixer
@@ -38,7 +39,7 @@ namespace mdDrums::messages
 	// A message built without allocating, for the audio thread: a CC in its first three bytes, or SysEx
 	struct Raw
 	{
-		std::array<uint8_t, 16> bytes{};
+		std::array<uint8_t, 32> bytes{};
 		uint8_t size = 0;
 
 		Message message() const { return Message(bytes.begin(), bytes.begin() + size); }
@@ -48,6 +49,7 @@ namespace mdDrums::messages
 	Raw out(uint8_t _track, bool _on);
 	Raw tempo(double _bpm);		// 30 to 300, as the engine takes it
 	Raw mixer(const Mixer& _mixer);
+	Raw kitName(const std::array<uint8_t, md::automation::sysex::MdKit::NameSize>& _name);
 
 	struct Parsed
 	{
@@ -56,6 +58,7 @@ namespace mdDrums::messages
 		bool on = false;
 		double bpm = 0;
 		Mixer mixer;
+		std::array<uint8_t, md::automation::sysex::MdKit::NameSize> name{};
 	};
 	// Empty for anything but one of these messages, well formed
 	std::optional<Parsed> parse(MessageView _message);
@@ -71,6 +74,8 @@ namespace mdDrums::messages
 
 	// Kit 1 as a Machinedrum UW boots with OS 1.63's factory patch memory: the working Kit of the factory image (TRX UW)
 	std::optional<md::automation::sysex::MdKit> factoryKit(const std::vector<uint8_t>& _flashImage);
+	// The 16 Kits the factory image stores (TRX UW to SEACLONES), what Slots 1-16 of a new Bank hold; none without one
+	std::vector<md::automation::sysex::MdKit> factoryKits(const std::vector<uint8_t>& _flashImage);
 
 	// The host parameters' pages (parameterDescriptions_mddrums.json): 0 to 4 are md::automation::machinedrum's, so
 	// that a parameter's (page, track, index) is its CC
@@ -93,6 +98,10 @@ namespace mdDrums::messages
 	std::optional<Raw> parameterMessage(uint8_t _page, uint8_t _track, uint8_t _index, int _value);
 	// A host parameter's value in a Device state; empty for a parameter MD Drums does not have
 	std::optional<int> parameterValue(const State& _state, uint8_t _page, uint8_t _track, uint8_t _index);
+	// Whether a host parameter is part of the Kit (Mute, Solo and Out are the mixer's)
+	bool isKitParameter(uint8_t _page);
+	// A Kit host parameter's value into a Kit (a machine's upper bytes kept); false for one that is not the Kit's
+	bool setKitValue(md::automation::sysex::MdKit& _kit, uint8_t _page, uint8_t _track, uint8_t _index, int _value);
 
 	// A Lock's value from its note's velocity (ADR 0003): velocity 0 is a note-off, so 1-127 stretch onto 0-127,
 	// rounded: 1-63 give 0-62 and 64-127 themselves. Both ends and the centre are there; 63 cannot be locked.

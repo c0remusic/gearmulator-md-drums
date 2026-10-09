@@ -9,14 +9,17 @@
 #include <vector>
 
 #include "MachineRunner.h"
+#include "TrackFx.h"
 
 #include "mdProtocol/mdlfosettings.h"
 
 namespace mdDrums
 {
 	// The Machinedrum's engines without its OS (mdEngine), as a plug-in drives them: 16 tracks, each with a
-	// machine, the 24 track parameters and a level, triggered by notes, rendered at the engine's own 44.1 kHz.
-	// A change or a trigger takes effect at the next 32-sample block the engine renders.
+	// machine, the 24 track parameters and a level, triggered by notes, and the master effects on Main, rendered at the
+	// engine's own 44.1 kHz. A change takes effect at the next 32-sample block the engine renders. A Hit sounds
+	// SampleAccurateDelay samples after its trigger, wherever the trigger falls in a block, its voice's own start aside:
+	// its Track's share of the mix waits the rest of the block (setSampleAccurate). On Main, MasterDelay samples later.
 	class Engine
 	{
 	public:
@@ -47,6 +50,8 @@ namespace mdDrums
 		Engine& operator=(const Engine&) = delete;
 
 		const std::vector<md::engine::MachineInfo>& machines() const;
+		// The OS's tables the Tracks' effects read, immutable: the editor measures the filter and the EQ with them
+		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const;
 
 		void setMachine(int _track, uint8_t _machineId);
 		void setParam(int _track, int _param, int _value);	// 0-127
@@ -57,7 +62,14 @@ namespace mdDrums
 		// A muted track is silent and drops its Hits, firing neither its Link nor its Choke
 		void setMute(int _track, bool _mute);
 		void setTempo(double _bpm);
-		void trigger(int _track, int _velocity);			// 1-127
+		// 1-127; the Tracks it strikes (bit n = Track n + 1): the Track and its Link, none of them muted
+		uint32_t trigger(int _track, int _velocity);
+
+		// On (the default), every Hit sounds the same time after its trigger: the engine's block wait, 0 to 31 samples,
+		// becomes a constant 31. Off, a Hit sounds at the engine's next block, as the Machinedrum does.
+		static constexpr int SampleAccurateDelay = BlockSize - 1;
+		void setSampleAccurate(bool _on);
+		bool isSampleAccurate() const;
 
 		// The Kit's Links and Chokes (trig and mute groups): a Hit of _track also hits _target at the same velocity, or
 		// silences _target until its own next Hit, as OS 1.63 plays them (md::engine::HostModel::setLink). NoTrack,
@@ -66,17 +78,28 @@ namespace mdDrums
 		void setLink(int _track, int _target);
 		void setChoke(int _track, int _target);
 
+		// The master effects, the mixer DSP's own code on Main (md::engine::MasterEngine): the Kit's 32 bytes, 0-127, in
+		// the Kit dump's order (Gate Box, Rhythm Echo, EQ, Dynamix, 8 each), smoothed as the OS smooths them. The Echo's
+		// TIME follows the tempo. Main comes out MasterDelay samples after the Outs: Dynamix's look-ahead, as on the
+		// Machinedrum.
+		static constexpr int MasterCount = 32;
+		static constexpr int MasterDelay = 16;
+		// Factory Kit 1's, which the engine starts with
+		static const std::array<uint8_t, MasterCount>& masterDefaults();
+		void setMaster(int _index, int _value);
+
 		// A track's LFO: the fields SET LFO PARAM ($62) sets, or a Kit's whole 36-byte block (the settings, then the
 		// running LFO's state), which a Kit load copies into the running LFO as the OS does
 		static constexpr int LfoBytes = 36;
 		void setLfo(int _track, const md::LfoSettings& _lfo);
 		void loadLfo(int _track, const uint8_t* _block);
 
-		// Outputs: the dry main mix (no master effects) left and right, then each track alone (after its effects
-		// and VOL, before PAN: the MD's individual-output formula).
+		// Outputs: Main left and right, after the master effects, then each track alone (after its effects and VOL,
+		// before PAN: the MD's individual-output formula).
 		static constexpr int OutputCount = 2 + TrackCount;
 
-		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only.
+		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only; their sends still feed
+		// the Echo and the Gate Box.
 		void setSeparateOutputs(uint32_t _tracks);
 
 		// _count samples of each output, full scale 1.0; _outputs holds OutputCount pointers, nullptr for an output
