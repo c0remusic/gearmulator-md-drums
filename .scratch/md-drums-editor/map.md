@@ -133,12 +133,15 @@ mesurées avant et après. Pas de tag.
   échantillon le firmware sur 7 scénarios depuis l'état de son DSP1, insensible aux registres et au scratch ; latence
   déclarée 51, Main 85 contre Out 67 à 44,1 kHz ; 16 Tracks et master 20 % d'un cœur ; traîne de quelques LSB sur Main
   comme la machine, silence pris sous −100 dBFS.
+- [Voix en parallèle : mesure de rentabilité](issues/25-voix-en-parallele.md) : `ParallelVoiceEngine` pas rentable,
+  non activé ; thread audio 19,6-19,9 % aujourd'hui, 21,4-21,7 % à 2 groupes, 16,7-17,5 % à 4 pour un CPU total de
+  36,6-41,8 % ; Main différent dès 2 groupes ; mesure gardée (`mdDrumsParallelTest`, hors garde-fou).
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
-  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) faits ;
-  voix en parallèle (25) ouvert ; restent les Kits et leur Bank, Ctrl+S compris (après le ticket 10), Push
+  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
+  mesure des voix en parallèle (25) faits ; restent les Kits et leur Bank, Ctrl+S compris (après le ticket 10), Push
   (après le ticket 11) et le second moteur de l'écran Hit et de l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.

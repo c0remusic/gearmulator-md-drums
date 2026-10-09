@@ -36,4 +36,10 @@ if(BUILD_TESTING)
 	add_test(NAME mdDrumsScreensTest COMMAND mdDrumsScreensTest)
 	set_tests_properties(mdDrumsScreensTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 120)
 	set_property(TARGET mdDrumsScreensTest PROPERTY FOLDER "Elektron/test")
+
+	# Measurement, not a gate: the voices split across threads (ParallelVoiceEngine) against the single voice DSP. Run by
+	# hand (ticket 25 of the editor map)
+	add_executable(mdDrumsParallelTest mdDrumsParallelTest.cpp)
+	target_link_libraries(mdDrumsParallelTest PRIVATE mdDrums)
+	set_property(TARGET mdDrumsParallelTest PROPERTY FOLDER "Elektron/test")
 endif()
