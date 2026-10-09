@@ -16,10 +16,10 @@
 namespace mdDrums
 {
 	// The Machinedrum's engines without its OS (mdEngine), as a plug-in drives them: 16 tracks, each with a
-	// machine, the 24 track parameters and a level, triggered by notes, rendered at the engine's own 44.1 kHz.
-	// A change takes effect at the next 32-sample block the engine renders. A Hit sounds SampleAccurateDelay samples
-	// after its trigger, wherever the trigger falls in a block, its voice's own start aside: its Track's share of the mix
-	// waits the rest of the block (setSampleAccurate).
+	// machine, the 24 track parameters and a level, triggered by notes, and the master effects on Main, rendered at the
+	// engine's own 44.1 kHz. A change takes effect at the next 32-sample block the engine renders. A Hit sounds
+	// SampleAccurateDelay samples after its trigger, wherever the trigger falls in a block, its voice's own start aside:
+	// its Track's share of the mix waits the rest of the block (setSampleAccurate). On Main, MasterDelay samples later.
 	class Engine
 	{
 	public:
@@ -75,17 +75,28 @@ namespace mdDrums
 		void setLink(int _track, int _target);
 		void setChoke(int _track, int _target);
 
+		// The master effects, the mixer DSP's own code on Main (md::engine::MasterEngine): the Kit's 32 bytes, 0-127, in
+		// the Kit dump's order (Gate Box, Rhythm Echo, EQ, Dynamix, 8 each), smoothed as the OS smooths them. The Echo's
+		// TIME follows the tempo. Main comes out MasterDelay samples after the Outs: Dynamix's look-ahead, as on the
+		// Machinedrum.
+		static constexpr int MasterCount = 32;
+		static constexpr int MasterDelay = 16;
+		// Factory Kit 1's, which the engine starts with
+		static const std::array<uint8_t, MasterCount>& masterDefaults();
+		void setMaster(int _index, int _value);
+
 		// A track's LFO: the fields SET LFO PARAM ($62) sets, or a Kit's whole 36-byte block (the settings, then the
 		// running LFO's state), which a Kit load copies into the running LFO as the OS does
 		static constexpr int LfoBytes = 36;
 		void setLfo(int _track, const md::LfoSettings& _lfo);
 		void loadLfo(int _track, const uint8_t* _block);
 
-		// Outputs: the dry main mix (no master effects) left and right, then each track alone (after its effects
-		// and VOL, before PAN: the MD's individual-output formula).
+		// Outputs: Main left and right, after the master effects, then each track alone (after its effects and VOL,
+		// before PAN: the MD's individual-output formula).
 		static constexpr int OutputCount = 2 + TrackCount;
 
-		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only.
+		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only; their sends still feed
+		// the Echo and the Gate Box.
 		void setSeparateOutputs(uint32_t _tracks);
 
 		// _count samples of each output, full scale 1.0; _outputs holds OutputCount pointers, nullptr for an output

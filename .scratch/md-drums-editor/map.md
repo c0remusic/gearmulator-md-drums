@@ -23,6 +23,7 @@ mesurées avant et après. Pas de tag.
   demander une fois vert. Jamais de tag.
 - **Latence** : tout changement du chemin de rendu (port, master) rapporte latence note→son et gigue, avant et après
   (`mdDrumsEngineTest` : depuis le ticket 19, 1,52 ms sans gigue sur TRX-BD à 44,1 kHz, 35 échantillons déclarés ;
+  depuis le ticket 24, Main 16 échantillons de plus, Dynamix, 51 déclarés ;
   avant, 1,16 ms en moyenne et 0,68 ms de gigue ; les 0,48 ms de départ comptaient depuis le bloc de 32 de la note).
 - **Fluidité** : chaque clic et drag instantané, mesuré entrée→pixel ; jamais `Plugin::withDeviceLocked` par frame
   ou par clic.
@@ -122,13 +123,23 @@ mesurées avant et après. Pas de tag.
   Espace à la vélocité de la bande (drag 1,5 px par pas, gardée dans les réglages) ; molette et flèches sur le nom de
   machine, flèches et Enter dans le browser, dans l'ordre de ses cellules. Ajouté après le ticket 22 : déjà spécifié
   par le HANDOFF, sans ticket.
+- [Effets master dans le moteur](issues/09-effets-master-moteur.md) : second DSP56300 qui ne joue que P:$342-$970,
+  synchrone dans `EngineT::render` après le mixeur ; coefficients par les quatre corps de l'OS dans `MachineRunner`
+  (sorties en `rts`) ; Main 16 échantillons après les Outs, latence déclarée 35 → 51 ; plafond 30 % du temps réel sur
+  le thread audio dans les tests, validé dans Live ; bit-exact contre le firmware à paramètres fixes ;
+  `setMaster(0-31, 0-127)` sans bypass ; voix en parallèle mesurées à part (ticket 25).
+- [Effets master dans mdEngine et MD Drums](issues/24-effets-master.md) : `MasterEngine` (boot partiel du programme
+  DSP1, stub HI08) ; mots de l'OS par ses corps dans `MachineRunner`, identiques au firmware ; Main échantillon pour
+  échantillon le firmware sur 7 scénarios depuis l'état de son DSP1, insensible aux registres et au scratch ; latence
+  déclarée 51, Main 85 contre Out 67 à 44,1 kHz ; 16 Tracks et master 20 % d'un cœur ; traîne de quelques LSB sur Main
+  comme la machine, silence pris sous −100 dBFS.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
-  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23) faits ; restent les Kits
-  et leur Bank, Ctrl+S compris (après le ticket 10), Push (après le ticket 11) et le second moteur de l'écran Hit et de
-  l'aperçu du browser (ticket 12).
+  (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) faits ;
+  voix en parallèle (25) ouvert ; restent les Kits et leur Bank, Ctrl+S compris (après le ticket 10), Push
+  (après le ticket 11) et le second moteur de l'écran Hit et de l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un

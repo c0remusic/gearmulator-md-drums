@@ -30,6 +30,14 @@ later versions can be compared file by file. Their documentation is in `.scratch
   tracks itself (`mdDrums/mdDrumsEngine.cpp`): `Mixer::gains` and `Mixer::mainSample` are `process`'s own gain and
   output steps, split out (bit-exact, `process` uses them); `HostModel::muted` and `choked` read a track's mute and
   Choke flags; `EngineT::mixOn = false` skips the mixer.
+- `engine/MasterEngine.*` (new), `engine/HostModel.*`, `engine/MdEngine.h`: the master effects. `MasterEngine` runs
+  the mixer DSP's master section (P:$342-$970 of OS 1.63's section 2: Rhythm Echo, Gate Box, their returns, EQ,
+  Dynamix) on its own in a second dsp56300, after the parts of the program's boot it needs, on VoiceEngine's
+  host-port handshake. `HostModel` keeps the Kit's 32 master bytes in the OS's slew targets (`setMaster`) and, each
+  tick after the level slew, calls one of the tick routine's four inline bodies that compute an effect's DSP words
+  ($20b4ae, $20b604, $20b74e, $20b940; their exits patched to `rts`), as the OS does in turn. `EngineT::enableMaster`
+  creates it; `render` then runs it on the mixer's buses (`Output::master`), or the caller does (`processMaster`).
+  Main comes out 16 samples after the buses, Dynamix's look-ahead.
 - `engine/MdEngine.h`, `engine/TrackFx.*`: `EngineT` keeps `TrackFx::Tables` behind a `shared_ptr` and hands it out
   (`tables()`), and `TrackFx::eqWords` keeps the EQ's coefficient words of the last block, so that MD Drums' editor
   draws the filter's and the EQ's response from the words the DSP computes (`mdDrums/mdDrumsFilterResponse.*`).
@@ -62,6 +70,17 @@ Choke onto a lower track, a choked track's sound coming back) comes at this engi
 than the firmware's, whose period follows its load (3 to 11 blocks measured). Concurrent voices also nudge each
 other on the firmware: its P-I-MT after a TRX-BD differs by -79 dB from the same hit after an EFM-CB, where the
 engine's tracks are independent.
+
+Master effects (2026-10-09, with `mdEngineFirmwareMaster`): seven scenarios (factory Kit 1's settings, the gate open,
+each send alone, EQ and Dynamix compressing, the Echo filtered, mono and fed back, the Gate Box with the Echo into it)
+on a booted firmware. The words the OS's own code computes in MachineRunner equal the firmware's mixer DSP's, word for
+word. `MasterEngine`, started from that DSP's memory as it stood before the Hit and fed this engine's buses, gives the
+firmware's Main sample for sample in all seven, and the same with random registers and scratch memory before every
+block: the master section depends on nothing the skipped parts of the program leave. From this engine's own history,
+Main differs: the Echo's and Gate Box's rings and the Gate Box's sine stand where the blocks run since the start put
+them, and a ring that wraps jumps back to its start, so a read crossing the end lands a sample off. With EFM-BD and
+TRX-SD, the firmware's Main differed in some runs from the Hit's first sample on by the same -75 dB whatever the
+master's settings, so in what reached its master; TRX-BD, EFM-CB and P-I-MT never did (not traced).
 
 Known difference: the firmware's ROM hits vary with what it played before them, by up to about -75 dB of residual.
 The same ROM-22 hit recorded alone and after ROM-01 and -02 differs from itself by -79.5 dB; this engine's ROM hits

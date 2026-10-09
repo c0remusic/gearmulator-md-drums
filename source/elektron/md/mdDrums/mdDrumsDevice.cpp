@@ -287,9 +287,12 @@ namespace mdDrums
 		{
 			if(!isMachinedrumSysex(_event, static_cast<uint8_t>(g_masterEffect + effect), 10))
 				continue;
-			// Kept in the Kit; the master effects play from ticket 09 on
 			if(s[7] < sysex::MasterEffectParameters)
-				m_kit.masterEffects[g_masterBlock[effect] * sysex::MasterEffectParameters + s[7]] = s[8];
+			{
+				const auto index = g_masterBlock[effect] * sysex::MasterEffectParameters + s[7];
+				m_kit.masterEffects[index] = s[8];
+				m_engine->setMaster(index, s[8]);
+			}
 			return;
 		}
 		if(isMachinedrumSysex(_event, g_lfoChange, 10))
@@ -380,6 +383,9 @@ namespace mdDrums
 			m_engine->setLink(track, m_kit.links[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.links[track]);
 			m_engine->setChoke(track, m_kit.chokes[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.chokes[track]);
 		}
+		// The dump keeps the master effects in the engine's order
+		for(int index = 0; index < Engine::MasterCount; ++index)
+			m_engine->setMaster(index, m_kit.masterEffects[static_cast<size_t>(index)]);
 	}
 
 	void Device::applyMixer()

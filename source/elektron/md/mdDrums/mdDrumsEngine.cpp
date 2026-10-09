@@ -44,6 +44,7 @@ namespace mdDrums
 		explicit State(md::fw::FlashOs _os) : engine(_os.firmware, std::move(_os.osImage))
 		{
 			engine.mixOn = false;
+			engine.enableMaster(_os.firmware);
 			pending.fill(-1);
 			chokeDelay.fill(-1);
 		}
@@ -70,10 +71,12 @@ namespace mdDrums
 		std::array<bool, TrackCount> wasChoked{};
 		std::array<Lane, TrackCount> lanes{};
 
-		// The output block: the main mix, the master effects' inputs (ticket 09), each Track's own output
-		std::array<std::array<int32_t, 2>, BlockSize> main{};
-		std::array<std::array<int32_t, 2>, BlockSize> rev{};
-		std::array<std::array<int32_t, 2>, BlockSize> del{};
+		// The output block: the master effects' inputs (the dry main mix and the two sends), Main after them, each Track's
+		// own output
+		md::engine::Mixer::Stereo dry{};
+		md::engine::Mixer::Stereo rev{};
+		md::engine::Mixer::Stereo del{};
+		md::engine::Mixer::Stereo main{};
 		std::array<std::array<int32_t, BlockSize>, TrackCount> solo{};
 
 		void renderBlock();
@@ -143,10 +146,29 @@ namespace mdDrums
 				solo[t][i] = lim(lane.solo[slot]);
 				lane.solo[slot] = 0;
 			}
-			main[i] = {md::engine::Mixer::mainSample(sum[0]), md::engine::Mixer::mainSample(sum[1])};
+			dry[i] = {md::engine::Mixer::mainSample(sum[0]), md::engine::Mixer::mainSample(sum[1])};
 			rev[i] = {md::engine::Mixer::mainSample(sum[2]), md::engine::Mixer::mainSample(sum[3])};
 			del[i] = {md::engine::Mixer::mainSample(sum[4]), md::engine::Mixer::mainSample(sum[5])};
 		}
+		if(!engine.processMaster(dry, rev, del, main))
+			throw std::runtime_error("Machinedrum master effects fault: " + engine.fault());
+	}
+
+	const std::array<uint8_t, Engine::MasterCount>& Engine::masterDefaults()
+	{
+		// Gate Box DVOL PRED DEC DAMP HP LP GATE LEV, Rhythm Echo TIME MOD MFRQ FB FLTF FLTW MONO LEV, EQ LF LG HF HG PF PG
+		// PQ GAIN, Dynamix ATCK REL TRHD RTIO KNEE HP OUTG MIX
+		static const std::array<uint8_t, MasterCount> defaults{
+			0, 0, 68, 50, 1, 82, 71, 109,
+			16, 0, 32, 27, 0, 44, 0, 71,
+			64, 64, 64, 64, 64, 64, 64, 127,
+			127, 127, 127, 127, 127, 127, 0, 0};
+		return defaults;
+	}
+
+	void Engine::setMaster(const int _index, const int _value)
+	{
+		m_state->engine.host().setMaster(_index, _value);
 	}
 
 	const std::array<const char*, Engine::ParamCount>& Engine::paramNames()
@@ -207,9 +229,14 @@ namespace mdDrums
 				host.setParam(track, param, paramDefaults()[param]);
 			host.setLevel(track, DefaultLevel);
 		}
+		for(int index = 0; index < MasterCount; ++index)
+			host.setMaster(index, masterDefaults()[index]);
 	}
 
 	Engine::~Engine() = default;
+
+	static_assert(Engine::MasterDelay == md::engine::MasterEngine::MainDelay);
+	static_assert(Engine::MasterCount == md::engine::HostModel<>::kMasterParams);
 
 	const std::vector<md::engine::MachineInfo>& Engine::machines() const
 	{

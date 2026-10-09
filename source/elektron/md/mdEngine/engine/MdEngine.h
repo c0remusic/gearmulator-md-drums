@@ -12,6 +12,7 @@
 #include <vector>
 #include "HostModel.h"
 #include "MachineRunner.h"
+#include "MasterEngine.h"
 #include "Mixer.h"
 #include "ParallelVoiceEngine.h"
 #include "TrackFx.h"
@@ -74,7 +75,29 @@ namespace md::engine
 		{
 			Mixer::Output mix;													// main, sends, individual outputs
 			std::array<std::array<int32_t, kBlock>, kTracks> tracks{};			// each track after its effects
+			Mixer::Stereo master{};		// md-drums: Main after the master effects (enableMaster), MasterEngine::MainDelay late
 		};
+
+		// md-drums: the master effects (MasterEngine), off until this is called (it allocates the mixer DSP, ~9 MB, and
+		// runs its init). With the mixer on, render() then runs them on its buses into Output::master; without it, the
+		// caller runs them on its own buses (processMaster). Either way the OS's parameter words of each tick reach them.
+		void enableMaster(const fw::Firmware& _fw)
+		{
+			if(!m_master)
+				m_master = std::make_unique<MasterEngine>(_fw);
+		}
+		bool masterOn() const { return m_master != nullptr; }
+		MasterEngine* masterEngine() { return m_master.get(); }
+		bool processMaster(const Mixer::Stereo& _main, const Mixer::Stereo& _rev, const Mixer::Stereo& _del, Mixer::Stereo& _out)
+		{
+			if(!m_master)
+				return false;
+			const auto tm0 = timingOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+			const bool ok = m_master->process(_main, _rev, _del, _out);
+			if(timingOn)
+				masterUs += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - tm0).count();
+			return ok;
+		}
 
 		// Optional stage timing (microseconds, accumulated): track effects, and the mix. The OS tick and the voice DSP
 		// are HostModel's (host().tickUs / dspUs).
@@ -83,7 +106,7 @@ namespace md::engine
 		bool mixOn = true;
 		const Mixer& mixer() const { return m_mixer; }
 		bool timingOn = false;
-		double fxUs = 0, mixUs = 0;
+		double fxUs = 0, mixUs = 0, masterUs = 0;
 
 		static constexpr bool kParallel = std::is_same_v<TVoices, ParallelVoiceEngine>;
 
@@ -113,6 +136,14 @@ namespace md::engine
 			m_out = &_out;
 			if(!m_host->renderBlock(m_voiceOut))
 				return false;
+			// md-drums: the master words the tick computed, before the master runs on this block (the OS sends them while
+			// the voice DSP renders, so they land on the mixer DSP between two of its blocks here)
+			if(m_master)
+			{
+				typename HostModel<TVoices>::MasterWords words;
+				if(m_host->takeMasterWords(words))
+					m_master->setWords(words.y, words.words.data(), words.count);
+			}
 			const auto tf0 = timingOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 			std::array<const int32_t*, kTracks> in{};
 			std::array<std::array<uint32_t, 5>, kTracks> mix{};
@@ -126,16 +157,23 @@ namespace md::engine
 			}
 			if(!mixOn)
 				return true;
-			if(!timingOn) { m_mixer.process(in.data(), mix.data(), _out.mix, dryMute); return true; }
+			if(!timingOn)
+			{
+				m_mixer.process(in.data(), mix.data(), _out.mix, dryMute);
+				return !m_master || processMaster(_out.mix.main, _out.mix.rev, _out.mix.del, _out.master);
+			}
 			const auto tf1 = std::chrono::steady_clock::now();
 			m_mixer.process(in.data(), mix.data(), _out.mix, dryMute);
 			const auto tf2 = std::chrono::steady_clock::now();
 			fxUs += std::chrono::duration<double, std::micro>(tf1 - tf0).count();
 			mixUs += std::chrono::duration<double, std::micro>(tf2 - tf1).count();
-			return true;
+			return !m_master || processMaster(_out.mix.main, _out.mix.rev, _out.mix.del, _out.master);
 		}
 
-		const std::string& fault() const { return m_voices->faultReason(); }
+		const std::string& fault() const
+		{
+			return m_master && !m_master->faultReason().empty() ? m_master->faultReason() : m_voices->faultReason();
+		}
 
 		bool skipSettled = true;	// false: run every track's effects every block (for verifying the skip)
 
@@ -167,6 +205,7 @@ namespace md::engine
 		std::vector<std::unique_ptr<TrackFx>> m_fxs;	// one per voice group (one when not parallel)
 		Output* m_out = nullptr;
 		Mixer m_mixer;
+		std::unique_ptr<MasterEngine> m_master;	// md-drums: the master effects, once enabled
 		std::array<TrackFx::State, kTracks> m_state{};
 		std::array<TrackFx::State, kTracks> m_settledState{};
 		std::array<bool, kTracks> m_settled{};

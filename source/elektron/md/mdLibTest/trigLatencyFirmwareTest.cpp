@@ -18,6 +18,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace
@@ -292,6 +293,134 @@ namespace
 		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the group scenarios");
 	}
 
+	// The master effects as the firmware plays them (g_masterScenarios): on one booted machine, every track's LFO at zero
+	// depth and its sends at 0, then for each scenario the 32 master bytes, a fresh track routed to Main with its machine,
+	// hitParameters, the scenario's sends and g_hitLevel, silence, then its Hit and two seconds of Main. Writes, per
+	// scenario: its index; the mixer DSP's memory of g_masterState before the Hit; and outputs A and B (32-bit unsigned
+	// counts and words, then 32-bit floats; little-endian).
+	void master(const char* _path, const std::string& _file)
+	{
+		using namespace md::automation;
+		Bench bench(_path, 0);
+		bootUntilNotesPlay(bench);
+		std::vector<uint8_t> bytes;
+		const auto append32 = [&](const uint32_t _value)
+		{
+			for(int shift = 0; shift < 32; shift += 8)
+				bytes.push_back(static_cast<uint8_t>(_value >> shift));
+		};
+		const auto sendSysex = [&](const std::optional<sysex::Message>& _message)
+		{
+			require(_message.has_value(), "no SysEx for a master scenario");
+			bench.sysex(std::vector<uint8_t>(_message->begin(), _message->end()));
+		};
+		const auto sendCc = [&](const ParameterChange& _change)
+		{
+			const auto cc = encodeParameterChange(md::MachineModel::Machinedrum, _change, 0);
+			require(cc.has_value(), "no CC for a master scenario");
+			bench.note((*cc)[0], (*cc)[1], (*cc)[2], 0);
+		};
+		auto& mixer = bench.hardware().getDspMixer().dsp().memory();
+
+		for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
+		{
+			sendCc({machinedrum::Routing, track, 3, 0});	// DEL
+			sendCc({machinedrum::Routing, track, 4, 0});	// REV
+			sendCc({machinedrum::Routing, track, 6, 0});	// LFOD
+		}
+		// The Kit's blocks of 8 are Gate Box, Echo, EQ, Dynamix; the SysEx ids go Echo, Gate Box, EQ, Dynamix
+		constexpr sysex::MasterEffect effects[4] = {sysex::MasterEffect::Reverb, sysex::MasterEffect::Echo,
+			sysex::MasterEffect::Eq, sysex::MasterEffect::Dynamix};
+		for(uint32_t index = 0; index < g_masterScenarios.size(); ++index)
+		{
+			const auto& scenario = g_masterScenarios[index];
+			for(uint8_t k = 0; k < 32; ++k)
+				sendSysex(sysex::masterEffectChange(effects[k / 8], k % 8, scenario.master[k]));
+			sendSysex(sysex::trackRouting(scenario.track, sysex::TrackOutput::Main));
+			sendSysex(sysex::assignMachine(md::MachineModel::Machinedrum, scenario.track, scenario.machine));
+			for(uint32_t block = 0; block < 4; ++block)
+				bench.process();
+			auto parameters = hitParameters(scenario.machine);
+			parameters[19] = scenario.del;
+			parameters[20] = scenario.rev;
+			for(uint8_t parameter = 0; parameter < parameters.size(); ++parameter)
+				sendCc({static_cast<uint8_t>(parameter / 8), scenario.track, static_cast<uint8_t>(parameter % 8),
+					parameters[parameter]});
+			sendCc({machinedrum::Level, scenario.track, 0, g_hitLevel});
+			// The OS's slew settles and the previous scenario's tails fall below -80 dB (the state taken below holds what
+			// remains, and the Echo's glide)
+			uint32_t quiet = 0;
+			for(uint32_t block = 0; (block < 172 * 3 || quiet < 16) && block < 172 * 10; ++block)
+				quiet = bench.process() < 1e-4f ? quiet + 1 : 0;
+			std::printf("scenario %u %s: %s before the Hit\n", index, scenario.name, quiet >= 16 ? "quiet" : "NOT quiet");
+
+			// The mixer DSP's state between two blocks: its thread waits for the output to drain wherever the codec's
+			// frame falls, mid-block too, so only a state taken in its wait for the next block (P:$3c-$43) is whole, and
+			// the same before and after a pause
+			auto& mixerDsp = bench.hardware().getDspMixer().dsp();
+			const auto waiting = [&]
+			{
+				const auto pc = mixerDsp.getPC().toWord();
+				return pc >= 0x3c && pc <= 0x43;
+			};
+			const auto snapshot = [&]
+			{
+				std::vector<uint32_t> words;
+				words.reserve(g_masterStateWords);
+				for(const auto& range : g_masterState)
+					for(auto address = range.from; address < range.to; ++address)
+						words.push_back(mixer.get(range.y ? dsp56k::MemArea_Y : dsp56k::MemArea_X, address) & 0xffffff);
+				return words;
+			};
+			std::vector<uint32_t> state;
+			for(uint32_t attempt = 0; ; ++attempt)
+			{
+				require(attempt < 400, "the mixer DSP never held still between two blocks");
+				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+				if(waiting())
+				{
+					state = snapshot();
+					std::this_thread::sleep_for(std::chrono::milliseconds(20));
+					if(waiting() && snapshot() == state)
+					{
+						std::printf("  mixer DSP state taken between two blocks, attempt %u\n", attempt);
+						break;
+					}
+				}
+				bench.process();
+			}
+
+			append32(index);
+			append32(static_cast<uint32_t>(state.size()));
+			for(const auto word : state)
+				append32(word);
+
+			bench.note(0x90, g_trackNotes[scenario.track], 100, 0);
+			std::array<std::vector<float>, 2> channels;
+			for(uint32_t block = 0; block < 172 * 2; ++block)
+			{
+				bench.process();
+				for(size_t channel = 0; channel < channels.size(); ++channel)
+					channels[channel].insert(channels[channel].end(), bench.outputs()[channel].begin(),
+						bench.outputs()[channel].end());
+			}
+			bench.note(0x80, g_trackNotes[scenario.track], 0, 0);
+			sendCc({machinedrum::Level, scenario.track, 0, 0});
+			append32(static_cast<uint32_t>(channels[0].size()));
+			for(const auto& channel : channels)
+			{
+				const auto* data = reinterpret_cast<const uint8_t*>(channel.data());
+				bytes.insert(bytes.end(), data, data + channel.size() * sizeof(float));
+			}
+			float peak = 0;
+			for(const auto& channel : channels)
+				for(const auto value : channel)
+					peak = std::max(peak, std::abs(value));
+			std::printf("  Main peak %.4f\n", peak);
+		}
+		require(baseLib::filesystem::writeFile(_file, bytes), "cannot write the master scenarios");
+	}
+
 	void run(const char* _path)
 	{
 		// Which notes on the base channel (channel 1) trigger a track, and what the firmware sends back.
@@ -384,6 +513,9 @@ int main(int argc, char** argv)
 		// --groups <file>: the Link and Choke scenarios of g_groupScenarios, for comparison with another engine.
 		else if(argc > 2 && std::string(argv[1]) == "--groups")
 			groups(path, argv[2]);
+		// --master <file>: the master effect scenarios of g_masterScenarios, for comparison with another engine.
+		else if(argc > 2 && std::string(argv[1]) == "--master")
+			master(path, argv[2]);
 		// --dsp2 <file> <from> <to>: DSP2's P memory after the boot, addresses in hexadecimal.
 		else if(argc > 4 && std::string(argv[1]) == "--dsp2")
 			dsp2(path, argv[2], static_cast<uint32_t>(std::stoul(argv[3], nullptr, 16)),

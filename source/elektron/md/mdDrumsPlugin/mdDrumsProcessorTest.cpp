@@ -45,9 +45,13 @@ namespace
 
 	constexpr int g_block = 512;
 
+	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
+	// silent below -100 dBFS rather than at 0
+	constexpr float g_silence = 1e-5f;
+
 	struct Result
 	{
-		int first = -1;		// host samples from the note to the first nonzero sample of Main
+		int first = -1;		// host samples from the note to the first sample of Main above -100 dBFS
 		float peak = 0;		// Main
 		double energy = 0;
 		float outPeak = 0;	// Out 01, when the host enables it (channels 2 on)
@@ -78,7 +82,7 @@ namespace
 			{
 				const auto left = buffer.getSample(0, s), right = buffer.getSample(1, s);
 				const auto value = std::max(std::abs(left), std::abs(right));
-				if(result.first < 0 && value != 0.0f)
+				if(result.first < 0 && value > g_silence)
 					result.first = position + s - _offset;
 				result.peak = std::max(result.peak, value);
 				result.energy += double(value) * value;
@@ -223,13 +227,16 @@ int main()
 			require(parameter(processor, "Machine", 0).getUnnormalizedValue() == 28
 				&& parameter(processor, "Level", 0).getUnnormalizedValue() == device(processor).kit().levels[0],
 				"the parameters do not start as the Device");
+			// Track 1 without sends: no Echo or Gate Box tail on Main from one note to the next
+			automate(processor, "DEL", 0, 0);
+			automate(processor, "REV", 0, 0);
 
 			const auto kick = play(processor, 36, 200, rate);
 			const auto none = play(processor, 60, 200, rate);
 			std::printf("%.0f Hz: note 36 at sample 200: first sound %d samples later, peak %.4f; note 60: peak %.4f\n",
 				rate, kick.first, kick.peak, none.peak);
 			require(kick.first >= 0 && kick.peak > 0.01f, "note 36 is silent");
-			require(none.peak == 0.0f, "a note outside 36-51 sounded");
+			require(none.peak < g_silence, "a note outside 36-51 sounded");
 
 			// The host automates track 1's machine: TRX-B2 to EFM-BD (id 32)
 			const auto before = play(processor, 36, 0, rate);
@@ -283,7 +290,7 @@ int main()
 			const auto onOut = play(processor, 36, 0, rate);
 			std::printf("%.0f Hz: track 1 on its Out: Main %.4f without the bus, Main %.4f and Out 01 %.4f with it\n", rate,
 				offMain.peak, onOut.peak, onOut.outPeak);
-			require(offMain.peak == 0.0f && onOut.peak == 0.0f && onOut.outPeak > 0.01f,
+			require(offMain.peak < g_silence && onOut.peak < g_silence && onOut.outPeak > 0.01f,
 				"the Out parameter did not move track 1 off Main");
 			layout.outputBuses.getReference(1) = juce::AudioChannelSet::disabled();
 			require(host.setBusesLayout(layout), "the host cannot disable Out 01");

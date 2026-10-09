@@ -7,15 +7,20 @@
 // equal, word for word, what the firmware's boot leaves in DSP2 (`mdTrigLatencyFirmwareTest --dsp2`, from $147e00).
 // The Links, Chokes and Mute of g_groupScenarios (`mdTrigLatencyFirmwareTest --groups`) must give the same samples
 // wherever both sound or both are silent, and part only where the firmware's tick timing decides (apartBlocks).
-// usage: mdEngineFirmwareTest <hits file> <DSP2 dump> [<group scenarios file>]
+// The master effects of g_masterScenarios (`mdTrigLatencyFirmwareTest --master`), run on the mixer DSP's own master
+// section (md::engine::MasterEngine) with the OS's own words, must give the firmware's Main (md-drums ticket 24).
+// usage: mdEngineFirmwareTest <hits file> <DSP2 dump> [<group scenarios file> [<master scenarios file>]]
 
 #include "hitParameters.h"
 
 #include "MdEngine.h"
 #include "Firmware.h"
 
+#include "dsp56kEmu/dsp.h"
+
 #include "mdProtocol/mdkit.h"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -491,6 +496,277 @@ namespace
 	}
 }
 
+namespace
+{
+	// The firmware's master scenarios, as mdTrigLatencyFirmwareTest --master writes them
+	struct FirmwareMaster
+	{
+		std::vector<uint32_t> state;		// the mixer DSP's memory of g_masterState before the Hit
+		std::array<std::vector<float>, 2> main;
+
+		uint32_t y(const uint32_t _address) const { return state[0x800 + _address]; }	// internal Y, after internal X
+	};
+
+	std::vector<FirmwareMaster> readMaster(const char* _path)
+	{
+		const auto bytes = readAll(_path);
+		std::vector<FirmwareMaster> scenarios;
+		size_t at = 0;
+		const auto read32 = [&]
+		{
+			require(at + 4 <= bytes.size(), "truncated master file");
+			uint32_t value;
+			std::memcpy(&value, &bytes[at], 4);
+			at += 4;
+			return value;
+		};
+		while(at < bytes.size())
+		{
+			require(read32() == scenarios.size(), "master scenarios out of order");
+			auto& scenario = scenarios.emplace_back();
+			scenario.state.resize(read32());
+			require(scenario.state.size() == g_masterStateWords, "the master file holds another state");
+			for(auto& word : scenario.state)
+				word = read32();
+			const auto count = read32();
+			for(auto& channel : scenario.main)
+			{
+				require(at + count * sizeof(float) <= bytes.size(), "truncated master file");
+				channel.resize(count);
+				std::memcpy(channel.data(), &bytes[at], count * sizeof(float));
+				at += count * sizeof(float);
+			}
+		}
+		require(scenarios.size() == g_masterScenarios.size(), "the master file lacks a scenario");
+		return scenarios;
+	}
+
+	using Buses = std::array<md::engine::Mixer::Stereo, 3>;	// dry main mix, reverb send, delay send
+
+	struct EngineMaster
+	{
+		std::vector<uint32_t> words;	// Y from g_masterWordsFrom, before the Hit
+		std::vector<Buses> buses;		// from the Hit's block on
+	};
+
+	// One master scenario on a fresh engine with its mixer DSP: the track as the firmware's, the 32 bytes on the path the
+	// firmware's took, settled, then the Hit and _count samples of the buses the master effects take
+	EngineMaster engineMaster(const md::fw::FlashOs& _os, const size_t _index, const size_t _count)
+	{
+		const auto& scenario = g_masterScenarios[_index];
+		md::engine::Engine engine(_os.firmware, _os.osImage);
+		engine.enableMaster(_os.firmware);
+		auto& host = engine.host();
+		host.setMachine(scenario.track, static_cast<uint8_t>(scenario.machine));
+		auto parameters = hitParameters(scenario.machine);
+		parameters[19] = scenario.del;
+		parameters[20] = scenario.rev;
+		for(int parameter = 0; parameter < static_cast<int>(parameters.size()); ++parameter)
+			host.setParam(scenario.track, parameter, parameters[parameter]);
+		host.setLevel(scenario.track, g_hitLevel);
+
+		// The OS's slew settles 3 below a target it rises to, on it when it falls: the bytes take the path the firmware's
+		// took, from factory Kit 1's at the boot through every scenario's up to this one
+		md::engine::Engine::Output out;
+		for(size_t step = 0; step <= _index + 1; ++step)
+		{
+			const auto& master = step ? g_masterScenarios[step - 1].master : g_kit1Master;
+			for(int k = 0; k < 32; ++k)
+				host.setMaster(k, master[k]);
+			for(int block = 0; block < 44100 / 2 / 32; ++block)
+				require(engine.render(out), "engine render fault: " + engine.fault());
+		}
+		for(int block = 0; block < 44100 / 32; ++block)
+			require(engine.render(out), "engine render fault: " + engine.fault());
+		EngineMaster result;
+		for(auto address = g_masterWordsFrom; address < g_masterWordsTo; ++address)
+			result.words.push_back(engine.masterEngine()->readY(address));
+		host.trigger(scenario.track, 100);
+		while(result.buses.size() * 32 < _count)
+		{
+			require(engine.render(out), "engine render fault: " + engine.fault());
+			result.buses.push_back({out.mix.main, out.mix.rev, out.mix.del});
+		}
+		return result;
+	}
+
+	// The master effects alone, from the firmware's mixer DSP's own state: _silent blocks of silence (the firmware's
+	// DSP ran them between its state and the Hit's first block of sound), then the engine's buses from the Hit's block.
+	// _disturb: before every block, random registers (but the modifiers) and scratch memory (X and Y $000-$0ff), as the
+	// track chains and the mix the harness skips would leave them
+	std::array<std::vector<float>, 2> masterFromFirmware(const md::fw::FlashOs& _os, const FirmwareMaster& _firmware,
+		const EngineMaster& _engine, const int _silent, const size_t _count, const bool _disturb = false)
+	{
+		md::engine::MasterEngine master(_os.firmware);
+		size_t at = 0;
+		for(const auto& range : g_masterState)
+		{
+			const auto count = static_cast<int>(range.to - range.from);
+			if(range.y)
+				master.setWords(range.from, &_firmware.state[at], count);
+			else
+				master.setX(range.from, &_firmware.state[at], count);
+			at += static_cast<size_t>(count);
+		}
+		std::array<std::vector<float>, 2> main;
+		md::engine::Mixer::Stereo out{};
+		const Buses silence{};
+		uint64_t random = 0x9e3779b97f4a7c15ull;
+		const auto next = [&] { random ^= random << 13; random ^= random >> 7; random ^= random << 17; return random; };
+		std::vector<uint32_t> scratch(0x100);
+		for(int block = 0; main[0].size() < _count; ++block)
+		{
+			if(_disturb)
+			{
+				for(auto& word : scratch)
+					word = static_cast<uint32_t>(next()) & 0xffffff;
+				master.setX(0, scratch.data(), static_cast<int>(scratch.size()));
+				master.setWords(0, scratch.data(), static_cast<int>(scratch.size()));
+				auto& regs = master.dsp().regs();
+				for(int i = 0; i < 7; ++i)
+				{
+					regs.r[i].var = static_cast<uint32_t>(next()) & 0xffffff;
+					regs.n[i].var = static_cast<uint32_t>(next()) & 0xffffff;
+				}
+				regs.n[7].var = static_cast<uint32_t>(next()) & 0xffffff;
+				regs.x.var = next() & 0xffffffffffffull;
+				regs.y.var = next() & 0xffffffffffffull;
+				regs.a.var = static_cast<decltype(regs.a.var)>(next() & ~0xffull);
+				regs.b.var = static_cast<decltype(regs.b.var)>(next() & ~0xffull);
+			}
+			const auto& buses = block < _silent ? silence : _engine.buses[static_cast<size_t>(block - _silent)];
+			require(master.process(buses[0], buses[1], buses[2], out), "master fault: " + master.faultReason());
+			if(block < _silent)
+				continue;
+			for(const auto& frame : out)
+				for(int channel = 0; channel < 2; ++channel)
+					main[channel].push_back(static_cast<float>(frame[channel]) / 8388608.0f);
+		}
+		for(auto& channel : main)
+			channel.resize(_count);
+		return main;
+	}
+
+	// Both from the firmware's first audible sample on, the other's shifted to it: the residual over both channels,
+	// relative to the firmware's energy
+	double masterResidualDb(const std::array<std::vector<float>, 2>& _firmware, const std::array<std::vector<float>, 2>& _other,
+		size_t& _shift)
+	{
+		const auto first = [](const std::array<std::vector<float>, 2>& _main)
+		{
+			for(size_t i = 0; i < _main[0].size(); ++i)
+				if(std::abs(_main[0][i]) >= 1e-3f || std::abs(_main[1][i]) >= 1e-3f)
+					return i;
+			throw std::runtime_error("a master scenario stayed silent");
+		};
+		const auto a = first(_firmware), b = first(_other);
+		require(b <= a, "Main sounds later than the firmware's");
+		_shift = a - b;
+		double residual = 0, energy = 0;
+		for(size_t channel = 0; channel < 2; ++channel)
+			for(size_t i = 0; i + a < _firmware[channel].size(); ++i)
+			{
+				const double x = _firmware[channel][a + i], y = _other[channel][b + i];
+				residual += (x - y) * (x - y);
+				energy += x * x;
+			}
+		return residual > 0 ? 10.0 * std::log10(residual / energy) : -999.0;
+	}
+
+	// The OS's words for the mixer DSP, computed by its own code in MachineRunner, must equal the firmware's. Then the
+	// master section in MasterEngine, started from the firmware's mixer DSP's memory and fed the engine's buses, must
+	// give the firmware's Main sample for sample, once placed on the block where the firmware's Hit reached its DSP (the
+	// UC's tick decides it: the previous scenario's lead is tried first, then up to g_masterLeadBlocks). Started from its
+	// own history instead, the engine's Main differs: its rings and the Gate Box's sine sit at other places.
+	void compareMaster(const md::fw::FlashOs& _os, const char* _path)
+	{
+		const auto scenarios = readMaster(_path);
+		std::string failure;
+		const auto fail = [&](const std::string& _what)
+		{
+			if(failure.empty())
+				failure = _what;
+		};
+		int lead = -1;
+		for(size_t index = 0; index < scenarios.size(); ++index)
+		{
+			const auto& firmware = scenarios[index];
+			const auto& scenario = g_masterScenarios[index];
+			const auto count = firmware.main[0].size();
+			const auto engine = engineMaster(_os, index, count);
+
+			size_t differing = 0;
+			for(size_t i = 0; i < engine.words.size(); ++i)
+			{
+				const auto address = g_masterWordsFrom + static_cast<uint32_t>(i);
+				if(address > 0x158 && address < 0x170)	// the Echo's own state
+					continue;
+				if(engine.words[i] != firmware.y(address))
+				{
+					++differing;
+					std::printf("  Y:$%03x firmware %06x engine %06x\n", address, firmware.y(address), engine.words[i]);
+				}
+			}
+			// The previous scenario's lead first, then all of them
+			double best = 1e9;
+			size_t bestShift = 0;
+			std::vector<int> leads;
+			if(lead >= 0)
+				leads.push_back(lead);
+			for(int silent = 0; silent <= g_masterLeadBlocks; ++silent)
+				if(silent != lead)
+					leads.push_back(silent);
+			for(const auto silent : leads)
+			{
+				size_t shift = 0;
+				const auto db = masterResidualDb(firmware.main, masterFromFirmware(_os, firmware, engine, silent, count), shift);
+				if(db < best)
+				{
+					best = db;
+					bestShift = shift;
+					lead = silent;
+				}
+				if(best <= -999.0)
+					break;
+			}
+			// MD_ENGINE_MASTER_DUMP: a file per scenario (the name, then the index), the firmware's Main L R and the master
+			// effects' from its state, aligned on the firmware's, as 32-bit floats
+			if(const auto* file = std::getenv("MD_ENGINE_MASTER_DUMP"); file && *file)
+			{
+				const auto main = masterFromFirmware(_os, firmware, engine, lead, count);
+				std::ofstream out(std::string(file) + std::to_string(index), std::ios::binary);
+				for(const auto& channel : firmware.main)
+					out.write(reinterpret_cast<const char*>(channel.data()), static_cast<std::streamsize>(count * sizeof(float)));
+				for(const auto& channel : main)
+				{
+					std::vector<float> aligned(count, 0.0f);
+					std::copy(channel.begin(), channel.begin() + static_cast<std::ptrdiff_t>(count - bestShift),
+						aligned.begin() + static_cast<std::ptrdiff_t>(bestShift));
+					out.write(reinterpret_cast<const char*>(aligned.data()), static_cast<std::streamsize>(count * sizeof(float)));
+				}
+			}
+			// The same, with what the skipped parts of the program would leave in the registers and the scratch memory
+			size_t disturbedShift = 0;
+			const auto disturbed = best <= -999.0 ? masterResidualDb(firmware.main,
+				masterFromFirmware(_os, firmware, engine, lead, count, true), disturbedShift) : best;
+			if(best <= -999.0)
+				std::printf("%-32s %zu of the OS's words differ; Main identical from the firmware's state, %d blocks on,"
+					" %s with registers and scratch disturbed\n", scenario.name, differing, lead,
+					disturbed <= -999.0 ? "and" : "NOT");
+			else
+				std::printf("%-32s %zu of the OS's words differ; Main %.1f dB from the firmware's at best (%d blocks on, %zu"
+					" samples apart)\n", scenario.name, differing, best, lead, bestShift);
+			if(differing)
+				fail(std::string(scenario.name) + ": the OS's words differ from the firmware's");
+			if(best > -999.0)
+				fail(std::string(scenario.name) + ": Main differs from the firmware's");
+			if(disturbed > -999.0)
+				fail(std::string(scenario.name) + ": the master effects depend on what the rest of the program leaves");
+		}
+		require(failure.empty(), failure);
+	}
+}
+
 int main(const int _argc, char** _argv)
 {
 	setvbuf(stdout, nullptr, _IONBF, 0);
@@ -538,6 +814,8 @@ int main(const int _argc, char** _argv)
 		}
 		if(_argc > 3)
 			compareGroups(flash, groupsOs, _argv[3]);
+		if(_argc > 4)
+			compareMaster(groupsOs, _argv[4]);
 		std::cout << "mdEngineFirmwareTest: PASS\n";
 		return 0;
 	}

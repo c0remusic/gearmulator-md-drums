@@ -153,6 +153,21 @@ namespace
 			return peak;
 		}
 
+		// A second of host blocks; the peak of the 16 Outs, where nothing sounds but the Tracks (Main keeps a tail of a few
+		// LSB after a Hit, the master effects' EQ and Dynamix, as on the Machinedrum)
+		float listenOuts()
+		{
+			float peak = 0;
+			for(uint32_t b = 0; b < static_cast<uint32_t>(rate() / Block); ++b)
+			{
+				process();
+				for(size_t channel = 2; channel < buffers.size(); ++channel)
+					for(const auto value : buffers[channel])
+						peak = std::max(peak, std::abs(value));
+			}
+			return peak;
+		}
+
 		void settle() { listen(0, static_cast<uint32_t>(rate() * 2 / Block)); }
 		float rate() const { return hostRate; }
 
@@ -187,8 +202,8 @@ namespace
 		const auto loud = rig.listen(0);
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x9f, 60, 100});
-		const auto other = rig.listen(0);
-		std::printf("note 36: peak %.4f; note 60: peak %.4f\n", loud, other);
+		const auto other = rig.listenOuts();
+		std::printf("note 36: peak %.4f; note 60: peak of the Outs %.4f\n", loud, other);
 		require(loud > 0.01f && other == 0.0f, "notes 36-51 only");
 
 		// The host's CCs count for nothing; the editor's set the Kit
@@ -198,7 +213,7 @@ namespace
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 0));
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		require(rig.device->kit().levels[0] == 0 && rig.listen(0) == 0.0f, "the editor's level CC did not silence track 1");
+		require(rig.device->kit().levels[0] == 0 && rig.listen(2) == 0.0f, "the editor's level CC did not silence track 1");
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
 
 		// ASSIGN MACHINE: TRX-BD on track 1, its SYN1-8 defaults said back as CCs
@@ -229,17 +244,22 @@ namespace
 		require(changed.lfo(3).shape1 == md::LfoSettings::Random, "$62 did not reach the Kit");
 		require(changed.links[4] == 5 && changed.chokes[8] == sysex::MdKit::Off, "$65 or $66 did not reach the Kit");
 
-		// Mute drops the Hits, Solo silences the others, Out takes a track off Main onto its own output
+		// Mute drops the Hits, Solo silences the others, Out takes a track off Main onto its own output (its sends at 0 here:
+		// a Track on its Out still feeds the Echo and the Gate Box, whose returns are on Main)
 		rig.settle();
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 1));
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		const auto muted = rig.listen(0);
+		const auto muted = rig.listen(2);
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Mute, 0, 0, 0));
 		rig.send(MidiEventSource::Editor, mdDrums::messages::solo(1, true).message());
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		const auto soloElsewhere = rig.listen(0);
+		const auto soloElsewhere = rig.listen(2);
 		rig.send(MidiEventSource::Editor, mdDrums::messages::solo(1, false).message());
 		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, true).message());
+		const auto del = rig.device->kit().parameters[0][19], rev = rig.device->kit().parameters[0][20];
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, 0));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, 0));
+		rig.settle();
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
 		float mainPeak = 0, outPeak = 0;
@@ -255,7 +275,9 @@ namespace
 		std::printf("muted %.4f, another track soloed %.4f, on Out 01: Main %.4f, Out 01 %.4f\n", muted, soloElsewhere,
 			mainPeak, outPeak);
 		require(muted == 0.0f && soloElsewhere == 0.0f, "Mute or Solo let a Hit through");
-		require(mainPeak == 0.0f && outPeak > 0.01f, "Out did not move track 1 off Main");
+		require(mainPeak < 1e-5f && outPeak > 0.01f, "Out did not move track 1 off Main");
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, del));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, rev));
 
 		// The state: Kit and mixer, read back by another Device
 		std::vector<uint8_t> state;
@@ -480,37 +502,58 @@ namespace
 	}
 
 	// Note to sound through the Plugin: TRX-BD on track 1, 48 notes at pseudo-random samples of 512-sample host blocks,
-	// to the first nonzero sample
+	// to the first sample of Main above -100 dBFS
 	void latency(const std::vector<uint8_t>& _flash, const float _rate)
 	{
 		Rig rig(_flash, _rate);
 		rig.send(MidiEventSource::Editor, *sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16));
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
+		// No sends: Main falls back below -100 dBFS between the notes (the master effects' EQ and Dynamix keep a tail of a
+		// few LSB, as on the Machinedrum)
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, 0));
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, 0));
 		uint32_t random = 0x16305eedu;
-		int minimum = 1 << 30, maximum = 0;
-		double sum = 0;
+		struct Stats
+		{
+			int minimum = 1 << 30, maximum = 0;
+			double sum = 0;
+			void add(const int _first)
+			{
+				require(_first >= 0, "a note stayed silent");
+				minimum = std::min(minimum, _first);
+				maximum = std::max(maximum, _first);
+				sum += _first;
+			}
+		};
+		Stats main, out;
 		for(int note = 0; note < 48; ++note)
 		{
 			rig.listen(0, static_cast<uint32_t>(_rate / Rig::Block));
 			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
 			const auto offset = random % Rig::Block;
 			rig.send(MidiEventSource::Host, {0x90, 36, 100}, offset);
-			int first = -1;
-			for(uint32_t b = 0, position = 0; b < 8 && first < 0; ++b, position += Rig::Block)
+			int firstMain = -1, firstOut = -1;
+			for(uint32_t b = 0, position = 0; b < 8 && (firstMain < 0 || firstOut < 0); ++b, position += Rig::Block)
 			{
 				rig.process();
-				for(uint32_t s = 0; s < Rig::Block && first < 0; ++s)
-					if(rig.buffers[0][s] != 0.0f || rig.buffers[1][s] != 0.0f)
-						first = static_cast<int>(position + s) - static_cast<int>(offset);
+				for(uint32_t s = 0; s < Rig::Block; ++s)
+				{
+					const auto at = static_cast<int>(position + s) - static_cast<int>(offset);
+					if(firstMain < 0 && (std::abs(rig.buffers[0][s]) > 1e-5f || std::abs(rig.buffers[1][s]) > 1e-5f))
+						firstMain = at;
+					if(firstOut < 0 && rig.buffers[2][s] != 0.0f)
+						firstOut = at;
+				}
 			}
-			require(first >= 0, "a note stayed silent");
-			minimum = std::min(minimum, first);
-			maximum = std::max(maximum, first);
-			sum += first;
+			main.add(firstMain);
+			out.add(firstOut);
 		}
-		std::printf("note to sound at %.0f Hz (TRXBD, 48 notes): %d-%d samples, mean %.1f (%.2f ms), jitter %d (%.2f ms),"
-			" reported %u\n", _rate, minimum, maximum, sum / 48, sum / 48 * 1000.0 / _rate, maximum - minimum,
-			(maximum - minimum) * 1000.0 / _rate, rig.plugin->getLatencyMidiToOutput());
+		const auto ms = [&](const double _samples) { return _samples * 1000.0 / _rate; };
+		std::printf("note to sound at %.0f Hz (TRXBD, 48 notes), reported %u: Main %d-%d samples, mean %.1f (%.2f ms),"
+			" jitter %d (%.2f ms); Out 01 %d-%d samples, mean %.1f (%.2f ms), jitter %d\n", _rate,
+			rig.plugin->getLatencyMidiToOutput(), main.minimum, main.maximum, main.sum / 48, ms(main.sum / 48),
+			main.maximum - main.minimum, ms(main.maximum - main.minimum), out.minimum, out.maximum, out.sum / 48,
+			ms(out.sum / 48), out.maximum - out.minimum);
 	}
 }
 

@@ -1,7 +1,8 @@
 // mdDrums::Engine as MD Drums drives it: it finds the flash image, plays a trigger within two 32-sample blocks,
-// scales the velocity, plays the UW bank's samples, and renders all 16 tracks playing faster than real time. It
-// reports the note-to-sound latency and its jitter, sample-accurate (ticket 19) and not, mixes as the engine's own
-// mixer does, retriggers without a click of its own, and plays Links, Chokes and Mute as the Machinedrum does.
+// scales the velocity, plays the UW bank's samples, and renders all 16 tracks playing and the master effects within
+// 30 % of real time. It reports the note-to-sound latency and its jitter, sample-accurate (ticket 19) and not, mixes
+// and runs the master effects as the engine's own mixer and mixer DSP do, retriggers without a click of its own, and
+// plays Links, Chokes and Mute as the Machinedrum does.
 
 #include "mdDrumsEngine.h"
 
@@ -25,6 +26,10 @@ namespace
 		if(!_condition)
 			throw std::runtime_error(_message);
 	}
+
+	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
+	// silent below -100 dBFS rather than at 0
+	constexpr float g_silence = 1e-5f;
 
 	uint8_t machineId(const mdDrums::Engine& _engine, const char* _name)
 	{
@@ -81,7 +86,7 @@ namespace
 			}
 			int first = -1;
 			for(size_t i = 0; i < left.size() && first < 0; ++i)
-				if(left[i] != 0.0f || right[i] != 0.0f)
+				if(std::abs(left[i]) > g_silence || std::abs(right[i]) > g_silence)
 					first = static_cast<int>(i);
 			require(first >= 0, "a note stayed silent");
 			minimum = std::min(minimum, first);
@@ -92,8 +97,9 @@ namespace
 			_engine.isSampleAccurate() ? "sample-accurate" : "on the engine's blocks", minimum, maximum, sum / 48,
 			sum / 48 * 1000.0 / 44100.0, maximum - minimum, (maximum - minimum) * 1000.0 / 44100.0);
 		// The rest of the engine's block (or the constant 31), then TRX-BD's voice, which sounds a block after its
-		// trigger, from its 5th sample
-		require(maximum <= mdDrums::Engine::BlockSize * 2 + 5, "a note took more than two blocks to sound");
+		// trigger, from its 5th sample, then Dynamix's look-ahead on Main
+		require(maximum <= mdDrums::Engine::BlockSize * 2 + 5 + mdDrums::Engine::MasterDelay,
+			"a note took more than two blocks to sound");
 		return maximum - minimum;
 	}
 
@@ -107,12 +113,15 @@ namespace
 
 	// The engine's own mixer (md::engine::Engine, as mdEngineFirmwareTest compares it with the firmware) against
 	// mdDrums::Engine with every Hit on an engine block, so that every Track waits as long: the same samples, at once
-	// when not sample-accurate, SampleAccurateDelay later when it is
+	// when not sample-accurate, SampleAccurateDelay later when it is. The master effects run on the engine's buses as
+	// they are, and on the same buses SampleAccurateDelay later, each with the OS's words of every tick.
 	void equivalence(const std::vector<uint8_t>& _flash)
 	{
 		auto os = md::fw::loadFirmwareFromFlash(_flash);
+		const auto firmware = os.firmware;
 		md::engine::Engine raw(os.firmware, std::move(os.osImage));
 		raw.loadRomBank(md::fw::loadRomBankFromFlash(_flash));
+		md::engine::MasterEngine onBlocks(firmware), late(firmware);
 		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
 		{
 			raw.host().setMachine(track, mdDrums::Engine::defaultMachine(track));
@@ -120,6 +129,8 @@ namespace
 				raw.host().setParam(track, param, mdDrums::Engine::paramDefaults()[param]);
 			raw.host().setLevel(track, mdDrums::Engine::DefaultLevel);
 		}
+		for(int index = 0; index < mdDrums::Engine::MasterCount; ++index)
+			raw.host().setMaster(index, mdDrums::Engine::masterDefaults()[index]);
 		mdDrums::Engine accurate(_flash), blocks(_flash);
 		blocks.setSampleAccurate(false);
 		accurate.setParam(4, 18, 20);	// a panned Track, and one with a send
@@ -131,9 +142,11 @@ namespace
 
 		constexpr int blockCount = 600;
 		constexpr size_t block = mdDrums::Engine::BlockSize;
-		std::vector<int32_t> rawLeft, rawRight;
+		constexpr size_t shift = mdDrums::Engine::SampleAccurateDelay;
+		std::vector<int32_t> rawLeft, rawRight, lateLeft, lateRight;
 		std::vector<float> accLeft(blockCount * block), accRight(blockCount * block), blkLeft(accLeft.size()), blkRight(accLeft.size());
 		md::engine::Engine::Output out;
+		std::vector<std::array<std::array<int32_t, 2>, 3>> buses(shift);	// the buses' last 31 frames, oldest first
 		for(int b = 0; b < blockCount; ++b)
 		{
 			if(b % 3 == 0)
@@ -145,25 +158,44 @@ namespace
 				blocks.trigger(track, velocity);
 			}
 			require(raw.render(out), "the engine faulted");
-			for(const auto& frame : out.mix.main)
+			md::engine::HostModel<>::MasterWords words;
+			if(raw.host().takeMasterWords(words))
 			{
-				rawLeft.push_back(frame[0]);
-				rawRight.push_back(frame[1]);
+				onBlocks.setWords(words.y, words.words.data(), words.count);
+				late.setWords(words.y, words.words.data(), words.count);
+			}
+			md::engine::Mixer::Stereo main{}, lateDry{}, lateRev{}, lateDel{};
+			require(onBlocks.process(out.mix.main, out.mix.rev, out.mix.del, main), "the master effects faulted");
+			for(size_t i = 0; i < block; ++i)
+			{
+				buses.push_back({out.mix.main[i], out.mix.rev[i], out.mix.del[i]});
+				lateDry[i] = buses.front()[0];
+				lateRev[i] = buses.front()[1];
+				lateDel[i] = buses.front()[2];
+				buses.erase(buses.begin());
+			}
+			md::engine::Mixer::Stereo lateMain{};
+			require(late.process(lateDry, lateRev, lateDel, lateMain), "the master effects faulted");
+			for(size_t i = 0; i < block; ++i)
+			{
+				rawLeft.push_back(main[i][0]);
+				rawRight.push_back(main[i][1]);
+				lateLeft.push_back(lateMain[i][0]);
+				lateRight.push_back(lateMain[i][1]);
 			}
 			accurate.render(accLeft.data() + b * block, accRight.data() + b * block, block);
 			blocks.render(blkLeft.data() + b * block, blkRight.data() + b * block, block);
 		}
 		const auto al = toSamples(accLeft), ar = toSamples(accRight), bl = toSamples(blkLeft), br = toSamples(blkRight);
 		size_t blockDiffs = 0, accurateDiffs = 0;
-		constexpr size_t shift = mdDrums::Engine::SampleAccurateDelay;
 		for(size_t i = 0; i < rawLeft.size(); ++i)
 		{
 			blockDiffs += (bl[i] != rawLeft[i]) + (br[i] != rawRight[i]);
-			if(i + shift < al.size())
-				accurateDiffs += (al[i + shift] != rawLeft[i]) + (ar[i + shift] != rawRight[i]);
+			accurateDiffs += (al[i] != lateLeft[i]) + (ar[i] != lateRight[i]);
 		}
-		std::printf("mix against the engine's own mixer, 200 Hits on its blocks, %zu samples: %zu differ on the engine's"
-			" blocks, %zu sample-accurate (%zu samples later)\n", rawLeft.size(), blockDiffs, accurateDiffs, shift);
+		std::printf("Main against the engine's own mixer and master effects, 200 Hits on its blocks, %zu samples: %zu differ"
+			" on the engine's blocks, %zu sample-accurate (buses %zu samples later)\n", rawLeft.size(), blockDiffs,
+			accurateDiffs, shift);
 		require(blockDiffs == 0 && accurateDiffs == 0, "the delayed mix is not the engine's mix");
 	}
 
@@ -186,9 +218,10 @@ namespace
 			for(size_t i = 0; i < left.size() && first < 0; ++i)
 				if(left[i] != 0.0f || right[i] != 0.0f)
 					first = static_cast<int>(i);
-			line += std::string(" ") + name + " " + std::to_string(first - mdDrums::Engine::SampleAccurateDelay);
+			line += std::string(" ") + name + " "
+				+ std::to_string(first - mdDrums::Engine::SampleAccurateDelay - mdDrums::Engine::MasterDelay);
 		}
-		std::printf("voice starts after the 31 samples:%s\n", line.c_str());
+		std::printf("voice starts after the 31 samples (and Dynamix's 16 on Main):%s\n", line.c_str());
 	}
 
 	// A sustained sound (E12-RC, HOLD and DEC at 127) retriggered at each of the 32 places of a block: the delays change
@@ -263,8 +296,8 @@ int main()
 		engine.trigger(0, 127);
 		const auto [first, loud] = listen(engine);
 		std::printf("TRXBD velocity 127: first audible sample %d, peak %.4f\n", first, loud);
-		require(first >= 0 && first < mdDrums::Engine::BlockSize * 2 + mdDrums::Engine::SampleAccurateDelay,
-			"the trigger took more than two blocks to sound");
+		require(first >= 0 && first < mdDrums::Engine::BlockSize * 2 + mdDrums::Engine::SampleAccurateDelay
+			+ mdDrums::Engine::MasterDelay, "the trigger took more than two blocks to sound");
 		require(loud > 0.01f, "the trigger is too quiet");
 
 		settle(engine);
@@ -306,7 +339,7 @@ int main()
 			};
 			std::printf("track 1 separated: main peak %.4f, own output %.4f, track 2 output %.4f\n",
 				std::max(peak(0), peak(1)), peak(2), peak(3));
-			require(peak(0) == 0.0f && peak(1) == 0.0f, "a separated track still plays in the main mix");
+			require(peak(0) < g_silence && peak(1) < g_silence, "a separated track still plays in the main mix");
 			require(peak(2) > 0.01f, "a separated track is silent on its own output");
 			require(peak(3) == 0.0f, "another track's output carries track 1");
 			engine.setSeparateOutputs(0);
@@ -395,7 +428,7 @@ int main()
 				const auto peak = listen(engine).second;
 				std::printf("%s velocity 127: peak %.4f\n", name, peak);
 				if(std::string(name) == "ROM33")
-					require(peak == 0.0f, "an empty ROM slot sounds");
+					require(peak < g_silence, "an empty ROM slot sounds");
 				else
 					require(peak > 0.01f, "a ROM machine of the factory bank is silent");
 			}
@@ -421,9 +454,10 @@ int main()
 			}
 			const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 			const double audio = 512.0 * 689.0 / 44100.0;
-			std::printf("16 tracks%s: %.2f s of audio in %.2f s (%.0f%% of one core)\n", accurate ? ", sample-accurate" : "",
-				audio, seconds, seconds / audio * 100.0);
-			require(seconds < audio, "the engine renders 16 tracks slower than real time");
+			std::printf("16 tracks and the master effects%s: %.2f s of audio in %.2f s (%.1f%% of one core)\n",
+				accurate ? ", sample-accurate" : "", audio, seconds, seconds / audio * 100.0);
+			// The audio thread's budget (ticket 09): what MD Drums renders, at most 30 % of real time on the reference PC
+			require(seconds < audio * 0.3, "the engine takes more than 30 % of real time for 16 tracks and the master");
 		}
 
 		std::cout << "mdDrumsEngineTest: PASS\n";

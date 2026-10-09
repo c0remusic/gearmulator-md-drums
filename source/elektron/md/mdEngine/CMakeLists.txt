@@ -8,6 +8,7 @@ add_library(mdEngine STATIC
 	engine/Dsp56.h
 	engine/HostModel.cpp engine/HostModel.h
 	engine/MachineRunner.cpp engine/MachineRunner.h
+	engine/MasterEngine.cpp engine/MasterEngine.h
 	engine/MdEngine.h
 	engine/Mixer.cpp engine/Mixer.h
 	engine/ParallelVoiceEngine.cpp engine/ParallelVoiceEngine.h

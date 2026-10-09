@@ -106,6 +106,61 @@ namespace mdFirmwareBench
 	// engine's tracks are independent. Measured: -67.7 to -79.1 dB.
 	inline constexpr double g_concurrentResidualFloorDb = -60.0;
 
+	// The master effects (md-drums ticket 24), played by the firmware (mdTrigLatencyFirmwareTest --master) and by the
+	// engine's mixer DSP harness (mdEngineFirmwareTest): one Hit on a fresh track routed to Main with its sends, the 32
+	// master bytes fixed beforehand, Main recorded. Kit order: Gate Box DVOL PRED DEC DAMP HP LP GATE LEV, Echo TIME MOD
+	// MFRQ FB FLTF FLTW MONO LEV, EQ LF LG HF HG PF PG PQ GAIN, Dynamix ATCK REL TRHD RTIO KNEE HP OUTG MIX. Echo MOD
+	// stays 0: its triangle runs from the boot, at a phase the firmware and the engine do not share.
+	struct MasterScenario
+	{
+		const char* name;
+		std::array<uint8_t, 32> master;
+		uint8_t track;		// 0-based, never played before
+		// TRX-BD, EFM-CB or P-I-MT: with EFM-BD and TRX-SD the firmware's Main differed in some runs, from the Hit's first
+		// sample on and by the same -75 dB whatever the master's settings, so in what reached its master (not traced)
+		uint16_t machine;
+		uint8_t del, rev;	// the track's sends
+	};
+
+	// Factory Kit 1's master effects, as OS 1.63 boots
+	inline constexpr std::array<uint8_t, 32> g_kit1Master{0, 0, 68, 50, 1, 82, 71, 109, 16, 0, 32, 27, 0, 44, 0, 71,
+		64, 64, 64, 64, 64, 64, 64, 127, 127, 127, 127, 127, 127, 127, 0, 0};
+
+	inline const std::array<MasterScenario, 7> g_masterScenarios{{
+		{"Kit 1, Echo and Gate Box", g_kit1Master, 10, 66, 80, 80},
+		{"EQ and Dynamix, no send", {0, 0, 68, 50, 1, 82, 71, 0, 16, 0, 32, 27, 0, 44, 0, 0,
+			40, 100, 90, 30, 70, 96, 64, 110, 20, 60, 50, 90, 64, 127, 64, 127}, 2, 16, 0, 0},
+		{"Echo filtered, mono, fed back", {0, 0, 68, 50, 1, 82, 71, 0, 40, 0, 32, 90, 30, 70, 64, 100,
+			64, 64, 64, 64, 64, 64, 64, 127, 127, 127, 127, 127, 127, 127, 0, 0}, 3, 37, 100, 0},
+		{"Gate Box, Echo into it", {64, 40, 100, 30, 10, 100, 127, 110, 16, 0, 32, 27, 0, 44, 0, 71,
+			64, 64, 64, 64, 64, 64, 64, 127, 127, 127, 127, 127, 127, 127, 0, 0}, 4, 66, 40, 100},
+		{"Kit 1, gate open", {0, 0, 68, 50, 1, 82, 127, 109, 16, 0, 32, 27, 0, 44, 0, 71,
+			64, 64, 64, 64, 64, 64, 64, 127, 127, 127, 127, 127, 127, 127, 0, 0}, 5, 66, 80, 80},
+		{"Kit 1, no reverb send", g_kit1Master, 6, 66, 80, 0},
+		{"Kit 1, no delay send", g_kit1Master, 7, 66, 0, 80},
+	}};
+
+	// The mixer DSP's words the master reads, from the Echo's to the Gate Box's: what the OS sends (Y:$150-$158,
+	// $170-$18c) and what the DSP derives from them or keeps (the rest)
+	inline constexpr uint32_t g_masterWordsFrom = 0x150, g_masterWordsTo = 0x18d;
+
+	// The mixer DSP's memory as the master section keeps it, which the firmware's is recorded with before each Hit: its
+	// internal X and Y, then external memory (X, Y and P at once) from the Echo's delay pool to the end of the sine table.
+	// Besides the parameters it holds the delay lines, the filters and the positions in each ring, which depend on how
+	// many blocks have run since the boot: the Gate Box reads a sine at a phase that turns 32 words a block, and the
+	// Echo's and Gate Box's rings wrap by jumping back to their start, so a read that crosses the end lands a sample off.
+	struct MasterRange
+	{
+		bool y;			// X otherwise
+		uint32_t from, to;
+	};
+	inline constexpr std::array<MasterRange, 3> g_masterState{{{false, 0, 0x800}, {true, 0, 0x800},
+		{false, 0x1000da, 0x150000}}};
+	inline constexpr size_t g_masterStateWords = 0x800 + 0x800 + (0x150000 - 0x1000da);
+
+	// The blocks between the firmware's state and its Hit's first block of sound, at most
+	inline constexpr int g_masterLeadBlocks = 64;
+
 	inline const std::array<GroupScenario, 6> g_groupScenarios{{
 		// Kit 1's Choke: the open hat, then the closed hat a tenth of a second later cuts it in the same tick
 		{"Choke 9 to 10 (factory Kit 1)", {g_noTrack, g_noTrack, 9, 8, g_noTrack, g_noTrack}, {}, {}, {},
