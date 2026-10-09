@@ -41,6 +41,11 @@ later versions can be compared file by file. Their documentation is in `.scratch
 - `engine/MdEngine.h`, `engine/TrackFx.*`: `EngineT` keeps `TrackFx::Tables` behind a `shared_ptr` and hands it out
   (`tables()`), and `TrackFx::eqWords` keeps the EQ's coefficient words of the last block, so that MD Drums' editor
   draws the filter's and the EQ's response from the words the DSP computes (`mdDrums/mdDrumsFilterResponse.*`).
+- `engine/HostModel.*`: parameter locks from outside (`lock`, md-drums' ADR 0003), which upstream leaves out with the
+  sequencer. A Hit's locks go where the tick's trigger path applies the OS's own, with a pending machine: straight
+  into the smoothing target, the smoothed array and the voice array, held as the target until the track's next Hit,
+  which puts the Kit's values back the same way. A lock with no Hit of its track in its block is dropped. Not
+  compared with the firmware's sequencer.
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

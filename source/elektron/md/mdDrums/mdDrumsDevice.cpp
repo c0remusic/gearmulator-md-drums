@@ -206,6 +206,12 @@ namespace mdDrums
 		if(status == synthLib::M_NOTEON && _event.c > 0)
 		{
 			const auto track = static_cast<int>(_event.b) - FirstNote;
+			const auto param = static_cast<int>(_event.b) - FirstLockNote;
+			if(param >= 0 && param < Engine::ParamCount)
+			{
+				m_engine->lock(_event.a & 0x0f, param, messages::lockValue(_event.c));
+				return;
+			}
 			if(track < 0 || track >= Engine::TrackCount)
 				return;
 			const auto struck = m_engine->trigger(track, _event.c);

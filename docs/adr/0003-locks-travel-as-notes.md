@@ -31,8 +31,9 @@ running.
   channel) from the host, still no CC or SysEx.
 - A Live clip carries no MIDI channel, so Locks for Track n come from a Live track that sends on channel n. One MIDI
   track on one channel locks one Track.
-- Velocity 0 is a note-off: the scale from velocity 1-127 to values 0-127 is fixed before the first push that plays
-  Locks, since every clip printed after it depends on it.
+- Velocity 0 is a note-off, so velocity 1-127 stretches onto values 0-127, rounded: 1-63 give 0-62, 64-127 give
+  themselves (`messages::lockValue`). Both ends and the centre can be locked, 63 cannot. Every clip printed from the
+  first push on depends on this scale.
 - `HostModel` models Locks (its header listed them as not modelled): a local change to mdEngine, listed in its README.
 - Locks are invisible to the host parameters and the editor, whose knobs show the Kit.
 - A Hit whose note has a chance of not playing leaves its Locks without a Hit, and so dropped.

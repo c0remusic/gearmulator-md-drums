@@ -1,8 +1,9 @@
 // MD Drums' Device driven by MIDI bytes alone, through synthLib::Plugin as the plug-in drives it: it boots with factory
 // Kit 1, plays notes 36-51 and drops the others, takes the Machinedrum's CCs and SysEx from the editor and ignores the
 // host's, answers ASSIGN MACHINE with the new machine's SYN1-8 as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
-// across a state round trip, and renders with notes and CCs without allocating. It reports the note-to-sound latency
-// at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of one core.
+// across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It reports the
+// note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of
+// one core.
 
 #include "mdDrumsDevice.h"
 #include "mdDrumsTelemetry.h"
@@ -336,6 +337,142 @@ namespace
 		std::printf("%zu host parameter values sent and read back from the Device\n", checked);
 	}
 
+	// Locks (ADR 0003), heard on Main against takes that differ only in them. Every take boots the same Device, sets
+	// track 1's Kit FLTF to 20 and SRR to 0, settles, and from then on processes the same host blocks.
+	constexpr uint8_t Fltf = 12;	// engine parameter numbers: page x 8 + index
+	constexpr uint8_t Srr = 15;
+
+	uint8_t lockNote(const uint8_t _param) { return static_cast<uint8_t>(mdDrums::Device::FirstLockNote + _param); }
+	uint8_t lockVelocity(const uint8_t _value) { return static_cast<uint8_t>(_value >= 64 ? _value : _value + 1); }
+
+	struct Take
+	{
+		explicit Take(const std::vector<uint8_t>& _flash) : rig(_flash, 44100.0f)
+		{
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, Fltf - 8, 20));
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, Srr - 8, 0));
+			rig.settle();
+		}
+
+		// TRX-BD on track 1 from its next Hit, which then takes its Kit's 24 values at once, as a Lock does
+		void assignAtNextHit() { rig.send(MidiEventSource::Editor, *sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16)); }
+		void kit(const uint8_t _param, const uint8_t _value)
+		{
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, _param - 8, _value), Offset);
+		}
+		void hit() { rig.send(MidiEventSource::Host, {0x90, 36, 100}, Offset); }
+		void lock(const uint8_t _param, const uint8_t _value, const uint8_t _channel = 0)
+		{
+			rig.send(MidiEventSource::Host, {static_cast<uint8_t>(0x90 | _channel), lockNote(_param), lockVelocity(_value)},
+				Offset);
+		}
+
+		// Main, left and right, for _blocks host blocks
+		std::vector<float> record(const uint32_t _blocks)
+		{
+			std::vector<float> samples;
+			for(uint32_t b = 0; b < _blocks; ++b)
+			{
+				rig.process();
+				samples.insert(samples.end(), rig.buffers[0].begin(), rig.buffers[0].end());
+				samples.insert(samples.end(), rig.buffers[1].begin(), rig.buffers[1].end());
+			}
+			return samples;
+		}
+
+		static constexpr uint32_t Offset = 100;	// every event's, in its host block
+		Rig rig;
+	};
+
+	float peak(const std::vector<float>& _samples)
+	{
+		float result = 0;
+		for(const auto s : _samples)
+			result = std::max(result, std::abs(s));
+		return result;
+	}
+
+	void locks(const std::vector<uint8_t>& _flash)
+	{
+		for(int velocity = 1; velocity < 128; ++velocity)
+		{
+			const auto value = mdDrums::messages::lockValue(static_cast<uint8_t>(velocity));
+			require(value == (velocity < 64 ? velocity - 1 : velocity), "velocity " + std::to_string(velocity)
+				+ " locks " + std::to_string(value));
+		}
+
+		constexpr uint32_t Blocks = 40;	// about half a second, past three dozen ticks
+
+		// A Lock plays at once what the Kit would, in either order with its Hit; the Kit keeps its own value
+		Take kitTake(_flash);
+		kitTake.assignAtNextHit();
+		kitTake.kit(Fltf, 100);
+		kitTake.kit(Srr, 90);
+		kitTake.hit();
+		const auto kitHit = kitTake.record(Blocks);
+
+		Take locked(_flash);
+		locked.assignAtNextHit();
+		locked.lock(Fltf, 100);
+		locked.lock(Srr, 90);
+		locked.hit();
+		const auto lockedHit = locked.record(Blocks);
+
+		Take lockedAfter(_flash);
+		lockedAfter.assignAtNextHit();
+		lockedAfter.hit();
+		lockedAfter.lock(Fltf, 100);
+		lockedAfter.lock(Srr, 90);
+		const auto lockedAfterHit = lockedAfter.record(Blocks);
+
+		Take plain(_flash);
+		plain.assignAtNextHit();
+		plain.hit();
+		const auto plainHit = plain.record(Blocks);
+
+		std::printf("Locks FLTF 100, SRR 90: peak %.4f, the Kit's own Hit %.4f\n", peak(lockedHit), peak(plainHit));
+		require(peak(plainHit) > 0.01f && lockedHit != plainHit, "the Locks changed nothing");
+		require(lockedHit == kitHit, "a Locked Hit did not play as the Kit with those values would");
+		require(lockedAfterHit == kitHit, "a Lock after its Hit at the same offset was not applied");
+		const auto& kitValues = locked.rig.device->kit().parameters[0];
+		require(kitValues[Fltf] == 20 && kitValues[Srr] == 0, "a Lock changed the Kit");
+
+		// The next Hit without a Lock plays the Kit again, as one Locked to the Kit's values would
+		const auto second = [&](const bool _relock, const uint8_t _fltf, const uint8_t _srr)
+		{
+			Take take(_flash);
+			take.assignAtNextHit();
+			take.lock(Fltf, 100);
+			take.lock(Srr, 90);
+			take.hit();
+			take.record(Blocks);
+			if(_relock)
+			{
+				take.lock(Fltf, _fltf);
+				take.lock(Srr, _srr);
+			}
+			take.hit();
+			return take.record(Blocks);
+		};
+		const auto back = second(false, 0, 0);
+		require(back == second(true, 20, 0), "the Hit after a Locked one did not play the Kit");
+		require(back != second(true, 100, 90), "the Hit after a Locked one kept its Locks");
+
+		// A Lock without a Hit of its Track in its block is dropped: alone, or on another Track's channel
+		Take orphans(_flash);
+		orphans.lock(Fltf, 100);
+		orphans.record(4);
+		orphans.lock(Fltf, 100, 1);
+		orphans.hit();
+		const auto orphanHit = orphans.record(Blocks);
+
+		Take none(_flash);
+		none.record(4);
+		none.hit();
+		require(orphanHit == none.record(Blocks), "a Lock without its Hit reached a Hit");
+		std::printf("Locks: at once in either order, back to the Kit at the next Hit, dropped without their Hit\n");
+	}
+
 	// Notes and CCs, inline SysEx included, on a prepared Plugin: no heap allocation
 	void allocations(const std::vector<uint8_t>& _flash)
 	{
@@ -570,6 +707,7 @@ int main()
 	{
 		behaviour(flash);
 		parameters(flash);
+		locks(flash);
 		allocations(flash);
 		latency(flash, 44100.0f);
 		latency(flash, 48000.0f);

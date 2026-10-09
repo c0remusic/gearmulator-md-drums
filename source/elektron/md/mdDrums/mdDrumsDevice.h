@@ -12,15 +12,17 @@
 namespace mdDrums
 {
 	// MD Drums' synthLib::Device: a Machinedrum seen through its MIDI (ADR 0002), the engines without the OS behind it.
-	// It takes notes 36-51 on any channel from anyone, and from the editor (source Editor) the Machinedrum's CCs on
-	// channels 1 to 4 (24 parameters, level, mute), ASSIGN MACHINE ($5B), the master effects ($5D-$60), SET LFO PARAM
-	// ($62), SET TRIG GROUP and SET MUTE GROUP ($65, $66) and Kit dumps ($52), plus MD Drums' own messages (Solo, Out,
-	// tempo, mixer). What the host sends besides notes is ignored. It renders synchronously, cutting its block at each
-	// event's offset, and holds everything the sound depends on: its state is its Kit and its mixer.
+	// It takes notes 36-51 on any channel from anyone, Locks as notes 64-87 on their Track's channel (ADR 0003), and from
+	// the editor (source Editor) the Machinedrum's CCs on channels 1 to 4 (24 parameters, level, mute), ASSIGN MACHINE
+	// ($5B), the master effects ($5D-$60), SET LFO PARAM ($62), SET TRIG GROUP and SET MUTE GROUP ($65, $66) and Kit dumps
+	// ($52), plus MD Drums' own messages (Solo, Out, tempo, mixer). What the host sends besides notes is ignored. It
+	// renders synchronously, cutting its block at each event's offset, and holds everything the sound depends on: its
+	// state is its Kit and its mixer.
 	class Device final : public synthLib::Device
 	{
 	public:
 		static constexpr int FirstNote = 36;
+		static constexpr int FirstLockNote = 64;	// SYN1 to LFOM, the engine's parameter order; velocity: lockValue()
 		static constexpr int OutputCount = Engine::OutputCount;	// Main left and right, then Out 01 to 16
 		// Every Hit sounds 31 samples after its note (Engine::SampleAccurateDelay), then its voice starts: 4 samples for
 		// most machines (TRX-SD, -CH, EFM, E12, P-I; 12 for ROM, 36 for TRX-BD, which sounds a block later;

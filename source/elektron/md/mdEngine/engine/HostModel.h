@@ -6,8 +6,8 @@
 // It also produces each track's inputs to the mixer DSP (DSP1): the 9 effect words (Y:$200+$40k) and the
 // 5 mix words (Y:$100+5k), computed as the tick routine does ($20b1f6-$20b302).
 //
-// Not yet modelled: parameter locks (a sequencer feature). Trig and mute groups (Links and Chokes) are the Kit's and
-// act on every Hit (md-drums).
+// md-drums: trig and mute groups (Links and Chokes) are the Kit's and act on every Hit; parameter locks come with a
+// Hit from outside (lock()), as the OS's sequencer gives them to its own trigger path.
 #pragma once
 #include <algorithm>
 #include <array>
@@ -35,6 +35,11 @@ namespace md::engine
 		void setMachine(int _track, uint8_t _machineId);
 		void setParam(int _track, int _param, int _value);	// 0-127, smoothed like the MD
 		int param(int _track, int _param) const { return m_raw[_track][_param]; }
+		// md-drums: a parameter lock (0-127) for the track's Hit in the block about to render. Where the tick's trigger
+		// path applies the OS's own locks, with a pending machine, the parameter takes the value at once (no glide) and
+		// holds it until the track's next Hit; a Hit without a lock on a parameter the last Hit locked plays the Kit's
+		// value again, at once too. A lock with no Hit of its track in that block is dropped; param() stays the Kit's.
+		void lock(int _track, int _param, int _value);
 		void setTempo(double _bpm);							// tempo factor for tempo-synced LFOs and E12/ROM retrig
 		// velocity 1-127; accent: the sequencer's accented step (velocity becomes 128 + 2 x accent amount). A muted track
 		// drops its Hit, as the OS's note handler does ($20ccf6), and so fires neither its Link nor its Choke.
@@ -165,5 +170,14 @@ namespace md::engine
 		std::array<bool, kTracks> m_choked{};	// the OS's group-mute flag ($1001510), apart from the user mute
 		MasterWords m_masterWords;
 		bool m_masterPending = false;
+
+		// md-drums: locks (bit n = parameter n) waiting for a Hit in the block about to render, and those the track's
+		// last Hit plays; the smoothing target is the lock's value on a locked parameter, the Kit's elsewhere
+		void applyLocks(int _track);
+		uint8_t target(int _track, int _param) const;
+		std::array<uint32_t, kTracks> m_lockPending{};
+		std::array<uint32_t, kTracks> m_locked{};
+		std::array<std::array<uint8_t, kParams>, kTracks> m_lockPendingValue{};
+		std::array<std::array<uint8_t, kParams>, kTracks> m_lockValue{};
 	};
 }
