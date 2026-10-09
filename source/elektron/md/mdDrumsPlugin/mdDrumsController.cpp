@@ -393,6 +393,33 @@ namespace mdDrums
 		getProcessor().addMidiEvent(event);
 	}
 
+	void Controller::setLink(const uint8_t _track, const uint8_t _target)
+	{
+		if(_track >= TrackCount)
+			return;
+		const auto target = _target < TrackCount && _target != _track ? _target : Off;
+		m_kitBase.links[_track] = target;
+		if(const auto message = md::automation::sysex::linkChange(_track, target))
+			sendToDevice(*message);
+	}
+
+	void Controller::setChoke(const uint8_t _track, const uint8_t _target)
+	{
+		if(_track >= TrackCount)
+			return;
+		const auto target = _target < TrackCount && _target != _track ? _target : Off;
+		m_kitBase.chokes[_track] = target;
+		if(const auto message = md::automation::sysex::chokeChange(_track, target))
+			sendToDevice(*message);
+	}
+
+	void Controller::sendToDevice(const std::vector<uint8_t>& _sysex)
+	{
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex.assign(_sysex.begin(), _sysex.end());
+		getProcessor().addMidiEvent(event);
+	}
+
 	void Controller::setLoadedState(std::vector<uint8_t> _state)
 	{
 		m_loadedState = std::move(_state);

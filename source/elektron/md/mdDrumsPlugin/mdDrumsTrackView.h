@@ -25,11 +25,11 @@ namespace mdDrums
 	// The v22 skin's behaviour until the slices that give it more (tickets 17 and 18): the shown Track, chosen by a click
 	// on a list row, a Mix strip, a send or by ‹ ›, and what the views say about it (its row and strip lit, "Track 01",
 	// the machine's family, where it plays, the machine's names for SYN1-8 and in the LFO's menu); the overlays opened
-	// and closed (the machine browser, the LFO's target menu, the Kits; Esc closes them, the browser as Cancel), and the
-	// browser's "Listen while choosing", with which a machine chosen plays the Track; playing the Track (the play key and
-	// Space, at the head band's velocity, which a drag sets) and stepping its machine (the wheel or the arrows on its
-	// name, the arrows in the browser: ticket 23); and the Size control, which steps the window through 75, 100, 125 and
-	// 150 % on TUS's own "scale" setting. Everything runs on the message thread.
+	// and closed (the machine browser, the LFO's target menu, the Kits, the Links and Chokes menu; Esc closes them, the
+	// browser as Cancel), and the browser's "Listen while choosing", with which a machine chosen plays the Track; playing
+	// the Track (the play key and Space, at the head band's velocity, which a drag sets) and stepping its machine (the
+	// wheel or the arrows on its name, the arrows in the browser: ticket 23); and the Size control, which steps the
+	// window through 75, 100, 125 and 150 % on TUS's own "scale" setting. Everything runs on the message thread.
 	class TrackView
 	{
 	public:
@@ -38,7 +38,8 @@ namespace mdDrums
 			None,
 			Browser,
 			LfoMenu,
-			Kits
+			Kits,
+			Links		// the Track's Links and Chokes, over the Hit screen (LinksView)
 		};
 
 		static constexpr std::array<int, 4> Scales{75, 100, 125, 150};

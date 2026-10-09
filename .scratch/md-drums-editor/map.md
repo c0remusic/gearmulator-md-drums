@@ -167,15 +167,19 @@ mesurées avant et après. Pas de tag.
   mais le Device joue toujours un Kit, dont `loadLfo` copie les 36 octets du bloc LFO ; les 256 blocs des 16 Kits
   d'usine et celui d'un Kit neuf (`$0000029a`) sèment le générateur (`mdDrumsBankTest`), que `mdDrumsScreensTest`
   vérifie bit-exact une fois semé. Rien à corriger dans MD Drums.
+- [Links et Chokes dans l'éditeur](issues/29-links-chokes-editeur.md) : deux lignes dans la bande de tête (colonnes
+  8-11, y 84 et 124) en phrases, « Also strikes track 05 », « Silences no track » ; un seul menu par-dessus l'écran
+  Hit, grille du menu du LFO, sections Strikes et Silences avec Off, la Track elle-même inerte ; valeurs du Kit, pas
+  de paramètre hôte ; aucun son au choix ; rien ailleurs ; ticket 30.
+- [Links et Chokes : construction](issues/30-links-chokes-construction.md) : `Controller::setLink`, `setChoke` vers
+  `$65`/`$66`, `LinksView` ; Device, état et Save suivent ; cellule→pixel 10,4 ms.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
-  mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28)
-  faits.
-- **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
-  paramètre hôte (ticket 06). À placer avec la tranche Track.
+  mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28),
+  Links et Chokes (29, 30) faits.
 - **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
   ajoutés au garde-fou.
 

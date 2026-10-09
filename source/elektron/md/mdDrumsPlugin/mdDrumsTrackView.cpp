@@ -4,6 +4,7 @@
 #include "mdDrumsEditor.h"
 #include "mdDrumsKitsView.h"
 #include "mdDrumsLfoView.h"
+#include "mdDrumsLinksView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "jucePluginEditorLib/pluginProcessor.h"
@@ -332,6 +333,10 @@ namespace mdDrums
 		show("lfomenu", _overlay == Overlay::LfoMenu);
 		if(_overlay == Overlay::LfoMenu)
 			updateLfoMenu();
+		show("linksmenu", _overlay == Overlay::Links);
+		if(_overlay == Overlay::Links)
+			if(auto* links = m_editor.getLinksView())
+				links->refresh();
 	}
 
 	void TrackView::onPartChanged(const uint8_t _part)

@@ -37,6 +37,9 @@
 					<div id="machine" class="a c4 w4 machine">{{Machine_text}}<vglyph class="chevron" shape="chevron"/></div>
 					<div id="family" class="a c12 w3 meta inset family"><span id="family_code" class="code">TRX</span><span id="family_text">modelled analog</span></div>
 					<div id="output" class="a c12 w3 meta inset output">Plays on <b id="output_text">Main</b></div>
+					<!-- The Track's Link and Choke (ticket 29), filled by mdDrumsLinksView.cpp: either opens their menu -->
+					<div id="link" class="a c8 w4 meta lc link"><span id="link_word" class="word"><span id="link_text">Strikes no other track</span><vglyph class="down" shape="down"/></span></div>
+					<div id="choke" class="a c8 w4 meta lc choke"><span id="choke_word" class="word"><span id="choke_text">Silences no track</span><vglyph class="down" shape="down"/></span></div>
 					<div id="velocity_label" class="a c15 w1 label velocitylabel">Velocity</div>
 					<div id="velocity" class="a c15 w1 velocity">100</div>
 					<div id="velocity_bar" class="a c15 w1 velocitybar"><div id="velocity_fill" class="fill" style="width: 50dp;"/></div>
@@ -130,6 +133,23 @@
 							<!-- The graduations' words, placed by mdDrumsHitView.cpp -->
 							<span id="hit_tick1" class="a hint tick"/><span id="hit_tick2" class="a hint tick"/><span id="hit_tick3" class="a hint tick"/><span id="hit_tick4" class="a hint tick"/>
 							<span id="hit_tick5" class="a hint tick"/><span id="hit_tick6" class="a hint tick"/><span id="hit_tick7" class="a hint tick"/><span id="hit_tick8" class="a hint tick"/>
+							<!-- The Track's Links and Chokes, over the whole Hit screen (the head band's lines open it, Done closes it;
+							     mdDrumsLinksView.cpp) -->
+							<div id="linksmenu" class="a lfomenu overlay">
+								<div id="linksmenu_head" class="a mhead"><span id="linksmenu_label" class="label">Track 01</span><span class="hint">strikes and silences</span><span id="linksmenu_done" class="right word keep">Done</span></div>
+								<div class="a label mlabel mr0">Strikes</div>
+								<div id="links_link_off" class="a mt moff mr1">Off</div>
+								<div id="links_link1" class="a mt m0 mr0">01</div><div id="links_link2" class="a mt m1 mr0">02</div><div id="links_link3" class="a mt m2 mr0">03</div><div id="links_link4" class="a mt m3 mr0">04</div>
+								<div id="links_link5" class="a mt m4 mr0">05</div><div id="links_link6" class="a mt m5 mr0">06</div><div id="links_link7" class="a mt m6 mr0">07</div><div id="links_link8" class="a mt m7 mr0">08</div>
+								<div id="links_link9" class="a mt m0 mr1">09</div><div id="links_link10" class="a mt m1 mr1">10</div><div id="links_link11" class="a mt m2 mr1">11</div><div id="links_link12" class="a mt m3 mr1">12</div>
+								<div id="links_link13" class="a mt m4 mr1">13</div><div id="links_link14" class="a mt m5 mr1">14</div><div id="links_link15" class="a mt m6 mr1">15</div><div id="links_link16" class="a mt m7 mr1">16</div>
+								<div class="a label mlabel mr2">Silences</div>
+								<div id="links_choke_off" class="a mt moff mr3">Off</div>
+								<div id="links_choke1" class="a mt m0 mr2">01</div><div id="links_choke2" class="a mt m1 mr2">02</div><div id="links_choke3" class="a mt m2 mr2">03</div><div id="links_choke4" class="a mt m3 mr2">04</div>
+								<div id="links_choke5" class="a mt m4 mr2">05</div><div id="links_choke6" class="a mt m5 mr2">06</div><div id="links_choke7" class="a mt m6 mr2">07</div><div id="links_choke8" class="a mt m7 mr2">08</div>
+								<div id="links_choke9" class="a mt m0 mr3">09</div><div id="links_choke10" class="a mt m1 mr3">10</div><div id="links_choke11" class="a mt m2 mr3">11</div><div id="links_choke12" class="a mt m3 mr3">12</div>
+								<div id="links_choke13" class="a mt m4 mr3">13</div><div id="links_choke14" class="a mt m5 mr3">14</div><div id="links_choke15" class="a mt m6 mr3">15</div><div id="links_choke16" class="a mt m7 mr3">16</div>
+							</div>
 						</div>
 					</div>
 					<div id="rule_391" class="a rule edit" style="top: 391dp;"/>

@@ -6,6 +6,7 @@
 #include "mdDrumsKitsView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsLfoView.h"
+#include "mdDrumsLinksView.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
@@ -35,6 +36,7 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_linksView.reset();
 		m_kitsView.reset();
 		m_lfoView.reset();
 		m_filterView.reset();
@@ -60,6 +62,7 @@ namespace mdDrums
 		m_filterView = std::make_unique<FilterView>(*this, processor.getFxTables());
 		m_lfoView = std::make_unique<LfoView>(*this);
 		m_kitsView = std::make_unique<KitsView>(*this);
+		m_linksView = std::make_unique<LinksView>(*this);
 
 		// Esc on the context's root, in the capture phase: before the stack's listener on the document, even when the
 		// document itself has the key

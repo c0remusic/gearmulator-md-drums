@@ -13,7 +13,8 @@
 // - the Filter and EQ and LFO screens draw what the shown Track's parameters give, an LFO's target is underlined, ASSIGN
 //   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22);
 // - the play key and Space play the shown Track at the velocity a drag sets, the wheel and the arrows step its machine
-//   (ticket 23).
+//   (ticket 23);
+// - the head band's Link and Choke lines open their menu, whose cells set the Kit played's values (ticket 29).
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
@@ -24,6 +25,7 @@
 #include "mdDrumsKitsView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsLfoView.h"
+#include "mdDrumsLinksView.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
@@ -1053,18 +1055,94 @@ namespace
 		require(_f.editor->getTrackView()->getOverlay() == Overlay::None && !view->isOpen(), "Esc did not close the Kits");
 	}
 
+	// Links and Chokes (ticket 29): the head band's lines, on the 4 px steps, open their menu over the Hit screen; a cell
+	// sets the Kit played's value, the lines and the cells follow on the next frame and Save lights; the Track itself is
+	// inert; a choice keeps the menu open; Done and Esc close it
+	void links(Fixture& _f)
+	{
+		using Overlay = mdDrums::TrackView::Overlay;
+		constexpr auto off = mdDrums::Controller::Off;
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto* view = _f.editor->getLinksView();
+		auto* tracks = _f.editor->getTrackView();
+		auto* kits = _f.editor->getKitsView();
+		require(view != nullptr, "the editor has no Links view");
+		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
+		const auto on = [&](const std::string& _id) { return _f.find(_id)->IsClassSet("on"); };
+		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
+
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		controller.setLink(0, off);
+		controller.setChoke(0, off);
+		view->refresh();
+		_f.layout();
+		require(text("link_text") == "Strikes no other track" && text("choke_text") == "Silences no track",
+			"the lines without a Link or a Choke");
+		viewBaselines(_f, {"link_text", "choke_text"});
+		const auto line = _f.box(*_f.find("link"));
+		require(std::abs(line.x - 576) < 0.5f && std::abs(line.y - 84) < 0.5f, "the Link's line is not on column 8 at y 84");
+
+		clickNow("link_word");
+		require(tracks->getOverlay() == Overlay::Links && _f.find("linksmenu")->IsVisible(true)
+			&& text("linksmenu_label") == "Track 01" && on("links_link_off") && on("links_choke_off"),
+			"the Link's line does not open the menu");
+		kits->refresh();
+		const bool savedBefore = _f.find("kit_save")->IsClassSet("on");
+
+		// A cell clicked: the line and the cell on the next frame
+		_f.frame();
+		const auto start = Clock::now();
+		clickNow("links_link5");
+		_f.frame();
+		const auto ms = since(start);
+		require(controller.link(0) == 4 && on("links_link5") && !on("links_link_off")
+			&& text("link_text") == "Also strikes <b>track 05</b>", "a cell does not set the Link");
+		require(ms <= 33.0, "a cell clicked took over 33 ms to reach the pixels");
+		clickNow("links_choke1");
+		require(controller.choke(0) == off && on("links_choke_off") && _f.find("links_choke1")->IsClassSet("self"),
+			"the Track itself is not inert");
+		clickNow("links_choke3");
+		require(controller.choke(0) == 2 && text("choke_text") == "Silences <b>track 03</b>", "a cell does not set the Choke");
+		require(tracks->getOverlay() == Overlay::Links, "a choice closed the menu");
+		kits->refresh();
+		require(_f.find("kit_save")->IsClassSet("on"), "Save does not light after a Link");
+		std::printf("links: track 05 struck and track 03 silenced from track 01, cell to pixel %.2f ms; Save %s, then lit\n",
+			ms, savedBefore ? "lit" : "unlit");
+
+		_f.context().ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
+		_f.layout();
+		require(tracks->getOverlay() == Overlay::None && !_f.find("linksmenu")->IsVisible(true), "Esc does not close the menu");
+		clickNow("choke_word");
+		require(tracks->getOverlay() == Overlay::Links, "the Choke's line does not open the menu");
+		clickNow("linksmenu_done");
+		require(tracks->getOverlay() == Overlay::None, "Done does not close the menu");
+
+		controller.setLink(0, off);
+		controller.setChoke(0, off);
+		view->refresh();
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
-		for(const auto& view : readViews())
+		const auto save = [&](const std::string& _name)
 		{
-			_f.showView(view.name);
 			for(int i = 0; i < 3; ++i)
 				_f.frame();
-			juce::FileOutputStream out{juce::File(juce::String(_prefix + view.name + ".png"))};
+			juce::FileOutputStream out{juce::File(juce::String(_prefix + _name + ".png"))};
 			out.setPosition(0);
 			out.truncate();
 			juce::PNGImageFormat().writeImageToStream(_f.image, out);
+		};
+		for(const auto& view : readViews())
+		{
+			_f.showView(view.name);
+			save(view.name);
 		}
+		// The Links and Chokes menu, which the mockup has not
+		_f.showView("track");
+		_f.editor->getTrackView()->setOverlay(mdDrums::TrackView::Overlay::Links);
+		save("linksmenu");
 		_f.showView("track");
 	}
 }
@@ -1093,7 +1171,7 @@ int main()
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
 			{"meters", meters}, {"hit screen", hitScreen}, {"hit preview", hitPreview}, {"filter screen", filterScreen},
 			{"lfo screen", lfoScreen},
-			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}})
+			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}, {"links", links}})
 		{
 			try
 			{

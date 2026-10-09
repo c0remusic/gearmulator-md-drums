@@ -79,6 +79,11 @@ vglyph.chevron { width: 12dp; height: 12dp; margin-left: 12dp; color: #a7aaaf; }
 vglyph.down { width: 8dp; height: 8dp; margin-left: 4dp; color: #a7aaaf; }
 .family { top: 84dp; height: 24dp; line-height: 22dp; }
 .output { top: 124dp; height: 24dp; line-height: 22dp; }
+/* The Track's Link and Choke on columns 8-11, on the family's and the output's lines: words that open their menu, the
+   text on the column's edge */
+.link { top: 84dp; height: 24dp; line-height: 22dp; }
+.choke { top: 124dp; height: 24dp; line-height: 22dp; }
+.lc .word { margin-left: -4dp; color: #a7aaaf; }
 .velocitylabel { top: 84dp; height: 24dp; line-height: 24dp; }
 .velocity { top: 112dp; height: 32dp; line-height: 32dp; font-size: 22dp; cursor: pointer; drag: drag; }
 .velocitybar { top: 144dp; height: 4dp; background-color: #3a3c40; }
@@ -193,6 +198,12 @@ vknob { top: 84dp; width: 64dp; height: 64dp; drag: drag; cursor: pointer; }
 .m0 { left: 96dp; } .m1 { left: 132dp; } .m2 { left: 168dp; } .m3 { left: 204dp; } .m4 { left: 240dp; } .m5 { left: 276dp; }
 .m6 { left: 312dp; } .m7 { left: 348dp; }
 .mr0 { top: 48dp; } .mr1 { top: 72dp; } .mr2 { top: 104dp; } .mr3 { top: 128dp; } .mr4 { top: 152dp; }
+/* The Links and Chokes menu (the LFO menu's grid over the Hit screen): "Off" under its section's label, the target lit,
+   the Track itself dimmed */
+.moff { left: 16dp; }
+.mt.on { background-color: #6fd1c4; color: #10201e; }
+.mt.self { color: #6e7177; cursor: default; }
+.mt.self:hover { color: #6e7177; background-color: transparent; }
 
 /* ---- Mix tab: strip t on column t ---- */
 .mixsurface, .mastersurface { left: 0dp; top: 56dp; width: 1296dp; height: 768dp; background-color: #26272a; }

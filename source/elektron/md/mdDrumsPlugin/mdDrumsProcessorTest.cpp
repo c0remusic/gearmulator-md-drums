@@ -176,7 +176,8 @@ namespace
 
 	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
 	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
-	// new name reaches the Device; a machine changed tells the host its SYN1-8
+	// new name reaches the Device; a Link and a Choke reach the Device and the state (ticket 29); a machine changed tells
+	// the host its SYN1-8
 	void kits(mdDrums::Processor& _processor)
 	{
 		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
@@ -217,6 +218,35 @@ namespace
 		require(device(_processor).kit().displayName() == "RENAMED" && controller.playedKit().displayName() == "RENAMED",
 			"a new name did not reach the Device");
 
+		// A Link and a Choke (ticket 29): the Device plays them from the next block, the Kit played holds them, the state
+		// keeps them; a Track aimed at itself is Off
+		const auto linkedKit = controller.playedKit();
+		controller.setLink(0, 4);
+		controller.setChoke(0, 2);
+		controller.setLink(1, 1);
+		block();
+		require(device(_processor).kit().links[0] == 4 && device(_processor).kit().chokes[0] == 2,
+			"a Link or a Choke did not reach the Device");
+		require(controller.link(0) == 4 && controller.choke(0) == 2 && controller.link(1) == mdDrums::Controller::Off
+			&& device(_processor).kit().links[1] == mdDrums::Controller::Off, "a Track linked to itself is not Off");
+		require(controller.playedKit() != linkedKit && controller.playedKit().links[0] == 4,
+			"a Link does not make the Kit played differ");
+		{
+			juce::MemoryBlock linkedState;
+			static_cast<juce::AudioProcessor&>(_processor).getStateInformation(linkedState);
+			mdDrums::Processor restoredLinks(true);
+			static_cast<juce::AudioProcessor&>(restoredLinks).setStateInformation(linkedState.getData(),
+				static_cast<int>(linkedState.getSize()));
+			const auto& c = dynamic_cast<mdDrums::Controller&>(restoredLinks.getController());
+			require(c.link(0) == 4 && c.choke(0) == 2 && device(restoredLinks).kit().links[0] == 4,
+				"the state did not keep a Link and a Choke");
+		}
+		controller.setLink(0, mdDrums::Controller::Off);
+		controller.setChoke(0, mdDrums::Controller::Off);
+		block();
+		require(device(_processor).kit().links[0] == mdDrums::Controller::Off
+			&& device(_processor).kit().chokes[0] == mdDrums::Controller::Off, "a Link or a Choke did not go Off");
+
 		struct Counter final : juce::AudioProcessorParameter::Listener
 		{
 			int changes = 0;
@@ -229,8 +259,8 @@ namespace
 		syn1.removeListener(&counter);
 		require(counter.changes > 0, "the host was not told SYN1 after a machine change");
 		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
-			" the state; renamed; SYN1 told to the host %d time(s) after a machine change\n", kit.displayName().c_str(),
-			counter.changes);
+			" the state; renamed; a Link and a Choke to the Device and the state; SYN1 told to the host %d time(s) after a"
+			" machine change\n", kit.displayName().c_str(), counter.changes);
 	}
 
 	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of the

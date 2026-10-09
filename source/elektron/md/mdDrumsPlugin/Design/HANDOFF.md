@@ -49,6 +49,8 @@ All coordinates below are window pixels at 100 %, `x, y, width, height`.
 | Caption "Track 01" | 256, 84, 64, 24 | 12 px label |
 | Previous / next track | 336 / 360, 84, 24, 24 | ‹ › step through the tracks (not the machines) |
 | Machine name | 256, 108, 304, 40 | 34 px; chevron after it; click opens the machine browser, wheel or ↑ ↓ steps machines |
+| Link line | 576, 84, 304, 24 | ticket 29: "Also strikes track 05 ▾" or "Strikes no other track ▾", 14 px ink-dim, the track in ink; click opens the Links and Chokes menu |
+| Choke line | 576, 124, 304, 24 | "Silences track 10 ▾" or "Silences no track ▾"; click opens the same menu |
 | Family line | 896, 84, 224, 24 | text from x 912: "TRX" (12 px, tracked) + "modelled analog" (14 px ink-dim) |
 | Output line | 896, 124, 224, 24 | "Plays on Out 01" or "Plays on Main" |
 | Velocity label | 1136, 84, 64, 24 | |
@@ -106,6 +108,10 @@ Hit at y 176, Filter and EQ at y 392, LFO at y 608. Inside each, 16 px on every 
 - **LFO target menu** (over the whole LFO screen, display colour, 16 px inside): head "LFO 01 modulates", the
   track's machine, "Done"; then a grid of 80 px label column + 8 cells of 36 px: "Track" over two rows of 8 track
   numbers (y 656, 680), then SYN, EFX, ROUTING rows of parameter names (from y 712). Chosen cells accent-filled.
+- **Links and Chokes menu** (ticket 29; over the whole Hit screen, the LFO target menu's grid): head "Track 01"
+  "strikes and silences", "Done"; "Strikes" and "Silences" each a label at rows y 224 and 280 with "Off" under it
+  (x 912, 36 px) and 16 track numbers in two rows of 8 (cells of 36 from x 992). The target accent-filled, the Track
+  itself dimmed and inert. A choice keeps the menu open; Done and Esc close it. Values of the Kit, not host parameters.
 
 ### Machine browser (over the bands, Track tab)
 

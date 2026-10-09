@@ -69,6 +69,15 @@ namespace mdDrums
 		void loadKit(const md::automation::sysex::MdKit& _kit, int _slot);
 		// Names the Kit played, 16 characters at most (the Device keeps the name with its Kit)
 		void renameKit(const std::string& _name);
+		// The Kit played's Links and Chokes (ticket 29 of the editor map), on the message thread: the Track a Track's Hit
+		// also strikes, and the one it silences, MdKit::Off for none. Values of the Kit, not host parameters: a change
+		// goes to the Device as SET TRIG GROUP or SET MUTE GROUP ($65, $66) at the next audio block. A Track aimed at
+		// itself does nothing on the Machinedrum, and is taken as Off.
+		uint8_t link(const uint8_t _track) const { return _track < TrackCount ? m_kitBase.links[_track] : Off; }
+		uint8_t choke(const uint8_t _track) const { return _track < TrackCount ? m_kitBase.chokes[_track] : Off; }
+		void setLink(uint8_t _track, uint8_t _target);
+		void setChoke(uint8_t _track, uint8_t _target);
+		static constexpr uint8_t Off = md::automation::sysex::MdKit::Off;
 
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
@@ -97,6 +106,8 @@ namespace mdDrums
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
 		// Any thread: a relay set to _value, given to its parameter of the Track shown
 		void relayChanged(uint8_t _index, int _value);
+		// A SysEx message for the Device, at the next audio block
+		void sendToDevice(const std::vector<uint8_t>& _sysex);
 
 		std::array<Address, ParameterCount> m_addresses{};
 		std::array<pluginLib::Parameter*, ParameterCount> m_parameters{};
