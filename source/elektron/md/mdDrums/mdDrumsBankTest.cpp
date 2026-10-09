@@ -1,12 +1,14 @@
 // The Kits' Bank (ticket 26 of the editor map): a new file holds the 16 factory Kits in Slots 1-16, Kit 1 the one a
 // Machinedrum boots with, the other 48 empty; each Slot is a Kit dump OS 1.63 takes, for its slot; a write keeps the
 // file's size and the other Slots; two Banks on one file keep each other's Slots; an emptied Slot reads back empty; a
-// .syx file's Kits come out in their order, the empty Slots left out.
+// .syx file's Kits come out in their order, the empty Slots left out. Every factory Kit, and a new one, seeds the LFO
+// RND generator.
 
 #include "mdDrumsBank.h"
 #include "mdDrumsEngine.h"
 #include "mdDrumsMessages.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -58,6 +60,19 @@ int main()
 		const auto kit1 = mdDrums::messages::factoryKit(flash);
 		require(factory.size() == 16, "the flash image holds " + std::to_string(factory.size()) + " factory Kits");
 		require(kit1 && factory[0] == *kit1, "Slot 1 is not the Kit a Machinedrum boots with");
+
+		// The LFO RND generator's two words (each LFO block's bytes 24-31, which a Kit loads into the running LFO): mdEngine
+		// starts them at 0, where RND never moves; every Kit the Device plays seeds them, a new one too
+		int seeded = 0;
+		for(const auto& kit : std::vector<Kit>{factory.begin(), factory.end()})
+			for(const auto& lfo : kit.lfos)
+				seeded += std::any_of(lfo.begin() + 24, lfo.begin() + 32, [](const uint8_t _b) { return _b != 0; });
+		const Kit blank;
+		const bool blankSeeded = std::any_of(blank.lfos[0].begin() + 24, blank.lfos[0].begin() + 32,
+			[](const uint8_t _b) { return _b != 0; });
+		std::printf("LFO RND: %d of %d factory LFO blocks seed it, a new Kit's %s\n", seeded, 16 * 16,
+			blankSeeded ? "too" : "not");
+		require(seeded == 16 * 16 && blankSeeded, "a Kit leaves the LFO RND generator unseeded");
 
 		const auto file = folder / "Bank.syx";
 		mdDrums::Bank bank(file, factory);

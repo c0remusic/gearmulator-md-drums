@@ -163,6 +163,10 @@ mesurées avant et après. Pas de tag.
   37 ms un rendu, 43 ms sur moteur bâti d'avance, ~120 ms la première fois ; une machine choisie prend ses SYN1-8 par
   défaut avant le rapport du Device ; pas d'aperçu pendant qu'un Hit de la Track joue ; mémoire à 16 instances à
   constater à l'installation.
+- LFO RND figé dans mdEngine (trouvé au ticket 05), sans ticket : mdEngine part de mots d'état à 0 où RND ne bouge pas,
+  mais le Device joue toujours un Kit, dont `loadLfo` copie les 36 octets du bloc LFO ; les 256 blocs des 16 Kits
+  d'usine et celui d'un Kit neuf (`$0000029a`) sèment le générateur (`mdDrumsBankTest`), que `mdDrumsScreensTest`
+  vérifie bit-exact une fois semé. Rien à corriger dans MD Drums.
 
 ## Not yet specified
 
@@ -172,9 +176,6 @@ mesurées avant et après. Pas de tag.
   faits.
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
-- **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
-  décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
-  applique le dump `$52`) ; sinon une graine.
 - **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
   ajoutés au garde-fou.
 
