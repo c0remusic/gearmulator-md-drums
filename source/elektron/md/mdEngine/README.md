@@ -46,6 +46,14 @@ later versions can be compared file by file. Their documentation is in `.scratch
   into the smoothing target, the smoothed array and the voice array, held as the target until the track's next Hit,
   which puts the Kit's values back the same way. A lock with no Hit of its track in its block is dropped. Not
   compared with the firmware's sequencer.
+- `engine/MdEngine.h`, `engine/VoiceEngine.*`, `engine/MachineRunner.h`: `EngineT::warmUpVoices` compiles every audio
+  machine's voice code ahead. The voice DSP's JIT compiles a machine's code the first time a voice runs it, 1.5 to
+  8 ms in one 32-sample block, which an audio thread at 128 samples cannot afford. Each machine but RAM-R and RAM-P
+  plays a Hit at its default SYN1-8 for 4 blocks on the voice DSP alone, its words computed by a copy of the OS
+  (`MachineRunner::clone`); then `VoiceEngine::restoreState` puts back the DSP's P, X and Y memory and registers as
+  `saveState` took them, P's code unchanged so that what the JIT compiled stays valid. 177 ms on this PC; the engine
+  then gives the same samples as one that was not warmed, and a Track's first Hit costs no more than its next ones
+  (`mdDrums/mdDrumsFirstHitTest.cpp`).
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

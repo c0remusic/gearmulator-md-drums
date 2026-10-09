@@ -53,11 +53,13 @@ namespace mdDrums
 		// elektron_sps1-1uw_os1.63.bin in _folders and in the folders the Gearmulator plug-ins use. Empty if none.
 		static std::vector<uint8_t> findFlashImage(const std::vector<std::filesystem::path>& _folders);
 
-		// Throws md::fw::FirmwareError or std::runtime_error when the image holds no usable OS.
+		// Throws md::fw::FirmwareError or std::runtime_error when the image holds no usable OS. Every machine's voice code
+		// is compiled before the first render (md::engine::EngineT::warmUpVoices), so that no Hit pays for it on the audio
+		// thread; the engine sounds as an engine that had not.
 		explicit Engine(const std::vector<uint8_t>& _flashImage);
 		// From the OS and the UW sample bank a flash image gave (md::fw::loadFirmwareFromFlash, loadRomBankFromFlash),
-		// for whoever builds engines again and again (the editor's preview, HitPreview). Without _master, the engine has no
-		// master effects (about half its memory) and Main is the dry mix.
+		// for whoever builds engines again and again (the editor's preview, HitPreview), without compiling the machines
+		// ahead. Without _master, the engine has no master effects (about half its memory) and Main is the dry mix.
 		Engine(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank, bool _master);
 		~Engine();
 

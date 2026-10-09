@@ -83,4 +83,14 @@ if(BUILD_TESTING)
 	add_test(NAME mdDrumsSkinTest COMMAND mdDrumsSkinTest)
 	set_tests_properties(mdDrumsSkinTest PROPERTIES LABELS "FirmwareTest;Performance" SKIP_RETURN_CODE 77 TIMEOUT 180)
 	set_property(TARGET mdDrumsSkinTest PROPERTY FOLDER "Elektron/test")
+
+	# Measurement, not a gate: several instances in one process, their memory and CPU (ticket 31). Run by hand
+	add_executable(mdDrumsInstancesTest mdDrumsInstancesTest.cpp)
+	target_link_libraries(mdDrumsInstancesTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
+		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
+	if(WIN32)
+		target_link_libraries(mdDrumsInstancesTest PRIVATE psapi)
+	endif()
+	target_compile_definitions(mdDrumsInstancesTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1)
+	set_property(TARGET mdDrumsInstancesTest PROPERTY FOLDER "Elektron/test")
 endif()

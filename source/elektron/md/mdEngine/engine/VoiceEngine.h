@@ -45,6 +45,13 @@ namespace md::engine
 		void writeP(uint32_t _addr, const uint32_t* _words, size_t _count);
 		uint32_t readP(uint32_t _addr) const;
 
+		// md-drums: the DSP's memory and registers between two blocks, and back (EngineT::warmUpVoices, which runs every
+		// machine once so that the JIT compiles its code, then puts the DSP back as it was: P holds the same code after,
+		// so what the JIT compiled stays valid)
+		struct State;
+		std::shared_ptr<State> saveState() const;
+		void restoreState(const State& _state);
+
 		uint64_t instructionsLastBlock() const { return m_lastInstructions; }
 		uint32_t voiceInstructions(int _voice) const { return m_voiceInstr[static_cast<size_t>(_voice)]; }	// DSP instructions the voice used in the last block
 		int activeVoicesLastBlock() const { return m_lastActive; }	// voices that rendered (flag 1) in the last block

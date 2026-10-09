@@ -71,6 +71,54 @@ namespace md::engine
 			m_voices->writeP(fw::RomBank::DataAddr, _bank.data.data(), _bank.data.size());
 		}
 
+		// md-drums: every audio machine's voice code compiled now rather than at its first Hit. The voice DSP's JIT compiles
+		// a machine's code the first time a voice runs it: 1.5 to 8 ms in one 32-sample block (mdDrumsFirstHitTest), more
+		// than an audio thread at 128 samples has. Each audio machine but RAM-R and RAM-P plays a Hit at its default
+		// SYN1-8 for _blocks blocks on the voice DSP alone, its words computed by a copy of the OS; the DSP then gets its
+		// memory and registers back (VoiceEngine::saveState), so that the engine sounds as if nothing had run. Call it
+		// after loadRomBank, before the first render. Returns the machines run, or -1 if the voice DSP faulted.
+		int warmUpVoices(const int _blocks = 4)
+		{
+			if constexpr(kParallel)
+			{
+				return 0;
+			}
+			else
+			{
+				const auto state = m_voices->saveState();
+				const auto os = m_os->clone();
+				std::vector<const MachineInfo*> machines;
+				for(const auto& m : os->machines())
+					if(!(m.id >= 0x60 && m.id <= 0x7b) && m.name.rfind("RAM", 0) != 0)	// MID/CTR have no audio
+						machines.push_back(&m);
+				typename TVoices::Block block;
+				bool ok = true;
+				for(size_t first = 0; first < machines.size() && ok; first += kTracks)
+				{
+					for(int b = 0; b < _blocks && ok; ++b)
+					{
+						for(size_t v = 0; v < static_cast<size_t>(kTracks) && first + v < machines.size(); ++v)
+						{
+							const auto& machine = *machines[first + v];
+							std::array<uint16_t, 24> params{};
+							params.fill(64 << 7);
+							for(size_t p = 0; p < 8; ++p)
+								params[p] = static_cast<uint16_t>(machine.defaults[p] << 7);
+							uint32_t out[32];
+							const int n = os->compute(machine.id, params.data(), out, 32, b == 0);
+							if(n < 0)
+								continue;
+							out[0] = b == 0 ? static_cast<uint32_t>(machine.id) + 1 : 0;
+							m_voices->setSlot(static_cast<int>(v), out, std::clamp(n, 1, static_cast<int>(TVoices::kSlotWords)));
+						}
+						ok = m_voices->renderBlock(block);
+					}
+				}
+				m_voices->restoreState(*state);
+				return ok ? static_cast<int>(machines.size()) : -1;
+			}
+		}
+
 		struct Output
 		{
 			Mixer::Output mix;													// main, sends, individual outputs

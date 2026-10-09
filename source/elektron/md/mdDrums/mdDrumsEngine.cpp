@@ -225,6 +225,9 @@ namespace mdDrums
 	Engine::Engine(const std::vector<uint8_t>& _flashImage)
 		: Engine(md::fw::loadFirmwareFromFlash(_flashImage), md::fw::loadRomBankFromFlash(_flashImage), true)
 	{
+		// The machines' voice code compiled before the audio thread plays them (EngineT::warmUpVoices)
+		if(m_state->engine.warmUpVoices() < 0)
+			throw std::runtime_error("Machinedrum voice DSP fault while compiling the machines");
 	}
 
 	Engine::Engine(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank, const bool _master)

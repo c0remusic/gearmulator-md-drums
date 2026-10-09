@@ -1,10 +1,12 @@
 // Harness structure adapted from shnolk/monomodule src/core/dsp/DspEngine.cpp (AGPL-3.0).
 #include "VoiceEngine.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #include "dsp56kEmu/assembler.h"
 #include "dsp56kEmu/audio.h"
@@ -304,6 +306,37 @@ namespace md::engine
 		}
 		m_voiceInstr[kVoices - 1] = static_cast<uint32_t>(m_dsp->getInstructionCounter() - prev);
 		return true;
+	}
+
+	struct VoiceEngine::State
+	{
+		std::vector<TWord> p, x, y;
+		DspRegs regs;
+	};
+
+	std::shared_ptr<VoiceEngine::State> VoiceEngine::saveState() const
+	{
+		// P as large as the external memory X and Y share with it; X and Y up to where they join it
+		const auto sizeP = Memory::calcPMemSize(kSizeP, kSizeXY, kBridge);
+		const auto sizeXY = Memory::calcXYMemSize(kSizeXY, kBridge);
+		auto state = std::make_shared<State>();
+		const auto* p = m_mem->getMemAreaPtr(MemArea_P);
+		const auto* x = m_mem->getMemAreaPtr(MemArea_X);
+		const auto* y = m_mem->getMemAreaPtr(MemArea_Y);
+		state->p.assign(p, p + sizeP);
+		state->x.assign(x, x + sizeXY);
+		state->y.assign(y, y + sizeXY);
+		state->regs = m_dsp->regs();
+		return state;
+	}
+
+	void VoiceEngine::restoreState(const State& _state)
+	{
+		std::copy(_state.p.begin(), _state.p.end(), m_mem->getMemAreaPtr(MemArea_P));
+		std::copy(_state.x.begin(), _state.x.end(), m_mem->getMemAreaPtr(MemArea_X));
+		std::copy(_state.y.begin(), _state.y.end(), m_mem->getMemAreaPtr(MemArea_Y));
+		m_dsp->regs() = _state.regs;
+		m_fault.clear();
 	}
 
 	bool VoiceEngine::renderBlock(Block& _out)

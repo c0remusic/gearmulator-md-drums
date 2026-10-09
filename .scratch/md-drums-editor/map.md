@@ -173,6 +173,10 @@ mesurées avant et après. Pas de tag.
   de paramètre hôte ; aucun son au choix ; rien ailleurs ; ticket 30.
 - [Links et Chokes : construction](issues/30-links-chokes-construction.md) : `Controller::setLink`, `setChoke` vers
   `$65`/`$66`, `LinksView` ; Device, état et Save suivent ; cellule→pixel 10,4 ms.
+- [Mesures hors Live](issues/31-mesures-hors-live.md) : le premier Hit d'une machine coûtait 1,5 à 8 ms dans un bloc
+  (JIT du DSP de voix), d'où des décrochages à 128 échantillons ; corrigé par `EngineT::warmUpVoices` à la
+  construction (177 ms, mêmes échantillons) ; 16 instances : 199 Mo et 24 % d'un cœur chacune, aucun bloc en retard
+  sur 55 120 ; éditeur 11 Mo, aperçu partagé +88 Mo.
 
 ## Not yet specified
 
@@ -180,8 +184,9 @@ mesurées avant et après. Pas de tag.
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
   mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28),
   Links et Chokes (29, 30) faits.
-- **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
-  ajoutés au garde-fou.
+- **Validation dans Live** (l'utilisateur) : son compteur CPU et ses threads, la fluidité à la main, l'undo après un
+  Kit, Ctrl+S, Push 2 (liste en Configure), les Outs depuis un Drum Rack. Mesuré hors Live : latence (tests), CPU,
+  mémoire et blocs en retard (ticket 31), entrée→pixel (`mdDrumsSkinTest`).
 
 ## Out of scope
 

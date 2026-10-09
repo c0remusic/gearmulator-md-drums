@@ -62,6 +62,14 @@ if(BUILD_TESTING)
 	target_link_libraries(mdDrumsParallelTest PRIVATE mdDrums)
 	set_property(TARGET mdDrumsParallelTest PROPERTY FOLDER "Elektron/test")
 
+	# A Track's first Hit against the next ones, the OS's code and the voice DSP apart, on a cold engine and on one whose
+	# machines were compiled ahead (ticket 31): the times are printed, the two engines' samples must be the same
+	add_executable(mdDrumsFirstHitTest mdDrumsFirstHitTest.cpp)
+	target_link_libraries(mdDrumsFirstHitTest PRIVATE mdDrums)
+	add_test(NAME mdDrumsFirstHitTest COMMAND mdDrumsFirstHitTest)
+	set_tests_properties(mdDrumsFirstHitTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 120)
+	set_property(TARGET mdDrumsFirstHitTest PROPERTY FOLDER "Elektron/test")
+
 	# Measurement, not a gate: what a second engine costs the Hit screen and the browser's preview (ticket 12)
 	add_executable(mdDrumsPreviewTest mdDrumsPreviewTest.cpp)
 	target_link_libraries(mdDrumsPreviewTest PRIVATE mdDrums)
