@@ -63,6 +63,8 @@ body.mdd { background-color: #1b1c1e; color: #f2f2f2; font-family: Inter; font-s
 .kit .label { color: #8e9197; margin-right: 8dp; }
 .kit .num { font-size: 12dp; color: #a7aaaf; margin-right: 8dp; }
 .kitsave { left: 192dp; top: 84dp; width: 40dp; height: 24dp; line-height: 22dp; text-align: right; color: #8e9197; }
+/* Lit while the Kit played differs from its Slot */
+.kitsave.on { color: #f2f2f2; font-weight: 600; cursor: pointer; }
 .tracks { top: 124dp; }
 .caption { top: 84dp; }
 .step { top: 84dp; width: 24dp; height: 24dp; line-height: 22dp; text-align: center; color: #a7aaaf; cursor: pointer; }
@@ -145,16 +147,23 @@ vknob { top: 84dp; width: 64dp; height: 64dp; drag: drag; cursor: pointer; }
 /* Kits: 64 Slots in four columns of 16 rows of 40, the chosen one's panel on columns 13-16 */
 #kits_title, #kits_actions { top: 124dp; }
 .slotsel { left: 0dp; width: 248dp; height: 40dp; background-color: #26272a; }
-.slot { width: 224dp; height: 24dp; line-height: 22dp; font-size: 14dp; color: #8e9197; cursor: pointer; }
+.slot { width: 224dp; height: 24dp; line-height: 22dp; font-size: 14dp; color: #a7aaaf; cursor: pointer; }
+.slot.empty { color: #8e9197; }
 .slot .num, .kitm .num { display: inline-block; width: 24dp; margin-right: 8dp; font-size: 12dp; letter-spacing: 0dp; color: #8e9197; }
-.slot:hover { color: #f2f2f2; }
+.slot:hover, .slot.on { color: #f2f2f2; }
 .kitssep { left: 968dp; top: 176dp; width: 1dp; height: 648dp; background-color: #3a3c40; }
 .kitcaption { top: 184dp; width: 304dp; height: 24dp; line-height: 24dp; }
 .kitpname { top: 208dp; width: 304dp; height: 32dp; line-height: 32dp; font-size: 22dp; font-weight: 600; }
+.kitpname.empty { color: #8e9197; }
+/* Rename: the name typed in place, 16 characters at most */
+.kitedit { display: none; color: #f2f2f2; background-color: #151618; cursor: text; }
 .kittracks { top: 256dp; width: 304dp; }
 .kitm { width: 144dp; height: 24dp; line-height: 22dp; font-size: 14dp; letter-spacing: 1dp; color: #a7aaaf; }
 .kact { top: 496dp; width: 304dp; height: 24dp; line-height: 22dp; font-size: 14dp; color: #a7aaaf; }
 .kact .act { margin-right: 24dp; cursor: pointer; }
+/* A click that would lose something asks for a second one; Cancel next to it */
+.kact .confirm { color: #ff7a5c; }
+#kit_confirm, #kit_cancel { display: none; }
 .kitnote { top: 528dp; width: 304dp; height: 16dp; line-height: 16dp; }
 
 /* The machine browser, over the bands: families on columns 4-10, ROM on 12-16 over the preview */

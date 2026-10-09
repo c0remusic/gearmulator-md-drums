@@ -3,6 +3,7 @@
 #include "mdDrumsFilterView.h"
 #include "mdDrumsGlyph.h"
 #include "mdDrumsHitView.h"
+#include "mdDrumsKitsView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsLfoView.h"
 #include "mdDrumsMeterView.h"
@@ -32,6 +33,7 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_kitsView.reset();
 		m_lfoView.reset();
 		m_filterView.reset();
 		m_hitView.reset();
@@ -52,6 +54,7 @@ namespace mdDrums
 		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz());
 		m_filterView = std::make_unique<FilterView>(*this, processor.getFxTables());
 		m_lfoView = std::make_unique<LfoView>(*this);
+		m_kitsView = std::make_unique<KitsView>(*this);
 
 		// Esc on the context's root, in the capture phase: before the stack's listener on the document, even when the
 		// document itself has the key
@@ -61,8 +64,14 @@ namespace mdDrums
 				auto* root = document->GetParentNode() ? document->GetParentNode() : document;
 				juceRmlUi::EventListener::Add(root, Rml::EventId::Keydown, [this](Rml::Event& _event)
 				{
-					const bool handled = juceRmlUi::helper::getKeyIdentifier(_event) == Rml::Input::KI_ESCAPE ? escape()
-						: !juceRmlUi::helper::getKeyModCommand(_event) && m_trackView && m_trackView->key(_event);
+					const auto key = juceRmlUi::helper::getKeyIdentifier(_event);
+					bool handled;
+					if(key == Rml::Input::KI_ESCAPE)
+						handled = escape();
+					else if(juceRmlUi::helper::getKeyModCommand(_event))
+						handled = key == Rml::Input::KI_S && m_kitsView && (m_kitsView->save(), true);
+					else
+						handled = (m_kitsView && m_kitsView->key(_event)) || (m_trackView && m_trackView->key(_event));
 					if(handled)
 						_event.StopPropagation();
 				}, true);
@@ -72,6 +81,8 @@ namespace mdDrums
 	bool Editor::escape() const
 	{
 		if(m_lfoView && m_lfoView->escape())
+			return true;
+		if(m_kitsView && m_kitsView->escape())
 			return true;
 		return m_trackView && m_trackView->escape();
 	}

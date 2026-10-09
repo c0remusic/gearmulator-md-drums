@@ -136,20 +136,27 @@ mesurées avant et après. Pas de tag.
 - [Voix en parallèle : mesure de rentabilité](issues/25-voix-en-parallele.md) : `ParallelVoiceEngine` pas rentable,
   non activé ; thread audio 19,6-19,9 % aujourd'hui, 21,4-21,7 % à 2 groupes, 16,7-17,5 % à 4 pour un CPU total de
   36,6-41,8 % ; Main différent dès 2 groupes ; mesure gardée (`mdDrumsParallelTest`, hors garde-fou).
+- [Chargement d'un Kit face à l'hôte](issues/10-chargement-kit-hote.md) : paramètres en `PresetChange` puis un
+  `notifyHostOfProgramChange` (comme TUS), l'automation de Live gagne ; Save allumé quand le Kit joué diffère de son
+  Slot, d'où que vienne l'écart ; Slot joué dans un chunk du Processor ; un set garde sa copie du Kit ; dump `$52`
+  entier vers le Device ; import dans les Slots vides sans boucler, export du Slot choisi ; écriture d'un Slot seul,
+  Bank relue avant ; CC SYN d'une machine notifiés sans geste ; Rename, Delete, Save here précisés ; ticket 26.
+- [Kits et Bank](issues/26-kits-et-bank.md) : `Bank.syx` de 64 dumps, amorcé des 16 Kits d'usine, Slot écrit en place
+  (deux instances sans perte) ; Kit joué et Slot dans le Controller (chunk « KSLT ») ; chargement en un dump ; nom par
+  message propre (`KitName`) ; overlay, Save, Ctrl+S, Import et Export dans `KitsView` ; Slot cliqué 8 ms
+  entrée→pixel ; undo de Live et Ctrl+S face à l'hôte à constater à l'installation.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
-  mesure des voix en parallèle (25) faits ; restent les Kits et leur Bank, Ctrl+S compris (après le ticket 10), Push
+  mesure des voix en parallèle (25), Kits et Bank (26) faits ; restent Push
   (après le ticket 11) et le second moteur de l'écran Hit et de l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un
   décalage constant. Le chargement du bloc LFO de 36 octets d'un Kit le corrige (tickets 04 et 07, où le Device
   applique le dump `$52`) ; sinon une graine.
-- **Tranche Kits** : writer et format de la Bank fixés par le ticket 04 ; reste la forme du chargement face à l'hôte
-  (ticket 10) avant d'en faire un ticket `task`.
 - **Installation et validation dans Live** : mesures finales (latence, fluidité, CPU avec le master), liste des tests
   ajoutés au garde-fou.
 

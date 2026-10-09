@@ -295,8 +295,10 @@ the engine.
   output included, and return on Main; EQ and DYNAMIX act on Main only. Defaults: the values in the table above.
 - **Kits:** a bank of 64 slots in the plug-in's data folder, shared by every set; the plug-in state keeps the kit
   played, its slot, its name and whether it changed. Import reads Machinedrum kit dumps with
-  `md::automation::sysex::parseKitDump` (one kit or a project's 64, into the empty slots from the chosen one on);
-  Export needs a kit dump writer, which does not exist yet. A kit holds machines, parameters, levels, LFOs and master
-  effects; not mutes, solos or outputs.
+  `md::automation::sysex::parseMdKit` (one kit or a project's 64, into the empty slots from the chosen one on);
+  Export writes the chosen slot with `mdKitDump`. A kit holds machines, parameters, levels, LFOs and master
+  effects; not mutes, solos or outputs. As built (ticket 26 of the editor map): `mdDrums/mdDrumsBank.*` (the file,
+  `Bank.syx`, 64 dumps of 1233 bytes, a Slot written in place), `mdDrumsKitsView.*`; Save is lit while the kit played
+  differs from its slot, whatever changed it (ticket 10).
 - **Not retained:** the head band's other arrow and play layouts (`v22-var-head.html`) and the three other LFO screens
   (`v22-var-lfo.html`) stay in the mockup for reference only.

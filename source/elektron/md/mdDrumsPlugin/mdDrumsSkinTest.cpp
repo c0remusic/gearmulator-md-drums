@@ -20,6 +20,7 @@
 #include "mdDrumsEditor.h"
 #include "mdDrumsFilterView.h"
 #include "mdDrumsHitView.h"
+#include "mdDrumsKitsView.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsLfoView.h"
 #include "mdDrumsMeterView.h"
@@ -33,6 +34,8 @@
 #include "juceRmlUi/rmlInterfaces.h"
 #include "synthLib/plugin.h"
 
+#include "mdProtocol/mdmachines.h"
+
 #include "RmlUi/Core/ComputedValues.h"
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -42,6 +45,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -801,6 +805,124 @@ namespace
 		tracks->setPlayVelocity(100);
 	}
 
+	// The Kits (ticket 26): the overlay shows the Bank's Slots and the chosen one's panel, a Slot clicked on the next frame;
+	// Load asks again while the Kit played differs from its Slot, then plays it; Save is lit while it differs and Ctrl+S
+	// saves it; Save here into an empty Slot makes it the one played; Rename types the name in place; Delete asks again
+	// and Esc leaves the question; the arrows choose and Enter loads; Export writes the chosen Slot and Import fills the
+	// empty ones from the chosen one on
+	void kits(Fixture& _f)
+	{
+		using Overlay = mdDrums::TrackView::Overlay;
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto* view = _f.editor->getKitsView();
+		auto* bank = _f.processor.getBank();
+		require(view != nullptr && bank != nullptr, "no Kits view or no Bank");
+		auto& context = _f.context();
+		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
+		const auto has = [&](const std::string& _id, const std::string& _what) { return text(_id).find(_what) != std::string::npos; };
+		const auto visible = [&](const std::string& _id) { return _f.find(_id)->IsVisible(); };
+		const auto saveLit = [&] { view->refresh(); return _f.find("kit_save")->IsClassSet("on"); };
+		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
+
+		_f.showView("track");
+		_f.editor->getTrackView()->setOverlay(Overlay::Kits);
+		_f.layout();
+		require(view->isOpen() && has("slot1", "TRX UW") && has("slot16", "SEACLONES") && has("slot17", "Empty"),
+			"the overlay does not show the Bank");
+
+		// A Slot clicked: lit and its panel on the next frame
+		_f.frame();
+		auto* slot4 = _f.find("slot4");
+		const auto sb = _f.box(*slot4);
+		const auto r = _f.dp();
+		context.ProcessMouseMove(juce::roundToInt((sb.x + 40) * r), juce::roundToInt((sb.y + 12) * r), 0);
+		_f.frame();
+		const auto start = Clock::now();
+		context.ProcessMouseButtonDown(0, 0);
+		context.ProcessMouseButtonUp(0, 0);
+		_f.frame();
+		const auto ms = since(start);
+		const auto lit = _f.box(*_f.find("slot_sel_bg"));
+		const auto kit4 = *bank->slot(3);
+		const auto* machine = md::machines::find(md::MachineModel::Machinedrum, kit4.machine(0));
+		std::printf("kits: slot 04 chosen, event to pixel %.2f ms; lit at y %g, \"%s\", track 1 %s\n", ms, lit.y,
+			text("kit_caption").c_str(), machine ? std::string(machine->name).c_str() : "--");
+		require(view->chosen() == 3 && std::abs(lit.y - 296) < 0.5f && text("kit_caption") == "Slot 04"
+			&& has("kit_name_big", "P-I UW") && machine && has("kitm1", std::string(machine->name)),
+			"a Slot clicked is not chosen with its panel");
+		require(ms <= 33.0, "a Slot clicked took over 33 ms to reach the pixels");
+
+		// Load, the Kit played changed: asked again, then played
+		set(_f, "FLTF", 0, 77);
+		require(saveLit(), "Save is not lit with a parameter changed");
+		clickNow("kit_load");
+		require(view->confirming() && std::string(view->confirming()) == "load" && visible("kit_confirm")
+			&& text("kit_confirm") == "Load anyway" && visible("kit_cancel") && !visible("kit_load"),
+			"Load does not ask again when the Kit played has changed");
+		clickNow("kit_confirm");
+		require(controller.playedSlot() == 3 && controller.playedKit() == kit4 && !saveLit() && text("kit_slot") == "04"
+			&& has("kit_name", "P-I UW") && view->note() == "Playing 04, P-I UW", "Load anyway did not play the Slot");
+		std::printf("kits: Load asked again, then \"%s\"\n", view->note().c_str());
+
+		// Save lit by a change, Ctrl+S
+		set(_f, "FLTF", 0, kit4.parameters[0][12] == 90 ? 91 : 90);
+		require(saveLit(), "Save is not lit with a parameter changed");
+		context.ProcessKeyDown(Rml::Input::KI_S, Rml::Input::KM_CTRL | Rml::Input::KM_META);
+		require(!saveLit() && *bank->slot(3) == controller.playedKit(), "Ctrl+S did not save the Kit in its Slot");
+
+		// Save here into an empty Slot: it is the one played
+		clickNow("slot20");
+		require(!visible("kit_load") && visible("kit_savehere") && has("kit_name_big", "Empty"), "an empty Slot's panel is wrong");
+		clickNow("kit_savehere");
+		require(controller.playedSlot() == 19 && bank->slot(19) && *bank->slot(19) == controller.playedKit()
+			&& view->note() == "Saved in slot 20", "Save here did not put the Kit played into slot 20");
+
+		// Rename in place: Enter keeps the name, for the Slot and the Kit played
+		clickNow("kit_rename");
+		_f.layout();
+		require(view->isRenaming() && visible("kit_name_edit") && !visible("kit_name_big"), "Rename does not open the name");
+		view->setRenameText("MY KIT");
+		context.ProcessKeyDown(Rml::Input::KI_RETURN, 0);
+		require(!view->isRenaming() && bank->slot(19)->displayName() == "MY KIT" && controller.playedKit().displayName() == "MY KIT"
+			&& !saveLit() && has("kit_name", "MY KIT"), "Rename did not name the Slot and the Kit played");
+
+		// Delete: asked again, Esc leaves the question; asked and confirmed, the Slot is empty and Save lit; Ctrl+S puts
+		// the Kit back
+		clickNow("kit_delete");
+		require(view->confirming() && text("kit_confirm") == "Delete it", "Delete does not ask again");
+		context.ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
+		require(!view->confirming() && view->isOpen() && bank->slot(19), "Esc did not leave the question alone");
+		clickNow("kit_delete");
+		clickNow("kit_confirm");
+		require(!bank->slot(19) && saveLit() && has("slot20", "Empty"), "Delete did not empty the Slot played");
+		context.ProcessKeyDown(Rml::Input::KI_S, Rml::Input::KM_CTRL | Rml::Input::KM_META);
+		require(bank->slot(19) && !saveLit(), "Ctrl+S did not put the Kit back into its emptied Slot");
+
+		// The arrows choose, Enter loads
+		context.ProcessKeyDown(Rml::Input::KI_DOWN, 0);
+		const auto down = view->chosen();
+		context.ProcessKeyDown(Rml::Input::KI_LEFT, 0);
+		const auto left = view->chosen();
+		context.ProcessKeyDown(Rml::Input::KI_UP, 0);
+		const auto up = view->chosen();
+		context.ProcessKeyDown(Rml::Input::KI_RETURN, 0);
+		std::printf("kits: arrows down %d, left %d, up %d (0-based), Enter plays slot %02d\n", down, left, up,
+			controller.playedSlot() + 1);
+		require(down == 20 && left == 4 && up == 3 && controller.playedSlot() == 3, "the arrows or Enter do not work");
+
+		// Export the chosen Slot, import it into the empty ones from slot 40 on
+		const auto file = std::filesystem::temp_directory_path() / "mdDrumsSkinTest_kit.syx";
+		require(view->exportFile(file), "Export failed: " + view->note());
+		view->choose(39);
+		require(view->importFile(file) && bank->slot(39) && *bank->slot(39) == *bank->slot(3)
+			&& view->note() == "Imported 1 kit from mdDrumsSkinTest_kit.syx into slot 40", "Import failed: " + view->note());
+		std::filesystem::remove(file);
+		std::printf("kits: exported slot 04, \"%s\"\n", view->note().c_str());
+
+		context.ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
+		require(_f.editor->getTrackView()->getOverlay() == Overlay::None && !view->isOpen(), "Esc did not close the Kits");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		for(const auto& view : readViews())
@@ -840,7 +962,7 @@ int main()
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
 			{"meters", meters}, {"hit screen", hitScreen}, {"filter screen", filterScreen}, {"lfo screen", lfoScreen},
-			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}})
+			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}})
 		{
 			try
 			{

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mdDrumsBank.h"
 #include "mdDrumsTelemetry.h"
 
 #include "TrackFx.h"
@@ -29,6 +30,7 @@ namespace mdDrums
 
 		// The host's tempo, sent to the Device as MD Drums' own message when it changes
 		void processBpm(float _bpm) override;
+		void saveChunkData(baseLib::BinaryStream& _s) override;
 		void loadChunkData(baseLib::ChunkReader& _cr) override;
 
 		// Where the flash image was looked for, for the dialog when it is missing
@@ -40,6 +42,9 @@ namespace mdDrums
 		std::shared_ptr<const md::engine::TrackFx::Tables> getFxTables() const { return std::atomic_load(&m_fxTables); }
 		// The host's tempo as last sent to the Device; 0 before the host gives one (the engine then runs at 125)
 		float getBpm() const { return m_bpm.load(std::memory_order_relaxed); }
+		// The Kits' Bank (ticket 10 of the editor map), "Bank.syx" in the plug-in's data folder, made with the Device; none
+		// without one. A test Processor's is a file of its own in the temporary folder, removed with it.
+		Bank* getBank() const { return m_bank.get(); }
 
 	private:
 		// Main, then the 16 Outs, off until the host enables them
@@ -49,5 +54,7 @@ namespace mdDrums
 		std::shared_ptr<Telemetry> m_telemetry = std::make_shared<Telemetry>();
 		std::shared_ptr<const md::engine::TrackFx::Tables> m_fxTables;
 		std::atomic<float> m_bpm{0.0f};
+		bool m_forTests = false;
+		std::unique_ptr<Bank> m_bank;
 	};
 }

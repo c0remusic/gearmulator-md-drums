@@ -8,6 +8,7 @@
 #include "synthLib/plugin.h"
 
 #include <algorithm>
+#include <cstring>
 
 namespace mdDrums
 {
@@ -75,8 +76,11 @@ namespace mdDrums
 		for(const auto& [index, parameters] : getExposedParameters())
 		{
 			const auto slot = slotOf(index.page, index.partNum, index.paramNum);
-			if(slot >= 0)
-				m_addresses[static_cast<size_t>(slot)] = {index.page, index.partNum, index.paramNum};
+			if(slot < 0)
+				continue;
+			m_addresses[static_cast<size_t>(slot)] = {index.page, index.partNum, index.paramNum};
+			if(!parameters.empty())
+				m_parameters[static_cast<size_t>(slot)] = parameters.front();
 		}
 
 		// The parameters start as the Device does (factory Kit 1); a loaded state replaces them in onStateLoaded
@@ -209,9 +213,70 @@ namespace mdDrums
 			{_event.a, _event.b, _event.c}, 0);
 		if(!change)
 			return false;
+		// The host learns the new values as it does a Kit's, without a gesture (ticket 10)
 		for(auto* parameter : findSynthParam(change->track, change->page, change->index))
+		{
 			parameter->setValueFromSynth(change->value, pluginLib::Parameter::Origin::PresetChange);
+			parameter->sendValueChangedMessageToListeners(parameter->getValue());
+		}
 		return true;
+	}
+
+	md::automation::sysex::MdKit Controller::playedKit() const
+	{
+		auto kit = m_kitBase;
+		for(size_t slot = 0; slot < ParameterCount; ++slot)
+		{
+			const auto* parameter = m_parameters[slot];
+			const auto& address = m_addresses[slot];
+			if(parameter && messages::isKitParameter(address.page))
+				messages::setKitValue(kit, address.page, address.part, address.index, parameter->getUnnormalizedValue());
+		}
+		return kit;
+	}
+
+	void Controller::setPlayedSlot(const int _slot)
+	{
+		m_slot = std::clamp(_slot, 0, 63);
+	}
+
+	void Controller::loadKit(const md::automation::sysex::MdKit& _kit, const int _slot)
+	{
+		m_kitBase = _kit;
+		setPlayedSlot(_slot);
+
+		// What waits for the Device is older than the Kit
+		for(size_t slot = 0; slot < ParameterCount; ++slot)
+			if(messages::isKitParameter(m_addresses[slot].page))
+				m_dirty[slot / 64].fetch_and(~(1ull << (slot % 64)), std::memory_order_acq_rel);
+
+		synthLib::SMidiEvent dump(synthLib::MidiEventSource::Editor);
+		const auto bytes = md::automation::sysex::mdKitDump(_kit, 0);
+		dump.sysex.assign(bytes.begin(), bytes.end());
+		getProcessor().addMidiEvent(dump);
+
+		const messages::State state{_kit, {}};
+		for(const auto& [index, parameters] : getExposedParameters())
+		{
+			if(!messages::isKitParameter(index.page))
+				continue;
+			const auto value = messages::parameterValue(state, index.page, index.partNum, index.paramNum);
+			if(!value)
+				continue;
+			for(auto* parameter : parameters)
+				parameter->setValueFromSynth(*value, pluginLib::Parameter::Origin::PresetChange);
+		}
+		getProcessor().notifyHostOfProgramChange();
+	}
+
+	void Controller::renameKit(const std::string& _name)
+	{
+		m_kitBase.name.fill(0);
+		std::memcpy(m_kitBase.name.data(), _name.data(), std::min(_name.size(), m_kitBase.name.size()));
+		const auto message = messages::kitName(m_kitBase.name);
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex.assign(message.bytes.begin(), message.bytes.begin() + message.size);
+		getProcessor().addMidiEvent(event);
 	}
 
 	void Controller::setLoadedState(std::vector<uint8_t> _state)
@@ -242,6 +307,7 @@ namespace mdDrums
 
 	void Controller::applyState(const messages::State& _state)
 	{
+		m_kitBase = _state.kit;
 		for(const auto& [index, parameters] : getExposedParameters())
 		{
 			const auto value = messages::parameterValue(_state, index.page, index.partNum, index.paramNum);

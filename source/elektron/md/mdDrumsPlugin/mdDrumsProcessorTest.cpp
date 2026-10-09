@@ -121,6 +121,65 @@ namespace
 		return *d;
 	}
 
+	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
+	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
+	// new name reaches the Device; a machine changed tells the host its SYN1-8
+	void kits(mdDrums::Processor& _processor)
+	{
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
+		auto* bank = _processor.getBank();
+		require(bank != nullptr && bank->slot(3).has_value(), "no Bank, or no Kit in its Slot 4");
+		const auto kit = *bank->slot(3);
+		const auto mixer = device(_processor).mixer();
+		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
+		juce::MidiBuffer midi;
+		const auto block = [&]
+		{
+			process(_processor, buffer, midi);
+			_processor.getController().processPendingMidiMessages();
+		};
+
+		controller.loadKit(kit, 3);
+		block();
+		require(device(_processor).kit() == kit, "the Device does not play the Kit loaded");
+		require(device(_processor).mixer() == mixer, "loading a Kit changed the mixer");
+		require(controller.playedSlot() == 3 && controller.playedKit() == kit, "the Kit played is not the one loaded");
+		require(parameter(_processor, "Machine", 0).getUnnormalizedValue() == kit.machine(0)
+			&& parameter(_processor, "FLTF", 2).getUnnormalizedValue() == kit.parameters[2][12]
+			&& parameter(_processor, "Level", 5).getUnnormalizedValue() == kit.levels[5],
+			"the parameters do not follow the Kit loaded");
+		automate(_processor, "FLTF", 2, kit.parameters[2][12] == 99 ? 98 : 99);
+		require(controller.playedKit() != kit, "a parameter changed does not make the Kit differ from its Slot");
+
+		juce::MemoryBlock state;
+		static_cast<juce::AudioProcessor&>(_processor).getStateInformation(state);
+		mdDrums::Processor restored(true);
+		static_cast<juce::AudioProcessor&>(restored).setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+		const auto& restoredController = dynamic_cast<mdDrums::Controller&>(restored.getController());
+		require(restoredController.playedSlot() == 3 && restoredController.playedKit() == controller.playedKit(),
+			"the state did not bring back the Kit played and its Slot");
+
+		controller.renameKit("RENAMED");
+		block();
+		require(device(_processor).kit().displayName() == "RENAMED" && controller.playedKit().displayName() == "RENAMED",
+			"a new name did not reach the Device");
+
+		struct Counter final : juce::AudioProcessorParameter::Listener
+		{
+			int changes = 0;
+			void parameterValueChanged(int, float) override { ++changes; }
+			void parameterGestureChanged(int, bool) override {}
+		} counter;
+		auto& syn1 = parameter(_processor, "SYN1", 0);
+		syn1.addListener(&counter);
+		automate(_processor, "Machine", 0, kit.machine(0) == 17 ? 16 : 17);
+		syn1.removeListener(&counter);
+		require(counter.changes > 0, "the host was not told SYN1 after a machine change");
+		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
+			" the state; renamed; SYN1 told to the host %d time(s) after a machine change\n", kit.displayName().c_str(),
+			counter.changes);
+	}
+
 	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
 	// control); MD_DRUMS_EDITOR_PNG names a file for a picture of it
 	void editor(mdDrums::Processor& _processor)
@@ -315,7 +374,10 @@ int main()
 
 			automate(processor, "Out", 0, 0);
 			if(rate == 44100.0)
+			{
+				kits(processor);
 				editor(processor);
+			}
 			latency(processor, rate);
 		}
 		std::cout << "mdDrumsProcessorTest: PASS\n";

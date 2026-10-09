@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.15)
 project(mdDrums)
 
 add_library(mdDrums STATIC
+	mdDrumsBank.cpp mdDrumsBank.h
 	mdDrumsDevice.cpp mdDrumsDevice.h
 	mdDrumsEngine.cpp mdDrumsEngine.h
 	mdDrumsFilterResponse.cpp mdDrumsFilterResponse.h
@@ -36,6 +37,13 @@ if(BUILD_TESTING)
 	add_test(NAME mdDrumsScreensTest COMMAND mdDrumsScreensTest)
 	set_tests_properties(mdDrumsScreensTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 120)
 	set_property(TARGET mdDrumsScreensTest PROPERTY FOLDER "Elektron/test")
+
+	# The Kits' Bank: its file, its Slots, two instances on one file
+	add_executable(mdDrumsBankTest mdDrumsBankTest.cpp)
+	target_link_libraries(mdDrumsBankTest PRIVATE mdDrums)
+	add_test(NAME mdDrumsBankTest COMMAND mdDrumsBankTest)
+	set_tests_properties(mdDrumsBankTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 60)
+	set_property(TARGET mdDrumsBankTest PROPERTY FOLDER "Elektron/test")
 
 	# Measurement, not a gate: the voices split across threads (ParallelVoiceEngine) against the single voice DSP. Run by
 	# hand (ticket 25 of the editor map)

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <atomic>
+#include <string>
 #include <vector>
 
 namespace mdDrums
@@ -54,6 +55,18 @@ namespace mdDrums
 		}
 		static constexpr uint8_t FirstNote = 36;
 
+		// The Kit played (ticket 10 of the editor map), on the message thread: the one loaded last (its name, Links and
+		// Chokes, its LFOs' running state), with the host parameters' values as they are now
+		md::automation::sysex::MdKit playedKit() const;
+		// The Bank's Slot it came from or was saved to (0-63), which the plug-in's state keeps
+		int playedSlot() const { return m_slot; }
+		void setPlayedSlot(int _slot);
+		// Plays a Kit: one dump to the Device at the next audio block; the parameters follow as a preset's do (the host
+		// told once, without gestures) and changes still waiting for the Device are dropped. _slot becomes the one played.
+		void loadKit(const md::automation::sysex::MdKit& _kit, int _slot);
+		// Names the Kit played, 16 characters at most (the Device keeps the name with its Kit)
+		void renameKit(const std::string& _name);
+
 	protected:
 		pluginLib::Parameter* createParameter(pluginLib::Controller& _controller, const pluginLib::Description& _description,
 			uint8_t _part, int _uid, const pluginLib::Parameter::PartFormatter& _formatter) override;
@@ -72,10 +85,13 @@ namespace mdDrums
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
 
 		std::array<Address, ParameterCount> m_addresses{};
+		std::array<pluginLib::Parameter*, ParameterCount> m_parameters{};
 		std::array<std::atomic<int32_t>, ParameterCount> m_values{};
 		std::array<std::atomic<uint64_t>, (ParameterCount + 63) / 64> m_dirty{};
 		std::atomic<uint32_t> m_auditions{0};	// bit n: Track n + 1 waits to be played
 		std::array<std::atomic<uint8_t>, TrackCount> m_auditionVelocity{};
 		std::vector<uint8_t> m_loadedState;
+		md::automation::sysex::MdKit m_kitBase;
+		int m_slot = 0;
 	};
 }

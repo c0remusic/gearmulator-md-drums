@@ -15,6 +15,8 @@ namespace mdDrums::messages
 		constexpr uint8_t g_header[] = {0xf0, 0x7d, 0x4d, 0x44, 0x44};
 		constexpr size_t g_commandAt = sizeof(g_header);
 		constexpr size_t g_workingKit = 0x0a;	// in the factory patch image
+		constexpr size_t g_storedKits = 0x8ca;	// the 16 stored Kits, a record each
+		constexpr size_t g_factoryKitCount = 16;
 
 		constexpr uint8_t g_machinedrum[] = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00};
 		constexpr uint8_t g_assignMachine = 0x5b;
@@ -95,6 +97,14 @@ namespace mdDrums::messages
 		return Writer::own(Command::Mixer).add21(_mixer.mute).add21(_mixer.solo).add21(_mixer.out).add(0xf7).raw;
 	}
 
+	Raw kitName(const std::array<uint8_t, md::automation::sysex::MdKit::NameSize>& _name)
+	{
+		auto writer = Writer::own(Command::KitName);
+		for(const auto byte : _name)
+			writer.add(static_cast<uint8_t>(byte & 0x7f));
+		return writer.add(0xf7).raw;
+	}
+
 	std::optional<Parsed> parse(const MessageView _message)
 	{
 		if(_message.size() < g_commandAt + 2 || !std::equal(std::begin(g_header), std::end(g_header), _message.begin())
@@ -126,6 +136,11 @@ namespace mdDrums::messages
 			parsed.mixer.mute = static_cast<uint16_t>(read21(_message, data));
 			parsed.mixer.solo = static_cast<uint16_t>(read21(_message, data + 3));
 			parsed.mixer.out = static_cast<uint16_t>(read21(_message, data + 6));
+			return parsed;
+		case Command::KitName:
+			if(length != parsed.name.size())
+				return std::nullopt;
+			std::copy_n(_message.begin() + data, parsed.name.size(), parsed.name.begin());
 			return parsed;
 		}
 		return std::nullopt;
@@ -159,6 +174,21 @@ namespace mdDrums::messages
 		if(image.size() < g_workingKit + md::automation::sysex::MdKit::RecordSize)
 			return std::nullopt;
 		return md::automation::sysex::MdKit::fromRecord(&image[g_workingKit]);
+	}
+
+	std::vector<md::automation::sysex::MdKit> factoryKits(const std::vector<uint8_t>& _flashImage)
+	{
+		using md::automation::sysex::MdKit;
+		const auto image = md::fw::loadPatchImageFromFlash(_flashImage);
+		std::vector<MdKit> kits;
+		for(size_t k = 0; k < g_factoryKitCount; ++k)
+		{
+			const auto at = g_storedKits + k * MdKit::RecordSize;
+			if(image.size() < at + MdKit::RecordSize)
+				break;
+			kits.push_back(MdKit::fromRecord(&image[at]));
+		}
+		return kits;
 	}
 
 	std::optional<Raw> parameterMessage(const uint8_t _page, const uint8_t _track, const uint8_t _index, const int _value)
@@ -247,6 +277,51 @@ namespace mdDrums::messages
 			return kit.masterEffects[g_masterBlock[_index / 8] * 8 + _index % 8];
 		default:
 			return std::nullopt;
+		}
+	}
+
+	bool isKitParameter(const uint8_t _page)
+	{
+		return _page != pages::Mute && _page != pages::Mixer;
+	}
+
+	bool setKitValue(md::automation::sysex::MdKit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index,
+		const int _value)
+	{
+		if(_track >= md::automation::machinedrum::TrackCount)
+			return false;
+		const auto value = static_cast<uint8_t>(std::clamp(_value, 0, 255));
+		switch(_page)
+		{
+		case pages::Synthesis:
+		case pages::Effects:
+		case pages::Routing:
+			if(_index >= 8)
+				return false;
+			_kit.parameters[_track][_page * 8 + _index] = value;
+			return true;
+		case pages::Level:
+			if(_index != 0)
+				return false;
+			_kit.levels[_track] = value;
+			return true;
+		case pages::Machine:
+			if(_index != 0)
+				return false;
+			_kit.machines[_track] = (_kit.machines[_track] & ~0xffu) | value;
+			return true;
+		case pages::Lfo:
+			if(_index >= 5)
+				return false;
+			_kit.lfos[_track][_index] = value;
+			return true;
+		case pages::Master:
+			if(_index >= 32)
+				return false;
+			_kit.masterEffects[g_masterBlock[_index / 8] * 8 + _index % 8] = value;
+			return true;
+		default:
+			return false;
 		}
 	}
 }

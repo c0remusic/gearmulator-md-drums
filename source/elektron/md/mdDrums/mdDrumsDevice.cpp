@@ -271,6 +271,9 @@ namespace mdDrums
 			case messages::Command::Mixer:
 				m_mixer = own->mixer;
 				break;
+			case messages::Command::KitName:
+				m_kit.name = own->name;
+				return;
 			}
 			applyMixer();
 			return;

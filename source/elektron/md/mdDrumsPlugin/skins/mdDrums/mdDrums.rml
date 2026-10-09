@@ -356,7 +356,7 @@
 			</div>
 
 			<!-- Kits, over the Track tab under the kit row (the kit row opens and closes them; a tab closes them): 64 Slots
-			     in four columns of 16 rows of 40, the chosen one's panel on columns 13-16. Static until the Kits slice. -->
+			     in four columns of 16 rows of 40, the chosen one's panel on columns 13-16. KitsView fills them from the Bank. -->
 			<div id="kits" class="layer overlay">
 				<div id="kits_title" class="a c1 w8 bhead"><span class="big">Kits</span><span>64 slots, kept by the plug-in</span></div>
 				<div id="kits_actions" class="a c12 bact"><span id="kits_import" class="act">Import .syx</span><span id="kits_export" class="act">Export .syx</span><span id="kits_done" class="act keep">Done</span></div>
@@ -437,28 +437,29 @@
 				<div id="kits_sep" class="a kitssep"/>
 				<div id="kit_caption" class="a c13 label kitcaption">Slot 01, playing</div>
 				<div id="kit_name_big" class="a c13 kitpname">Kit 01</div>
+				<input id="kit_name_edit" type="text" maxlength="16" class="a c13 kitpname kitedit"/>
 				<div id="kit_tracks" class="a c13 grp kittracks"><span>Tracks</span><div class="line"/></div>
 				<div class="col c13">
-					<div id="kitm1" class="a kitm" style="top: 280dp;" data-model="part0"><span class="num">01</span>{{Machine_text}}</div>
-					<div id="kitm2" class="a kitm" style="top: 304dp;" data-model="part1"><span class="num">02</span>{{Machine_text}}</div>
-					<div id="kitm3" class="a kitm" style="top: 328dp;" data-model="part2"><span class="num">03</span>{{Machine_text}}</div>
-					<div id="kitm4" class="a kitm" style="top: 352dp;" data-model="part3"><span class="num">04</span>{{Machine_text}}</div>
-					<div id="kitm5" class="a kitm" style="top: 376dp;" data-model="part4"><span class="num">05</span>{{Machine_text}}</div>
-					<div id="kitm6" class="a kitm" style="top: 400dp;" data-model="part5"><span class="num">06</span>{{Machine_text}}</div>
-					<div id="kitm7" class="a kitm" style="top: 424dp;" data-model="part6"><span class="num">07</span>{{Machine_text}}</div>
-					<div id="kitm8" class="a kitm" style="top: 448dp;" data-model="part7"><span class="num">08</span>{{Machine_text}}</div>
+					<div id="kitm1" class="a kitm" style="top: 280dp;"><span class="num">01</span>--</div>
+					<div id="kitm2" class="a kitm" style="top: 304dp;"><span class="num">02</span>--</div>
+					<div id="kitm3" class="a kitm" style="top: 328dp;"><span class="num">03</span>--</div>
+					<div id="kitm4" class="a kitm" style="top: 352dp;"><span class="num">04</span>--</div>
+					<div id="kitm5" class="a kitm" style="top: 376dp;"><span class="num">05</span>--</div>
+					<div id="kitm6" class="a kitm" style="top: 400dp;"><span class="num">06</span>--</div>
+					<div id="kitm7" class="a kitm" style="top: 424dp;"><span class="num">07</span>--</div>
+					<div id="kitm8" class="a kitm" style="top: 448dp;"><span class="num">08</span>--</div>
 				</div>
 				<div class="col c15">
-					<div id="kitm9" class="a kitm" style="top: 280dp;" data-model="part8"><span class="num">09</span>{{Machine_text}}</div>
-					<div id="kitm10" class="a kitm" style="top: 304dp;" data-model="part9"><span class="num">10</span>{{Machine_text}}</div>
-					<div id="kitm11" class="a kitm" style="top: 328dp;" data-model="part10"><span class="num">11</span>{{Machine_text}}</div>
-					<div id="kitm12" class="a kitm" style="top: 352dp;" data-model="part11"><span class="num">12</span>{{Machine_text}}</div>
-					<div id="kitm13" class="a kitm" style="top: 376dp;" data-model="part12"><span class="num">13</span>{{Machine_text}}</div>
-					<div id="kitm14" class="a kitm" style="top: 400dp;" data-model="part13"><span class="num">14</span>{{Machine_text}}</div>
-					<div id="kitm15" class="a kitm" style="top: 424dp;" data-model="part14"><span class="num">15</span>{{Machine_text}}</div>
-					<div id="kitm16" class="a kitm" style="top: 448dp;" data-model="part15"><span class="num">16</span>{{Machine_text}}</div>
+					<div id="kitm9" class="a kitm" style="top: 280dp;"><span class="num">09</span>--</div>
+					<div id="kitm10" class="a kitm" style="top: 304dp;"><span class="num">10</span>--</div>
+					<div id="kitm11" class="a kitm" style="top: 328dp;"><span class="num">11</span>--</div>
+					<div id="kitm12" class="a kitm" style="top: 352dp;"><span class="num">12</span>--</div>
+					<div id="kitm13" class="a kitm" style="top: 376dp;"><span class="num">13</span>--</div>
+					<div id="kitm14" class="a kitm" style="top: 400dp;"><span class="num">14</span>--</div>
+					<div id="kitm15" class="a kitm" style="top: 424dp;"><span class="num">15</span>--</div>
+					<div id="kitm16" class="a kitm" style="top: 448dp;"><span class="num">16</span>--</div>
 				</div>
-				<div id="kit_actions" class="a c13 kact"><span class="act load">Load</span><span class="act">Save here</span><span class="act">Rename</span><span class="act">Delete</span></div>
+				<div id="kit_actions" class="a c13 kact"><span id="kit_load" class="act load">Load</span><span id="kit_savehere" class="act">Save here</span><span id="kit_rename" class="act">Rename</span><span id="kit_delete" class="act">Delete</span><span id="kit_confirm" class="act confirm">Load anyway</span><span id="kit_cancel" class="act">Cancel</span></div>
 				<div id="kit_note" class="a c13 hint kitnote"></div>
 			</div>
 		</div>

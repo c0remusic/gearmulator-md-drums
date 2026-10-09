@@ -2,6 +2,7 @@
 
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsKitsView.h"
 #include "mdDrumsLfoView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
@@ -320,6 +321,8 @@ namespace mdDrums
 			m_machineBeforeBrowser = machine ? machine->getUnnormalizedValue() : -1;
 		}
 		m_overlay = _overlay;
+		if(auto* kits = m_editor.getKitsView())
+			kits->setOpen(_overlay == Overlay::Kits);
 
 		// The Kits take the Track tab under the kit row; the browser takes the bands' place; the menu, the LFO screen's
 		show("track_main", _overlay != Overlay::Kits);

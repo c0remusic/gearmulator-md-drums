@@ -9,6 +9,7 @@ namespace mdDrums
 {
 	class FilterView;
 	class HitView;
+	class KitsView;
 	class LfoView;
 	class MeterView;
 	class Processor;
@@ -36,9 +37,12 @@ namespace mdDrums
 		HitView* getHitView() const { return m_hitView.get(); }
 		FilterView* getFilterView() const { return m_filterView.get(); }
 		LfoView* getLfoView() const { return m_lfoView.get(); }
+		KitsView* getKitsView() const { return m_kitsView.get(); }
 
-		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else closes the open overlay. The other
-		// keys go to TrackView::key first (Space, the browser's arrows and Enter, the machine's arrows)
+		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else leaves a Kit's renaming or a second-
+		// click question, else closes the open overlay. Ctrl+S saves the Kit played. The other keys go to KitsView::key
+		// (the Kits' arrows and Enter, a name typed), then TrackView::key (Space, the browser's arrows and Enter, the
+		// machine's arrows)
 		bool escape() const;
 
 	private:
@@ -47,6 +51,7 @@ namespace mdDrums
 		std::unique_ptr<HitView> m_hitView;
 		std::unique_ptr<FilterView> m_filterView;
 		std::unique_ptr<LfoView> m_lfoView;
+		std::unique_ptr<KitsView> m_kitsView;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState
