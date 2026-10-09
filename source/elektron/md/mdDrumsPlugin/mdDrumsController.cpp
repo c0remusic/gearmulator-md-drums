@@ -20,6 +20,19 @@ namespace mdDrums
 		// routing, the LFO, Level, Mute, Solo, Out
 		constexpr int g_machineAt = 0, g_synAt = 1, g_lfoAt = 25, g_levelAt = 30, g_muteAt = 31, g_mixerAt = 32;
 
+		// What each relay aims at on the Track shown: page and index; the relay Track (0) chooses the Track itself
+		struct RelayTarget
+		{
+			uint8_t page;
+			uint8_t index;
+		};
+		constexpr std::array<RelayTarget, Controller::RelayCount> g_relayTargets{{
+			{pages::Focus, 0}, {pages::Machine, 0}, {pages::Level, 0}, {pages::Mute, 0}, {pages::Mixer, 0},
+			{pages::Mixer, 1}, {pages::Lfo, 2}, {pages::Lfo, 3},
+			{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7},
+			{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7},
+			{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {2, 7}}};
+
 		size_t lowestBit(uint64_t _bits)
 		{
 			size_t bit = 0;
@@ -40,6 +53,15 @@ namespace mdDrums
 				const uint8_t _part, const int _uid, const pluginLib::Parameter::PartFormatter& _formatter)
 				: pluginLib::Parameter(_controller, _description, _part, _uid, _formatter), m_drums(_controller)
 			{
+			}
+
+			// The master effects and the relays without a prefix ("ECHO TIME", "FLTF" on Push 2's display), the Tracks'
+			// with theirs ("Track 1 FLTF")
+			juce::String getName(const int _maximumStringLength) const override
+			{
+				if(!getDescription().isNonPartSensitive())
+					return pluginLib::Parameter::getName(_maximumStringLength);
+				return juce::String(getDescription().displayName).substring(0, _maximumStringLength);
 			}
 
 			juce::String getText(const float _normalisedValue, const int _maximumLength) const override
@@ -82,6 +104,12 @@ namespace mdDrums
 			if(!parameters.empty())
 				m_parameters[static_cast<size_t>(slot)] = parameters.front();
 		}
+		for(uint8_t i = 0; i < RelayCount; ++i)
+		{
+			const auto relays = findSynthParam(0, pages::Focus, i);
+			m_relays[i] = relays.empty() ? nullptr : relays.front();
+		}
+		m_relayShown.fill(-1);
 
 		// The parameters start as the Device does (factory Kit 1); a loaded state replaces them in onStateLoaded
 		std::vector<uint8_t> state;
@@ -128,6 +156,11 @@ namespace mdDrums
 	{
 		// Any thread: the value in its slot, the slot marked; the audio thread sends it
 		const auto& description = _parameter.getDescription();
+		if(description.page == pages::Focus)
+		{
+			relayChanged(description.index, _value);
+			return;
+		}
 		const auto slot = slotOf(static_cast<uint8_t>(description.page), _parameter.getPart(), description.index);
 		if(slot < 0)
 			return;
@@ -202,6 +235,87 @@ namespace mdDrums
 		for(const auto& [index, parameters] : getExposedParameters())
 			for(auto* parameter : parameters)
 				parameter->flushRealtimeValueToUi();
+		syncRelays();
+	}
+
+	void Controller::relayChanged(const uint8_t _index, const int _value)
+	{
+		if(_index >= RelayCount)
+			return;
+		if(_index == 0)
+		{
+			m_pendingPart.store(std::clamp(_value, 0, TrackCount - 1), std::memory_order_release);
+			return;
+		}
+		const auto& target = g_relayTargets[_index];
+		const auto slot = slotOf(target.page, m_shownPart.load(std::memory_order_acquire), target.index);
+		if(slot < 0)
+			return;
+		// To the Device at the next block, as host automation goes; to the parameter on the message thread
+		m_values[static_cast<size_t>(slot)].store(_value, std::memory_order_relaxed);
+		m_dirty[static_cast<size_t>(slot) / 64].fetch_or(1ull << (slot % 64), std::memory_order_release);
+		m_relaySlot[_index].store(slot, std::memory_order_relaxed);
+		m_relayPending.fetch_or(1u << _index, std::memory_order_release);
+	}
+
+	void Controller::syncRelays()
+	{
+		// The Track shown: the relay Track's request, else the editor's
+		if(const auto part = m_pendingPart.exchange(-1, std::memory_order_acq_rel); part >= 0)
+			setCurrentPart(static_cast<uint8_t>(part));
+		const auto part = getCurrentPart();
+		m_shownPart.store(part, std::memory_order_release);
+
+		// What a relay was set to, given to its parameter (which the Device has by now, or at the next block)
+		auto pending = m_relayPending.exchange(0, std::memory_order_acq_rel);
+		while(pending)
+		{
+			const auto i = lowestBit(pending);
+			pending &= pending - 1;
+			const auto slot = m_relaySlot[i].load(std::memory_order_relaxed);
+			const auto value = m_values[static_cast<size_t>(slot)].load(std::memory_order_relaxed);
+			if(auto* parameter = m_parameters[static_cast<size_t>(slot)])
+				parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			m_relayShown[i] = value;
+		}
+
+		// What the Track shown holds, given to the relays whose parameter moved since (a relay just set waits for its
+		// value to come back here, so that a turn is never undone)
+		for(size_t i = 0; i < RelayCount; ++i)
+		{
+			auto* relay = m_relays[i];
+			if(!relay)
+				continue;
+			int value = part;
+			if(i > 0)
+			{
+				const auto slot = slotOf(g_relayTargets[i].page, part, g_relayTargets[i].index);
+				const auto* parameter = slot >= 0 ? m_parameters[static_cast<size_t>(slot)] : nullptr;
+				if(!parameter)
+					continue;
+				value = parameter->getUnnormalizedValue();
+			}
+			if(value == m_relayShown[i])
+				continue;
+			relay->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			m_relayShown[i] = value;
+		}
+	}
+
+	void Controller::preparePushList()
+	{
+		std::vector<pluginLib::Parameter*> list(m_relays.begin(), m_relays.end());
+		for(uint8_t i = 0; i < MasterParameterCount; ++i)
+			for(auto* parameter : findSynthParam(0, pages::Master, i))
+				list.push_back(parameter);
+		for(auto* parameter : list)
+		{
+			if(!parameter)
+				continue;
+			parameter->beginChangeGesture();
+			parameter->juce::AudioProcessorParameter::setValueNotifyingHost(parameter->getValue());
+			parameter->endChangeGesture();
+		}
 	}
 
 	bool Controller::parseControllerMessage(const synthLib::SMidiEvent& _event)

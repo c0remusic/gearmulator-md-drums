@@ -90,6 +90,7 @@ namespace mdDrums::messages
 		constexpr uint8_t Lfo = 6;			// destination track, destination parameter, shape 1, shape 2, mode
 		constexpr uint8_t Mixer = 7;		// Solo at index 0, Out at 1
 		constexpr uint8_t Master = 8;		// echo 0-7, reverb 8-15, EQ 16-23, dynamix 24-31; on track 0
+		constexpr uint8_t Focus = 9;		// the relays for Push 2, on the Track shown; the plug-in's, not the Device's
 	}
 
 	// What a host parameter sends the Device at _value, built without allocating: a CC, ASSIGN MACHINE, SET LFO PARAM,
@@ -98,7 +99,7 @@ namespace mdDrums::messages
 	std::optional<Raw> parameterMessage(uint8_t _page, uint8_t _track, uint8_t _index, int _value);
 	// A host parameter's value in a Device state; empty for a parameter MD Drums does not have
 	std::optional<int> parameterValue(const State& _state, uint8_t _page, uint8_t _track, uint8_t _index);
-	// Whether a host parameter is part of the Kit (Mute, Solo and Out are the mixer's)
+	// Whether a host parameter is part of the Kit (Mute, Solo and Out are the mixer's, the relays the plug-in's)
 	bool isKitParameter(uint8_t _page);
 	// A Kit host parameter's value into a Kit (a machine's upper bytes kept); false for one that is not the Kit's
 	bool setKitValue(md::automation::sysex::MdKit& _kit, uint8_t _page, uint8_t _track, uint8_t _index, int _value);

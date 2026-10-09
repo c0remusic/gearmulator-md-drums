@@ -9,8 +9,10 @@
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
+#include "mdDrumsController.h"
 
 #include "skins.h"
+#include "juceRmlUi/rmlMenu.h"
 
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlEventListener.h"
@@ -116,5 +118,15 @@ namespace mdDrums
 	jucePluginEditorLib::Editor* EditorState::createEditor(const jucePluginEditorLib::Skin& _skin)
 	{
 		return new Editor(m_processor, _skin);
+	}
+
+	void EditorState::initContextMenu(juceRmlUi::Menu& _menu)
+	{
+		jucePluginEditorLib::PluginEditorState::initContextMenu(_menu);
+		_menu.addSeparator();
+		_menu.addEntry("Prepare Push list (Live in Configure mode)", [this]
+		{
+			static_cast<Controller&>(m_processor.getController()).preparePushList();
+		});
 	}
 }

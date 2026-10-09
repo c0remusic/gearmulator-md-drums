@@ -325,7 +325,8 @@ namespace
 			for(const auto& [index, parameters] : controller.getExposedParameters())
 				for(auto* p : parameters)
 				{
-					if(p->getPart() != t)
+					// The relays for Push 2 have no control: they aim at the Track the editor shows
+					if(p->getPart() != t || p->getDescription().page == mdDrums::messages::pages::Focus)
 						continue;
 					++total;
 					std::vector<Rml::Element*> elements;

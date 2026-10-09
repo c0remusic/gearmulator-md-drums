@@ -26,6 +26,59 @@
 #include <stdexcept>
 #include <string>
 
+#include <new>
+
+// Allocations counted on this thread while asked: a relay set by the host must not allocate (the audio thread sets it)
+#if defined(_MSC_VER)
+#include <malloc.h>
+#endif
+
+namespace
+{
+	thread_local bool g_countAllocations = false;
+	thread_local size_t g_allocations = 0;
+}
+
+void* operator new(const std::size_t _size)
+{
+	if(g_countAllocations)
+		++g_allocations;
+	if(void* const result = std::malloc(_size ? _size : 1))
+		return result;
+	throw std::bad_alloc();
+}
+
+void* operator new[](const std::size_t _size) { return ::operator new(_size); }
+
+void* operator new(const std::size_t _size, const std::align_val_t _alignment)
+{
+	if(g_countAllocations)
+		++g_allocations;
+#if defined(_MSC_VER)
+	if(void* const result = _aligned_malloc(_size ? _size : 1, static_cast<std::size_t>(_alignment)))
+		return result;
+#else
+	void* result = nullptr;
+	if(posix_memalign(&result, static_cast<std::size_t>(_alignment), _size ? _size : 1) == 0)
+		return result;
+#endif
+	throw std::bad_alloc();
+}
+
+void* operator new[](const std::size_t _size, const std::align_val_t _alignment) { return ::operator new(_size, _alignment); }
+void operator delete(void* const _pointer) noexcept { std::free(_pointer); }
+void operator delete[](void* const _pointer) noexcept { std::free(_pointer); }
+void operator delete(void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
+void operator delete[](void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
+#if defined(_MSC_VER)
+void operator delete(void* const _pointer, std::align_val_t) noexcept { _aligned_free(_pointer); }
+#else
+void operator delete(void* const _pointer, std::align_val_t) noexcept { std::free(_pointer); }
+#endif
+void operator delete[](void* const _pointer, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
+void operator delete(void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
+void operator delete[](void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
+
 namespace juceRmlUi
 {
 	// The friend hook the MD editor tests use: one RmlUi frame, so that paint() has geometry
@@ -180,6 +233,98 @@ namespace
 			counter.changes);
 	}
 
+	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of the
+	// Track shown its value, the Device getting it at the next block, and the host told; the relay Track shows another
+	// Track and the relays then hold its values; a parameter of the Track shown moved elsewhere moves its relay; the
+	// state keeps the Track shown; "Prepare Push list" moves the 64 of the list, in order, each in a gesture
+	void relays(mdDrums::Processor& _processor)
+	{
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
+		auto& host = static_cast<juce::AudioProcessor&>(_processor);
+		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
+		juce::MidiBuffer midi;
+		const auto block = [&]
+		{
+			process(_processor, buffer, midi);
+			_processor.getController().processPendingMidiMessages();
+			controller.syncRelays();
+		};
+		const auto hostSets = [](pluginLib::Parameter& _p, const int _value)
+		{
+			_p.setValue(_p.convertTo0to1(static_cast<float>(_value)));
+		};
+		auto& relayTrack = *controller.relay(0);
+		auto& relayFltf = *controller.relay(20);
+		auto& relayMachine = *controller.relay(1);
+		require(relayFltf.getDescription().name == "FocusFLTF", "relay 20 is not FLTF");
+
+		controller.setCurrentPart(0);
+		block();
+		const auto fltf = parameter(_processor, "FLTF", 0).getUnnormalizedValue();
+		g_allocations = 0;
+		g_countAllocations = true;
+		hostSets(relayFltf, fltf == 33 ? 34 : 33);
+		g_countAllocations = false;
+		require(g_allocations == 0, "a relay set by the host allocated " + std::to_string(g_allocations) + " times");
+		block();
+		const auto set = relayFltf.getUnnormalizedValue();
+		require(parameter(_processor, "FLTF", 0).getUnnormalizedValue() == set
+			&& device(_processor).kit().parameters[0][12] == set, "a relay did not set its parameter of the Track shown");
+
+		g_countAllocations = true;
+		hostSets(relayTrack, 5);
+		g_countAllocations = false;
+		require(g_allocations == 0, "the relay Track set by the host allocated");
+		block();
+		require(controller.getCurrentPart() == 5, "the relay Track did not show Track 6");
+		require(relayMachine.getUnnormalizedValue() == parameter(_processor, "Machine", 5).getUnnormalizedValue()
+			&& relayFltf.getUnnormalizedValue() == parameter(_processor, "FLTF", 5).getUnnormalizedValue(),
+			"the relays do not hold the values of the Track shown");
+
+		struct Counter final : juce::AudioProcessorParameter::Listener
+		{
+			int changes = 0;
+			void parameterValueChanged(int, float) override { ++changes; }
+			void parameterGestureChanged(int, bool) override {}
+		} counter;
+		relayFltf.addListener(&counter);
+		const auto moved = parameter(_processor, "FLTF", 5).getUnnormalizedValue() == 99 ? 98 : 99;
+		automate(_processor, "FLTF", 5, moved);
+		controller.syncRelays();
+		relayFltf.removeListener(&counter);
+		require(relayFltf.getUnnormalizedValue() == moved && counter.changes > 0,
+			"a parameter of the Track shown moved without its relay and the host following");
+
+		juce::MemoryBlock state;
+		host.getStateInformation(state);
+		mdDrums::Processor restored(true);
+		static_cast<juce::AudioProcessor&>(restored).setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+		require(restored.getController().getCurrentPart() == 5, "the state did not keep the Track shown");
+
+		// "Prepare Push list": the relays then the master effects, each in its own gesture
+		struct Recorder final : juce::AudioProcessorListener
+		{
+			std::vector<int> begun;
+			int changed = 0, ended = 0;
+			void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override { ++changed; }
+			void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails&) override {}
+			void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, const int _index) override { begun.push_back(_index); }
+			void audioProcessorParameterChangeGestureEnd(juce::AudioProcessor*, int) override { ++ended; }
+		} recorder;
+		host.addListener(&recorder);
+		controller.preparePushList();
+		host.removeListener(&recorder);
+		bool ordered = recorder.begun.size() == 64;
+		for(size_t i = 0; ordered && i < 64; ++i)
+			ordered = recorder.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
+		std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays following; Push"
+			" list moved %zu parameters in order (no allocation setting a relay), %d changes, %d gestures ended\n", set, recorder.begun.size(),
+			recorder.changed, recorder.ended);
+		require(ordered && recorder.ended == 64 && recorder.changed >= 64, "Prepare Push list did not move the 64 in order");
+		controller.setCurrentPart(0);
+		block();
+	}
+
 	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
 	// control); MD_DRUMS_EDITOR_PNG names a file for a picture of it
 	void editor(mdDrums::Processor& _processor)
@@ -273,14 +418,17 @@ int main()
 				parameters[0]->getName(64).toRawUTF8(),
 				dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters.getLast())->paramID.toRawUTF8(),
 				parameters.getLast()->getName(64).toRawUTF8());
-			require(parameters.size() == 576, "not 576 parameters");
+			require(parameters.size() == 608, "not 608 parameters");
 			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[0])->paramID == "5_0_0"
 				&& parameters[0]->getName(64) == "Track 1 Machine", "track 1's machine is not the first parameter");
 			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[33])->paramID == "7_0_1"
 				&& dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[34])->paramID == "5_1_0",
 				"a Track does not hold 34 parameters ending with Out");
 			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[544])->paramID == "8_0_0"
-				&& parameters[544]->getName(64) == "Master Echo TIME", "the master effects do not follow the Tracks");
+				&& parameters[544]->getName(64) == "Echo TIME", "the master effects do not follow the Tracks");
+			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[576])->paramID == "9_0_0"
+				&& parameters[576]->getName(64) == "Track" && parameters[607]->getName(64) == "LFOM",
+				"the relays for Push 2 do not follow the master effects");
 
 			// The parameters start as the Device boots: factory Kit 1, TRX-B2 on track 1
 			require(parameter(processor, "Machine", 0).getUnnormalizedValue() == 28
@@ -376,6 +524,7 @@ int main()
 			if(rate == 44100.0)
 			{
 				kits(processor);
+				relays(processor);
 				editor(processor);
 			}
 			latency(processor, rate);

@@ -61,5 +61,7 @@ namespace mdDrums
 
 	private:
 		jucePluginEditorLib::Editor* createEditor(const jucePluginEditorLib::Skin& _skin) override;
+		// The settings menu's "Prepare Push list" (ticket 11 of the editor map), for Live in Configure mode
+		void initContextMenu(juceRmlUi::Menu& _menu) override;
 	};
 }

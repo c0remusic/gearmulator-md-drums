@@ -282,7 +282,7 @@ namespace mdDrums::messages
 
 	bool isKitParameter(const uint8_t _page)
 	{
-		return _page != pages::Mute && _page != pages::Mixer;
+		return _page != pages::Mute && _page != pages::Mixer && _page != pages::Focus;
 	}
 
 	bool setKitValue(md::automation::sysex::MdKit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index,

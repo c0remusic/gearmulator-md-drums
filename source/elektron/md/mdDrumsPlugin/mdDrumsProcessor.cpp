@@ -133,8 +133,13 @@ namespace mdDrums
 	{
 		jucePluginEditorLib::Processor::saveChunkData(_s);
 		// The Bank's Slot the Kit played came from (its Kit is the Device's, in "MIDI")
-		baseLib::ChunkWriter cw(_s, "KSLT", 1);
-		_s.write<uint32_t>(static_cast<uint32_t>(dynamic_cast<Controller&>(getController()).playedSlot()));
+		{
+			baseLib::ChunkWriter cw(_s, "KSLT", 1);
+			_s.write<uint32_t>(static_cast<uint32_t>(dynamic_cast<Controller&>(getController()).playedSlot()));
+		}
+		// The Track shown, which the editor and the relays for Push 2 aim at
+		baseLib::ChunkWriter cw(_s, "FOCS", 1);
+		_s.write<uint32_t>(getController().getCurrentPart());
 	}
 
 	void Processor::loadChunkData(baseLib::ChunkReader& _cr)
@@ -142,6 +147,12 @@ namespace mdDrums
 		_cr.add("KSLT", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
 			dynamic_cast<Controller&>(getController()).setPlayedSlot(static_cast<int>(_stream.read<uint32_t>()));
+		});
+		_cr.add("FOCS", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		{
+			const auto part = _stream.read<uint32_t>();
+			if(part < Controller::TrackCount)
+				getController().setCurrentPart(static_cast<uint8_t>(part));
 		});
 		// Before the stack's own "MIDI" reader (the first one registered wins): the Device's state, also handed to the
 		// Controller, which then follows it without touching the Device

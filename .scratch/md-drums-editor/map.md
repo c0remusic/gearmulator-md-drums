@@ -145,13 +145,22 @@ mesurées avant et après. Pas de tag.
   (deux instances sans perte) ; Kit joué et Slot dans le Controller (chunk « KSLT ») ; chargement en un dump ; nom par
   message propre (`KitName`) ; overlay, Save, Ctrl+S, Import et Export dans `KitsView` ; Slot cliqué 8 ms
   entrée→pixel ; undo de Live et Ctrl+S face à l'hôte à constater à l'installation.
+- [Banques Push 2](issues/11-banques-push2.md) : 32 relais sur la Track montrée (Track, Machine, Level, Mute, Solo,
+  Out, deux formes de LFO, puis les pages SYN, EFFECTS, ROUTING de la Machinedrum) et les 32 Master en direct, 8
+  banques ; relais tourné = vrai paramètre sans geste, automation des relais = « Track montrée » ; Track montrée
+  partagée éditeur-relais ; liste posée dans Live par une commande « Prepare Push list » en mode Configure ; noms de la
+  Machinedrum, Master raccourcis ; Drum Rack documenté pour les pads ; ticket 27.
+- [Push 2 : relais, liste et noms](issues/27-push2.md) : 32 relais en page 9 (608 paramètres), posés par l'hôte sans
+  verrou ni allocation, synchronisés au timer du Controller dans les deux sens ; Track montrée dans l'état (« FOCS ») ;
+  Master sans préfixe ; « Prepare Push list » au menu des réglages ; `docs/md-drums-push2.md` ; passage dans Live et
+  sur Push à constater à l'installation.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
-  mesure des voix en parallèle (25), Kits et Bank (26) faits ; restent Push
-  (après le ticket 11) et le second moteur de l'écran Hit et de l'aperçu du browser (ticket 12).
+  mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27) faits ; reste le second moteur de l'écran Hit et
+  de l'aperçu du browser (ticket 12).
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un

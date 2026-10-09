@@ -25,6 +25,9 @@ namespace mdDrums
 		static constexpr size_t TrackParameterCount = 34;	// Machine, 24 parameters, 5 LFO, Level, Mute, Solo, Out
 		static constexpr size_t MasterParameterCount = 32;
 		static constexpr size_t ParameterCount = TrackCount * TrackParameterCount + MasterParameterCount;
+		// The relays for Push 2 (ticket 11 of the editor map), after them: Track, Machine, Level, Mute, Solo, Out, LFO
+		// shapes 1 and 2, SYN1-8, the Machinedrum's EFFECTS and ROUTING pages, on the Track shown
+		static constexpr size_t RelayCount = 32;
 
 		explicit Controller(Processor& _processor);
 		~Controller() override;
@@ -67,6 +70,15 @@ namespace mdDrums
 		// Names the Kit played, 16 characters at most (the Device keeps the name with its Kit)
 		void renameKit(const std::string& _name);
 
+		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
+		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
+		// The host is told without a gesture.
+		void syncRelays();
+		// For Live in Configure mode, which adds a parameter the plug-in moves: the 64 of the Push list in order (the
+		// relays, then the master effects), each moved to its own value in a gesture
+		void preparePushList();
+		pluginLib::Parameter* relay(size_t _index) const { return _index < RelayCount ? m_relays[_index] : nullptr; }
+
 	protected:
 		pluginLib::Parameter* createParameter(pluginLib::Controller& _controller, const pluginLib::Description& _description,
 			uint8_t _part, int _uid, const pluginLib::Parameter::PartFormatter& _formatter) override;
@@ -83,6 +95,8 @@ namespace mdDrums
 
 		void applyState(const messages::State& _state);
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
+		// Any thread: a relay set to _value, given to its parameter of the Track shown
+		void relayChanged(uint8_t _index, int _value);
 
 		std::array<Address, ParameterCount> m_addresses{};
 		std::array<pluginLib::Parameter*, ParameterCount> m_parameters{};
@@ -93,5 +107,12 @@ namespace mdDrums
 		std::vector<uint8_t> m_loadedState;
 		md::automation::sysex::MdKit m_kitBase;
 		int m_slot = 0;
+
+		std::array<pluginLib::Parameter*, RelayCount> m_relays{};
+		std::atomic<uint8_t> m_shownPart{0};
+		std::atomic<int> m_pendingPart{-1};			// the Track the relay Track asked for, -1 none
+		std::atomic<uint32_t> m_relayPending{0};		// bit n: relay n was set and its parameter waits for the value
+		std::array<std::atomic<int>, RelayCount> m_relaySlot{};	// the slot of the parameter relay n was set for
+		std::array<int, RelayCount> m_relayShown{};		// what each relay was last given (message thread)
 	};
 }
