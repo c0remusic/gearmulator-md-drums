@@ -4,6 +4,8 @@
 #include "MdEngine.h"
 #include "Firmware.h"
 
+#include "mdProtocol/mdkit.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
@@ -41,10 +43,11 @@ namespace mdDrums
 	// the engine's own mix, shifted.
 	struct Engine::State
 	{
-		explicit State(md::fw::FlashOs _os) : engine(_os.firmware, std::move(_os.osImage))
+		State(md::fw::FlashOs _os, const bool _master) : engine(_os.firmware, std::move(_os.osImage))
 		{
 			engine.mixOn = false;
-			engine.enableMaster(_os.firmware);
+			if(_master)
+				engine.enableMaster(_os.firmware);
 			pending.fill(-1);
 			chokeDelay.fill(-1);
 		}
@@ -150,7 +153,9 @@ namespace mdDrums
 			rev[i] = {md::engine::Mixer::mainSample(sum[2]), md::engine::Mixer::mainSample(sum[3])};
 			del[i] = {md::engine::Mixer::mainSample(sum[4]), md::engine::Mixer::mainSample(sum[5])};
 		}
-		if(!engine.processMaster(dry, rev, del, main))
+		if(!engine.masterOn())
+			main = dry;
+		else if(!engine.processMaster(dry, rev, del, main))
 			throw std::runtime_error("Machinedrum master effects fault: " + engine.fault());
 	}
 
@@ -218,9 +223,14 @@ namespace mdDrums
 	}
 
 	Engine::Engine(const std::vector<uint8_t>& _flashImage)
-		: m_state(std::make_unique<State>(md::fw::loadFirmwareFromFlash(_flashImage)))
+		: Engine(md::fw::loadFirmwareFromFlash(_flashImage), md::fw::loadRomBankFromFlash(_flashImage), true)
 	{
-		m_state->engine.loadRomBank(md::fw::loadRomBankFromFlash(_flashImage));
+	}
+
+	Engine::Engine(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank, const bool _master)
+		: m_state(std::make_unique<State>(_os, _master))
+	{
+		m_state->engine.loadRomBank(_bank);
 		auto& host = m_state->engine.host();
 		for(int track = 0; track < TrackCount; ++track)
 		{
@@ -389,5 +399,23 @@ namespace mdDrums
 			state.used += count;
 			done += count;
 		}
+	}
+
+	void applyKit(Engine& _engine, const md::automation::sysex::MdKit& _kit)
+	{
+		using md::automation::sysex::MdKit;
+		for(uint8_t track = 0; track < Engine::TrackCount; ++track)
+		{
+			_engine.setMachine(track, _kit.machine(track));
+			for(uint8_t parameter = 0; parameter < MdKit::ParameterCount; ++parameter)
+				_engine.setParam(track, parameter, _kit.parameters[track][parameter]);
+			_engine.setLevel(track, _kit.levels[track]);
+			_engine.loadLfo(track, _kit.lfos[track].data());
+			_engine.setLink(track, _kit.links[track] == MdKit::Off ? Engine::NoTrack : _kit.links[track]);
+			_engine.setChoke(track, _kit.chokes[track] == MdKit::Off ? Engine::NoTrack : _kit.chokes[track]);
+		}
+		// The dump keeps the master effects in the engine's order
+		for(int index = 0; index < Engine::MasterCount; ++index)
+			_engine.setMaster(index, _kit.masterEffects[static_cast<size_t>(index)]);
 	}
 }

@@ -57,6 +57,8 @@ namespace mdDrums
 		const messages::Mixer& mixer() const { return m_mixer; }
 		// The OS's tables the Tracks' effects read (Engine::fxTables), for the editor's Filter and EQ screen
 		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const { return m_engine ? m_engine->fxTables() : nullptr; }
+		// The OS's machines: their names, SYN1-8 names and defaults
+		const std::vector<md::engine::MachineInfo>& machines() const { return m_engine->machines(); }
 
 	protected:
 		void readMidiOut(std::vector<synthLib::SMidiEvent>& _midiOut) override;

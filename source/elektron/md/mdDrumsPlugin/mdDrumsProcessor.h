@@ -3,12 +3,14 @@
 #include "mdDrumsBank.h"
 #include "mdDrumsTelemetry.h"
 
+#include "MachineRunner.h"
 #include "TrackFx.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
 
 #include <atomic>
 #include <memory>
+#include <vector>
 
 namespace mdDrums
 {
@@ -40,6 +42,9 @@ namespace mdDrums
 		Telemetry& getTelemetry() const { return *m_telemetry; }
 		// The OS's tables the Device's Tracks' effects read, for the Filter and EQ screen; none without a Device
 		std::shared_ptr<const md::engine::TrackFx::Tables> getFxTables() const { return std::atomic_load(&m_fxTables); }
+		// The OS's machines (their SYN1-8 defaults), for the Hit screen's preview; none without a Device
+		using Machines = std::vector<md::engine::MachineInfo>;
+		std::shared_ptr<const Machines> getMachines() const { return std::atomic_load(&m_machines); }
 		// The host's tempo as last sent to the Device; 0 before the host gives one (the engine then runs at 125)
 		float getBpm() const { return m_bpm.load(std::memory_order_relaxed); }
 		// The Kits' Bank (ticket 10 of the editor map), "Bank.syx" in the plug-in's data folder, made with the Device; none
@@ -53,6 +58,7 @@ namespace mdDrums
 
 		std::shared_ptr<Telemetry> m_telemetry = std::make_shared<Telemetry>();
 		std::shared_ptr<const md::engine::TrackFx::Tables> m_fxTables;
+		std::shared_ptr<const Machines> m_machines;
 		std::atomic<float> m_bpm{0.0f};
 		bool m_forTests = false;
 		std::unique_ptr<Bank> m_bank;

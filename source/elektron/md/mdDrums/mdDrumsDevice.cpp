@@ -161,10 +161,6 @@ namespace mdDrums
 
 	void Device::capture(const std::array<float*, Engine::OutputCount>& _outputs, const size_t _count)
 	{
-		const auto toColumn = [](const float _v)
-		{
-			return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L));
-		};
 		for(int track = 0; track < Engine::TrackCount; ++track)
 		{
 			auto& c = m_captures[static_cast<size_t>(track)];
@@ -181,7 +177,7 @@ namespace mdDrums
 				if(++c.filled < Telemetry::ColumnSamples)
 					continue;
 				c.filled = 0;
-				c.active = m_telemetry->addColumn(track, toColumn(c.low), toColumn(c.high));
+				c.active = m_telemetry->addColumn(track, Telemetry::level(c.low), Telemetry::level(c.high));
 				if(!c.active)
 					break;
 			}
@@ -382,19 +378,7 @@ namespace mdDrums
 
 	void Device::applyKit()
 	{
-		for(uint8_t track = 0; track < Engine::TrackCount; ++track)
-		{
-			m_engine->setMachine(track, m_kit.machine(track));
-			for(uint8_t parameter = 0; parameter < sysex::MdKit::ParameterCount; ++parameter)
-				m_engine->setParam(track, parameter, m_kit.parameters[track][parameter]);
-			m_engine->setLevel(track, m_kit.levels[track]);
-			m_engine->loadLfo(track, m_kit.lfos[track].data());
-			m_engine->setLink(track, m_kit.links[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.links[track]);
-			m_engine->setChoke(track, m_kit.chokes[track] == sysex::MdKit::Off ? Engine::NoTrack : m_kit.chokes[track]);
-		}
-		// The dump keeps the master effects in the engine's order
-		for(int index = 0; index < Engine::MasterCount; ++index)
-			m_engine->setMaster(index, m_kit.masterEffects[static_cast<size_t>(index)]);
+		mdDrums::applyKit(*m_engine, m_kit);
 	}
 
 	void Device::applyMixer()

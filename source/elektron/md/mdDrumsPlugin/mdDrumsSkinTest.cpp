@@ -9,6 +9,7 @@
 // - input to pixel: a knob dragged and a list row clicked show on the next frame, and the event, RmlUi's update and
 //   the software render take 33 ms at most;
 // - the meters and Hit lights follow the Processor's Telemetry (ticket 20), and so does the Hit screen (ticket 21);
+//   a change of the shown Track's sound previews its Hit there and in the machine browser (ticket 28);
 // - the Filter and EQ and LFO screens draw what the shown Track's parameters give, an LFO's target is underlined, ASSIGN
 //   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22);
 // - the play key and Space play the shown Track at the velocity a drag sets, the wheel and the arrows step its machine
@@ -36,6 +37,8 @@
 
 #include "mdProtocol/mdmachines.h"
 
+#include "Firmware.h"
+
 #include "RmlUi/Core/ComputedValues.h"
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/ElementDocument.h"
@@ -52,6 +55,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace juceRmlUi
@@ -515,6 +519,131 @@ namespace
 		require(!view->playing(), "the playhead stays after the Hit");
 	}
 
+	void set(Fixture& _f, const char* _name, uint8_t _part, int _value);
+	void click(Fixture& _f, const std::string& _id);
+
+	// Pixel columns of a screen's plot holding the Hit's ink
+	int inkColumns(Fixture& _f, const std::string& _screen)
+	{
+		const auto screen = _f.box(*_f.find(_screen));
+		int columns = 0;
+		for(float x = screen.x + 17; x < screen.x + screen.w - 17; x += 1.0f)
+		{
+			for(float y = screen.y + 49; y < screen.y + 216 - 37; y += 1.0f)
+			{
+				if(_f.pixel(x, y).getBrightness() <= 0.85f)
+					continue;
+				++columns;
+				break;
+			}
+		}
+		return columns;
+	}
+
+	// The preview (ticket 28): a change of the shown Track's sound renders its Hit, shown once rendered as "Preview,
+	// velocity n" at the last Hit's velocity, until the Track sounds again; in the browser, the machine chosen with its
+	// own SYN1-8 before the Device reports them: the Hit the engine renders for that Kit
+	void hitPreview(Fixture& _f)
+	{
+		auto* view = _f.editor->getHitView();
+		auto* tracks = _f.editor->getTrackView();
+		auto& telemetry = _f.processor.getTelemetry();
+		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		_f.showView("track");
+		_f.editor->setCurrentPart(0);
+		double now = 3.0e6;
+		view->update(now);
+		require(!view->previewing() && _f.find("hit_note")->GetInnerRML() == "Last hit, velocity 110",
+			"the Hit screen does not start on the last Hit");
+
+		// The engine renders on its own thread: the screen reads its result at each frame (fake time barely moves, so that
+		// a machine chosen keeps its own SYN1-8 meanwhile)
+		const auto untilPreview = [&](const std::chrono::steady_clock::time_point _start)
+		{
+			while(view->previewPending() || !view->previewing())
+			{
+				require(std::chrono::steady_clock::now() - _start < std::chrono::seconds(10), "no preview within 10 s");
+				std::this_thread::sleep_for(std::chrono::milliseconds(2));
+				view->update(now += 0.05);
+			}
+			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _start).count();
+		};
+
+		auto start = std::chrono::steady_clock::now();
+		set(_f, "FLTF", 0, 30);
+		view->update(now += 1);
+		require(view->previewPending(), "a change of the sound asks for no preview");
+		const auto first = untilPreview(start);
+		_f.frame();
+		const auto note = _f.find("hit_note")->GetInnerRML();
+		const auto ink = inkColumns(_f, "screen_hit");
+		std::printf("hit preview: a knob turned to its Hit shown in %.0f ms (the flash image read, the engine built), "
+			"note \"%s\", ink on %d columns\n", first, note.c_str(), ink);
+		require(note == "Preview, velocity 110", "the preview's note");
+		require(ink > 20, "the preview is not drawn");
+
+		// The next engine is built meanwhile
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		start = std::chrono::steady_clock::now();
+		set(_f, "FLTF", 0, 31);
+		view->update(now += 1);
+		const auto next = untilPreview(start);
+		std::printf("hit preview: the next knob turn shown in %.0f ms\n", next);
+
+		// A Hit of the Track: the live capture again
+		telemetry.beginCapture(0, 90);
+		for(int c = 0; c < 100; ++c)
+			telemetry.addColumn(0, -8000, 8000);
+		view->update(now += 1);
+		require(!view->previewing() && _f.find("hit_note")->GetInnerRML() == "Last hit, velocity 90",
+			"a Hit does not take the screen back from the preview");
+		view->update(now += 100);
+
+		// The browser, listening off (no audio runs here): EFM-SD chosen on Track 1
+		tracks->setListening(false);
+		_f.showView("browser");
+		start = std::chrono::steady_clock::now();
+		click(_f, "mach_33");
+		require(controller.getParameter("Machine", 0)->getUnnormalizedValue() == 33, "the cell did not choose its machine");
+		view->update(now += 1);
+		const auto chosen = untilPreview(start);
+		_f.frame();
+		const auto browserInk = inkColumns(_f, "screen_preview");
+		const auto* tick2 = _f.find("preview_tick2");
+		std::printf("browser preview: EFM-SD's Hit shown in %.0f ms, ink on %d columns, second graduation \"%s\"\n", chosen,
+			browserInk, tick2->GetInnerRML().c_str());
+		require(browserInk > 20, "the browser's preview is not drawn");
+		require(tick2->IsVisible(true) && tick2->GetInnerRML().find("ms") != std::string::npos,
+			"the browser's preview has no graduations");
+
+		// The Hit the engine renders for the Kit played, with EFM-SD's own SYN1-8, at the last Hit's velocity
+		const auto machines = _f.processor.getMachines();
+		require(machines != nullptr, "the Processor holds no machines");
+		mdDrums::HitPreview::Request request;
+		request.kit = controller.playedKit();
+		for(const auto& machine : *machines)
+			if(machine.id == 33)
+				for(int p = 0; p < 8; ++p)
+					request.kit.parameters[0][p] = machine.defaults[p];
+		request.track = 0;
+		request.velocity = 90;
+		const auto flash = mdDrums::Engine::findFlashImage({});
+		mdDrums::Engine engine(md::fw::loadFirmwareFromFlash(flash), md::fw::loadRomBankFromFlash(flash), false);
+		mdDrums::Telemetry::Capture expected;
+		mdDrums::HitPreview::render(engine, request, expected);
+		const auto& shown = view->preview();
+		int differ = 0;
+		for(int c = 0; c < mdDrums::Telemetry::CaptureColumns; ++c)
+			differ += shown.columns[static_cast<size_t>(c)] != expected.columns[static_cast<size_t>(c)];
+		std::printf("browser preview: %d of %d columns differ from the engine's Hit with EFM-SD's own SYN1-8\n", differ,
+			mdDrums::Telemetry::CaptureColumns);
+		require(shown.count == expected.count && differ == 0, "the browser's preview is not the machine's Hit");
+
+		click(_f, "browser_cancel");
+		tracks->setListening(true);
+		set(_f, "FLTF", 0, 0);
+	}
+
 	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
 	{
 		auto* p = _f.processor.getController().getParameter(_name, _part);
@@ -962,7 +1091,8 @@ int main()
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
-			{"meters", meters}, {"hit screen", hitScreen}, {"filter screen", filterScreen}, {"lfo screen", lfoScreen},
+			{"meters", meters}, {"hit screen", hitScreen}, {"hit preview", hitPreview}, {"filter screen", filterScreen},
+			{"lfo screen", lfoScreen},
 			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}})
 		{
 			try

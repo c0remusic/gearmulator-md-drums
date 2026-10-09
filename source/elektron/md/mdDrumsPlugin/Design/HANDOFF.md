@@ -92,7 +92,8 @@ Hit at y 176, Filter and EQ at y 392, LFO at y 608. Inside each, 16 px on every 
 
 - **Hit:** the last hit's waveform (min/max columns), `--track` until heard, ink behind a 1 px accent playhead that
   crosses the window in real time; over it, the amplitude envelope (2 px accent). The window fits the hit: 0.1, 0.2,
-  0.3, 0.4, 0.6 or 0.8 s, ticks in ms. Title "Hit", note "Last hit, velocity 110" or "Not played yet".
+  0.3, 0.4, 0.6 or 0.8 s, ticks in ms. Title "Hit", note "Last hit, velocity 110", "Preview, velocity 110" (the
+  sound changed since: its hit rendered, ticket 28) or "Not played yet".
 - **Filter and EQ:** response from 20 Hz to 20 kHz (ticks 100, 1k, 10k; "0 dB" line), 2 px accent; the EQ point as
   a 6 x 6 ink square. Note "SRR n" when SRR is above 0.
 - **LFO:** title row "LFO", the target "FLTF on track 01 ▾" (opens the target menu), "Assign" at the right (a word, no
@@ -277,10 +278,13 @@ the engine.
 - **Drawing:** the software renderer ignores transforms, so whatever turns or moves (knob arcs and pointers, meters,
   scopes, the screens' plots and playhead) is drawn on `juceRmlUi::ElemCanvas`, as `mdOutputMetersView.cpp` and
   `mdCurveView.cpp` do. Hide elements with `display`, never a zero scale.
-- **Hit screen:** two sources. After each hit the engine plays, a lock-free ring of the track's own output (after its
-  effects and VOL) gives the real waveform; while a knob turns, a second `mdDrums::Engine` re-renders the hit with the
-  machine, the 24 parameters and the velocity on a worker thread (22-27 ms a render, about 88 MB more; keep only the
-  latest request). The mockup's model (DEC, HOLD, PTCH, STRT, END reshaping a recorded hit) is not for the plug-in.
+- **Hit screen:** two sources. After each hit the engine plays, a lock-free capture of the track's own output (after
+  its effects and VOL) gives the real waveform (ticket 21); when the track's sound changes, a second engine without the
+  master effects renders its hit on a thread of its own (`mdDrums::HitPreview`, ticket 28): a fresh engine each time,
+  so that the same settings draw the same hit, the one a Device just loaded with that Kit plays first; the latest
+  request only; about 84 MB while an editor uses it, freed after 30 s without a request. The note says "Preview,
+  velocity 110" until the track sounds again. The browser's preview screen shows the same, for the machine chosen (not
+  the one hovered). The mockup's model (DEC, HOLD, PTCH, STRT, END reshaping a recorded hit) is not for the plug-in.
 - **Filter and EQ, LFO screens:** the mockup's curves are models; draw the engine's responses where it can give them,
   the MD's LFO shapes from its own tables. Done in ticket 22 of the editor map: the response comes from the mixer DSP's
   own coefficient words (`mdDrums/mdDrumsFilterResponse.*`), 0 dB being an untouched Track at 1 kHz, so the open

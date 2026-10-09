@@ -241,7 +241,8 @@ vknob.sk { top: 728dp; width: 28dp; height: 28dp; }
 /* A struck Track's number, in the list, in Mix and among the sends: accent for 140 ms (MeterView) */
 .tn.trig, .sn.trig { color: #6fd1c4; }
 
-/* The Hit screen's graduation words: 12 px on a baseline 16 px over the screen's foot (mdDrumsHitView.cpp) */
+/* The Hit screen's and the browser's preview's graduation words: 12 px on a baseline 16 px over the screen's foot
+   (mdDrumsHitView.cpp) */
 .tick { top: 188dp; height: 16dp; line-height: 16dp; display: none; }
 
 /* The Filter and EQ screen's words: the graduations' 4 px after their lines on the axis' baseline, "0 dB" 4 px over its

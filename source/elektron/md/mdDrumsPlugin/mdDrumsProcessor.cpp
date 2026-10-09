@@ -110,6 +110,7 @@ namespace mdDrums
 		params.homePath = getDataFolder();
 		auto* device = new Device(params, m_telemetry);
 		std::atomic_store(&m_fxTables, device->fxTables());
+		std::atomic_store(&m_machines, std::make_shared<const Machines>(device->machines()));
 		return device;
 	}
 

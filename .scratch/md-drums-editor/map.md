@@ -154,13 +154,22 @@ mesurées avant et après. Pas de tag.
   verrou ni allocation, synchronisés au timer du Controller dans les deux sens ; Track montrée dans l'état (« FOCS ») ;
   Master sans préfixe ; « Prepare Push list » au menu des réglages ; `docs/md-drums-push2.md` ; passage dans Live et
   sur Push à constater à l'installation.
+- [Coût du second moteur de l'écran Hit](issues/12-cout-second-moteur-hit.md) : un mdEngine sans master (84 Mo, 22 ms
+  à construire, un Hit de 0,8 s en 25-37 ms) partagé par les instances du processus, créé à la demande d'un éditeur
+  ouvert, libéré après 30 s ; voix neuve à chaque rendu ; un changement du son de la Track montrée rend « Preview,
+  velocity n », un vrai coup reprend la capture ; aperçu du browser sur la machine choisie, pas au survol ; ticket 28.
+- [Second moteur de l'écran Hit et de l'aperçu](issues/28-second-moteur.md) : `HitPreview`, moteur sans master neuf à
+  chaque rendu, un par processus sur son thread ; le premier Hit d'un Device chargé du Kit, colonne pour colonne ;
+  37 ms un rendu, 43 ms sur moteur bâti d'avance, ~120 ms la première fois ; une machine choisie prend ses SYN1-8 par
+  défaut avant le rapport du Device ; pas d'aperçu pendant qu'un Hit de la Track joue ; mémoire à 16 instances à
+  constater à l'installation.
 
 ## Not yet specified
 
 - **Tranches de construction après le skin** : skin statique (17, 18), gigue (19), lecture du moteur (16), télémétrie
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
-  mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27) faits ; reste le second moteur de l'écran Hit et
-  de l'aperçu du browser (ticket 12).
+  mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28)
+  faits.
 - **Édition des Links et Chokes dans l'éditeur** : absente du HANDOFF ; valeurs du Kit envoyées en `$65`/`$66`, sans
   paramètre hôte (ticket 06). À placer avec la tranche Track.
 - **LFO RND figé dans mdEngine** (lu, pas exécuté, ticket 05) : ses deux mots d'état ne sont jamais semés, d'où un

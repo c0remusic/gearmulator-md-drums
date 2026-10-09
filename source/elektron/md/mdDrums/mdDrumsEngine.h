@@ -13,6 +13,17 @@
 
 #include "mdProtocol/mdlfosettings.h"
 
+namespace md::fw
+{
+	struct FlashOs;
+	struct RomBank;
+}
+
+namespace md::automation::sysex
+{
+	struct MdKit;
+}
+
 namespace mdDrums
 {
 	// The Machinedrum's engines without its OS (mdEngine), as a plug-in drives them: 16 tracks, each with a
@@ -44,6 +55,10 @@ namespace mdDrums
 
 		// Throws md::fw::FirmwareError or std::runtime_error when the image holds no usable OS.
 		explicit Engine(const std::vector<uint8_t>& _flashImage);
+		// From the OS and the UW sample bank a flash image gave (md::fw::loadFirmwareFromFlash, loadRomBankFromFlash),
+		// for whoever builds engines again and again (the editor's preview, HitPreview). Without _master, the engine has no
+		// master effects (about half its memory) and Main is the dry mix.
+		Engine(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank, bool _master);
 		~Engine();
 
 		Engine(const Engine&) = delete;
@@ -111,4 +126,8 @@ namespace mdDrums
 		struct State;
 		std::unique_ptr<State> m_state;
 	};
+
+	// A whole Kit into an engine, as the Device plays one: each Track's machine, its 24 parameters, level, LFO (settings and
+	// running state), Link and Choke, then the master effects
+	void applyKit(Engine& _engine, const md::automation::sysex::MdKit& _kit);
 }

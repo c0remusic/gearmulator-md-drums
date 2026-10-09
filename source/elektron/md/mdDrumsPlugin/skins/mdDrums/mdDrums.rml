@@ -350,6 +350,9 @@
 					<div class="a band" style="top: 608dp;">
 						<div id="screen_preview" class="a screen">
 							<div id="screen_preview_title" class="a stitle"><span class="label">Hit</span><span class="right hint">{{Machine_text}}</span></div>
+							<!-- The graduations' words, placed by mdDrumsHitView.cpp -->
+							<span id="preview_tick1" class="a hint tick"/><span id="preview_tick2" class="a hint tick"/><span id="preview_tick3" class="a hint tick"/><span id="preview_tick4" class="a hint tick"/>
+							<span id="preview_tick5" class="a hint tick"/><span id="preview_tick6" class="a hint tick"/><span id="preview_tick7" class="a hint tick"/><span id="preview_tick8" class="a hint tick"/>
 						</div>
 					</div>
 				</div>

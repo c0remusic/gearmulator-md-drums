@@ -53,7 +53,10 @@ namespace mdDrums
 		auto& processor = static_cast<Processor&>(getProcessor());
 		auto& telemetry = processor.getTelemetry();
 		m_meterView = std::make_unique<MeterView>(*this, telemetry, getAcceleratedRefreshRateHz());
-		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz());
+		std::vector<std::filesystem::path> romFolders;
+		for(const auto& folder : processor.romFolders())
+			romFolders.emplace_back(folder);
+		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz(), std::move(romFolders));
 		m_filterView = std::make_unique<FilterView>(*this, processor.getFxTables());
 		m_lfoView = std::make_unique<LfoView>(*this);
 		m_kitsView = std::make_unique<KitsView>(*this);

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -22,6 +23,12 @@ namespace mdDrums
 		static constexpr int ColumnSamples = 8;
 		static constexpr int CaptureColumns = 4410;
 		using Column = std::array<int16_t, 2>;	// min, max
+
+		// A sample (full scale 1.0) as a column holds it
+		static int16_t level(const float _sample)
+		{
+			return static_cast<int16_t>(std::clamp(std::lround(_sample * 32767.0f), -32767L, 32767L));
+		}
 
 		struct Capture
 		{

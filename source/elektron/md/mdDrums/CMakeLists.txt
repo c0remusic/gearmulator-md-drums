@@ -9,6 +9,7 @@ add_library(mdDrums STATIC
 	mdDrumsDevice.cpp mdDrumsDevice.h
 	mdDrumsEngine.cpp mdDrumsEngine.h
 	mdDrumsFilterResponse.cpp mdDrumsFilterResponse.h
+	mdDrumsHitPreview.cpp mdDrumsHitPreview.h
 	mdDrumsLfo.cpp mdDrumsLfo.h
 	mdDrumsMessages.cpp mdDrumsMessages.h
 	mdDrumsTelemetry.h
@@ -45,9 +46,27 @@ if(BUILD_TESTING)
 	set_tests_properties(mdDrumsBankTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 60)
 	set_property(TARGET mdDrumsBankTest PROPERTY FOLDER "Elektron/test")
 
+	# The Hit screen's preview (ticket 28): the Hit the Device would play first, the same each time, on a shared thread
+	add_executable(mdDrumsHitPreviewTest mdDrumsHitPreviewTest.cpp)
+	target_link_libraries(mdDrumsHitPreviewTest PRIVATE mdDrums)
+	if(WIN32)
+		target_link_libraries(mdDrumsHitPreviewTest PRIVATE psapi)
+	endif()
+	add_test(NAME mdDrumsHitPreviewTest COMMAND mdDrumsHitPreviewTest)
+	set_tests_properties(mdDrumsHitPreviewTest PROPERTIES LABELS "FirmwareTest" SKIP_RETURN_CODE 77 TIMEOUT 120)
+	set_property(TARGET mdDrumsHitPreviewTest PROPERTY FOLDER "Elektron/test")
+
 	# Measurement, not a gate: the voices split across threads (ParallelVoiceEngine) against the single voice DSP. Run by
 	# hand (ticket 25 of the editor map)
 	add_executable(mdDrumsParallelTest mdDrumsParallelTest.cpp)
 	target_link_libraries(mdDrumsParallelTest PRIVATE mdDrums)
 	set_property(TARGET mdDrumsParallelTest PROPERTY FOLDER "Elektron/test")
+
+	# Measurement, not a gate: what a second engine costs the Hit screen and the browser's preview (ticket 12)
+	add_executable(mdDrumsPreviewTest mdDrumsPreviewTest.cpp)
+	target_link_libraries(mdDrumsPreviewTest PRIVATE mdDrums)
+	if(WIN32)
+		target_link_libraries(mdDrumsPreviewTest PRIVATE psapi)
+	endif()
+	set_property(TARGET mdDrumsPreviewTest PROPERTY FOLDER "Elektron/test")
 endif()
