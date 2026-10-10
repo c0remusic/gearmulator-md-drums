@@ -1,8 +1,10 @@
 // md-drums: harness on VoiceEngine's pattern (a host-port handshake per block), for the mixer DSP's master section.
 #include "MasterEngine.h"
 
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #include "dsp56kEmu/assembler.h"
 #include "dsp56kEmu/dsp.h"
@@ -179,6 +181,48 @@ namespace md::engine
 				_out[i][c] = static_cast<int32_t>(w << 8) >> 8;
 			}
 		return true;
+	}
+
+	bool MasterEngine::warmUp(const int _blocks)
+	{
+		// P as large as the external memory X and Y share with it; X and Y up to where they join it
+		const auto sizeP = Memory::calcPMemSize(kSizeP, kSizeXY, kBridge);
+		const auto sizeXY = Memory::calcXYMemSize(kSizeXY, kBridge);
+		const auto* p = m_mem->getMemAreaPtr(MemArea_P);
+		const auto* x = m_mem->getMemAreaPtr(MemArea_X);
+		const auto* y = m_mem->getMemAreaPtr(MemArea_Y);
+		const std::vector<TWord> savedP(p, p + sizeP), savedX(x, x + sizeXY), savedY(y, y + sizeXY);
+		const auto savedRegs = m_dsp->regs();
+
+		uint32_t seed = 0x2545f491;
+		Mixer::Stereo main{}, rev{}, del{}, out{};
+		bool ok = true;
+		for(int b = 0; b < _blocks && ok; ++b)
+		{
+			const bool loud = b < _blocks / 2;
+			for(auto* bus : {&main, &rev, &del})
+			{
+				for(auto& frame : *bus)
+				{
+					for(auto& sample : frame)
+					{
+						seed ^= seed << 13;
+						seed ^= seed >> 17;
+						seed ^= seed << 5;
+						sample = loud ? static_cast<int32_t>(seed << 8) >> 8 : 0;
+					}
+				}
+			}
+			ok = process(main, rev, del, out);
+		}
+
+		std::copy(savedP.begin(), savedP.end(), m_mem->getMemAreaPtr(MemArea_P));
+		std::copy(savedX.begin(), savedX.end(), m_mem->getMemAreaPtr(MemArea_X));
+		std::copy(savedY.begin(), savedY.end(), m_mem->getMemAreaPtr(MemArea_Y));
+		m_dsp->regs() = savedRegs;
+		if(ok)
+			m_fault.clear();
+		return ok;
 	}
 
 	uint32_t MasterEngine::readX(const uint32_t _addr) const

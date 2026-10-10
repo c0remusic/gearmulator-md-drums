@@ -54,6 +54,11 @@ later versions can be compared file by file. Their documentation is in `.scratch
   `saveState` took them, P's code unchanged so that what the JIT compiled stays valid. 177 ms on this PC; the engine
   then gives the same samples as one that was not warmed, and a Track's first Hit costs no more than its next ones
   (`mdDrums/mdDrumsFirstHitTest.cpp`).
+- `engine/MasterEngine.*`: `MasterEngine::warmUp` does the same for the mixer DSP, whose JIT compiled the master's
+  code in the engine's first block: 26 ms where an audio thread at 128 samples has 2.9. It runs 64 blocks, loud noise
+  on the three buses then silence, and puts back the DSP's memory and registers. 33 ms on this PC; Main is then the
+  same, sample for sample, the first block costs 0.25 ms, and no master parameter through its range costs a block more
+  than 0.12 ms of master (`mdDrums/mdDrumsFirstHitTest.cpp`).
 
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.

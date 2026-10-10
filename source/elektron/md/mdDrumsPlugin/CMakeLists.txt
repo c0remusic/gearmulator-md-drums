@@ -84,6 +84,20 @@ if(BUILD_TESTING)
 	set_tests_properties(mdDrumsSkinTest PROPERTIES LABELS "FirmwareTest;Performance" SKIP_RETURN_CODE 77 TIMEOUT 180)
 	set_property(TARGET mdDrumsSkinTest PROPERTY FOLDER "Elektron/test")
 
+	# The VST3 itself, loaded through JUCE's VST3 hosting as Live loads it: the layer mdDrumsProcessorTest does not see
+	if(TARGET mdDrumsPlugin_VST3)
+		add_executable(mdDrumsVst3HostTest mdDrumsVst3HostTest.cpp)
+		target_link_libraries(mdDrumsVst3HostTest PRIVATE juce::juce_audio_processors juce::juce_gui_basics)
+		target_compile_definitions(mdDrumsVst3HostTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
+			JUCE_STANDALONE_APPLICATION=1 JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_VST=0 JUCE_PLUGINHOST_AU=0
+			JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1
+			MD_DRUMS_PARAMETERS="${CMAKE_CURRENT_SOURCE_DIR}/parameterDescriptions_mddrums.json")
+		add_dependencies(mdDrumsVst3HostTest mdDrumsPlugin_VST3)
+		add_test(NAME mdDrumsVst3HostTest COMMAND mdDrumsVst3HostTest "$<TARGET_FILE:mdDrumsPlugin_VST3>")
+		set_tests_properties(mdDrumsVst3HostTest PROPERTIES LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 180)
+		set_property(TARGET mdDrumsVst3HostTest PROPERTY FOLDER "Elektron/test")
+	endif()
+
 	# Measurement, not a gate: several instances in one process, their memory and CPU (ticket 31). Run by hand
 	add_executable(mdDrumsInstancesTest mdDrumsInstancesTest.cpp)
 	target_link_libraries(mdDrumsInstancesTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums

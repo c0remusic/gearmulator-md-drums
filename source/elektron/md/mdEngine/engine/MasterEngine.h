@@ -42,6 +42,14 @@ namespace md::engine
 		// One 32-sample block: the dry main mix, the reverb send and the delay send in, Main out. False on a fault.
 		bool process(const Mixer::Stereo& _main, const Mixer::Stereo& _rev, const Mixer::Stereo& _del, Mixer::Stereo& _out);
 
+		// The master's code compiled now rather than in the first block. The mixer DSP's JIT compiles its code the first
+		// time it runs: about 26 ms in the first 32-sample block (mdDrumsFirstHitTest), nine times what an audio thread at
+		// 128 samples has. Runs _blocks blocks, loud noise on the three buses then silence, so that the effects' branches
+		// for a signal and for its tail run too; then the DSP gets its memory and registers back, as VoiceEngine's warm-up
+		// does: P holds the same code after, so what the JIT compiled stays valid, and the master sounds as if nothing had
+		// run. Between two blocks. False on a fault.
+		bool warmUp(int _blocks = 64);
+
 		uint32_t readX(uint32_t _addr) const;
 		uint32_t readY(uint32_t _addr) const;
 		uint64_t instructionsLastBlock() const { return m_lastInstructions; }
