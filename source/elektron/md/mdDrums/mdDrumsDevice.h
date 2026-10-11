@@ -23,7 +23,9 @@ namespace mdDrums
 	public:
 		static constexpr int FirstNote = 36;
 		static constexpr int FirstLockNote = 64;	// SYN1 to LFOM, the engine's parameter order; velocity: lockValue()
-		static constexpr int OutputCount = Engine::OutputCount;	// Main left and right, then Out 01 to 16
+		// Main left and right, then Out 01 to 15, each the sum of the Tracks the mixer puts on it (messages::OutCount)
+		static constexpr int OutCount = messages::OutCount;
+		static constexpr int OutputCount = 2 + OutCount;
 		// Every Hit sounds 31 samples after its note (Engine::SampleAccurateDelay), then its voice starts: 4 samples for
 		// most machines (TRX-SD, -CH, EFM, E12, P-I; 12 for ROM, 36 for TRX-BD, which sounds a block later;
 		// mdDrumsEngineTest). The latency reported is Main's, which comes Engine::MasterDelay after the Outs.
@@ -91,6 +93,9 @@ namespace mdDrums
 			float low = 0.0f, high = 0.0f;
 		};
 		std::array<Capture, Engine::TrackCount> m_captures{};
+		// Each Track's own output, a chunk at a time: the Telemetry and the captures read it, the Outs sum it
+		static constexpr size_t Chunk = 256;
+		std::array<std::array<float, Chunk>, Engine::TrackCount> m_tracks{};
 		int64_t m_position = 0;	// samples rendered so far
 		// The last Hit note's Track and the sample it came at: a Lock on channel 1 at that sample goes with it
 		int m_lastHitTrack = 0;

@@ -16,7 +16,7 @@ namespace mdDrums
 {
 	// MD Drums on the TUS plug-in stack (ADR 0001): a jucePluginEditorLib::Processor over mdDrums::Device, which speaks
 	// the Machinedrum's MIDI (ADR 0002), with a Controller from parameterDescriptions_mddrums.json and an RmlUi skin.
-	// Host notes 36-51 trigger Tracks 1-16; the outputs are Main, then "Out 01" to "Out 16", each optional, a Track's
+	// Host notes 36-51 trigger Tracks 1-16; the outputs are Main, then "Out 01" to "Out 15", each optional, a Track's
 	// Out parameter deciding whether it leaves Main whatever the host does with the bus.
 	class Processor final : public jucePluginEditorLib::Processor
 	{
@@ -52,7 +52,7 @@ namespace mdDrums
 		Bank* getBank() const { return m_bank.get(); }
 
 	private:
-		// Main, then the 16 Outs, off until the host enables them
+		// Main, then the 15 Outs (messages::OutCount), off until the host enables them
 		static BusesProperties buses();
 		bool isBusesLayoutSupported(const BusesLayout& _layouts) const override;
 

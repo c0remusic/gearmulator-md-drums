@@ -1,11 +1,11 @@
 // MD Drums as a host loads it: the VST3 the user installs, through JUCE's VST3 hosting, as Live does.
 // mdDrumsProcessorTest checks the processor; this checks the VST3 layer between it and the host: the class and the
 // 608 parameter IDs that Live sets keep (the hashes of the frozen "page_part_index" strings), the only automatable ones
-// with Bypass; Main and the 16 Outs and their channels; notes, Locks (as md-drums-seq sends them in Live) and host
-// automation through the VST3 process call; the latency reported; the state through IComponent; the same samples
-// whatever the block sizes and offline; no block that stalls the audio thread; nothing of its own told to the host
-// while it plays Locks, automates or restores a state (the host would take it for an edit; a Track's machine is the
-// exception, its SYN1-8 taking the machine's defaults); and the editor through IPlugView, drawn in the host's window
+// with Bypass; Main and 15 Outs, any Track on any (Live opens 16 buses); notes, Locks (as md-drums-seq sends them in
+// Live) and host automation through the VST3 process call; the latency reported; the state through IComponent; the same
+// samples whatever the block sizes and offline; no block that stalls the audio thread; nothing of its own told to the
+// host while it plays Locks, automates or restores a state (the host would take it for an edit; a Track's machine is
+// the exception, its SYN1-8 taking the machine's defaults); and the editor through IPlugView, drawn in the host's window
 // while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -45,6 +45,7 @@ namespace
 	constexpr double g_rate = 44100.0;
 	constexpr int g_block = 128;
 	constexpr int g_tracks = 16;
+	constexpr int g_outs = 15;			// Out 01-15: Live opens at most 16 output buses per plug-in, Main included
 	constexpr int g_parameters = 608;	// 16 Tracks of 34, the 32 master effects, the 32 relays for Push 2
 	constexpr int g_relays = 576;		// the first relay: those follow the Track shown and tell the host (ticket 27)
 	constexpr int g_latency = 51;		// what the plug-in reports at 44.1 kHz: Main's
@@ -216,7 +217,7 @@ namespace
 			plugin->prepareToPlay(_rate, g_block);
 		}
 
-		// Out 01-16 the host takes, the others disabled
+		// Out 01-15 the host takes, the others disabled
 		void outs(const std::vector<int>& _outs, const double _rate = g_rate) const
 		{
 			plugin->releaseResources();
@@ -369,6 +370,12 @@ namespace
 		return _audio.getMagnitude(_channel, static_cast<int>(_from), static_cast<int>(length));
 	}
 
+	// The Out parameter's value for Main (0) or Out 01-15, normalised
+	float outValue(const int _out)
+	{
+		return static_cast<float>(_out) / g_outs;
+	}
+
 	// A host automating: the value set, then blocks for the VST3 process call to carry it
 	void automate(Instance& _instance, const int _index, const float _value)
 	{
@@ -479,11 +486,11 @@ namespace
 				std::chrono::duration<double, std::milli>(Clock::now() - start).count(),
 				instance->told.summary(ids).c_str());
 
-			// Main and the 16 Outs, the Outs off until the host takes them
-			require(plugin.getBusCount(true) == 0 && plugin.getBusCount(false) == 17, "not Main and 16 Outs");
+			// Main and 15 Outs, the Outs off until the host takes them
+			require(plugin.getBusCount(true) == 0 && plugin.getBusCount(false) == 1 + g_outs, "not Main and 15 Outs");
 			require(plugin.getBus(false, 0)->getName() == "Main" && plugin.getBus(false, 0)->isEnabled()
 				&& plugin.getChannelCountOfBus(false, 0) == 2, "Main is not an enabled stereo bus");
-			for(int bus = 1; bus <= g_tracks; ++bus)
+			for(int bus = 1; bus <= g_outs; ++bus)
 			{
 				require(plugin.getBus(false, bus)->getName() == juce::String::formatted("Out %02d", bus)
 					&& !plugin.getBus(false, bus)->isEnabled()
@@ -570,38 +577,41 @@ namespace
 			pump(300);
 			std::printf("The host set Track 3's machine to EFM-BD: told %s\n", instance->told.summary(ids).c_str());
 
-			// The Outs: each Track on its own when the host takes the 16, and its channel the bus's
-			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
-			require(plugin.getTotalNumOutputChannels() == 18, "Main and 16 Outs are not 18 channels");
+			// The Outs (ticket 33), the host taking the 15: Track n on Out n, Track 16 on Out 15 with Track 15, each Out's
+			// channel the bus's
+			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+			require(plugin.getTotalNumOutputChannels() == 2 + g_outs, "Main and 15 Outs are not 17 channels");
+			const auto naturalOut = [](const int _track) { return std::min(_track + 1, g_outs); };
 			for(int track = 0; track < g_tracks; ++track)
-				automate(*instance, ids.index("Out", track), 1.0f);
+				automate(*instance, ids.index("Out", track), outValue(naturalOut(track)));
 			{
 				const auto spacing = std::llround(0.25 * g_rate);
 				const auto take = render(plugin, eachTrack(spacing, spacing), spacing * 18);
 				for(int track = 0; track < g_tracks; ++track)
 				{
 					const auto from = (track + 1) * spacing;
-					require(peak(take, 2 + track, from, spacing) > g_sound,
-						"Track " + std::to_string(track + 1) + " is silent on its Out");
+					const auto out = naturalOut(track);
+					require(peak(take, 1 + out, from, spacing) > g_sound,
+						"Track " + std::to_string(track + 1) + " is silent on Out " + std::to_string(out));
 					// The Outs of the Tracks still to strike (those struck may still ring)
-					for(int out = track + 1; out < g_tracks; ++out)
+					for(int later = out + 1; later <= g_outs; ++later)
 					{
-						require(peak(take, 2 + out, from, spacing) < g_silence,
-							"Track " + std::to_string(track + 1) + " sounds on Out " + std::to_string(out + 1));
+						require(peak(take, 1 + later, from, spacing) < g_silence,
+							"Track " + std::to_string(track + 1) + " sounds on Out " + std::to_string(later));
 					}
 				}
-				std::printf("16 Outs taken: each Track on its own Out's channel; Track 1 left Main at %.6f\n",
+				std::printf("15 Outs taken: each Track on its Out's channel, Track 16 on Out 15; Track 1 left Main at %.6f\n",
 					std::max(peak(take, 0, spacing, spacing), peak(take, 1, spacing, spacing)));
 			}
-			// Out 16 alone: its channel follows Main's, and a Track on an Out the host left sounds nowhere
-			instance->outs({16});
+			// Out 15 alone: its channel follows Main's, and a Track on an Out the host left sounds nowhere
+			instance->outs({15});
 			{
 				const auto spacing = std::llround(0.25 * g_rate);
 				const auto take = render(plugin, {{spacing, 51, 100}, {spacing * 3, 40, 100}}, spacing * 5);
-				std::printf("Out 16 alone: Track 16 on channel 2 %.3f; Track 5 (Out off) Main %.6f, channel 2 %.6f\n",
+				std::printf("Out 15 alone: Track 16 on channel 2 %.3f; Track 5 (Out 05, off) Main %.6f, channel 2 %.6f\n",
 					peak(take, 2, spacing, spacing), peak(take, 0, spacing * 3, spacing), peak(take, 2, spacing * 3, spacing));
 				require(plugin.getTotalNumOutputChannels() == 3 && peak(take, 2, spacing, spacing) > g_sound,
-					"Track 16 is not on Out 16 when the host takes it alone");
+					"Track 16 is not on Out 15 when the host takes it alone");
 				require(peak(take, 2, spacing * 3, spacing) < g_silence && peak(take, 0, spacing * 3, spacing) < g_silence
 					&& peak(take, 1, spacing * 3, spacing) < g_silence, "Track 5 sounds although on an Out the host left");
 			}
@@ -650,11 +660,13 @@ namespace
 		}
 
 		// Locks through VST3, as md-drums-seq sends them in Live: VOL locked to 0 silences its Hit, and the next Hit of the
-		// Track plays the Kit's VOL again. Each Track heard on its own Out (an Out carries its Track whatever Out says)
+		// Track plays the Kit's VOL again. Each Track heard alone on its Out
 		{
 			auto instance = load(formats, description);
 			auto& plugin = *instance->plugin;
-			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
+			for(const int track : {0, 2, 6})
+				automate(*instance, ids.index("Out", track), outValue(track + 1));
 			render(plugin, {}, g_rate);
 			const auto beats = [&](const char* _name, const int _bars, const std::vector<int>& _tracks,
 				const std::vector<int>& _locked, const int _offbeat, const bool _channelOne = false)

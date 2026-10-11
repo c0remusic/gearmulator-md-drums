@@ -183,6 +183,9 @@ mesurées avant et après. Pas de tag.
   de classe et IDs VST3 des 608 figés, 609 automatisables (Bypass), Outs sur leurs canaux, état, blocs variables et
   hors temps réel identiques, rien renvoyé à l'hôte sauf les SYN1-8 d'une machine changée, éditeur par IPlugView ;
   trouvé un premier bloc de 27 ms (JIT du DSP master), corrigé par `MasterEngine::warmUp` (33 ms, Main identique).
+- [Out 16 hors de portée dans Live](issues/33-out-16-dans-live.md) : Live ouvre 16 bus, Main compris ; Out devient un
+  choix entre Main et 15 Outs, n'importe quelle Track sur n'importe lequel, un Out la somme de ses Tracks ; la case
+  Out d'une tranche bascule au clic entre Main et l'Out naturel (16 vers 15), la molette parcourt.
 
 ## Not yet specified
 
@@ -190,13 +193,11 @@ mesurées avant et après. Pas de tag.
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
   mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28),
   Links et Chokes (29, 30) faits.
-- [Out 16 hors de portée dans Live](issues/33-out-16-dans-live.md) : décision ouverte, 17 bus pour un plafond de 16 ;
-  recommandé : Out devient un choix entre Main et 15 Outs.
 - **Validation dans Live** (l'utilisateur) : la fluidité à la main, l'undo après un Kit, Ctrl+S, Push 2 (liste en
   Configure), les Outs depuis un Drum Rack, l'automation des SYN1-8 quand une machine change. Mesuré hors Live :
   latence (tests), CPU, mémoire et blocs en retard (ticket 31), entrée→pixel (`mdDrumsSkinTest`), la couche VST3 et
   les Locks (ticket 32). Mesuré dans Live par script (ticket 32) : latence, chargement pendant la lecture, CPU à 8
-  instances, Outs 01-15.
+  instances, Outs 01-15 (Main et 15 Outs depuis le ticket 33, à revoir dans Live).
 
 ## Out of scope
 

@@ -86,6 +86,11 @@ namespace mdDrums
 		void onPartChanged(uint8_t _part);
 		void updateMachine() const;
 		void updateOutput() const;
+		// A Mix strip's Out: a click moves the Track between Main and its natural Out (its own number, 16 to 15), the
+		// wheel through Main and Out 01-15 (ticket 33)
+		void updateStripOut(uint8_t _track) const;
+		void setStripOut(uint8_t _track, int _out) const;
+		static uint8_t naturalOut(uint8_t _track);
 		void updateLfoMenu() const;
 		void updateSize() const;
 		void show(const std::string& _id, bool _visible) const;
@@ -102,5 +107,6 @@ namespace mdDrums
 		baseLib::EventListener<pluginLib::Parameter*> m_onMachineChanged;
 		baseLib::EventListener<pluginLib::Parameter*> m_onOutChanged;
 		baseLib::EventListener<pluginLib::Parameter*> m_onLfoTrackChanged;
+		std::array<baseLib::EventListener<pluginLib::Parameter*>, 16> m_onStripOutChanged;
 	};
 }

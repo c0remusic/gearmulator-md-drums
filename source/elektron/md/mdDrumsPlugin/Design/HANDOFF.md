@@ -141,7 +141,7 @@ strips 1 and 16), with a 4 px accent bar at y 56.
 | Level fader | 16, 228, 64, 492 | rail 2 px `--track` at x + 39; cap 48 x 8 ink at x + 16 |
 | Level value | 16, 728, 64, 16 | |
 | M / S | 20 / 52, 752, 24, 24 | |
-| Out 01 | 20, 784, 56, 24 | toggle: on, the track plays on its own output and leaves Main |
+| Out 01 | 20, 784, 56, 24 | the Out the track plays on, lit when off Main; a click moves it between Main and its natural Out (its number, Track 16 to Out 15), the wheel steps Main, Out 01-15 (ticket 33) |
 
 ## Master tab
 
@@ -259,7 +259,7 @@ adds, appended after them:
 
 | ID | Type | Where |
 |---|---|---|
-| `t<n>_out` | bool | Mix, Out 01-16: on, the track leaves Main for its own output |
+| `t<n>_out` | 0-15 | Mix, Out: 0 Main, 1-15 the Out the track leaves Main for (as built: Live opens at most 16 output buses per plug-in, Main included) |
 | `t<n>_solo` | bool | list and Mix, S |
 | `t<n>_lfoTrack`, `t<n>_lfoParam` | int, track 1-16; parameter 0-23 | LFO target menu and ASSIGN |
 | `t<n>_lfoShape1`, `t<n>_lfoShape2` | choice TRI SAW SQR RMP EXP RND | LFO chips |
@@ -300,7 +300,7 @@ the engine.
   from each Hit, RND takes 8 steps a period at half the swing, LFOM fades shape 1 into shape 2 inverted, and the value
   moves once a tick (125 Hz). The plot starts on a Hit of the Track and runs free after it, HOLD included.
 - **Outputs:** add `t<n>_out`; the track leaves the main mix when it is on, whatever the host does with the bus; name
-  the buses "Out 01" to "Out 16" (they are "Track 1" to "Track 16" today) so that Live lists what the editor shows.
+  the buses "Out 01" to "Out 15" (they are "Track 1" to "Track 16" today) so that Live lists what the editor shows; as built, any track on any of the 15 (ticket 33 of the editor map).
 - **Master effects:** mdEngine has none yet. Echo and reverb take every track's DEL and REV sends, tracks on their own
   output included, and return on Main; EQ and DYNAMIX act on Main only. Defaults: the values in the table above.
 - **Kits:** a bank of 64 slots in the plug-in's data folder, shared by every set; the plug-in state keeps the kit

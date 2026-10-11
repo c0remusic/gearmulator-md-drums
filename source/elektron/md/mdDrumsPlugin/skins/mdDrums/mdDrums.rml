@@ -506,7 +506,7 @@
 				<div id="strip1_meter" class="a vu"><div class="fill"/></div><vknob id="strip1_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip1_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip1_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip1_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip1_out" class="a toggle out" param="Out" isToggle="1">Out 01</button>
+				<button id="strip1_out" class="a toggle out" param="Out">Out 01</button>
 			</div>
 			<div class="a strip c2" data-model="part1">
 				<div id="strip2_num" class="a w1 sn">02</div><div id="strip2_name" class="a w1 sm">{{Machine_text}}</div>
@@ -514,7 +514,7 @@
 				<div id="strip2_meter" class="a vu"><div class="fill"/></div><vknob id="strip2_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip2_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip2_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip2_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip2_out" class="a toggle out" param="Out" isToggle="1">Out 02</button>
+				<button id="strip2_out" class="a toggle out" param="Out">Out 02</button>
 			</div>
 			<div class="a strip c3" data-model="part2">
 				<div id="strip3_num" class="a w1 sn">03</div><div id="strip3_name" class="a w1 sm">{{Machine_text}}</div>
@@ -522,7 +522,7 @@
 				<div id="strip3_meter" class="a vu"><div class="fill"/></div><vknob id="strip3_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip3_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip3_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip3_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip3_out" class="a toggle out" param="Out" isToggle="1">Out 03</button>
+				<button id="strip3_out" class="a toggle out" param="Out">Out 03</button>
 			</div>
 			<div class="a strip c4" data-model="part3">
 				<div id="strip4_num" class="a w1 sn">04</div><div id="strip4_name" class="a w1 sm">{{Machine_text}}</div>
@@ -530,7 +530,7 @@
 				<div id="strip4_meter" class="a vu"><div class="fill"/></div><vknob id="strip4_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip4_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip4_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip4_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip4_out" class="a toggle out" param="Out" isToggle="1">Out 04</button>
+				<button id="strip4_out" class="a toggle out" param="Out">Out 04</button>
 			</div>
 			<div class="a strip c5" data-model="part4">
 				<div id="strip5_num" class="a w1 sn">05</div><div id="strip5_name" class="a w1 sm">{{Machine_text}}</div>
@@ -538,7 +538,7 @@
 				<div id="strip5_meter" class="a vu"><div class="fill"/></div><vknob id="strip5_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip5_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip5_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip5_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip5_out" class="a toggle out" param="Out" isToggle="1">Out 05</button>
+				<button id="strip5_out" class="a toggle out" param="Out">Out 05</button>
 			</div>
 			<div class="a strip c6" data-model="part5">
 				<div id="strip6_num" class="a w1 sn">06</div><div id="strip6_name" class="a w1 sm">{{Machine_text}}</div>
@@ -546,7 +546,7 @@
 				<div id="strip6_meter" class="a vu"><div class="fill"/></div><vknob id="strip6_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip6_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip6_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip6_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip6_out" class="a toggle out" param="Out" isToggle="1">Out 06</button>
+				<button id="strip6_out" class="a toggle out" param="Out">Out 06</button>
 			</div>
 			<div class="a strip c7" data-model="part6">
 				<div id="strip7_num" class="a w1 sn">07</div><div id="strip7_name" class="a w1 sm">{{Machine_text}}</div>
@@ -554,7 +554,7 @@
 				<div id="strip7_meter" class="a vu"><div class="fill"/></div><vknob id="strip7_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip7_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip7_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip7_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip7_out" class="a toggle out" param="Out" isToggle="1">Out 07</button>
+				<button id="strip7_out" class="a toggle out" param="Out">Out 07</button>
 			</div>
 			<div class="a strip c8" data-model="part7">
 				<div id="strip8_num" class="a w1 sn">08</div><div id="strip8_name" class="a w1 sm">{{Machine_text}}</div>
@@ -562,7 +562,7 @@
 				<div id="strip8_meter" class="a vu"><div class="fill"/></div><vknob id="strip8_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip8_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip8_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip8_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip8_out" class="a toggle out" param="Out" isToggle="1">Out 08</button>
+				<button id="strip8_out" class="a toggle out" param="Out">Out 08</button>
 			</div>
 			<div class="a strip c9" data-model="part8">
 				<div id="strip9_num" class="a w1 sn">09</div><div id="strip9_name" class="a w1 sm">{{Machine_text}}</div>
@@ -570,7 +570,7 @@
 				<div id="strip9_meter" class="a vu"><div class="fill"/></div><vknob id="strip9_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip9_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip9_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip9_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip9_out" class="a toggle out" param="Out" isToggle="1">Out 09</button>
+				<button id="strip9_out" class="a toggle out" param="Out">Out 09</button>
 			</div>
 			<div class="a strip c10" data-model="part9">
 				<div id="strip10_num" class="a w1 sn">10</div><div id="strip10_name" class="a w1 sm">{{Machine_text}}</div>
@@ -578,7 +578,7 @@
 				<div id="strip10_meter" class="a vu"><div class="fill"/></div><vknob id="strip10_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip10_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip10_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip10_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip10_out" class="a toggle out" param="Out" isToggle="1">Out 10</button>
+				<button id="strip10_out" class="a toggle out" param="Out">Out 10</button>
 			</div>
 			<div class="a strip c11" data-model="part10">
 				<div id="strip11_num" class="a w1 sn">11</div><div id="strip11_name" class="a w1 sm">{{Machine_text}}</div>
@@ -586,7 +586,7 @@
 				<div id="strip11_meter" class="a vu"><div class="fill"/></div><vknob id="strip11_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip11_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip11_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip11_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip11_out" class="a toggle out" param="Out" isToggle="1">Out 11</button>
+				<button id="strip11_out" class="a toggle out" param="Out">Out 11</button>
 			</div>
 			<div class="a strip c12" data-model="part11">
 				<div id="strip12_num" class="a w1 sn">12</div><div id="strip12_name" class="a w1 sm">{{Machine_text}}</div>
@@ -594,7 +594,7 @@
 				<div id="strip12_meter" class="a vu"><div class="fill"/></div><vknob id="strip12_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip12_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip12_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip12_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip12_out" class="a toggle out" param="Out" isToggle="1">Out 12</button>
+				<button id="strip12_out" class="a toggle out" param="Out">Out 12</button>
 			</div>
 			<div class="a strip c13" data-model="part12">
 				<div id="strip13_num" class="a w1 sn">13</div><div id="strip13_name" class="a w1 sm">{{Machine_text}}</div>
@@ -602,7 +602,7 @@
 				<div id="strip13_meter" class="a vu"><div class="fill"/></div><vknob id="strip13_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip13_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip13_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip13_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip13_out" class="a toggle out" param="Out" isToggle="1">Out 13</button>
+				<button id="strip13_out" class="a toggle out" param="Out">Out 13</button>
 			</div>
 			<div class="a strip c14" data-model="part13">
 				<div id="strip14_num" class="a w1 sn">14</div><div id="strip14_name" class="a w1 sm">{{Machine_text}}</div>
@@ -610,7 +610,7 @@
 				<div id="strip14_meter" class="a vu"><div class="fill"/></div><vknob id="strip14_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip14_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip14_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip14_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip14_out" class="a toggle out" param="Out" isToggle="1">Out 14</button>
+				<button id="strip14_out" class="a toggle out" param="Out">Out 14</button>
 			</div>
 			<div class="a strip c15" data-model="part14">
 				<div id="strip15_num" class="a w1 sn">15</div><div id="strip15_name" class="a w1 sm">{{Machine_text}}</div>
@@ -618,7 +618,7 @@
 				<div id="strip15_meter" class="a vu"><div class="fill"/></div><vknob id="strip15_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip15_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip15_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip15_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip15_out" class="a toggle out" param="Out" isToggle="1">Out 15</button>
+				<button id="strip15_out" class="a toggle out" param="Out">Out 15</button>
 			</div>
 			<div class="a strip c16" data-model="part15">
 				<div id="strip16_num" class="a w1 sn">16</div><div id="strip16_name" class="a w1 sm">{{Machine_text}}</div>
@@ -626,7 +626,7 @@
 				<div id="strip16_meter" class="a vu"><div class="fill"/></div><vknob id="strip16_fader" class="a fader" param="Level" fader="1" speed="492"/>
 				<div id="strip16_level" class="a w1 level">{{Level_value}}</div>
 				<button id="strip16_mute" class="a toggle mute" param="Mute" isToggle="1">M</button><button id="strip16_solo" class="a toggle solo" param="Solo" isToggle="1">S</button>
-				<button id="strip16_out" class="a toggle out" param="Out" isToggle="1">Out 16</button>
+				<button id="strip16_out" class="a toggle out" param="Out">Out 16</button>
 			</div>
 		</div>
 

@@ -18,21 +18,37 @@ namespace mdDrums::messages
 	enum class Command : uint8_t
 	{
 		Solo = 0x01,		// track, 0 or 1
-		Out = 0x02,			// track, 0 (Main) or 1 (its own Out)
+		Out = 0x02,			// track, 0 (Main) or 1-15 (Out 01-15)
 		Tempo = 0x03,		// BPM x 100, three 7-bit bytes, high first
-		Mixer = 0x04,		// the mute, solo and Out masks, three 7-bit bytes each, high first (bit n = track n + 1)
+		// The mute and solo masks, three 7-bit bytes each, high first (bit n = track n + 1), then each Track's Out, a byte
+		// each (0 Main, 1-15 Out 01-15). Read too: the earlier form, an Out mask instead (Track n on Out n, 16 on 15)
+		Mixer = 0x04,
 		KitName = 0x05,		// the Kit's 16 name bytes, NUL-padded, 7 bits each (the Machinedrum names a Kit in its dump only)
 	};
+
+	// The Outs a Track can leave Main for: Live opens at most 16 output buses per plug-in, the track's own included
+	// (ticket 33 of the editor map), so Main and 15, any Track on any of them
+	constexpr uint8_t OutCount = 15;
 
 	struct Mixer
 	{
 		uint16_t mute = 0;
 		uint16_t solo = 0;
-		uint16_t out = 0;
+		std::array<uint8_t, 16> outs{};	// per Track: 0 Main, 1-15 Out 01-15
+
+		// The Tracks that leave Main (bit n = track n + 1)
+		uint16_t offMain() const
+		{
+			uint16_t mask = 0;
+			for(size_t t = 0; t < outs.size(); ++t)
+				if(outs[t])
+					mask = static_cast<uint16_t>(mask | 1u << t);
+			return mask;
+		}
 
 		bool operator==(const Mixer& _other) const
 		{
-			return mute == _other.mute && solo == _other.solo && out == _other.out;
+			return mute == _other.mute && solo == _other.solo && outs == _other.outs;
 		}
 	};
 
@@ -46,7 +62,7 @@ namespace mdDrums::messages
 	};
 
 	Raw solo(uint8_t _track, bool _on);
-	Raw out(uint8_t _track, bool _on);
+	Raw out(uint8_t _track, uint8_t _out);	// _out: 0 Main, 1-15 Out 01-15
 	Raw tempo(double _bpm);		// 30 to 300, as the engine takes it
 	Raw mixer(const Mixer& _mixer);
 	Raw kitName(const std::array<uint8_t, md::automation::sysex::MdKit::NameSize>& _name);
@@ -56,6 +72,7 @@ namespace mdDrums::messages
 		Command command;
 		uint8_t track = 0;
 		bool on = false;
+		uint8_t out = 0;
 		double bpm = 0;
 		Mixer mixer;
 		std::array<uint8_t, md::automation::sysex::MdKit::NameSize> name{};

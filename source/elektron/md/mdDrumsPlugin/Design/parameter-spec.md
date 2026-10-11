@@ -19,7 +19,7 @@ relays for Push 2 (ticket 27, `docs/md-drums-push2.md`).
 | 3 | 0 | Level | 0-127 | CC 8-11 |
 | 4 | 0 | Mute | Off, On | CC 12-15 |
 | 7 | 0 | Solo | Off, On | MD Drums' own `F0 7D 4D 44 44 01` |
-| 7 | 1 | Out | Main, Out | MD Drums' own `F0 7D 4D 44 44 02`: the Track leaves Main for "Out nn", whatever the host does with the bus |
+| 7 | 1 | Out | Main, Out 01-15 | MD Drums' own `F0 7D 4D 44 44 02`: the Track leaves Main for that Out, whatever the host does with the bus; any Track on any Out, an Out the sum of its Tracks (ticket 33: Live opens 16 buses, Main included) |
 | 8 | 0-7 | EchoTIME MOD MFRQ FB FLTF FLTW MONO LEV | 0-127 | `$5D` |
 | 8 | 8-15 | ReverbDVOL PRED DEC DAMP HP LP GATE LEV | 0-127 | `$5E` |
 | 8 | 16-23 | EqLF LG HF HG PF PG PQ GAIN | 0-127 | `$5F` |
@@ -31,5 +31,5 @@ relays for Push 2 (ticket 27, `docs/md-drums-push2.md`).
 The master effects are kept in the Kit and play since ticket 24. Links and Chokes are Kit values sent as
 `$65` and `$66`, not host parameters.
 
-Outputs: "Main" stereo, then "Out 01" to "Out 16" mono, off until the host enables them. Notes 36-51 on any channel
+Outputs: "Main" stereo, then "Out 01" to "Out 15" mono, off until the host enables them. Notes 36-51 on any channel
 trigger Tracks 1-16 with velocity; the host's other MIDI does nothing.

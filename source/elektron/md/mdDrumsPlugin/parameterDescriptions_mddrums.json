@@ -3,7 +3,7 @@
 	"valuelists":
 	{
 		"offOn": ["Off", "On"],
-		"outs": ["Main", "Out"],
+		"outs": ["Main", "Out 01", "Out 02", "Out 03", "Out 04", "Out 05", "Out 06", "Out 07", "Out 08", "Out 09", "Out 10", "Out 11", "Out 12", "Out 13", "Out 14", "Out 15"],
 		"machines": ["GND---", "GND-SN", "GND-NS", "GND-IM", "GND-SW", "GND-PU", "#6", "NFX-EV", "NFX-CO", "NFX-UC", "#10", "#11", "#12", "#13", "#14", "#15", "TRX-BD", "TRX-SD", "TRX-XT", "TRX-CP", "TRX-RS", "TRX-CB", "TRX-CH", "TRX-OH", "TRX-CY", "TRX-MA", "TRX-CL", "TRX-XC", "TRX-B2", "TRX-S2", "#30", "#31", "EFM-BD", "EFM-SD", "EFM-XT", "EFM-CP", "EFM-RS", "EFM-CB", "EFM-HH", "EFM-CY", "#40", "#41", "#42", "#43", "#44", "#45", "#46", "#47", "E12-BD", "E12-SD", "E12-HT", "E12-LT", "E12-CP", "E12-RS", "E12-CB", "E12-CH", "E12-OH", "E12-RC", "E12-CC", "E12-BR", "E12-TA", "E12-TR", "E12-SH", "E12-BC", "P-I-BD", "P-I-SD", "P-I-MT", "P-I-ML", "P-I-MA", "P-I-RS", "P-I-RC", "P-I-CC", "P-I-HH", "#73", "#74", "#75", "#76", "#77", "#78", "#79", "INP-GA", "INP-GB", "INP-FA", "INP-FB", "INP-EA", "INP-EB", "INP-CA", "INP-CB", "#88", "#89", "#90", "#91", "#92", "#93", "#94", "#95", "MID-01", "MID-02", "MID-03", "MID-04", "MID-05", "MID-06", "MID-07", "MID-08", "MID-09", "MID-10", "MID-11", "MID-12", "MID-13", "MID-14", "MID-15", "MID-16", "CTR-AL", "CTR-8P", "#114", "#115", "#116", "#117", "#118", "#119", "CTR-RE", "CTR-GB", "CTR-EQ", "CTR-DX", "#124", "#125", "#126", "#127", "ROM-01", "ROM-02", "ROM-03", "ROM-04", "ROM-05", "ROM-06", "ROM-07", "ROM-08", "ROM-09", "ROM-10", "ROM-11", "ROM-12", "ROM-13", "ROM-14", "ROM-15", "ROM-16", "ROM-17", "ROM-18", "ROM-19", "ROM-20", "ROM-21", "ROM-22", "ROM-23", "ROM-24", "ROM-25", "ROM-26", "ROM-27", "ROM-28", "ROM-29", "ROM-30", "ROM-31", "ROM-32", "RAM-R1", "RAM-R2", "RAM-P1", "RAM-P2", "#164", "RAM-R3", "RAM-R4", "RAM-P3", "RAM-P4", "#169", "#170", "#171", "#172", "#173", "#174", "#175", "ROM-33", "ROM-34", "ROM-35", "ROM-36", "ROM-37", "ROM-38", "ROM-39", "ROM-40", "ROM-41", "ROM-42", "ROM-43", "ROM-44", "ROM-45", "ROM-46", "ROM-47", "ROM-48"],
 		"lfoTracks": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
 		"lfoParams": ["SYN1", "SYN2", "SYN3", "SYN4", "SYN5", "SYN6", "SYN7", "SYN8", "AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR", "DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"],
@@ -45,7 +45,7 @@
 		{"page": 3, "index": 0, "name": "Level", "displayName": "Level", "default": 100},
 		{"page": 4, "index": 0, "name": "Mute", "displayName": "Mute", "max": 1, "isBool": true, "toText": "offOn"},
 		{"page": 7, "index": 0, "name": "Solo", "displayName": "Solo", "max": 1, "isBool": true, "toText": "offOn"},
-		{"page": 7, "index": 1, "name": "Out", "displayName": "Out", "max": 1, "isBool": true, "toText": "outs"},
+		{"page": 7, "index": 1, "name": "Out", "displayName": "Out", "max": 15, "toText": "outs"},
 		{"page": 8, "index": 0, "name": "EchoTIME", "displayName": "Echo TIME", "default": 16, "class": "NonPartSensitive"},
 		{"page": 8, "index": 1, "name": "EchoMOD", "displayName": "Echo MOD", "default": 0, "class": "NonPartSensitive"},
 		{"page": 8, "index": 2, "name": "EchoMFRQ", "displayName": "Echo MFRQ", "default": 32, "class": "NonPartSensitive"},
@@ -83,7 +83,7 @@
 		{"page": 9, "index": 2, "name": "FocusLevel", "displayName": "Level", "default": 100, "class": "NonPartSensitive"},
 		{"page": 9, "index": 3, "name": "FocusMute", "displayName": "Mute", "max": 1, "isBool": true, "toText": "offOn", "class": "NonPartSensitive"},
 		{"page": 9, "index": 4, "name": "FocusSolo", "displayName": "Solo", "max": 1, "isBool": true, "toText": "offOn", "class": "NonPartSensitive"},
-		{"page": 9, "index": 5, "name": "FocusOut", "displayName": "Out", "max": 1, "isBool": true, "toText": "outs", "class": "NonPartSensitive"},
+		{"page": 9, "index": 5, "name": "FocusOut", "displayName": "Out", "max": 15, "toText": "outs", "class": "NonPartSensitive"},
 		{"page": 9, "index": 6, "name": "FocusLfoShape1", "displayName": "LFO SHP1", "max": 5, "toText": "lfoShapes", "class": "NonPartSensitive"},
 		{"page": 9, "index": 7, "name": "FocusLfoShape2", "displayName": "LFO SHP2", "max": 5, "toText": "lfoShapes", "class": "NonPartSensitive"},
 		{"page": 9, "index": 8, "name": "FocusSYN1", "displayName": "SYN1", "default": 64, "class": "NonPartSensitive"},

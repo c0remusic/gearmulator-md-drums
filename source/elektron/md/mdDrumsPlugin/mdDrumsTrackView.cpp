@@ -5,6 +5,7 @@
 #include "mdDrumsKitsView.h"
 #include "mdDrumsLfoView.h"
 #include "mdDrumsLinksView.h"
+#include "mdDrumsMessages.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "jucePluginEditorLib/pluginProcessor.h"
@@ -83,6 +84,29 @@ namespace mdDrums
 			for(const auto& id : {"row" + n + "_num", "row" + n + "_name", "strip" + n + "_num", "strip" + n + "_name",
 				"send" + n + "_num", "send" + n + "_name"})
 				m_editor.addClick(id, [this, t](Rml::Event&) { showTrack(t); });
+		}
+		// The Mix strips' Outs
+		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
+		{
+			const auto id = "strip" + std::to_string(t + 1) + "_out";
+			m_editor.addClick(id, [this, t](Rml::Event&)
+			{
+				const auto* out = m_editor.getProcessor().getController().getParameter("Out", t);
+				setStripOut(t, out && out->getUnnormalizedValue() ? 0 : naturalOut(t));
+			});
+			if(auto* e = find(id))
+				juceRmlUi::EventListener::Add(e, Rml::EventId::Mousescroll, [this, t](Rml::Event& _event)
+				{
+					const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
+					const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
+					const auto* out = m_editor.getProcessor().getController().getParameter("Out", t);
+					if(out && delta != 0.0f)
+						setStripOut(t, out->getUnnormalizedValue() + (delta > 0.0f ? 1 : -1));
+					_event.StopPropagation();
+				});
+			if(auto* out = controller.getParameter("Out", t))
+				m_onStripOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&) { updateStripOut(t); });
+			updateStripOut(t);
 		}
 		m_editor.addClick("track_prev", [this](Rml::Event&) { stepTrack(-1); });
 		m_editor.addClick("track_next", [this](Rml::Event&) { stepTrack(1); });
@@ -434,8 +458,39 @@ namespace mdDrums
 	void TrackView::updateOutput() const
 	{
 		const auto* out = m_editor.getProcessor().getController().getParameter("Out", m_part);
+		const auto value = out ? out->getUnnormalizedValue() : 0;
 		if(auto* text = find("output_text"))
-			text->SetInnerRML(out && out->getUnnormalizedValue() ? "Out " + twoDigits(m_part + 1) : std::string("Main"));
+			text->SetInnerRML(value ? "Out " + twoDigits(value) : std::string("Main"));
+	}
+
+	void TrackView::updateStripOut(const uint8_t _track) const
+	{
+		const auto* out = m_editor.getProcessor().getController().getParameter("Out", _track);
+		const auto value = out ? out->getUnnormalizedValue() : 0;
+		if(auto* e = find("strip" + std::to_string(_track + 1) + "_out"))
+		{
+			// On an Out: the Out it plays on; on Main: the one a click sends it to
+			e->SetInnerRML("Out " + twoDigits(value ? value : naturalOut(_track)));
+			e->SetClass("on", value != 0);
+		}
+	}
+
+	uint8_t TrackView::naturalOut(const uint8_t _track)
+	{
+		return static_cast<uint8_t>(std::min<int>(_track + 1, mdDrums::messages::OutCount));
+	}
+
+	void TrackView::setStripOut(const uint8_t _track, const int _out) const
+	{
+		auto* out = m_editor.getProcessor().getController().getParameter("Out", _track);
+		if(!out)
+			return;
+		out->setUnnormalizedValueNotifyingHost(std::clamp(_out, 0, static_cast<int>(mdDrums::messages::OutCount)),
+			pluginLib::Parameter::Origin::Ui);
+		// At once, not when the parameter tells its listeners from the message loop
+		updateStripOut(_track);
+		if(_track == m_part)
+			updateOutput();
 	}
 
 	void TrackView::updateLfoMenu() const

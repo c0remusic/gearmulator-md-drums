@@ -1123,6 +1123,50 @@ namespace
 		view->refresh();
 	}
 
+	// A Mix strip's Out (ticket 33): Main, or one of 15 Outs, any Track on any. A click moves the Track between Main and
+	// its natural Out (its own number, Track 16 to 15), the wheel steps through Main and Out 01-15; the box reads the Out,
+	// lit off Main, and the head band says where the Track shown plays, from the click's frame on
+	void outs(Fixture& _f)
+	{
+		auto& controller = _f.processor.getController();
+		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
+		const auto lit = [&](const std::string& _id) { return _f.find(_id)->IsClassSet("on"); };
+		const auto value = [&](const uint8_t _track) { return controller.getParameter("Out", _track)->getUnnormalizedValue(); };
+		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
+		const auto wheel = [&](const std::string& _id, const float _y)
+		{
+			_f.layout();
+			const auto b = _f.box(*_f.find(_id));
+			const auto r = _f.dp();
+			_f.context().ProcessMouseMove(juce::roundToInt((b.x + b.w * 0.5f) * r), juce::roundToInt((b.y + b.h * 0.5f) * r), 0);
+			_f.context().ProcessMouseWheel(Rml::Vector2f(0.0f, _y), 0);
+			_f.layout();
+		};
+
+		_f.showView("mix");
+		_f.editor->setCurrentPart(15);
+		require(value(15) == 0 && text("strip16_out") == "Out 15" && !lit("strip16_out"),
+			"Track 16 on Main does not offer Out 15");
+		clickNow("strip16_out");
+		require(value(15) == 15 && text("strip16_out") == "Out 15" && lit("strip16_out")
+			&& text("output_text") == "Out 15", "a click does not put Track 16 on Out 15");
+		clickNow("strip16_out");
+		require(value(15) == 0 && !lit("strip16_out") && text("output_text") == "Main", "a second click does not bring it back");
+		wheel("strip16_out", 1.0f);
+		wheel("strip16_out", 1.0f);
+		require(value(15) == 2 && text("strip16_out") == "Out 02" && lit("strip16_out"), "the wheel does not step the Outs");
+		wheel("strip16_out", -1.0f);
+		wheel("strip16_out", -1.0f);
+		wheel("strip16_out", -1.0f);
+		require(value(15) == 0 && !lit("strip16_out"), "the wheel does not stop at Main");
+		clickNow("strip1_out");
+		require(value(0) == 1 && text("strip1_out") == "Out 01" && lit("strip1_out"), "a click does not put Track 1 on Out 01");
+		clickNow("strip1_out");
+		require(value(0) == 0, "Track 1 does not come back to Main");
+		_f.editor->setCurrentPart(0);
+		std::printf("outs: a click puts Track 16 on Out 15 and back, the wheel steps Main, Out 01, Out 02\n");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		const auto save = [&](const std::string& _name)
@@ -1171,7 +1215,8 @@ int main()
 			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
 			{"meters", meters}, {"hit screen", hitScreen}, {"hit preview", hitPreview}, {"filter screen", filterScreen},
 			{"lfo screen", lfoScreen},
-			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}, {"links", links}})
+			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}, {"links", links},
+			{"outs", outs}})
 		{
 			try
 			{

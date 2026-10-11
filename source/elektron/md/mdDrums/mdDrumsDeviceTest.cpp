@@ -24,6 +24,7 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(_MSC_VER)
@@ -138,7 +139,7 @@ namespace
 			midiOut.insert(midiOut.end(), out.begin(), out.end());
 		}
 
-		// A second of host blocks; the peak of output _channel (0-1 Main, 2-17 Out 01-16)
+		// A second of host blocks; the peak of output _channel (0-1 Main, 2-16 Out 01-15)
 		float listen(const size_t _channel, const uint32_t _blocks = 0)
 		{
 			float peak = 0;
@@ -155,7 +156,7 @@ namespace
 			return peak;
 		}
 
-		// A second of host blocks; the peak of the 16 Outs, where nothing sounds but the Tracks (Main keeps a tail of a few
+		// A second of host blocks; the peak of the 15 Outs, where nothing sounds but the Tracks (Main keeps a tail of a few
 		// LSB after a Hit, the master effects' EQ and Dynamix, as on the Machinedrum)
 		float listenOuts()
 		{
@@ -202,6 +203,9 @@ namespace
 
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
 		const auto loud = rig.listen(0);
+		// From here every Track on its own Out (Track 16 shares Out 15), each heard alone, away from Main's tail
+		for(uint8_t t = 0; t < 16; ++t)
+			rig.send(MidiEventSource::Editor, mdDrums::messages::out(t, static_cast<uint8_t>(std::min(t + 1, 15))).message());
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x9f, 60, 100});
 		const auto other = rig.listenOuts();
@@ -257,27 +261,55 @@ namespace
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
 		const auto soloElsewhere = rig.listen(2);
 		rig.send(MidiEventSource::Editor, mdDrums::messages::solo(1, false).message());
-		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, true).message());
+		std::printf("muted %.4f, another track soloed %.4f\n", muted, soloElsewhere);
+		require(muted == 0.0f && soloElsewhere == 0.0f, "Mute or Solo let a Hit through");
+
+		// Out: Main, or one of 15 Outs, any Track on any of them, an Out the sum of its Tracks (ticket 33)
 		const auto del = rig.device->kit().parameters[0][19], rev = rig.device->kit().parameters[0][20];
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, 0));
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, 0));
-		rig.settle();
+		const auto strike = [&](const uint8_t _note, const size_t _out)
+		{
+			rig.settle();
+			rig.settle();
+			rig.send(MidiEventSource::Host, {0x90, _note, 100});
+			float mainPeak = 0, outPeak = 0;
+			for(uint32_t b = 0; b < 86; ++b)
+			{
+				rig.process();
+				for(size_t i = 0; i < Rig::Block; ++i)
+				{
+					mainPeak = std::max({mainPeak, std::abs(rig.buffers[0][i]), std::abs(rig.buffers[1][i])});
+					outPeak = std::max(outPeak, std::abs(rig.buffers[1 + _out][i]));
+				}
+			}
+			return std::pair{mainPeak, outPeak};
+		};
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 0).message());
+		const auto onMain = strike(36, 1);
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 1).message());
+		const auto onOut = strike(36, 1);
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 9).message());
+		const auto onOut9 = strike(36, 9);
+		const auto leftOut1 = strike(36, 1);
+		const auto sixteen = strike(51, 15);
+		std::printf("track 1 on Main: Main %.4f, Out 01 %.4f; on Out 01: Main %.4f, Out 01 %.4f; on Out 09: Out 09 %.4f,"
+			" Out 01 %.4f; track 16 on Out 15 %.4f\n", onMain.first, onMain.second, onOut.first, onOut.second,
+			onOut9.second, leftOut1.second, sixteen.second);
+		require(onMain.first > 0.01f && onMain.second == 0.0f, "Out on Main did not keep track 1 on Main alone");
+		require(onOut.first < 1e-5f && onOut.second > 0.01f, "Out did not move track 1 off Main onto Out 01");
+		require(onOut9.second > 0.01f && leftOut1.second == 0.0f, "Out 09 did not take track 1 from Out 01");
+		require(sixteen.second > 0.01f, "track 16 does not sound on Out 15");
+		// Two Tracks on one Out: the sum of the two
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(1, 9).message());
 		rig.settle();
 		rig.send(MidiEventSource::Host, {0x90, 36, 100});
-		float mainPeak = 0, outPeak = 0;
-		for(uint32_t b = 0; b < 86; ++b)
-		{
-			rig.process();
-			for(size_t i = 0; i < Rig::Block; ++i)
-			{
-				mainPeak = std::max({mainPeak, std::abs(rig.buffers[0][i]), std::abs(rig.buffers[1][i])});
-				outPeak = std::max(outPeak, std::abs(rig.buffers[2][i]));
-			}
-		}
-		std::printf("muted %.4f, another track soloed %.4f, on Out 01: Main %.4f, Out 01 %.4f\n", muted, soloElsewhere,
-			mainPeak, outPeak);
-		require(muted == 0.0f && soloElsewhere == 0.0f, "Mute or Solo let a Hit through");
-		require(mainPeak < 1e-5f && outPeak > 0.01f, "Out did not move track 1 off Main");
+		rig.send(MidiEventSource::Host, {0x90, 37, 100});
+		const auto both = rig.listen(1 + 9);	// Out n is channel 1 + n
+		std::printf("tracks 1 and 2 on Out 09: %.4f\n", both);
+		require(both > onOut9.second * 0.5f, "two Tracks on one Out do not both sound there");
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(1, 2).message());
+		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 1).message());
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 3, del));
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 4, rev));
 
@@ -580,6 +612,7 @@ namespace
 		// the Track's own output exactly as it was rendered
 		{
 			Rig rig(_flash, 44100.0f);
+			rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 1).message());	// Track 1 heard on Out 01
 			rig.settle();
 			constexpr uint32_t offset = 100;
 			rig.send(MidiEventSource::Host, {0x90, 36, 110}, offset);
@@ -702,27 +735,30 @@ namespace
 			}
 		};
 		Stats main, out;
-		for(int note = 0; note < 48; ++note)
+		// Track 1 on Main, then on Out 01 (Main comes MasterDelay later, after the master effects)
+		for(const bool onOut : {false, true})
 		{
-			rig.listen(0, static_cast<uint32_t>(_rate / Rig::Block));
-			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
-			const auto offset = random % Rig::Block;
-			rig.send(MidiEventSource::Host, {0x90, 36, 100}, offset);
-			int firstMain = -1, firstOut = -1;
-			for(uint32_t b = 0, position = 0; b < 8 && (firstMain < 0 || firstOut < 0); ++b, position += Rig::Block)
+			rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, onOut ? 1 : 0).message());
+			for(int note = 0; note < 48; ++note)
 			{
-				rig.process();
-				for(uint32_t s = 0; s < Rig::Block; ++s)
+				rig.listen(0, static_cast<uint32_t>(_rate / Rig::Block));
+				random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+				const auto offset = random % Rig::Block;
+				rig.send(MidiEventSource::Host, {0x90, 36, 100}, offset);
+				int first = -1;
+				for(uint32_t b = 0, position = 0; b < 8 && first < 0; ++b, position += Rig::Block)
 				{
-					const auto at = static_cast<int>(position + s) - static_cast<int>(offset);
-					if(firstMain < 0 && (std::abs(rig.buffers[0][s]) > 1e-5f || std::abs(rig.buffers[1][s]) > 1e-5f))
-						firstMain = at;
-					if(firstOut < 0 && rig.buffers[2][s] != 0.0f)
-						firstOut = at;
+					rig.process();
+					for(uint32_t s = 0; s < Rig::Block && first < 0; ++s)
+					{
+						const bool heard = onOut ? rig.buffers[2][s] != 0.0f
+							: std::abs(rig.buffers[0][s]) > 1e-5f || std::abs(rig.buffers[1][s]) > 1e-5f;
+						if(heard)
+							first = static_cast<int>(position + s) - static_cast<int>(offset);
+					}
 				}
+				(onOut ? out : main).add(first);
 			}
-			main.add(firstMain);
-			out.add(firstOut);
 		}
 		const auto ms = [&](const double _samples) { return _samples * 1000.0 / _rate; };
 		std::printf("note to sound at %.0f Hz (TRXBD, 48 notes), reported %u: Main %d-%d samples, mean %.1f (%.2f ms),"

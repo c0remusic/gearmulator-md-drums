@@ -81,9 +81,10 @@ namespace mdDrums::messages
 		return trackFlag(Command::Solo, _track, _on);
 	}
 
-	Raw out(const uint8_t _track, const bool _on)
+	Raw out(const uint8_t _track, const uint8_t _out)
 	{
-		return trackFlag(Command::Out, _track, _on);
+		return Writer::own(Command::Out).add(static_cast<uint8_t>(_track & 0x0f))
+			.add(std::min(_out, OutCount)).add(0xf7).raw;
 	}
 
 	Raw tempo(const double _bpm)
@@ -94,7 +95,10 @@ namespace mdDrums::messages
 
 	Raw mixer(const Mixer& _mixer)
 	{
-		return Writer::own(Command::Mixer).add21(_mixer.mute).add21(_mixer.solo).add21(_mixer.out).add(0xf7).raw;
+		auto writer = Writer::own(Command::Mixer).add21(_mixer.mute).add21(_mixer.solo);
+		for(const auto out : _mixer.outs)
+			writer.add(std::min(out, OutCount));
+		return writer.add(0xf7).raw;
 	}
 
 	Raw kitName(const std::array<uint8_t, md::automation::sysex::MdKit::NameSize>& _name)
@@ -119,11 +123,16 @@ namespace mdDrums::messages
 		switch(parsed.command)
 		{
 		case Command::Solo:
-		case Command::Out:
 			if(length != 2 || _message[data] > 15 || _message[data + 1] > 1)
 				return std::nullopt;
 			parsed.track = _message[data];
 			parsed.on = _message[data + 1] != 0;
+			return parsed;
+		case Command::Out:
+			if(length != 2 || _message[data] > 15 || _message[data + 1] > OutCount)
+				return std::nullopt;
+			parsed.track = _message[data];
+			parsed.out = _message[data + 1];
 			return parsed;
 		case Command::Tempo:
 			if(length != 3)
@@ -131,12 +140,28 @@ namespace mdDrums::messages
 			parsed.bpm = read21(_message, data) / 100.0;
 			return parsed;
 		case Command::Mixer:
-			if(length != 9)
+		{
+			const auto outs = parsed.mixer.outs.size();
+			if(length != 6 + outs && length != 9)
 				return std::nullopt;
 			parsed.mixer.mute = static_cast<uint16_t>(read21(_message, data));
 			parsed.mixer.solo = static_cast<uint16_t>(read21(_message, data + 3));
-			parsed.mixer.out = static_cast<uint16_t>(read21(_message, data + 6));
+			if(length == 9)
+			{
+				// The earlier form: an Out mask, Track n on Out n
+				const auto mask = read21(_message, data + 6);
+				for(size_t t = 0; t < outs; ++t)
+					parsed.mixer.outs[t] = (mask >> t) & 1 ? static_cast<uint8_t>(std::min<size_t>(t + 1, OutCount)) : 0;
+				return parsed;
+			}
+			for(size_t t = 0; t < outs; ++t)
+			{
+				if(_message[data + 6 + t] > OutCount)
+					return std::nullopt;
+				parsed.mixer.outs[t] = _message[data + 6 + t];
+			}
 			return parsed;
+		}
 		case Command::KitName:
 			if(length != parsed.name.size())
 				return std::nullopt;
@@ -235,7 +260,7 @@ namespace mdDrums::messages
 		case pages::Mixer:
 			if(_index > 1)
 				return std::nullopt;
-			return _index == 0 ? solo(_track, value != 0) : out(_track, value != 0);
+			return _index == 0 ? solo(_track, value != 0) : out(_track, static_cast<uint8_t>(std::min(value, OutCount)));
 		case pages::Master:
 			if(_index >= 32)
 				return std::nullopt;
@@ -269,7 +294,7 @@ namespace mdDrums::messages
 			if(_index == 0)
 				return bit(_state.mixer.solo, _track);
 			if(_index == 1)
-				return bit(_state.mixer.out, _track);
+				return _state.mixer.outs[_track];
 			return std::nullopt;
 		case pages::Master:
 			if(_index >= 32)

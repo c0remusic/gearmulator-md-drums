@@ -106,7 +106,7 @@ vglyph.down { width: 8dp; height: 8dp; margin-left: 4dp; color: #a7aaaf; }
 .toggle.mute { left: 176dp; }
 .toggle.solo { left: 208dp; }
 .toggle.mute:checked { background-color: #ff7a5c; border-color: #ff7a5c; color: #111111; }
-.toggle.solo:checked, .toggle.out:checked { background-color: #f2f2f2; border-color: #f2f2f2; color: #111111; }
+.toggle.solo:checked, .toggle.out.on { background-color: #f2f2f2; border-color: #f2f2f2; color: #111111; }
 
 /* Bands: 216 px from y 176, 392 and 608; content 28 px from the rules: title (+28), groups (+60), knobs (+84), names
    (+156), values (+172). Knob k on column 3 + k. */

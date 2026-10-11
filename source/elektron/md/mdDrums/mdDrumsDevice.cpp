@@ -135,28 +135,51 @@ namespace mdDrums
 
 	void Device::render(const synthLib::TAudioOutputs& _outputs, const size_t _offset, const size_t _count)
 	{
-		if(!_count)
-			return;
-		std::array<float*, OutputCount> outputs{};
-		for(size_t channel = 0; channel < OutputCount; ++channel)
-			outputs[channel] = _outputs[channel] ? _outputs[channel] + _offset : nullptr;
-		m_engine->render(outputs.data(), _count);
-		if(m_telemetry)
+		// Main straight from the engine, each Track's own output into m_tracks a chunk at a time, then each Out the sum
+		// of the Tracks on it
+		for(size_t done = 0; done < _count;)
 		{
-			for(int channel = 0; channel < OutputCount; ++channel)
+			const auto count = std::min(_count - done, Chunk);
+			std::array<float*, Engine::OutputCount> outputs{};
+			for(size_t channel = 0; channel < 2; ++channel)
+				outputs[channel] = _outputs[channel] ? _outputs[channel] + _offset + done : nullptr;
+			for(size_t track = 0; track < Engine::TrackCount; ++track)
+				outputs[2 + track] = m_tracks[track].data();
+			m_engine->render(outputs.data(), count);
+
+			for(size_t out = 0; out < OutCount; ++out)
+				if(auto* samples = _outputs[2 + out])
+					std::fill_n(samples + _offset + done, count, 0.0f);
+			for(size_t track = 0; track < Engine::TrackCount; ++track)
 			{
-				const auto* samples = outputs[static_cast<size_t>(channel)];
+				const auto out = m_mixer.outs[track];
+				auto* samples = out && out <= OutCount ? _outputs[1 + out] : nullptr;
 				if(!samples)
 					continue;
-				float peak = 0.0f;
-				for(size_t i = 0; i < _count; ++i)
-					peak = std::max(peak, std::abs(samples[i]));
-				if(peak > 0.0f)
-					m_telemetry->raisePeak(channel, peak);
+				samples += _offset + done;
+				const auto& own = m_tracks[track];
+				for(size_t i = 0; i < count; ++i)
+					samples[i] += own[i];
 			}
-			capture(outputs, _count);
+
+			if(m_telemetry)
+			{
+				for(int channel = 0; channel < Engine::OutputCount; ++channel)
+				{
+					const auto* samples = outputs[static_cast<size_t>(channel)];
+					if(!samples)
+						continue;
+					float peak = 0.0f;
+					for(size_t i = 0; i < count; ++i)
+						peak = std::max(peak, std::abs(samples[i]));
+					if(peak > 0.0f)
+						m_telemetry->raisePeak(channel, peak);
+				}
+				capture(outputs, count);
+			}
+			m_position += static_cast<int64_t>(count);
+			done += count;
 		}
-		m_position += static_cast<int64_t>(_count);
 	}
 
 	void Device::capture(const std::array<float*, Engine::OutputCount>& _outputs, const size_t _count)
@@ -271,7 +294,7 @@ namespace mdDrums
 				m_mixer.solo = static_cast<uint16_t>(own->on ? m_mixer.solo | bit : m_mixer.solo & ~bit);
 				break;
 			case messages::Command::Out:
-				m_mixer.out = static_cast<uint16_t>(own->on ? m_mixer.out | bit : m_mixer.out & ~bit);
+				m_mixer.outs[own->track] = own->out;
 				break;
 			case messages::Command::Tempo:
 				m_engine->setTempo(own->bpm);
@@ -396,6 +419,6 @@ namespace mdDrums
 			const bool muted = (m_mixer.mute & bit) || (m_mixer.solo && !(m_mixer.solo & bit));
 			m_engine->setMute(track, muted);
 		}
-		m_engine->setSeparateOutputs(m_mixer.out);
+		m_engine->setSeparateOutputs(m_mixer.offMain());
 	}
 }
