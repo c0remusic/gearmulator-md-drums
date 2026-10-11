@@ -37,3 +37,21 @@ running.
 - `HostModel` models Locks (its header listed them as not modelled): a local change to mdEngine, listed in its README.
 - Locks are invisible to the host parameters and the editor, whose knobs show the Kit.
 - A Hit whose note has a chance of not playing leaves its Locks without a Hit, and so dropped.
+
+## Amendment (2026-10-11): on channel 1, a Lock goes with the Hit just before it
+
+Live does not keep the MIDI channel a Max for Live device puts on its notes: md-drums-seq measured channel 1 for notes
+it sent on channels 3 and 7, right after the device and on another track taking its MIDI. A sequencer playing in Live
+could then lock Track 1 only.
+
+A Lock on channel 1 now goes with the Hit note received just before it at the same sample, whatever that Hit's Track;
+with none, it is Track 1's, as before (`Device::apply`). Channels 2-16 still name their Track, before or after its Hit.
+So a sender that cannot keep channels sends each Hit followed by its Locks (Hit A, A's Locks, Hit B, B's Locks), and
+one that keeps them, such as a clip through an External Instrument on channel n, works as before. A lone Track 1 Hit
+plays its Locks in either order, as before.
+
+- The order of two notes at one sample now matters on channel 1. MD Drums keeps it (`synthLib::Plugin` inserts an
+  event after those at the same offset, JUCE's MidiBuffer too). Whether Live plays a clip's simultaneous notes in a set
+  order is not measured: until it is, a clip on channel 1 carrying another Track's Locks may bind them to the wrong
+  Hit, and a clip on its Track's channel is the safe way.
+- `mdDrumsDeviceTest` and `mdDrumsVst3HostTest` check both rules, the second with md-drums-seq's notes.

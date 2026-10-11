@@ -1,11 +1,12 @@
 // MD Drums as a host loads it: the VST3 the user installs, through JUCE's VST3 hosting, as Live does.
 // mdDrumsProcessorTest checks the processor; this checks the VST3 layer between it and the host: the class and the
 // 608 parameter IDs that Live sets keep (the hashes of the frozen "page_part_index" strings), the only automatable ones
-// with Bypass; Main and the 16 Outs and their channels; notes and host automation through the VST3 process call; the
-// latency reported; the state through IComponent; the same samples whatever the block sizes and offline; no block that
-// stalls the audio thread; nothing of its own told to the host while it automates or restores a state (the host would
-// take it for an edit; a Track's machine is the exception, its SYN1-8 taking the machine's defaults); and the editor
-// through IPlugView, drawn in the host's window while an audio thread plays.
+// with Bypass; Main and the 16 Outs and their channels; notes, Locks (as md-drums-seq sends them in Live) and host
+// automation through the VST3 process call; the latency reported; the state through IComponent; the same samples
+// whatever the block sizes and offline; no block that stalls the audio thread; nothing of its own told to the host
+// while it plays Locks, automates or restores a state (the host would take it for an edit; a Track's machine is the
+// exception, its SYN1-8 taking the machine's defaults); and the editor through IPlugView, drawn in the host's window
+// while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -247,6 +248,8 @@ namespace
 		int64_t sample;
 		int number;
 		int velocity;
+		int channel = 1;
+		bool off = false;
 	};
 
 	// Notes 36-51 (Tracks 1-16) one after the other
@@ -299,8 +302,10 @@ namespace
 			midi.clear();
 			for(; next < _notes.size() && _notes[next].sample < position + size; ++next)
 			{
-				midi.addEvent(juce::MidiMessage::noteOn(1, _notes[next].number, static_cast<juce::uint8>(_notes[next].velocity)),
-					static_cast<int>(_notes[next].sample - position));
+				const auto& note = _notes[next];
+				midi.addEvent(note.off ? juce::MidiMessage::noteOff(note.channel, note.number)
+					: juce::MidiMessage::noteOn(note.channel, note.number, static_cast<juce::uint8>(note.velocity)),
+					static_cast<int>(note.sample - position));
 			}
 			if(_beforeBlock)
 				_beforeBlock(position);
@@ -315,6 +320,47 @@ namespace
 			position += size;
 		}
 		return take;
+	}
+
+	// Locks as a sequencer in Live sends them (md-drums-seq): at 126 BPM, each Hit with its Track's Locks at the same
+	// sample, every note released a sixteenth later. _bars of four beats, beat b striking _tracks[b % size]; the beats in
+	// _locked lock VOL to 0 (note 64 + 17, velocity 1); _offbeat, if not 0, strikes on every off-beat without a Lock.
+	// Each note on its Track's channel, the Lock first; or, _channelOne, all on channel 1 with the Hit first, as Live
+	// passes a Max for Live device's notes (ADR 0003, amended).
+	constexpr int64_t g_beat = 21000;	// 60 / 126 s at 44.1 kHz
+	constexpr int g_vol = 17;			// VOL's engine parameter number: SYN1-8, AMD AMF EQF EQG, FLTF FLTW FLTQ SRR, DIST
+
+	std::vector<Note> lockedBeats(const int _bars, const std::vector<int>& _tracks, const std::vector<int>& _locked,
+		const int _offbeat, const bool _channelOne = false)
+	{
+		std::vector<Note> notes;
+		const auto release = [&](const int64_t _at, const int _number, const int _channel)
+		{
+			notes.push_back({_at + g_beat / 4, _number, 0, _channel, true});
+		};
+		for(int beat = 0; beat < _bars * 4; ++beat)
+		{
+			const auto at = g_beat * (beat + 1);
+			const auto track = _tracks[static_cast<size_t>(beat) % _tracks.size()];
+			const auto channel = _channelOne ? 1 : track + 1;
+			const bool locked = std::find(_locked.begin(), _locked.end(), beat % 4) != _locked.end();
+			if(locked && !_channelOne)
+				notes.push_back({at, 64 + g_vol, 1, channel});
+			notes.push_back({at, 36 + track, 100, channel});
+			if(locked && _channelOne)
+				notes.push_back({at, 64 + g_vol, 1, channel});
+			if(locked)
+				release(at, 64 + g_vol, channel);
+			release(at, 36 + track, channel);
+			if(_offbeat)
+			{
+				const auto offChannel = _channelOne ? 1 : _offbeat + 1;
+				notes.push_back({at + g_beat / 2, 36 + _offbeat, 100, offChannel});
+				release(at + g_beat / 2, 36 + _offbeat, offChannel);
+			}
+		}
+		std::stable_sort(notes.begin(), notes.end(), [](const Note& _a, const Note& _b) { return _a.sample < _b.sample; });
+		return notes;
 	}
 
 	float peak(const juce::AudioBuffer<float>& _audio, const int _channel, const int64_t _from, const int64_t _length)
@@ -601,6 +647,41 @@ namespace
 				require(peak(take, 0, spacing, spacing) < g_silence && peak(take, 1, spacing, spacing) < g_silence,
 					"the restored Track 1 sounds on Main although on its Out");
 			}
+		}
+
+		// Locks through VST3, as md-drums-seq sends them in Live: VOL locked to 0 silences its Hit, and the next Hit of the
+		// Track plays the Kit's VOL again. Each Track heard on its own Out (an Out carries its Track whatever Out says)
+		{
+			auto instance = load(formats, description);
+			auto& plugin = *instance->plugin;
+			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+			render(plugin, {}, g_rate);
+			const auto beats = [&](const char* _name, const int _bars, const std::vector<int>& _tracks,
+				const std::vector<int>& _locked, const int _offbeat, const bool _channelOne = false)
+			{
+				instance->told.clear();
+				const auto notes = lockedBeats(_bars, _tracks, _locked, _offbeat, _channelOne);
+				const auto take = render(plugin, notes, g_beat * (_bars * 4 + 2));
+				pump(200);
+				std::printf("%s, each beat's Track on its Out (L locked):", _name);
+				for(int beat = 0; beat < _bars * 4; ++beat)
+				{
+					// From where the Hit sounds on: before, the Track's last Hit still rings (TRX-BD's long tail)
+					const auto track = _tracks[static_cast<size_t>(beat) % _tracks.size()];
+					const auto value = peak(take, 2 + track, g_beat * (beat + 1) + g_block, g_beat / 2);
+					const bool locked = std::find(_locked.begin(), _locked.end(), beat % 4) != _locked.end();
+					std::printf(" %s%.3f", locked ? "L" : "", std::abs(value));	// silence reads -0 (fast-math)
+					require(locked ? value < g_silence : value > g_sound, std::string(_name) + ": beat "
+						+ std::to_string(beat + 1) + (locked ? " sounds although its VOL is locked to 0"
+						: " is silent although it has no Lock"));
+				}
+				std::printf("\n");
+				require(instance->told.own(ids).empty(), std::string(_name) + ": MD Drums told the host of a Lock");
+				render(plugin, {}, g_rate);
+			};
+			beats("Track 3 on the beats, VOL 0 on 2 and 4", 2, {2}, {1, 3}, 0);
+			beats("Track 1 then Track 3 by bar, VOL 0 on 2 and 4, Track 7 off-beats", 4, {0, 0, 0, 0, 2, 2, 2, 2}, {1, 3}, 6);
+			beats("The same, every note on channel 1, each Hit before its Locks", 4, {0, 0, 0, 0, 2, 2, 2, 2}, {1, 3}, 6, true);
 		}
 
 		// The same samples whatever the block sizes and offline, from two fresh instances: Live cuts blocks as it likes and

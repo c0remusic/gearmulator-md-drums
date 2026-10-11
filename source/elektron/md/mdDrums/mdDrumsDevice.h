@@ -12,12 +12,12 @@
 namespace mdDrums
 {
 	// MD Drums' synthLib::Device: a Machinedrum seen through its MIDI (ADR 0002), the engines without the OS behind it.
-	// It takes notes 36-51 on any channel from anyone, Locks as notes 64-87 on their Track's channel (ADR 0003), and from
-	// the editor (source Editor) the Machinedrum's CCs on channels 1 to 4 (24 parameters, level, mute), ASSIGN MACHINE
-	// ($5B), the master effects ($5D-$60), SET LFO PARAM ($62), SET TRIG GROUP and SET MUTE GROUP ($65, $66) and Kit dumps
-	// ($52), plus MD Drums' own messages (Solo, Out, tempo, mixer). What the host sends besides notes is ignored. It
-	// renders synchronously, cutting its block at each event's offset, and holds everything the sound depends on: its
-	// state is its Kit and its mixer.
+	// It takes notes 36-51 on any channel from anyone, Locks as notes 64-87 on their Track's channel or, on channel 1,
+	// for the Hit just before them at the same sample (ADR 0003, amended), and from the editor (source Editor) the
+	// Machinedrum's CCs on channels 1 to 4 (24 parameters, level, mute), ASSIGN MACHINE ($5B), the master effects
+	// ($5D-$60), SET LFO PARAM ($62), SET TRIG GROUP and SET MUTE GROUP ($65, $66) and Kit dumps ($52), plus MD Drums' own
+	// messages (Solo, Out, tempo, mixer). What the host sends besides notes is ignored. It renders synchronously, cutting
+	// its block at each event's offset, and holds everything the sound depends on: its state is its Kit and its mixer.
 	class Device final : public synthLib::Device
 	{
 	public:
@@ -92,6 +92,9 @@ namespace mdDrums
 		};
 		std::array<Capture, Engine::TrackCount> m_captures{};
 		int64_t m_position = 0;	// samples rendered so far
+		// The last Hit note's Track and the sample it came at: a Lock on channel 1 at that sample goes with it
+		int m_lastHitTrack = 0;
+		int64_t m_lastHitPosition = -1;
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 

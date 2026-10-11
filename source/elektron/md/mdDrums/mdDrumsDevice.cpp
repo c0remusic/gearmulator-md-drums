@@ -205,11 +205,17 @@ namespace mdDrums
 			const auto param = static_cast<int>(_event.b) - FirstLockNote;
 			if(param >= 0 && param < Engine::ParamCount)
 			{
-				m_engine->lock(_event.a & 0x0f, param, messages::lockValue(_event.c));
+				// Channels 2-16 name their Track. Channel 1 names the Hit just before at the same sample, whatever its
+				// Track: Live gives a Max for Live device's notes channel 1 (ADR 0003, amended); without one, Track 1
+				const auto channel = _event.a & 0x0f;
+				const auto lockTrack = channel == 0 && m_lastHitPosition == m_position ? m_lastHitTrack : channel;
+				m_engine->lock(lockTrack, param, messages::lockValue(_event.c));
 				return;
 			}
 			if(track < 0 || track >= Engine::TrackCount)
 				return;
+			m_lastHitTrack = track;
+			m_lastHitPosition = m_position;
 			const auto struck = m_engine->trigger(track, _event.c);
 			if(!m_telemetry)
 				return;

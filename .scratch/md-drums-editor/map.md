@@ -30,7 +30,9 @@ mesurées avant et après. Pas de tag.
 - Recherches : un doc par ticket dans `research/` à côté de cette carte (pas de branche `research/*`).
 - Contraintes établies : `mdLib` ne peut pas être lié à MD Drums (Musashi : une classe CPU par exécutable) ; la pile
   TUS génère les IDs JUCE en `page_part_index` ; aucun set Live MD Drums à préserver, IDs figés dès le premier push
-  du port.
+  du port ; Live ouvre au plus 16 bus de sortie par plug-in, celui de la piste compris (ticket 32) ; Live garde la DLL
+  d'un plug-in retiré tant qu'il tourne, ce qui bloque le garde-fou (lien du VST3) ; ne jamais charger dans Live un
+  preset écrit à la main (plantage du 2026-10-10).
 - **Cadrage (2026-10-08)** :
   - pile TUS complète (ADR 0001) ;
   - effets master par émulation du code DSP1 de la ROM, pas de réécriture ;
@@ -188,10 +190,13 @@ mesurées avant et après. Pas de tag.
   (20), écran Hit (21), écrans Filter/EQ et LFO, ASSIGN, écoute (22), jeu et pas à pas (23), effets master (24) et
   mesure des voix en parallèle (25), Kits et Bank (26), Push 2 (27), second moteur de l'écran Hit et de l'aperçu (28),
   Links et Chokes (29, 30) faits.
-- **Validation dans Live** (l'utilisateur) : son compteur CPU et ses threads, la fluidité à la main, l'undo après un
-  Kit, Ctrl+S, Push 2 (liste en Configure), les Outs depuis un Drum Rack, l'automation des SYN1-8 quand une machine
-  change. Mesuré hors Live : latence (tests), CPU, mémoire et blocs en retard (ticket 31), entrée→pixel
-  (`mdDrumsSkinTest`), la couche VST3 (ticket 32).
+- [Out 16 hors de portée dans Live](issues/33-out-16-dans-live.md) : décision ouverte, 17 bus pour un plafond de 16 ;
+  recommandé : Out devient un choix entre Main et 15 Outs.
+- **Validation dans Live** (l'utilisateur) : la fluidité à la main, l'undo après un Kit, Ctrl+S, Push 2 (liste en
+  Configure), les Outs depuis un Drum Rack, l'automation des SYN1-8 quand une machine change. Mesuré hors Live :
+  latence (tests), CPU, mémoire et blocs en retard (ticket 31), entrée→pixel (`mdDrumsSkinTest`), la couche VST3 et
+  les Locks (ticket 32). Mesuré dans Live par script (ticket 32) : latence, chargement pendant la lecture, CPU à 8
+  instances, Outs 01-15.
 
 ## Out of scope
 

@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <new>
@@ -360,11 +361,14 @@ namespace
 		{
 			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, _param - 8, _value), Offset);
 		}
-		void hit() { rig.send(MidiEventSource::Host, {0x90, 36, 100}, Offset); }
-		void lock(const uint8_t _param, const uint8_t _value, const uint8_t _channel = 0)
+		void hit(const uint8_t _note = 36, const uint32_t _offset = Offset)
+		{
+			rig.send(MidiEventSource::Host, {0x90, _note, 100}, _offset);
+		}
+		void lock(const uint8_t _param, const uint8_t _value, const uint8_t _channel = 0, const uint32_t _offset = Offset)
 		{
 			rig.send(MidiEventSource::Host, {static_cast<uint8_t>(0x90 | _channel), lockNote(_param), lockVelocity(_value)},
-				Offset);
+				_offset);
 		}
 
 		// Main, left and right, for _blocks host blocks
@@ -471,6 +475,41 @@ namespace
 		none.hit();
 		require(orphanHit == none.record(Blocks), "a Lock without its Hit reached a Hit");
 		std::printf("Locks: at once in either order, back to the Kit at the next Hit, dropped without their Hit\n");
+
+		// Channel 1 (amended ADR 0003): Live gives a Max for Live device's notes channel 1, so a Lock there goes with the
+		// Hit just before it at the same sample, whatever its Track, as a Lock on that Track's channel would
+		constexpr uint8_t Track3 = 38;
+		const auto take3 = [&](const std::function<void(Take&)>& _send)
+		{
+			Take take(_flash);
+			_send(take);
+			return take.record(Blocks);
+		};
+		const auto byChannel = take3([](Take& _t) { _t.lock(Srr, 90, 2); _t.hit(Track3); });
+		const auto byHit = take3([](Take& _t) { _t.hit(Track3); _t.lock(Srr, 90); });
+		const auto plain3 = take3([](Take& _t) { _t.hit(Track3); });
+		require(byChannel != plain3, "Track 3's Lock on its channel changed nothing");
+		require(byHit == byChannel, "a Lock on channel 1 after Track 3's Hit did not go with it");
+		// A Lock on channel 1 later than the Hit is Track 1's, which has no Hit: dropped, Track 3 plays its Kit
+		require(take3([](Take& _t) { _t.hit(Track3); _t.lock(Srr, 90, 0, Take::Offset + 1); }) == plain3,
+			"a Lock on channel 1 one sample after Track 3's Hit went with it");
+		// Two Tracks at one sample, each Hit followed by its Locks
+		const auto pairByChannel = take3([](Take& _t)
+		{
+			_t.lock(Fltf, 100);
+			_t.hit();
+			_t.lock(Srr, 90, 2);
+			_t.hit(Track3);
+		});
+		const auto pairByHit = take3([](Take& _t)
+		{
+			_t.hit();
+			_t.lock(Fltf, 100);
+			_t.hit(Track3);
+			_t.lock(Srr, 90);
+		});
+		require(pairByHit == pairByChannel, "Locks on channel 1 did not follow their own Hits at one sample");
+		std::printf("Locks on channel 1: with the Hit just before at the same sample, else Track 1's\n");
 	}
 
 	// Notes and CCs, inline SysEx included, on a prepared Plugin: no heap allocation

@@ -41,3 +41,35 @@ données à lui (`GEARMULATOR_DATA_ROOT`), jamais celui de l'utilisateur. Mesur�
   aucun sur 2068 au-delà de 2,9 ms, ni sur 1038 éditeur ouvert. Le test échoue au-delà de 10 ms. Latence inchangée.
 - **Reste pour Live** : ce que Live fait des SYN1-8 renvoyés quand l'hôte change une machine (automation de SYN
   écrasée ?) et des 608 valeurs publiées au chargement d'un Kit depuis l'éditeur (undo, automation).
+
+## Passage dans Live par script (2026-10-10, soir)
+
+Piloté par le pont LOM `TupleMCP` (Remote Script de l'utilisateur, NDJSON sur 127.0.0.1:39041), Live 12.2.1, sur des
+pistes « ZZ test » supprimées ensuite.
+
+- **Incident** : un preset de rack `.adg` fabriqué à la main (pour configurer les paramètres de MD Drums) a fait planter
+  Live au chargement, violation d'accès dans le code de Live (`Ableton Live 12 Suite.exe+0x3a553b7`, lecture à
+  l'adresse 0). Set ouvert non sauvé ; récupération refusée ensuite par l'utilisateur. Règle : ne plus charger de
+  preset Live écrit à la main.
+- **Live ne montre que les paramètres configurés** (plus de 64 paramètres : panneau vide) : sans liste Push préparée,
+  le script n'atteint ni Machine, ni SYN, ni Out. Au chargement, les relais créent une entrée temporaire « LFOM ».
+- **Mesuré** : latence vue par Live 51 échantillons ; chargement 0,94 s, duplication de piste ~1 s ; insertion pendant
+  la lecture sans perte de niveau sur la piste qui joue (pic CPU de Live 57 %) ; 8 instances sur le motif chargé : CPU
+  de Live 45 % en moyenne, pics 50-59 %, les 8 sonnent ; journal de Live sans erreur pour MD Drums (lignes « not
+  implemented » d'info, comme les UADx).
+- **Out 16 hors de portée** : Live offre « Out 01-MD Drums » à « Out 15-MD Drums ». Live ouvre au plus 16 bus de sortie
+  par plug-in, celui de la piste compris ; MD Drums en déclare 17. Ticket 33.
+- **Locks** (signalés par la session md-drums-seq) : rejoués par `mdDrumsVst3HostTest` avec les notes du séquenceur
+  (note 81 vélocité 1 sur le canal de la Track, au même échantillon que le Hit, Lock d'abord, relâchés une double
+  croche après) : VOL à 0 rend le Hit muet, le Hit suivant rejoue le Kit, rien n'est signalé à l'hôte. Le Lock sans
+  effet vu dans Live vient d'un canal perdu avant MD Drums : la session md-drums-seq a mesuré que Live donne le canal 1
+  aux notes d'un device Max for Live ; le temps 1 muet venait de md-drums-seq.
+- **ADR 0003 amendée** (option B, choisie par l'utilisateur le 2026-10-11, transmise par la session md-drums-seq) : une
+  Lock sur le canal 1 va avec la note de Hit reçue juste avant au même échantillon, quelle que soit sa Track ; sans
+  elle, Track 1 comme avant ; canaux 2-16 inchangés. `Device::apply` ; vérifié par `mdDrumsDeviceTest` (Lock canal 1
+  après le Hit de Track 3 = Lock sur le canal 3 ; un échantillon plus tard, perdue ; deux Tracks au même échantillon)
+  et `mdDrumsVst3HostTest` (motif de md-drums-seq, tout sur le canal 1, Hit d'abord).
+- **Live tient la DLL** : Live ne décharge pas un plug-in retiré du set ; tant qu'il tourne, `mdDrumsPlugin_VST3` ne se
+  lie pas (LNK1104), donc le garde-fou non plus.
+- **Reste dans Live** : automation des SYN quand une machine change (exige la liste Push dans le set), undo après Kit,
+  Ctrl+S, Push 2, fluidité.
