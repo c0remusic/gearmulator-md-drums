@@ -65,7 +65,8 @@ namespace mdDrums
 		int playedSlot() const { return m_slot; }
 		void setPlayedSlot(int _slot);
 		// Plays a Kit: one dump to the Device at the next audio block; the parameters follow as a preset's do (the host
-		// told once, without gestures) and changes still waiting for the Device are dropped. _slot becomes the one played.
+		// reads every value again, no edit) and changes still waiting for the Device are dropped. _slot becomes the one
+		// played.
 		void loadKit(const md::automation::sysex::MdKit& _kit, int _slot);
 		// Names the Kit played, 16 characters at most (the Device keeps the name with its Kit)
 		void renameKit(const std::string& _name);
@@ -81,7 +82,7 @@ namespace mdDrums
 
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
-		// The host is told without a gesture.
+		// The host then reads every value again, once for all that changed since the last call (tellHost).
 		void syncRelays();
 		// For Live in Configure mode, which adds a parameter the plug-in moves: the 64 of the Push list in order (the
 		// relays, then the master effects), each moved to its own value in a gesture
@@ -106,6 +107,8 @@ namespace mdDrums
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
 		// Any thread: a relay set to _value, given to its parameter of the Track shown
 		void relayChanged(uint8_t _index, int _value);
+		// On the message thread: the host reads every parameter's value again, for those the plug-in changed by itself
+		void tellHost();
 		// A SysEx message for the Device, at the next audio block
 		void sendToDevice(const std::vector<uint8_t>& _sysex);
 
@@ -125,5 +128,8 @@ namespace mdDrums
 		std::atomic<uint32_t> m_relayPending{0};		// bit n: relay n was set and its parameter waits for the value
 		std::array<std::atomic<int>, RelayCount> m_relaySlot{};	// the slot of the parameter relay n was set for
 		std::array<int, RelayCount> m_relayShown{};		// what each relay was last given (message thread)
+		// A value the host has yet to read again: set where the Device's messages arrive (an offline render may bring
+		// them on its own thread), taken on the message thread
+		std::atomic<bool> m_valuesChanged{false};
 	};
 }

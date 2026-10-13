@@ -21,6 +21,10 @@ Que voit l'hôte quand un Kit se charge, et comment le Kit et les paramètres h�
 
 ## Answer
 
+Amendé le 2026-10-13 (ticket 34) : « sans geste » ne suffisait pas. Les listeners appelés (par
+`notifyHostOfProgramChange`, ou pour les SYN1-8 d'une machine) devenaient des `performEdit`, que Live enregistre
+pendant un enregistrement. Kit, état et SYN1-8 passent désormais par une relecture (`Controller::tellHost`).
+
 Grilling du 2026-10-09 (l'utilisateur a pris les recommandations, deux tours).
 
 - **Hôte au chargement** : comme un preset TUS. Chaque paramètre du Kit est posé en `PresetChange` (sans geste), puis

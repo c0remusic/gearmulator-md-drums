@@ -186,6 +186,10 @@ mesurées avant et après. Pas de tag.
 - [Out 16 hors de portée dans Live](issues/33-out-16-dans-live.md) : Live ouvre 16 bus, Main compris ; Out devient un
   choix entre Main et 15 Outs, n'importe quelle Track sur n'importe lequel, un Out la somme de ses Tracks ; la case
   Out d'une tranche bascule au clic entre Main et l'Out naturel (16 vers 15), la molette parcourt.
+- [Valeurs dites à Live sans édition](issues/34-valeurs-sans-edition.md) : relais, SYN1-8 d'une machine, Kit et
+  état dits à l'hôte par relecture (`Controller::tellHost`), plus par `performEdit`, que Live enregistrait pendant
+  un enregistrement (32 relais au seul chargement) ; tests comptent éditions et relectures ; relecture par Live à
+  constater (Push 2).
 
 ## Not yet specified
 
@@ -197,7 +201,8 @@ mesurées avant et après. Pas de tag.
   Configure), les Outs depuis un Drum Rack, l'automation des SYN1-8 quand une machine change. Mesuré hors Live :
   latence (tests), CPU, mémoire et blocs en retard (ticket 31), entrée→pixel (`mdDrumsSkinTest`), la couche VST3 et
   les Locks (ticket 32). Mesuré dans Live par script (ticket 32) : latence, chargement pendant la lecture, CPU à 8
-  instances, Outs 01-15 (Main et 15 Outs depuis le ticket 33, à revoir dans Live).
+  instances, Outs 01-15 ; le 2026-10-13 : Main et 15 Outs tous proposés (ticket 33), Locks canal 1 depuis un clip
+  de Live (VOL à 0 rend muettes Track 1 et Track 5), undo sain, enregistrement d'automation parasite (ticket 34).
 
 ## Out of scope
 

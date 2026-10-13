@@ -98,6 +98,28 @@ namespace
 
 	constexpr int g_block = 512;
 
+	// What the plug-in tells the host by itself: an edit is a parameter's listeners called, which JUCE's VST3 wrapper
+	// turns into performEdit on the message thread and Live records while it records; a re-read is a change that makes
+	// the host read every value again (restartComponent with kParamValuesChanged)
+	struct HostWatch final : juce::AudioProcessorListener
+	{
+		explicit HostWatch(juce::AudioProcessor& _processor) : processor(_processor) { processor.addListener(this); }
+		~HostWatch() override { processor.removeListener(this); }
+		HostWatch(const HostWatch&) = delete;
+		HostWatch& operator=(const HostWatch&) = delete;
+
+		void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override { ++edits; }
+		void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& _details) override
+		{
+			if(_details.programChanged)
+				++rereads;
+		}
+
+		juce::AudioProcessor& processor;
+		int edits = 0;
+		int rereads = 0;
+	};
+
 	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
 	// silent below -100 dBFS rather than at 0
 	constexpr float g_silence = 1e-5f;
@@ -176,8 +198,8 @@ namespace
 
 	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
 	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
-	// new name reaches the Device; a Link and a Choke reach the Device and the state (ticket 29); a machine changed tells
-	// the host its SYN1-8
+	// new name reaches the Device; a Link and a Choke reach the Device and the state (ticket 29); a machine changed gives
+	// its SYN1-8 the machine's values. The host reads the values again after a Kit or a machine, with no edit.
 	void kits(mdDrums::Processor& _processor)
 	{
 		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
@@ -193,8 +215,13 @@ namespace
 			_processor.getController().processPendingMidiMessages();
 		};
 
-		controller.loadKit(kit, 3);
-		block();
+		{
+			HostWatch watch(_processor);
+			controller.loadKit(kit, 3);
+			block();
+			std::printf("kits: a Kit loaded told the host %d edits, %d re-reads\n", watch.edits, watch.rereads);
+			require(watch.edits == 0 && watch.rereads > 0, "a Kit loaded did not reach the host as one re-read");
+		}
 		require(device(_processor).kit() == kit, "the Device does not play the Kit loaded");
 		require(device(_processor).mixer() == mixer, "loading a Kit changed the mixer");
 		require(controller.playedSlot() == 3 && controller.playedKit() == kit, "the Kit played is not the one loaded");
@@ -247,26 +274,23 @@ namespace
 		require(device(_processor).kit().links[0] == mdDrums::Controller::Off
 			&& device(_processor).kit().chokes[0] == mdDrums::Controller::Off, "a Link or a Choke did not go Off");
 
-		struct Counter final : juce::AudioProcessorParameter::Listener
-		{
-			int changes = 0;
-			void parameterValueChanged(int, float) override { ++changes; }
-			void parameterGestureChanged(int, bool) override {}
-		} counter;
 		auto& syn1 = parameter(_processor, "SYN1", 0);
-		syn1.addListener(&counter);
+		const auto syn1Before = syn1.getUnnormalizedValue();
+		HostWatch watch(_processor);
 		automate(_processor, "Machine", 0, kit.machine(0) == 17 ? 16 : 17);
-		syn1.removeListener(&counter);
-		require(counter.changes > 0, "the host was not told SYN1 after a machine change");
+		require(syn1.getUnnormalizedValue() != syn1Before, "SYN1 did not take the new machine's value");
+		require(watch.edits == 0 && watch.rereads > 0, "a machine's SYN1-8 did not reach the host as a re-read, but as "
+			+ std::to_string(watch.edits) + " edits");
 		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
-			" the state; renamed; a Link and a Choke to the Device and the state; SYN1 told to the host %d time(s) after a"
-			" machine change\n", kit.displayName().c_str(), counter.changes);
+			" the state; renamed; a Link and a Choke to the Device and the state; a machine change: SYN1 %d to %d, %d"
+			" re-reads and no edit\n", kit.displayName().c_str(), syn1Before, syn1.getUnnormalizedValue(), watch.rereads);
 	}
 
 	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of the
-	// Track shown its value, the Device getting it at the next block, and the host told; the relay Track shows another
-	// Track and the relays then hold its values; a parameter of the Track shown moved elsewhere moves its relay; the
-	// state keeps the Track shown; "Prepare Push list" moves the 64 of the list, in order, each in a gesture
+	// Track shown its value, the Device getting it at the next block, and the host reads it again, with no edit; the relay
+	// Track shows another Track and the relays then hold its values; a parameter of the Track shown moved elsewhere moves
+	// its relay; the state keeps the Track shown; "Prepare Push list" moves the 64 of the list, in order, each in a
+	// gesture
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
@@ -296,7 +320,11 @@ namespace
 		hostSets(relayFltf, fltf == 33 ? 34 : 33);
 		g_countAllocations = false;
 		require(g_allocations == 0, "a relay set by the host allocated " + std::to_string(g_allocations) + " times");
-		block();
+		{
+			HostWatch watch(_processor);
+			block();
+			require(watch.edits == 0 && watch.rereads > 0, "a relay's parameter did not reach the host as a re-read");
+		}
 		const auto set = relayFltf.getUnnormalizedValue();
 		require(parameter(_processor, "FLTF", 0).getUnnormalizedValue() == set
 			&& device(_processor).kit().parameters[0][12] == set, "a relay did not set its parameter of the Track shown");
@@ -305,25 +333,27 @@ namespace
 		hostSets(relayTrack, 5);
 		g_countAllocations = false;
 		require(g_allocations == 0, "the relay Track set by the host allocated");
-		block();
+		int shownEdits = 0;
+		{
+			HostWatch watch(_processor);
+			block();
+			shownEdits = watch.edits;
+			require(watch.edits == 0 && watch.rereads > 0, "the relays of another Track did not reach the host as a re-read");
+		}
 		require(controller.getCurrentPart() == 5, "the relay Track did not show Track 6");
 		require(relayMachine.getUnnormalizedValue() == parameter(_processor, "Machine", 5).getUnnormalizedValue()
 			&& relayFltf.getUnnormalizedValue() == parameter(_processor, "FLTF", 5).getUnnormalizedValue(),
 			"the relays do not hold the values of the Track shown");
 
-		struct Counter final : juce::AudioProcessorParameter::Listener
 		{
-			int changes = 0;
-			void parameterValueChanged(int, float) override { ++changes; }
-			void parameterGestureChanged(int, bool) override {}
-		} counter;
-		relayFltf.addListener(&counter);
-		const auto moved = parameter(_processor, "FLTF", 5).getUnnormalizedValue() == 99 ? 98 : 99;
-		automate(_processor, "FLTF", 5, moved);
-		controller.syncRelays();
-		relayFltf.removeListener(&counter);
-		require(relayFltf.getUnnormalizedValue() == moved && counter.changes > 0,
-			"a parameter of the Track shown moved without its relay and the host following");
+			HostWatch watch(_processor);
+			const auto moved = parameter(_processor, "FLTF", 5).getUnnormalizedValue() == 99 ? 98 : 99;
+			automate(_processor, "FLTF", 5, moved);
+			controller.syncRelays();
+			require(relayFltf.getUnnormalizedValue() == moved && watch.rereads > 0,
+				"a parameter of the Track shown moved without its relay and the host reading it again");
+			require(watch.edits == 0, "a relay following its parameter reached the host as an edit");
+		}
 
 		juce::MemoryBlock state;
 		host.getStateInformation(state);
@@ -347,9 +377,9 @@ namespace
 		bool ordered = recorder.begun.size() == 64;
 		for(size_t i = 0; ordered && i < 64; ++i)
 			ordered = recorder.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
-		std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays following; Push"
-			" list moved %zu parameters in order (no allocation setting a relay), %d changes, %d gestures ended\n", set, recorder.begun.size(),
-			recorder.changed, recorder.ended);
+		std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays following (%d"
+			" edits); Push list moved %zu parameters in order (no allocation setting a relay), %d changes, %d gestures"
+			" ended\n", set, shownEdits, recorder.begun.size(), recorder.changed, recorder.ended);
 		require(ordered && recorder.ended == 64 && recorder.changed >= 64, "Prepare Push list did not move the 64 in order");
 		controller.setCurrentPart(0);
 		block();

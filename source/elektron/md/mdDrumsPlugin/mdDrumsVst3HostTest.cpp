@@ -3,10 +3,10 @@
 // 608 parameter IDs that Live sets keep (the hashes of the frozen "page_part_index" strings), the only automatable ones
 // with Bypass; Main and 15 Outs, any Track on any (Live opens 16 buses); notes, Locks (as md-drums-seq sends them in
 // Live) and host automation through the VST3 process call; the latency reported; the state through IComponent; the same
-// samples whatever the block sizes and offline; no block that stalls the audio thread; nothing of its own told to the
-// host while it plays Locks, automates or restores a state (the host would take it for an edit; a Track's machine is
-// the exception, its SYN1-8 taking the machine's defaults); and the editor through IPlugView, drawn in the host's window
-// while an audio thread plays.
+// samples whatever the block sizes and offline; no block that stalls the audio thread; nothing told to the host as an
+// edit (performEdit, which Live records while it records) as it loads, plays Locks, follows host automation, restores a
+// state or changes a Track's machine, whose SYN1-8 the host reads again; and the editor through IPlugView, drawn in the
+// host's window while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -21,6 +21,7 @@
 #include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -47,7 +48,7 @@ namespace
 	constexpr int g_tracks = 16;
 	constexpr int g_outs = 15;			// Out 01-15: Live opens at most 16 output buses per plug-in, Main included
 	constexpr int g_parameters = 608;	// 16 Tracks of 34, the 32 master effects, the 32 relays for Push 2
-	constexpr int g_relays = 576;		// the first relay: those follow the Track shown and tell the host (ticket 27)
+	constexpr int g_relays = 576;		// the first relay: those follow the Track shown (ticket 27)
 	constexpr int g_latency = 51;		// what the plug-in reports at 44.1 kHz: Main's
 	constexpr float g_silence = 1e-5f;	// Main keeps a tail of a few LSB after a Hit (EQ and Dynamix)
 	constexpr float g_sound = 1e-3f;
@@ -125,28 +126,65 @@ namespace
 	// Set around the host's process call: what the plug-in tells the host meanwhile comes as the call's outputs
 	thread_local bool g_inProcess = false;
 
-	// What the plug-in tells the host by itself: parameters it sets (performEdit, or the outputs of its process call),
-	// its gestures and its other changes (restartComponent, setDirty)
+	// What the plug-in tells the host by itself: parameters it sets, its gestures and its other changes (restartComponent,
+	// setDirty). A parameter comes as an edit (performEdit, or an output of its process call), which Live records while
+	// it records and adds to the device's panel, or as a re-read (restartComponent with kParamValuesChanged): JUCE's
+	// hosting then reads every value again, calls the listeners of those that differ and reports the restart, all in the
+	// same message. A parameter told in a message that no restart closes was an edit. (An edit followed by a restart in
+	// the same message would pass for a re-read: mdDrumsProcessorTest counts the plug-in's edits exactly.)
 	struct Told final : juce::AudioProcessorListener
 	{
 		std::mutex mutex;
-		std::vector<int> parameters;
-		int outputs = 0;	// of those, the process call's outputs; the others came as performEdit
+		std::vector<int> parameters;	// all, edited or read again
+		std::vector<int> edits;
+		std::vector<int> open;			// told in the message running, no restart seen yet
+		int outputs = 0;	// of the edits, the process call's outputs
 		int gestures = 0;
 		int changes = 0;
+		int rereads = 0;	// restarts that read the values again
+		bool closing = false;
+		std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 
 		void audioProcessorParameterChanged(juce::AudioProcessor*, const int _index, float) override
 		{
 			const std::lock_guard lock(mutex);
 			parameters.push_back(_index);
 			if(g_inProcess)
+			{
 				++outputs;
+				edits.push_back(_index);
+				return;
+			}
+			open.push_back(_index);
+			if(closing)
+				return;
+			closing = true;
+			// After the message running: what no restart closed meanwhile was an edit
+			juce::MessageManager::callAsync([this, guard = std::weak_ptr<bool>(alive)]
+			{
+				if(guard.lock())
+					close();
+			});
 		}
 
-		void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails&) override
+		void close()
+		{
+			const std::lock_guard lock(mutex);
+			edits.insert(edits.end(), open.begin(), open.end());
+			open.clear();
+			closing = false;
+		}
+
+		void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& _details) override
 		{
 			const std::lock_guard lock(mutex);
 			++changes;
+			// JUCE's hosting reports a restart, having read the values again, as a program and parameter info change
+			if(_details.programChanged && _details.parameterInfoChanged)
+			{
+				++rereads;
+				open.clear();
+			}
 		}
 
 		void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, int) override
@@ -159,21 +197,27 @@ namespace
 		{
 			const std::lock_guard lock(mutex);
 			parameters.clear();
+			edits.clear();
+			open.clear();
 			outputs = 0;
 			gestures = 0;
 			changes = 0;
+			rereads = 0;
 		}
 
-		// The Track and master parameters told, each once, by name
-		std::string own(const Frozen& _frozen)
+		bool has(const int _index)
+		{
+			const std::lock_guard lock(mutex);
+			return std::find(parameters.begin(), parameters.end(), _index) != parameters.end();
+		}
+
+		// The parameters told as edits, each once, by name
+		std::string edited(const Frozen& _frozen)
 		{
 			const std::lock_guard lock(mutex);
 			std::map<int, int> counts;
-			for(const auto index : parameters)
-			{
-				if(index < g_relays)
-					++counts[index];
-			}
+			for(const auto index : edits)
+				++counts[index];
 			std::string result;
 			for(const auto& [index, count] : counts)
 			{
@@ -188,13 +232,13 @@ namespace
 
 		std::string summary(const Frozen& _frozen)
 		{
-			const auto ownParameters = own(_frozen);
+			const auto names = edited(_frozen);
 			const std::lock_guard lock(mutex);
 			const auto relays = std::count_if(parameters.begin(), parameters.end(), [](const int _i) { return _i >= g_relays; });
-			return std::to_string(parameters.size()) + " parameters (" + std::to_string(relays) + " relays; "
-				+ (ownParameters.empty() ? std::string("no other") : ownParameters) + "; " + std::to_string(outputs)
-				+ " as process outputs), " + std::to_string(gestures)
-				+ " gestures, " + std::to_string(changes) + " other changes";
+			return std::to_string(parameters.size()) + " parameters (" + std::to_string(relays) + " relays) in "
+				+ std::to_string(rereads) + " re-reads; edits: " + (names.empty() ? std::string("none") : names) + " ("
+				+ std::to_string(outputs) + " as process outputs); " + std::to_string(gestures) + " gestures, "
+				+ std::to_string(changes) + " other changes";
 		}
 	};
 
@@ -485,6 +529,7 @@ namespace
 			std::printf("Loaded and prepared in %.0f ms; at load it told the host %s\n",
 				std::chrono::duration<double, std::milli>(Clock::now() - start).count(),
 				instance->told.summary(ids).c_str());
+			require(instance->told.edited(ids).empty(), "MD Drums told the host values as edits at load");
 
 			// Main and 15 Outs, the Outs off until the host takes them
 			require(plugin.getBusCount(true) == 0 && plugin.getBusCount(false) == 1 + g_outs, "not Main and 15 Outs");
@@ -567,7 +612,7 @@ namespace
 				pump(300);
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
 					instance->told.summary(ids).c_str());
-				require(instance->told.own(ids).empty(), "MD Drums echoed a parameter the host automates");
+				require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while it automated");
 				automate(*instance, syn1, kept[0]);
 				automate(*instance, level, kept[1]);
 				automate(*instance, echo, kept[2]);
@@ -576,6 +621,9 @@ namespace
 			automate(*instance, ids.index("Machine", 2), 32.0f / 191.0f);
 			pump(300);
 			std::printf("The host set Track 3's machine to EFM-BD: told %s\n", instance->told.summary(ids).c_str());
+			require(instance->told.edited(ids).empty() && instance->told.rereads > 0
+				&& instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
+				"a new machine's SYN1-8 did not reach the host as a re-read");
 
 			// The Outs (ticket 33), the host taking the 15: Track n on Out n, Track 16 on Out 15 with Track 15, each Out's
 			// channel the bus's
@@ -633,7 +681,7 @@ namespace
 			pump(300);
 			std::printf("State of %zu bytes restored where it was saved: told %s\n", saved.getSize(),
 				instance->told.summary(ids).c_str());
-			require(instance->told.own(ids).empty(), "MD Drums told the host its parameters while restoring a state");
+			require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while restoring a state");
 
 			// Another instance gets every parameter back, gives the same state back, and plays Track 1 off Main as saved
 			{
@@ -688,7 +736,7 @@ namespace
 						: " is silent although it has no Lock"));
 				}
 				std::printf("\n");
-				require(instance->told.own(ids).empty(), std::string(_name) + ": MD Drums told the host of a Lock");
+				require(instance->told.edited(ids).empty(), std::string(_name) + ": MD Drums told the host of a Lock");
 				render(plugin, {}, g_rate);
 			};
 			beats("Track 3 on the beats, VOL 0 on 2 and 4", 2, {2}, {1, 3}, 0);

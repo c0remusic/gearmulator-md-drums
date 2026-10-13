@@ -115,6 +115,8 @@ namespace mdDrums
 		std::vector<uint8_t> state;
 		if(_processor.getPlugin().getState(state, synthLib::StateTypeGlobal))
 			applyStateBytes(state);
+		// The relays with Track 1's values before the host reads any
+		syncRelays();
 	}
 
 	Controller::~Controller()
@@ -274,8 +276,12 @@ namespace mdDrums
 			pending &= pending - 1;
 			const auto slot = m_relaySlot[i].load(std::memory_order_relaxed);
 			const auto value = m_values[static_cast<size_t>(slot)].load(std::memory_order_relaxed);
-			if(auto* parameter = m_parameters[static_cast<size_t>(slot)])
-				parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			auto* parameter = m_parameters[static_cast<size_t>(slot)];
+			if(parameter && parameter->getUnnormalizedValue() != value)
+			{
+				parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::PresetChange);
+				m_valuesChanged.store(true, std::memory_order_relaxed);
+			}
 			m_relayShown[i] = value;
 		}
 
@@ -297,9 +303,27 @@ namespace mdDrums
 			}
 			if(value == m_relayShown[i])
 				continue;
-			relay->setValueFromSynth(value, pluginLib::Parameter::Origin::Midi);
+			if(relay->getUnnormalizedValue() != value)
+			{
+				relay->setValueFromSynth(value, pluginLib::Parameter::Origin::PresetChange);
+				m_valuesChanged.store(true, std::memory_order_relaxed);
+			}
 			m_relayShown[i] = value;
 		}
+
+		// Last in the Controller's timer, after the Device's messages: once for the relays and a machine's SYN1-8
+		if(m_valuesChanged.exchange(false, std::memory_order_relaxed))
+			tellHost();
+	}
+
+	void Controller::tellHost()
+	{
+		// As the stack does after a preset: the host reads every value again (VST3: restartComponent with
+		// kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value), and nothing the plug-in
+		// changes by itself reaches it as an edit (performEdit). Live records an edit while it records and adds its
+		// parameter to the device's panel: in Live 12.2.1 on 2026-10-13, MD Drums loaded during Arrangement Record
+		// recorded the 32 relays, which it then set from Track 1 as edits.
+		getProcessor().updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 	}
 
 	void Controller::preparePushList()
@@ -327,11 +351,13 @@ namespace mdDrums
 			{_event.a, _event.b, _event.c}, 0);
 		if(!change)
 			return false;
-		// The host learns the new values as it does a Kit's, without a gesture (ticket 10)
+		// The host reads the new values again as it does a Kit's, once the timer has the Device's messages (ticket 10)
 		for(auto* parameter : findSynthParam(change->track, change->page, change->index))
 		{
+			if(parameter->getUnnormalizedValue() == change->value)
+				continue;
 			parameter->setValueFromSynth(change->value, pluginLib::Parameter::Origin::PresetChange);
-			parameter->sendValueChangedMessageToListeners(parameter->getValue());
+			m_valuesChanged.store(true, std::memory_order_relaxed);
 		}
 		return true;
 	}
@@ -380,7 +406,7 @@ namespace mdDrums
 			for(auto* parameter : parameters)
 				parameter->setValueFromSynth(*value, pluginLib::Parameter::Origin::PresetChange);
 		}
-		getProcessor().notifyHostOfProgramChange();
+		tellHost();
 	}
 
 	void Controller::renameKit(const std::string& _name)
@@ -430,7 +456,7 @@ namespace mdDrums
 		if(m_loadedState.empty())
 			return;
 		if(applyStateBytes(m_loadedState))
-			getProcessor().notifyHostOfProgramChange();
+			tellHost();
 		m_loadedState.clear();
 	}
 

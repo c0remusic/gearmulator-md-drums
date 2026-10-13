@@ -40,7 +40,8 @@ données à lui (`GEARMULATOR_DATA_ROOT`), jamais celui de l'utilisateur. Mesur�
   muets) ; les 32 paramètres master parcourus, aucun bloc master au-delà de 0,12 ms. Par le VST3 : pire bloc 1,58 ms,
   aucun sur 2068 au-delà de 2,9 ms, ni sur 1038 éditeur ouvert. Le test échoue au-delà de 10 ms. Latence inchangée.
 - **Reste pour Live** : ce que Live fait des SYN1-8 renvoyés quand l'hôte change une machine (automation de SYN
-  écrasée ?) et des 608 valeurs publiées au chargement d'un Kit depuis l'éditeur (undo, automation).
+  écrasée ?) et des 608 valeurs publiées au chargement d'un Kit depuis l'éditeur (undo, automation). Réponse au
+  ticket 34 : Live les enregistrait ; elles passent désormais par une relecture.
 
 ## Passage dans Live par script (2026-10-10, soir)
 
