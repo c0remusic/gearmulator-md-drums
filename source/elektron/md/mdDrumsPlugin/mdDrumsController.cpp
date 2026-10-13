@@ -115,7 +115,8 @@ namespace mdDrums
 		std::vector<uint8_t> state;
 		if(_processor.getPlugin().getState(state, synthLib::StateTypeGlobal))
 			applyStateBytes(state);
-		// The relays with Track 1's values before the host reads any
+		// The relays with Track 1's values, as the host reads them first: not as edits
+		tellHost();
 		syncRelays();
 	}
 
@@ -268,6 +269,12 @@ namespace mdDrums
 		const auto part = getCurrentPart();
 		m_shownPart.store(part, std::memory_order_release);
 
+		// One parameter following another reaches the host as an edit: Live records that one while it records. Values
+		// changed in bulk (a Kit, a state, a machine's SYN1-8) make it read every value again instead, and the relays
+		// then follow within that re-read.
+		const auto origin = m_valuesChanged.load(std::memory_order_relaxed) ? pluginLib::Parameter::Origin::PresetChange
+			: pluginLib::Parameter::Origin::Midi;
+
 		// What a relay was set to, given to its parameter (which the Device has by now, or at the next block)
 		auto pending = m_relayPending.exchange(0, std::memory_order_acq_rel);
 		while(pending)
@@ -276,12 +283,8 @@ namespace mdDrums
 			pending &= pending - 1;
 			const auto slot = m_relaySlot[i].load(std::memory_order_relaxed);
 			const auto value = m_values[static_cast<size_t>(slot)].load(std::memory_order_relaxed);
-			auto* parameter = m_parameters[static_cast<size_t>(slot)];
-			if(parameter && parameter->getUnnormalizedValue() != value)
-			{
-				parameter->setValueFromSynth(value, pluginLib::Parameter::Origin::PresetChange);
-				m_valuesChanged.store(true, std::memory_order_relaxed);
-			}
+			if(auto* parameter = m_parameters[static_cast<size_t>(slot)])
+				parameter->setValueFromSynth(value, origin);
 			m_relayShown[i] = value;
 		}
 
@@ -303,27 +306,24 @@ namespace mdDrums
 			}
 			if(value == m_relayShown[i])
 				continue;
-			if(relay->getUnnormalizedValue() != value)
-			{
-				relay->setValueFromSynth(value, pluginLib::Parameter::Origin::PresetChange);
-				m_valuesChanged.store(true, std::memory_order_relaxed);
-			}
+			relay->setValueFromSynth(value, origin);
 			m_relayShown[i] = value;
 		}
 
-		// Last in the Controller's timer, after the Device's messages: once for the relays and a machine's SYN1-8
+		// Last in the Controller's timer, after the Device's messages: once for a Kit, a state, a machine's SYN1-8 and the
+		// relays following them. As the stack does after a preset, the host reads every value again (VST3:
+		// restartComponent with kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value) rather
+		// than taking hundreds of edits (performEdit), which Live would record while it records, add to the device's panel
+		// and take for overrides of its automation. Measured in Live 12.2.1 on 2026-10-13: as edits, MD Drums loaded
+		// during Arrangement Record recorded the 32 relays; as a re-read, Live follows the values but, while it records,
+		// writes automation for every parameter on its panel, changed or not, and Live sets no kRecording to wait for.
 		if(m_valuesChanged.exchange(false, std::memory_order_relaxed))
-			tellHost();
+			getProcessor().updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 	}
 
 	void Controller::tellHost()
 	{
-		// As the stack does after a preset: the host reads every value again (VST3: restartComponent with
-		// kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value), and nothing the plug-in
-		// changes by itself reaches it as an edit (performEdit). Live records an edit while it records and adds its
-		// parameter to the device's panel: in Live 12.2.1 on 2026-10-13, MD Drums loaded during Arrangement Record
-		// recorded the 32 relays, which it then set from Track 1 as edits.
-		getProcessor().updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
+		m_valuesChanged.store(true, std::memory_order_relaxed);
 	}
 
 	void Controller::preparePushList()

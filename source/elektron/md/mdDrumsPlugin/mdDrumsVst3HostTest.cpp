@@ -4,9 +4,9 @@
 // with Bypass; Main and 15 Outs, any Track on any (Live opens 16 buses); notes, Locks (as md-drums-seq sends them in
 // Live) and host automation through the VST3 process call; the latency reported; the state through IComponent; the same
 // samples whatever the block sizes and offline; no block that stalls the audio thread; nothing told to the host as an
-// edit (performEdit, which Live records while it records) as it loads, plays Locks, follows host automation, restores a
-// state or changes a Track's machine, whose SYN1-8 the host reads again; and the editor through IPlugView, drawn in the
-// host's window while an audio thread plays.
+// edit (performEdit, which Live records while it records) as it loads, plays Locks, restores a state or changes a
+// Track's machine, whose SYN1-8 the host reads again, and nothing but a relay of Push 2 while it automates the Track
+// shown; and the editor through IPlugView, drawn in the host's window while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -211,13 +211,16 @@ namespace
 			return std::find(parameters.begin(), parameters.end(), _index) != parameters.end();
 		}
 
-		// The parameters told as edits, each once, by name
-		std::string edited(const Frozen& _frozen)
+		// The parameters told as edits, each once, by name; _withRelays false leaves Push 2's relays out
+		std::string edited(const Frozen& _frozen, const bool _withRelays = true)
 		{
 			const std::lock_guard lock(mutex);
 			std::map<int, int> counts;
 			for(const auto index : edits)
-				++counts[index];
+			{
+				if(_withRelays || index < g_relays)
+					++counts[index];
+			}
 			std::string result;
 			for(const auto& [index, count] : counts)
 			{
@@ -612,7 +615,7 @@ namespace
 				pump(300);
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
 					instance->told.summary(ids).c_str());
-				require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while it automated");
+				require(instance->told.edited(ids, false).empty(), "MD Drums told the host an edit of its own while it automated");
 				automate(*instance, syn1, kept[0]);
 				automate(*instance, level, kept[1]);
 				automate(*instance, echo, kept[2]);

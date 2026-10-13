@@ -82,7 +82,8 @@ namespace mdDrums
 
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
-		// The host then reads every value again, once for all that changed since the last call (tellHost).
+		// A relay or a parameter following one reaches the host as an edit, without a gesture, unless the host reads every
+		// value again in the same tick (a Kit, a state, a machine's SYN1-8), which it then does once.
 		void syncRelays();
 		// For Live in Configure mode, which adds a parameter the plug-in moves: the 64 of the Push list in order (the
 		// relays, then the master effects), each moved to its own value in a gesture
@@ -107,7 +108,8 @@ namespace mdDrums
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
 		// Any thread: a relay set to _value, given to its parameter of the Track shown
 		void relayChanged(uint8_t _index, int _value);
-		// On the message thread: the host reads every parameter's value again, for those the plug-in changed by itself
+		// The host is to read every parameter's value again, for those the plug-in changed by itself, at the end of the
+		// Controller's next tick (syncRelays)
 		void tellHost();
 		// A SysEx message for the Device, at the next audio block
 		void sendToDevice(const std::vector<uint8_t>& _sysex);

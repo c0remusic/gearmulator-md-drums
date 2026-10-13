@@ -287,10 +287,10 @@ namespace
 	}
 
 	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of the
-	// Track shown its value, the Device getting it at the next block, and the host reads it again, with no edit; the relay
-	// Track shows another Track and the relays then hold its values; a parameter of the Track shown moved elsewhere moves
-	// its relay; the state keeps the Track shown; "Prepare Push list" moves the 64 of the list, in order, each in a
-	// gesture
+	// Track shown its value, the Device getting it at the next block, and the host takes it as an edit without a gesture
+	// (one parameter following another: ticket 34); the relay Track shows another Track and the relays then hold its
+	// values; a parameter of the Track shown moved elsewhere moves its relay; the state keeps the Track shown; "Prepare
+	// Push list" moves the 64 of the list, in order, each in a gesture
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
@@ -323,7 +323,8 @@ namespace
 		{
 			HostWatch watch(_processor);
 			block();
-			require(watch.edits == 0 && watch.rereads > 0, "a relay's parameter did not reach the host as a re-read");
+			require(watch.edits > 0 && watch.rereads == 0, "a relay's parameter did not reach the host as an edit, but as "
+				+ std::to_string(watch.edits) + " edits and " + std::to_string(watch.rereads) + " re-reads");
 		}
 		const auto set = relayFltf.getUnnormalizedValue();
 		require(parameter(_processor, "FLTF", 0).getUnnormalizedValue() == set
@@ -338,7 +339,7 @@ namespace
 			HostWatch watch(_processor);
 			block();
 			shownEdits = watch.edits;
-			require(watch.edits == 0 && watch.rereads > 0, "the relays of another Track did not reach the host as a re-read");
+			require(watch.edits > 0 && watch.rereads == 0, "the relays of another Track did not reach the host as edits");
 		}
 		require(controller.getCurrentPart() == 5, "the relay Track did not show Track 6");
 		require(relayMachine.getUnnormalizedValue() == parameter(_processor, "Machine", 5).getUnnormalizedValue()
@@ -350,9 +351,8 @@ namespace
 			const auto moved = parameter(_processor, "FLTF", 5).getUnnormalizedValue() == 99 ? 98 : 99;
 			automate(_processor, "FLTF", 5, moved);
 			controller.syncRelays();
-			require(relayFltf.getUnnormalizedValue() == moved && watch.rereads > 0,
-				"a parameter of the Track shown moved without its relay and the host reading it again");
-			require(watch.edits == 0, "a relay following its parameter reached the host as an edit");
+			require(relayFltf.getUnnormalizedValue() == moved && watch.edits > 0 && watch.rereads == 0,
+				"a parameter of the Track shown moved without its relay and the host taking it as an edit");
 		}
 
 		juce::MemoryBlock state;
