@@ -188,9 +188,10 @@ mesurées avant et après. Pas de tag.
   Out d'une tranche bascule au clic entre Main et l'Out naturel (16 vers 15), la molette parcourt.
 - [Valeurs dites à Live : édition ou relecture](issues/34-valeurs-sans-edition.md) : en édition (`performEdit`), Live
   enregistre ce qui change et l'ajoute au panneau (32 relais au seul chargement) ; en relecture, il suit mais écrit
-  tout son panneau à chaque relecture pendant qu'il enregistre, et ne dit pas qu'il enregistre. Retenu : relecture
-  pour Kit, état et SYN1-8, édition sans geste pour un relais ou son paramètre, rien au chargement ; tests comptent
-  éditions et relectures.
+  tout son panneau à chaque relecture pendant qu'il enregistre, et ne dit pas qu'il enregistre. Retenu (C) : relecture
+  pour Kit, état et SYN1-8 ; relais en éditions au changement de Track ; rien de ce qui suit un paramètre (en édition,
+  Live prenait le relais pour le paramètre touché) ; rien au chargement. Undo après Kit sain ; une machine changée met
+  l'automation de SYN en reprise en main.
 
 ## Not yet specified
 

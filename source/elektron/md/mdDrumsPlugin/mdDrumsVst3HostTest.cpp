@@ -4,9 +4,9 @@
 // with Bypass; Main and 15 Outs, any Track on any (Live opens 16 buses); notes, Locks (as md-drums-seq sends them in
 // Live) and host automation through the VST3 process call; the latency reported; the state through IComponent; the same
 // samples whatever the block sizes and offline; no block that stalls the audio thread; nothing told to the host as an
-// edit (performEdit, which Live records while it records) as it loads, plays Locks, restores a state or changes a
-// Track's machine, whose SYN1-8 the host reads again, and nothing but a relay of Push 2 while it automates the Track
-// shown; and the editor through IPlugView, drawn in the host's window while an audio thread plays.
+// edit (performEdit, which Live records while it records) as it loads, plays Locks, automates, restores a state or
+// changes a Track's machine, whose SYN1-8 the host reads again, and Push 2's relays as edits when the host shows
+// another Track; and the editor through IPlugView, drawn in the host's window while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -615,7 +615,7 @@ namespace
 				pump(300);
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
 					instance->told.summary(ids).c_str());
-				require(instance->told.edited(ids, false).empty(), "MD Drums told the host an edit of its own while it automated");
+				require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while it automated");
 				automate(*instance, syn1, kept[0]);
 				automate(*instance, level, kept[1]);
 				automate(*instance, echo, kept[2]);
@@ -627,6 +627,17 @@ namespace
 			require(instance->told.edited(ids).empty() && instance->told.rereads > 0
 				&& instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
 				"a new machine's SYN1-8 did not reach the host as a re-read");
+
+			// The relay Track set by the host (Push 2's first encoder): Track 6 shown, the relays reaching the host as edits,
+			// none of the Track parameters
+			instance->told.clear();
+			automate(*instance, ids.index("FocusTrack"), 5.0f / 15.0f);
+			pump(300);
+			std::printf("The host showed Track 6 through the relay Track: told %s\n", instance->told.summary(ids).c_str());
+			require(!instance->told.edited(ids).empty() && instance->told.edited(ids, false).empty()
+				&& instance->told.rereads == 0, "showing another Track did not give the host its relays as edits alone");
+			automate(*instance, ids.index("FocusTrack"), 0.0f);
+			pump(300);
 
 			// The Outs (ticket 33), the host taking the 15: Track n on Out n, Track 16 on Out 15 with Track 15, each Out's
 			// channel the bus's

@@ -82,8 +82,9 @@ namespace mdDrums
 
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
-		// A relay or a parameter following one reaches the host as an edit, without a gesture, unless the host reads every
-		// value again in the same tick (a Kit, a state, a machine's SYN1-8), which it then does once.
+		// The host learns the relays as edits, without a gesture, when the Track shown changes; a relay that follows its
+		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's SYN1-8 it
+		// reads again, once (ticket 34).
 		void syncRelays();
 		// For Live in Configure mode, which adds a parameter the plug-in moves: the 64 of the Push list in order (the
 		// relays, then the master effects), each moved to its own value in a gesture
@@ -130,6 +131,7 @@ namespace mdDrums
 		std::atomic<uint32_t> m_relayPending{0};		// bit n: relay n was set and its parameter waits for the value
 		std::array<std::atomic<int>, RelayCount> m_relaySlot{};	// the slot of the parameter relay n was set for
 		std::array<int, RelayCount> m_relayShown{};		// what each relay was last given (message thread)
+		int m_relaysPart = -1;							// the Track the relays were last given (message thread)
 		// A value the host has yet to read again: set where the Device's messages arrive (an offline render may bring
 		// them on its own thread), taken on the message thread
 		std::atomic<bool> m_valuesChanged{false};

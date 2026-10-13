@@ -50,3 +50,6 @@ Whether MD Drums' Outs stay reachable from inside a Drum Rack is to be confirmed
 - Push shows names in capitals, about 10 characters, and reduces a value text that holds digits to the number:
   "TRX-B2" shows "-2", "ROM-01" shows "-1".
 - The bank names are Live's ("Bank 1" ...), and the list holds 128 parameters at most per instance.
+- A knob turned in the editor, or automation of the Track shown, moves its relay without telling Live, so that Live
+  keeps "Track 1 FLTF" as the parameter last touched and records only that one: Push shows the relay's former value
+  until the Track shown changes, and turning that encoder starts from it (ticket 34).

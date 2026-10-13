@@ -269,11 +269,16 @@ namespace mdDrums
 		const auto part = getCurrentPart();
 		m_shownPart.store(part, std::memory_order_release);
 
-		// One parameter following another reaches the host as an edit: Live records that one while it records. Values
-		// changed in bulk (a Kit, a state, a machine's SYN1-8) make it read every value again instead, and the relays
-		// then follow within that re-read.
-		const auto origin = m_valuesChanged.load(std::memory_order_relaxed) ? pluginLib::Parameter::Origin::PresetChange
-			: pluginLib::Parameter::Origin::Midi;
+		// What follows a parameter the host does not learn (measured in Live 12.2.1, ticket 34): as an edit, Live would
+		// take the relay for the parameter last touched in the editor, so that its automation chooser offered "FLTF"
+		// rather than "Track 1 FLTF", and would record it beside the knob turned; as a re-read, Live would write every
+		// parameter on its panel while it records. Push 2 then shows the relay's former value until the Track shown
+		// changes, when the relays reach the host as edits, or until a re-read (a Kit, a state, a machine's SYN1-8),
+		// which they follow silently.
+		const auto silent = pluginLib::Parameter::Origin::PresetChange;
+		const auto shown = part != m_relaysPart && !m_valuesChanged.load(std::memory_order_relaxed)
+			? pluginLib::Parameter::Origin::Midi : silent;
+		m_relaysPart = part;
 
 		// What a relay was set to, given to its parameter (which the Device has by now, or at the next block)
 		auto pending = m_relayPending.exchange(0, std::memory_order_acq_rel);
@@ -284,7 +289,7 @@ namespace mdDrums
 			const auto slot = m_relaySlot[i].load(std::memory_order_relaxed);
 			const auto value = m_values[static_cast<size_t>(slot)].load(std::memory_order_relaxed);
 			if(auto* parameter = m_parameters[static_cast<size_t>(slot)])
-				parameter->setValueFromSynth(value, origin);
+				parameter->setValueFromSynth(value, silent);
 			m_relayShown[i] = value;
 		}
 
@@ -306,7 +311,7 @@ namespace mdDrums
 			}
 			if(value == m_relayShown[i])
 				continue;
-			relay->setValueFromSynth(value, origin);
+			relay->setValueFromSynth(value, shown);
 			m_relayShown[i] = value;
 		}
 

@@ -42,14 +42,28 @@ passent par le fil des messages, `enableMcpServer` allumé le temps des essais p
   - Live ne met pas `kRecording` dans le `ProcessContext` : la relecture du correctif suivant, retenue tant que l'hôte
     enregistre, partait en plein enregistrement (Live lisait déjà 25/127 pendant). Retenue retirée.
 
-**Retenu** : à chaque cas le moyen qui écrit le moins dans Live.
+**Hybride `674e3908` passé dans Live** (relais en éditions, le reste en relecture) :
 
+- un bouton tourné dans l'éditeur fait éditer son relais juste après : Live prend le relais « FLTF » pour le paramètre
+  touché en dernier, au lieu de « Track 1 FLTF ». Choisir au toucher le paramètre à automatiser tombe sur le relais, et
+  enregistrer un bouton écrit aussi son relais ;
+- une autre Track montrée pendant l'enregistrement écrit les relais qui changent et les ajoute au panneau ;
+- undo sain : le premier undo après un Kit chargé ramène le Kit d'avant (FLTF 25 vers 46), le second le bouton tourné
+  (46 vers 31) ;
+- SYN1 automatisé, machine changée pendant la lecture : SYN1 prend la valeur de la nouvelle machine (64), et Live met
+  l'automation de SYN1 en reprise en main (`automation_state` 2) jusqu'à « Re-Enable Automation ».
+
+**Retenu par l'utilisateur (C, 2026-10-14)** :
+
+- **Ce qui suit un paramètre, l'hôte ne l'apprend pas** : un relais qui suit son paramètre de la Track montrée (bouton
+  tourné, automation, MIDI), un paramètre qui suit son relais réglé par Push. Live garde « Track 1 FLTF » comme dernier
+  touché et n'enregistre que le bouton tourné. Prix : Push 2 montre l'ancienne valeur du relais jusqu'au prochain
+  changement de Track ou à la prochaine relecture ; tourner alors cet encodeur part de l'ancienne valeur.
+- **Les relais en éditions, sans geste, quand la Track montrée change** (éditeur ou relais Track réglé par Push) : Push
+  montre la nouvelle Track. Pendant un enregistrement, Live écrit les relais qui changent.
 - **Relecture pour ce qui change en bloc** : un Kit, un état, les SYN1-8 d'une machine (valeurs posées en
   `PresetChange`, sans listener de l'hôte, puis une relecture à la fin du tick suivant du timer du Controller,
-  `Controller::tellHost` la demande). Rien ajouté au panneau, comme le voulait le ticket 10 (« l'automation de Live gagne »).
-- **Édition, sans geste, pour un paramètre qui en suit un autre** : un relais qui suit son paramètre de la Track
-  montrée (bouton tourné, automation, autre Track montrée), un paramètre qui suit son relais réglé par Push. Live
-  n'écrit que celui-là. Dans le tick d'une relecture, les relais suivent sans édition, dans la relecture.
+  `Controller::tellHost` la demande). Rien ajouté au panneau. Les relais suivent dans la relecture.
 - **Rien au chargement** : les relais prennent les valeurs de la Track 1 dans la construction du Controller, dans une
   relecture.
 - Restent des éditions avec geste : un geste dans l'éditeur, « Prepare Push list » (voulu, pour le mode Configure).
@@ -57,11 +71,10 @@ passent par le fil des messages, `enableMcpServer` allumé le temps des essais p
 **Vérifié** :
 
 - `mdDrumsProcessorTest` : Kit chargé, 0 édition et 1 relecture ; machine changée, SYN1 de 43 à 64, 1 relecture, 0
-  édition ; relais réglé par l'hôte, son paramètre en édition ; autre Track montrée, 17 relais en éditions ; paramètre
-  de la Track montrée automatisé, son relais en édition.
+  édition ; relais réglé par l'hôte, son paramètre suit sans rien dire à l'hôte ; autre Track montrée, les relais en
+  éditions ; paramètre de la Track montrée automatisé, son relais suit sans rien dire.
 - `mdDrumsVst3HostTest` classe ce que l'hôte entend : édition, ou relecture (l'hébergement de JUCE relit tout, appelle
   les listeners de ce qui diffère et annonce le redémarrage dans le même message). Le build `812551fa` échoue au
-  chargement (« FocusTrack … FocusLFOM » en éditions) ; le nouveau : 0 édition au chargement, au changement de machine
-  (SYN1-8 relus), à la restauration d'un état, pendant les Locks ; pendant l'automation de SYN1 de la Track montrée,
-  le seul relais FocusSYN1.
-- Le build retenu n'est pas encore passé dans Live (il y faut un redémarrage de Live) : ses deux moyens, si.
+  chargement (« FocusTrack … FocusLFOM » en éditions) ; le nouveau : 0 édition au chargement, pendant l'automation, au
+  changement de machine (SYN1-8 relus), à la restauration d'un état, pendant les Locks ; le relais Track réglé par
+  l'hôte, les relais en éditions et aucun paramètre de Track.
