@@ -55,3 +55,15 @@ plays its Locks in either order, as before.
   order is not measured: until it is, a clip on channel 1 carrying another Track's Locks may bind them to the wrong
   Hit, and a clip on its Track's channel is the safe way.
 - `mdDrumsDeviceTest` and `mdDrumsVst3HostTest` check both rules, the second with md-drums-seq's notes.
+
+## Amendment (2026-10-13): the last channel-1 Hit
+
+md-drums-seq prints a pattern as one Session clip per Track, each on its own MIDI track routed to the MD Drums track's
+"N-MD Drums" input, which reaches the plug-in on channel N (measured in Live 12.2.1; md-drums-seq issue 07). Track 1's
+clip then plays on channel 1, and another Track's Hit can land between Track 1's Hit and its Locks at the same sample:
+under the rule above, that Hit would take Track 1's Locks.
+
+A Lock on channel 1 now goes with the last channel-1 Hit received just before it at the same sample; with none, it is
+Track 1's, as before. Channels 2-16 are unchanged. Live play is too: a Max for Live device's notes all reach MD Drums on
+channel 1, so the last channel-1 Hit is the last Hit. `mdDrumsDeviceTest` and `mdDrumsVst3HostTest` add a channel-5
+(and a channel-3) Hit between a channel-1 Hit and its Locks.

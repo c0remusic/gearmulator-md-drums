@@ -393,9 +393,9 @@ namespace
 		{
 			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, _param - 8, _value), Offset);
 		}
-		void hit(const uint8_t _note = 36, const uint32_t _offset = Offset)
+		void hit(const uint8_t _note = 36, const uint32_t _offset = Offset, const uint8_t _channel = 0)
 		{
-			rig.send(MidiEventSource::Host, {0x90, _note, 100}, _offset);
+			rig.send(MidiEventSource::Host, {static_cast<uint8_t>(0x90 | _channel), _note, 100}, _offset);
 		}
 		void lock(const uint8_t _param, const uint8_t _value, const uint8_t _channel = 0, const uint32_t _offset = Offset)
 		{
@@ -509,7 +509,8 @@ namespace
 		std::printf("Locks: at once in either order, back to the Kit at the next Hit, dropped without their Hit\n");
 
 		// Channel 1 (amended ADR 0003): Live gives a Max for Live device's notes channel 1, so a Lock there goes with the
-		// Hit just before it at the same sample, whatever its Track, as a Lock on that Track's channel would
+		// last channel-1 Hit just before it at the same sample, whatever its Track, as a Lock on that Track's channel
+		// would
 		constexpr uint8_t Track3 = 38;
 		const auto take3 = [&](const std::function<void(Take&)>& _send)
 		{
@@ -541,7 +542,30 @@ namespace
 			_t.lock(Srr, 90);
 		});
 		require(pairByHit == pairByChannel, "Locks on channel 1 did not follow their own Hits at one sample");
-		std::printf("Locks on channel 1: with the Hit just before at the same sample, else Track 1's\n");
+		// Another channel's Hit between a channel-1 Hit and its Locks, as md-drums-seq prints each Track on its own
+		// channel, Track 1's on channel 1: the Locks stay with the channel-1 Hit
+		constexpr uint8_t Track5 = 40;
+		const auto between = take3([](Take& _t)
+		{
+			_t.hit(Track3);
+			_t.hit(Track5, Take::Offset, 4);
+			_t.lock(Srr, 90);
+		});
+		const auto onTrack3 = take3([](Take& _t)
+		{
+			_t.lock(Srr, 90, 2);
+			_t.hit(Track3);
+			_t.hit(Track5, Take::Offset, 4);
+		});
+		const auto onTrack5 = take3([](Take& _t)
+		{
+			_t.hit(Track3);
+			_t.lock(Srr, 90, 4);
+			_t.hit(Track5, Take::Offset, 4);
+		});
+		require(onTrack3 != onTrack5, "a Lock on Track 3 or on Track 5 sounded the same");
+		require(between == onTrack3, "a channel-5 Hit between a channel-1 Hit and its Lock took the Lock");
+		std::printf("Locks on channel 1: with the last channel-1 Hit just before at the same sample, else Track 1's\n");
 	}
 
 	// Notes and CCs, inline SysEx included, on a prepared Plugin: no heap allocation

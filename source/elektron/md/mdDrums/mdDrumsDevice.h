@@ -97,7 +97,7 @@ namespace mdDrums
 		static constexpr size_t Chunk = 256;
 		std::array<std::array<float, Chunk>, Engine::TrackCount> m_tracks{};
 		int64_t m_position = 0;	// samples rendered so far
-		// The last Hit note's Track and the sample it came at: a Lock on channel 1 at that sample goes with it
+		// The last channel-1 Hit note's Track and the sample it came at: a Lock on channel 1 at that sample goes with it
 		int m_lastHitTrack = 0;
 		int64_t m_lastHitPosition = -1;
 		md::automation::sysex::MdKit m_kit;

@@ -745,6 +745,44 @@ namespace
 			beats("Track 3 on the beats, VOL 0 on 2 and 4", 2, {2}, {1, 3}, 0);
 			beats("Track 1 then Track 3 by bar, VOL 0 on 2 and 4, Track 7 off-beats", 4, {0, 0, 0, 0, 2, 2, 2, 2}, {1, 3}, 6);
 			beats("The same, every note on channel 1, each Hit before its Locks", 4, {0, 0, 0, 0, 2, 2, 2, 2}, {1, 3}, 6, true);
+
+			// As md-drums-seq prints, each Track's clip on its own channel, Track 1's on channel 1: Track 3's Hit lands
+			// between Track 1's Hit and its Lock at the same sample, and the Lock stays Track 1's (ADR 0003, amended)
+			{
+				instance->told.clear();
+				std::vector<Note> notes;
+				for(int beat = 0; beat < 8; ++beat)
+				{
+					const auto at = g_beat * (beat + 1);
+					const auto off = at + g_beat / 4;
+					notes.push_back({at, 36, 100, 1});
+					notes.push_back({at, 38, 100, 3});
+					if(beat % 2)
+					{
+						notes.push_back({at, 64 + g_vol, 1, 1});
+						notes.push_back({off, 64 + g_vol, 0, 1, true});
+					}
+					notes.push_back({off, 36, 0, 1, true});
+					notes.push_back({off, 38, 0, 3, true});
+				}
+				std::stable_sort(notes.begin(), notes.end(), [](const Note& _a, const Note& _b) { return _a.sample < _b.sample; });
+				const auto take = render(plugin, notes, g_beat * 10);
+				pump(200);
+				std::printf("Printed: Track 1 on channel 1, Track 3 on channel 3 between Track 1's Hit and its Lock (L locked):");
+				for(int beat = 0; beat < 8; ++beat)
+				{
+					const auto from = g_beat * (beat + 1) + g_block;
+					const auto one = peak(take, 2, from, g_beat / 2), three = peak(take, 4, from, g_beat / 2);
+					const bool locked = beat % 2;
+					std::printf(" %s%.3f/%.3f", locked ? "L" : "", std::abs(one), std::abs(three));
+					require(locked ? one < g_silence : one > g_sound, "printed: beat " + std::to_string(beat + 1)
+						+ (locked ? ", Track 1 sounds although its VOL is locked to 0" : ", Track 1 is silent"));
+					require(three > g_sound, "printed: beat " + std::to_string(beat + 1) + ", Track 3 took Track 1's Lock");
+				}
+				std::printf("\n");
+				require(instance->told.edited(ids).empty(), "printed: MD Drums told the host of a Lock");
+				render(plugin, {}, g_rate);
+			}
 		}
 
 		// The same samples whatever the block sizes and offline, from two fresh instances: Live cuts blocks as it likes and
