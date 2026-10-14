@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version in the file names and the package (e.g. 0.1.0)"
+        description: "Version in the file names, the package and the editor (e.g. 0.1.1)"
         required: true
-        default: "0.1.0"
+        default: "0.1.1"
 
 permissions:
   contents: read
@@ -34,6 +34,7 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
           -DXCODE_VERSION=16
           -DGEARMULATOR_JUCE_PRODUCTS_ROOT="${{ github.workspace }}/build/products"
+          -DMD_DRUMS_VERSION="${{ inputs.version }}"
           -DBUILD_TESTING=ON
           -Dgearmulator_BUILD_JUCEPLUGIN=ON
           -Dgearmulator_BUILD_FX_PLUGIN=OFF
@@ -89,12 +90,17 @@ jobs:
           mkdir -p "${root}/Library/Audio/Plug-Ins/VST3" "${root}/Library/Audio/Plug-Ins/Components"
           ditto "${products}/VST3/MD Drums.vst3" "${root}/Library/Audio/Plug-Ins/VST3/MD Drums.vst3"
           ditto "${products}/AU/MD Drums.component" "${root}/Library/Audio/Plug-Ins/Components/MD Drums.component"
-          pkgbuild --analyze --root "${root}" "${RUNNER_TEMP}/components.plist"
-          count="$(plutil -extract . raw -o - "${RUNNER_TEMP}/components.plist")"
-          for ((i = 0; i < count; i++)); do
-            plutil -replace "${i}.BundleIsRelocatable" -bool NO "${RUNNER_TEMP}/components.plist"
+          plist="${RUNNER_TEMP}/components.plist"
+          pkgbuild --analyze --root "${root}" "${plist}"
+          # plutil cannot walk a plist whose root is an array; PlistBuddy can
+          i=0
+          while /usr/libexec/PlistBuddy -c "Print :${i}" "${plist}" > /dev/null 2>&1; do
+            /usr/libexec/PlistBuddy -c "Set :${i}:BundleIsRelocatable false" "${plist}"
+            i=$((i + 1))
           done
-          pkgbuild --root "${root}" --component-plist "${RUNNER_TEMP}/components.plist" \
+          echo "${i} bundles, none relocatable"
+          test "${i}" -ge 2
+          pkgbuild --root "${root}" --component-plist "${plist}" \
             --identifier com.c0remusic.mddrums --version "${VERSION}" --install-location / \
             "${out}/${name}.pkg"
 
