@@ -43,7 +43,8 @@ namespace md::engine
 		void setTempo(double _bpm);							// tempo factor for tempo-synced LFOs and E12/ROM retrig
 		// velocity 1-127; accent: the sequencer's accented step (velocity becomes 128 + 2 x accent amount). A muted track
 		// drops its Hit, as the OS's note handler does ($20ccf6), and so fires neither its Link nor its Choke.
-		void trigger(int _track, int _velocity = 100, bool _accent = false);
+		// md-drums: returns the tracks it struck, one bit each: the track and its Link, a muted one left out.
+		uint32_t trigger(int _track, int _velocity = 100, bool _accent = false);
 
 		// md-drums: Links and Chokes, the Kit's trig and mute groups, played as OS 1.63 plays them
 		// (.scratch/md-drums-editor/research/06-groupes.md). A Hit of _track also hits its Link, at the same velocity
@@ -57,9 +58,9 @@ namespace md::engine
 		void setChoke(int _track, int _target);
 		uint8_t link(int _track) const { return m_link[_track]; }
 		uint8_t choke(int _track) const { return m_choke[_track]; }
-		// md-drums: a track's user mute, and whether a Choke holds it silent until its next Hit
-		bool muted(int _track) const { return m_mute[_track]; }
-		bool choked(int _track) const { return m_choked[_track]; }
+		// md-drums: in the block just rendered, the track whose Hit's Choke silenced _track there, or kOff. Only a higher
+		// track goes silent in the Hit's block; a lower one waits for the next tick and is not reported.
+		uint8_t cutBy(int _track) const { return m_cutBy[_track]; }
 		void setAccentAmount(int _amount) { m_accentAmount = std::clamp(_amount, 0, 127); }
 
 		// Caps how many tracks can be simultaneously active (most-recently-triggered N; a new distinct
@@ -168,6 +169,7 @@ namespace md::engine
 		std::array<uint8_t, kTracks> m_link{};
 		std::array<uint8_t, kTracks> m_choke{};
 		std::array<bool, kTracks> m_choked{};	// the OS's group-mute flag ($1001510), apart from the user mute
+		std::array<uint8_t, kTracks> m_cutBy{};	// md-drums: cutBy, for the block being rendered
 		MasterWords m_masterWords;
 		bool m_masterPending = false;
 

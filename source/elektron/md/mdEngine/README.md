@@ -28,8 +28,9 @@ later versions can be compared file by file. Their documentation is in `.scratch
   ($20ccf6); every Hit sets the track's smoothed level to its Kit level, as the tick's trigger path does ($20b022).
 - `engine/Mixer.*`, `engine/HostModel.h`, `engine/MdEngine.h`: for MD Drums' sample-accurate Hits, which mix the
   tracks itself (`mdDrums/mdDrumsEngine.cpp`): `Mixer::gains` and `Mixer::mainSample` are `process`'s own gain and
-  output steps, split out (bit-exact, `process` uses them); `HostModel::muted` and `choked` read a track's mute and
-  Choke flags; `EngineT::mixOn = false` skips the mixer.
+  output steps, split out (bit-exact, `process` uses them); `HostModel::trigger` returns the tracks a Hit struck
+  (the track and its Link, a muted one left out) and `HostModel::cutBy` the Choke that silenced a track in the block
+  just rendered, where it zeroes the track's words (ticket 38 of MD Drums' editor map); `EngineT::mixOn = false` skips the mixer.
 - `engine/MasterEngine.*` (new), `engine/HostModel.*`, `engine/MdEngine.h`: the master effects. `MasterEngine` runs
   the mixer DSP's master section (P:$342-$970 of OS 1.63's section 2: Rhythm Echo, Gate Box, their returns, EQ,
   Dynamix) on its own in a second dsp56300, after the parts of the program's boot it needs, on VoiceEngine's

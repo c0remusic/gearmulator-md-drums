@@ -224,6 +224,88 @@ namespace
 		std::printf("voice starts after the 31 samples (and Dynamix's 16 on Main):%s\n", line.c_str());
 	}
 
+	// Where a Choke cuts, sample-accurate (ticket 38 of the editor map): its target, a sustained E12-RC on its own output,
+	// sounds as it would without the Choke up to where the choking Hit sounds, 31 samples after that Hit's note, and is
+	// silent from there, whether it waits more or less than that Hit; through a Link's own Choke too, and after a Choke
+	// onto a Track already choked. A lower target goes silent at the engine's next tick instead, as the Machinedrum orders
+	// its tick: later, at its own delay, and without a gap before. Each case against the same engine with its Chokes off.
+	void chokes(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
+	{
+		struct Case
+		{
+			const char* name;
+			int target;
+			std::vector<int> chokers;					// the Tracks whose Choke is the target
+			int linkFrom;								// a Track that Links to linkTo, or -1
+			int linkTo;
+			std::vector<std::pair<size_t, int>> hits;	// a note's host sample and Track; the last one cuts
+			size_t from;								// where the comparison starts
+			bool lower;									// the target is below the Track that cuts it
+		};
+		constexpr size_t block = mdDrums::Engine::BlockSize;
+		// A note at sample _offset of host block _block: its Hit waits _offset - 1 samples (31 at offset 0)
+		const auto at = [](const size_t _block, const size_t _offset) { return _block * block + _offset; };
+		const std::vector<Case> cases{
+			{"a higher target waiting longer than the Hit", 5, {2}, -1, -1, {{at(138, 30), 5}, {at(300, 3), 2}}, at(138, 30), false},
+			{"a higher target waiting less than the Hit", 5, {2}, -1, -1, {{at(138, 3), 5}, {at(300, 30), 2}}, at(138, 3), false},
+			{"a lower target", 2, {5}, -1, -1, {{at(138, 30), 2}, {at(300, 3), 5}}, at(138, 30), true},
+			{"a Link's Choke", 6, {3}, 1, 3, {{at(138, 30), 6}, {at(300, 3), 1}}, at(138, 30), false},
+			{"a Choke after one onto a Track already choked", 5, {2, 3}, 1, 3,
+				{{at(138, 30), 5}, {at(300, 30), 2}, {at(400, 30), 2}, {at(500, 30), 5}, {at(800, 3), 1}}, at(600, 0), false},
+		};
+
+		const auto run = [&](const Case& _case, const bool _choke)
+		{
+			mdDrums::Engine engine(_os, _bank, true);
+			engine.setMachine(_case.target, machineId(engine, "E12RC"));
+			engine.setParam(_case.target, 1, 127);
+			engine.setParam(_case.target, 2, 127);
+			engine.setSeparateOutputs(1u << _case.target);
+			if(_case.linkFrom >= 0)
+				engine.setLink(_case.linkFrom, _case.linkTo);
+			if(_choke)
+				for(const auto track : _case.chokers)
+					engine.setChoke(track, _case.target);
+			std::vector<float> own(_case.hits.back().first + 4410);
+			size_t rendered = 0;
+			const auto renderTo = [&](const size_t _at)
+			{
+				std::array<float*, mdDrums::Engine::OutputCount> outputs{};
+				outputs[2 + _case.target] = own.data() + rendered;
+				engine.render(outputs.data(), _at - rendered);
+				rendered = _at;
+			};
+			for(const auto& [note, track] : _case.hits)
+			{
+				renderTo(note);
+				engine.trigger(track, 100);
+			}
+			renderTo(own.size());
+			return own;
+		};
+
+		for(const auto& c : cases)
+		{
+			const auto on = run(c, true), off = run(c, false);
+			const auto cut = c.hits.back().first + mdDrums::Engine::SampleAccurateDelay;
+			// Where the target goes silent for good, and what differs before
+			auto silent = on.size();
+			while(silent > c.from && on[silent - 1] == 0.0f)
+				--silent;
+			size_t differ = 0;
+			for(auto i = c.from; i < silent; ++i)
+				differ += on[i] != off[i];
+			float sounding = 0;
+			for(auto i = cut; i < cut + 256; ++i)
+				sounding = std::max(sounding, std::abs(off[i]));
+			std::printf("Choke, %s: silent %+d samples from where the cutting Hit sounds, %zu samples differ before\n",
+				c.name, static_cast<int>(silent) - static_cast<int>(cut), differ);
+			require(sounding > 0.001f, "the target was already silent where the Choke cuts it");
+			require(differ == 0, "a Choke changed its target before it cut it");
+			require(c.lower ? silent > cut : silent == cut, "a Choke did not cut its target where the Hit sounds");
+		}
+	}
+
 	// A sustained sound (E12-RC, HOLD and DEC at 127) retriggered at each of the 32 places of a block: the delays change
 	// at the Hit, which drops or doubles a few samples of the old tail. Threshold set before measuring: within 128
 	// samples from the new Hit's trigger, no sample step steeper than 1.5 times the steepest one of the same retrigger
@@ -324,6 +406,7 @@ int main()
 		}
 		equivalence(flash, os, bank);
 		retrigger(os, bank);
+		chokes(os, bank);
 		voiceStarts(os, bank);
 
 		// Track 1 on its own output: it leaves the main mix and sounds there alone.

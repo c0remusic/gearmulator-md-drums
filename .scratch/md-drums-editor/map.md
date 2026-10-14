@@ -196,6 +196,9 @@ mesurées avant et après. Pas de tag.
   testeurs muets faute de flash image ; ligne d'état dans la barre du haut (flash image manquante, un clic la choisit,
   copiée et Device refait sans recharger ; note qui ne joue rien ; nouvelle release lue sur GitHub une fois par jour) ;
   version 0.1.1 près du logo ; `mdDrumsUpdateTest` au garde-fou.
+- [Où une Choke coupe](issues/38-coupe-de-choke.md) : `HostModel` dit les Tracks frappées et les coupes de chaque bloc,
+  le moteur aligne ses voies ; la cible s'arrête exactement là où sonne le Hit qui coupe (une Track plus basse au tick
+  suivant, sans trou), Choke d'un Link comprise ; latence inchangée.
 
 ## Not yet specified
 

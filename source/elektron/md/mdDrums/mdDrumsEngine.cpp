@@ -50,7 +50,6 @@ namespace mdDrums
 			if(_master)
 				engine.enableMaster(_os.firmware);
 			pending.fill(-1);
-			chokeDelay.fill(-1);
 		}
 
 		static constexpr int Ring = 64;	// a block, plus the longest delay
@@ -71,9 +70,8 @@ namespace mdDrums
 		int64_t blockStart = 0;	// the engine's time at the next block it renders
 		std::array<int, TrackCount> delay{};
 		std::array<int, TrackCount> pending{};		// the delay a Hit set, from the block it lands in; -1 none
-		std::array<int, TrackCount> chokeDelay{};	// the delay of the Hit that chokes the Track; -1 none
-		std::array<bool, TrackCount> wasChoked{};
 		std::array<Lane, TrackCount> lanes{};
+		std::array<std::array<uint32_t, 5>, TrackCount> lastWords{};	// each Track's mixer words in the last block
 
 		// The output block: the master effects' inputs (the dry main mix and the two sends), Main after them, each Track's
 		// own output
@@ -95,46 +93,62 @@ namespace mdDrums
 		blockStart += BlockSize;
 		auto& host = engine.host();
 
+		std::array<bool, TrackCount> struck{};
 		for(int t = 0; t < TrackCount; ++t)
 		{
-			if(pending[t] >= 0)
+			struck[t] = pending[t] >= 0;
+			if(!struck[t])
+				continue;
+			delay[t] = pending[t];
+			pending[t] = -1;
+		}
+
+		// A Choke that silenced a Track in this block (ticket 38): the Track stops exactly where the Hit that cut it
+		// sounds. What it still had waiting past that point goes; when it waits less than that Hit, it plays on with
+		// its last block's words up to it, unless the Hit struck it too. A lower Track, which the engine silences at its
+		// next tick, keeps sounding until then at its own delay.
+		std::array<int, TrackCount> extend{};
+		for(int t = 0; t < TrackCount && sampleAccurate; ++t)
+		{
+			const auto by = host.cutBy(t);
+			if(by >= TrackCount)
+				continue;
+			for(auto time = start + delay[by]; time < start + SampleAccurateDelay; ++time)
 			{
-				delay[t] = pending[t];
-				pending[t] = -1;
+				lanes[t].mix[time & Mask] = {};
+				lanes[t].solo[time & Mask] = 0;
 			}
-			// A Choke the engine has just applied: the tail the Track would still play once the choking Hit sounds goes
-			const auto choked = host.choked(t);
-			if(choked && !wasChoked[t] && chokeDelay[t] >= 0)
-			{
-				for(auto time = start + chokeDelay[t]; time < start + delay[t]; ++time)
-				{
-					lanes[t].mix[time & Mask] = {};
-					lanes[t].solo[time & Mask] = 0;
-				}
-				chokeDelay[t] = -1;
-			}
-			wasChoked[t] = choked;
+			if(!struck[t])
+				extend[t] = std::max(0, delay[by] - delay[t]);
 		}
 
 		for(int t = 0; t < TrackCount; ++t)
 		{
+			const auto words = host.mixerInput(t).mix;
+			const auto last = lastWords[t];
+			lastWords[t] = words;
 			const auto& samples = out.tracks[t];
 			if(std::all_of(samples.begin(), samples.end(), [](const int32_t _s) { return _s == 0; }))
 				continue;
-			const auto& words = host.mixerInput(t).mix;
-			std::array<int32_t, Channels> gains{};
-			const bool main = engine.mixer().gains(words, (engine.dryMute >> t) & 1, gains);
-			const auto vol = sx24(words[1]);
 			auto& lane = lanes[t];
-			for(int i = 0; i < BlockSize; ++i)
+			// Samples _from to _to of the block with the mixer's words _words
+			const auto mix = [&](const std::array<uint32_t, 5>& _words, const int _from, const int _to)
 			{
-				const auto slot = (start + i + delay[t]) & Mask;
-				if(main)
-					for(int c = 0; c < Channels; ++c)
-						lane.mix[slot][c] = add(lane.mix[slot][c], mpy(gains[c], samples[i]));
-				// Mixer::solo, before its limiter
-				lane.solo[slot] = add(lane.solo[slot], asl(mpy(samples[i], vol), 4));
-			}
+				std::array<int32_t, Channels> gains{};
+				const bool main = engine.mixer().gains(_words, (engine.dryMute >> t) & 1, gains);
+				const auto vol = sx24(_words[1]);
+				for(int i = _from; i < _to; ++i)
+				{
+					const auto slot = (start + i + delay[t]) & Mask;
+					if(main)
+						for(int c = 0; c < Channels; ++c)
+							lane.mix[slot][c] = add(lane.mix[slot][c], mpy(gains[c], samples[i]));
+					// Mixer::solo, before its limiter
+					lane.solo[slot] = add(lane.solo[slot], asl(mpy(samples[i], vol), 4));
+				}
+			};
+			mix(last, 0, extend[t]);
+			mix(words, extend[t], BlockSize);
 		}
 
 		for(int i = 0; i < BlockSize; ++i)
@@ -345,24 +359,16 @@ namespace mdDrums
 		if(_track < 0 || _track >= TrackCount)
 			return 0;
 		auto& state = *m_state;
-		auto& host = state.engine.host();
-		host.trigger(_track, std::clamp(_velocity, 1, 127));
-		if(host.muted(_track))
-			return 0;
-		const auto link = host.link(_track);
-		const bool linked = link < TrackCount && link != _track && !host.muted(link);
-		const uint32_t struck = (1u << _track) | (linked ? 1u << link : 0u);
+		const auto struck = state.engine.host().trigger(_track, std::clamp(_velocity, 1, 127));
 		if(!state.sampleAccurate)
 			return struck;
 
-		// The Hit lands BlockSize - used samples from now: its Track waits the rest of the 31, and so does its Link,
-		// which the engine hits in the same block. Its Choke's target is cut as late after the choke as this Hit sounds.
+		// The Hit lands BlockSize - used samples from now: each Track it struck, its own and its Link's, waits the rest
+		// of the 31
 		const auto delay = static_cast<int>(state.used) - 1;
-		state.pending[_track] = delay;
-		if(linked)
-			state.pending[link] = delay;
-		if(const auto choke = host.choke(_track); choke < TrackCount && choke != _track)
-			state.chokeDelay[choke] = delay;
+		for(int t = 0; t < TrackCount; ++t)
+			if(struck & (1u << t))
+				state.pending[t] = delay;
 		return struck;
 	}
 
@@ -374,7 +380,6 @@ namespace mdDrums
 			return;
 		state.delay.fill(0);
 		state.pending.fill(-1);
-		state.chokeDelay.fill(-1);
 	}
 
 	bool Engine::isSampleAccurate() const

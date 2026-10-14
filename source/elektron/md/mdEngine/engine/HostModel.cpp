@@ -54,6 +54,7 @@ namespace md::engine
 		m_route.fill(6);
 		m_link.fill(kOff);
 		m_choke.fill(kOff);
+		m_cutBy.fill(kOff);
 		m_activeOrder.reserve(kTracks);	// no allocation when a trigger reorders it
 		// md-drums: the master bodies return to the caller instead of running into the tick's epilogue (which mdEngine
 		// never calls)
@@ -201,16 +202,18 @@ namespace md::engine
 	}
 
 	template<class TVoices>
-	void HostModel<TVoices>::trigger(const int _track, const int _velocity, const bool _accent)
+	uint32_t HostModel<TVoices>::trigger(const int _track, const int _velocity, const bool _accent)
 	{
 		if(m_mute[_track])
-			return;
+			return 0;
 		hit(_track, _velocity, _accent);
 		// The note handler gives the trig group's track the same velocity and accent ($20cf8c), and the tick fires it
 		// in the same tick from the handler's own flags only, so its own trig group does not fire ($20add8)
 		const auto link = m_link[_track];
-		if(link < kTracks && link != _track && !m_mute[link])
-			hit(link, _velocity, _accent);
+		if(link >= kTracks || link == _track || m_mute[link])
+			return 1u << _track;
+		hit(link, _velocity, _accent);
+		return (1u << _track) | (1u << link);
 	}
 
 	template<class TVoices>
@@ -343,8 +346,12 @@ namespace md::engine
 			m_choked[target] = true;
 			// A higher track's words come later in the same tick, a lower one's at the next tick. Between ticks only
 			// the struck tracks are updated: a higher target's words are given at once.
-			if(target > _track && !m_trigger[target])
-				updateMixer(target);
+			if(target > _track)
+			{
+				m_cutBy[target] = static_cast<uint8_t>(_track);
+				if(!m_trigger[target])
+					updateMixer(target);
+			}
 		}
 		// With a self-reference, the flag is set then cleared: nothing
 		m_choked[_track] = false;
@@ -424,6 +431,7 @@ namespace md::engine
 			if(m_trigger[t])
 				applyLocks(t);
 		m_lockPending.fill(0);
+		m_cutBy.fill(kOff);
 		if(m_blockCount++ % m_blocksPerTick == 0)
 			tick();
 		else

@@ -40,7 +40,8 @@ Link does not fire.
 _Avoid_: trig group, trig pos
 
 **Choke**:
-A Track's Hit that silences another Track at once, until that Track's next Hit.
+A Track's Hit that silences another Track where the Hit sounds, until that Track's next Hit; a lower-numbered Track goes
+silent at the engine's next tick instead, as on the Machinedrum. A Track hit through a Link fires its own Choke too.
 _Avoid_: mute group, choke group (Live's choke groups work both ways; a Choke goes one way)
 
 **Master effects**:

@@ -45,6 +45,7 @@ bloc, puis le bloc de sortie somme les 16 Tracks et passe le limiteur.
 - **Choke** : quand le moteur pose le Choke, la queue de la cible qui sonnerait après le Hit qui la coupe est retirée
   (cible coupée au retard du Hit). Si la cible attendait moins que le Hit, sa queue s'arrête jusqu'à 31 échantillons
   plus tôt que ce retard : le moteur l'a déjà mise à zéro ; écart dans le bloc que ce Choke avait déjà (ticket 15).
+  Corrigé au ticket 38 : la cible coupée s'arrête exactement là où sonne le Hit, dans les deux sens.
 - **LFO TRIG** : exact pour un LFO qui module sa propre Track ; vers une autre Track, l'effet arrive au retard de
   celle-ci, à 31 échantillons au plus du Hit qui relance le LFO.
 - **Automation** : un paramètre change au bloc suivant du moteur, puis au retard de sa Track.
