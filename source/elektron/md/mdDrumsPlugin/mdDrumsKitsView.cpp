@@ -95,7 +95,7 @@ namespace mdDrums
 		// flash image is chosen
 		if(head() == m_head)
 			return;
-		refresh();
+		m_editor.withDocumentLocked([this] { refresh(); });
 	}
 
 	Bank* KitsView::bank() const
@@ -315,6 +315,7 @@ namespace mdDrums
 		const auto* b = bank();
 		if(!b || (!_import && !exportable()))
 			return;
+		// The file chosen arrives from the message loop, outside an RmlUi event: its handling locks the document
 		const auto folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 		if(_import)
 		{
@@ -324,7 +325,7 @@ namespace mdDrums
 				{
 					const auto file = _chooser.getResult();
 					if(file != juce::File())
-						importFile(file.getFullPathName().toStdString());
+						m_editor.withDocumentLocked([&] { importFile(file.getFullPathName().toStdString()); });
 				});
 			return;
 		}
@@ -336,7 +337,7 @@ namespace mdDrums
 			{
 				const auto file = _chooser.getResult();
 				if(file != juce::File())
-					exportFile(file.getFullPathName().toStdString());
+					m_editor.withDocumentLocked([&] { exportFile(file.getFullPathName().toStdString()); });
 			});
 	}
 

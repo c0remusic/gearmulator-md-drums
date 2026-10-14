@@ -47,6 +47,19 @@ namespace mdDrums
 		// again each time.
 		Rml::Element* element(const std::string& _id) const;
 
+		// Runs _func under the document's access lock, which the OpenGL thread renders under, for a view that changes
+		// the document from outside an RmlUi event (whose dispatch holds the lock): a timer, a parameter's notification
+		// from the message loop, the Track shown changed by the Controller's timer or a state restored, a file chosen.
+		// The lock is recursive. Without a component nothing runs.
+		template<typename T> void withDocumentLocked(const T& _func) const
+		{
+			auto* component = getRmlComponent();
+			if(!component)
+				return;
+			juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
+			_func();
+		}
+
 		TrackView* getTrackView() const { return m_trackView.get(); }
 		MeterView* getMeterView() const { return m_meterView.get(); }
 		HitView* getHitView() const { return m_hitView.get(); }

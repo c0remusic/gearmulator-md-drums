@@ -46,8 +46,13 @@ namespace mdDrums
 			if(auto* tick = find("filter_tick" + std::to_string(i + 1)))
 				tick->SetProperty("left", dp(xOf(g_ticks[i]) + 4.0f));
 
+		// The Track shown and the parameters change outside an RmlUi event too (the Controller's timer, the message
+		// loop's notifications): the handlers lock the document
 		auto& controller = m_editor.getProcessor().getController();
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part) { onPartChanged(_part); });
+		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
+		{
+			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
+		});
 		onPartChanged(controller.getCurrentPart());
 	}
 
@@ -76,7 +81,10 @@ namespace mdDrums
 		{
 			m_onChanged[i].reset();
 			if(auto* parameter = controller.getParameter(g_parameters[i], _part))
-				m_onChanged[i].set(parameter->onValueChanged, [this](pluginLib::Parameter* const&) { update(); });
+				m_onChanged[i].set(parameter->onValueChanged, [this](pluginLib::Parameter* const&)
+				{
+					m_editor.withDocumentLocked([&] { update(); });
+				});
 		}
 		update();
 	}

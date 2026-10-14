@@ -61,14 +61,22 @@ namespace mdDrums
 		for(const auto* tab : {"tab_mix", "tab_master"})
 			m_editor.addClick(tab, [this](Rml::Event&) { disarm(); });
 
-		// Every Track's LFO target and depth, for the names it underlines
+		// Every Track's LFO target and depth, for the names it underlines. The parameters' notifications come from the
+		// message loop and the Track shown also changes from the Controller's timer, outside an RmlUi event: the
+		// handlers lock the document.
 		auto& controller = m_editor.getProcessor().getController();
 		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
 			for(const auto* name : {"LfoTrack", "LfoParam", "LFOD"})
 				if(auto* p = controller.getParameter(name, t))
-					m_onAnyLfo.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&) { updateUnderlines(); });
+					m_onAnyLfo.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
+					{
+						m_editor.withDocumentLocked([&] { updateUnderlines(); });
+					});
 
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part) { onPartChanged(_part); });
+		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
+		{
+			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
+		});
 		onPartChanged(controller.getCurrentPart());
 		updateTitle();
 	}
@@ -97,16 +105,25 @@ namespace mdDrums
 		m_onShown.clear();
 		for(const auto* name : {"LfoShape1", "LfoShape2", "LfoMode", "LFOS", "LFOD", "LFOM"})
 			if(auto* p = parameter(name, _part))
-				m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&) { update(); });
+				m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
+				{
+					m_editor.withDocumentLocked([&] { update(); });
+				});
 		for(const auto* name : {"LfoTrack", "LfoParam"})
 			if(auto* p = parameter(name, _part))
 				m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
 				{
-					listenToTarget();
-					update();
+					m_editor.withDocumentLocked([&]
+					{
+						listenToTarget();
+						update();
+					});
 				});
 		if(auto* p = parameter("Machine", _part))
-			m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&) { updateTargets(); });
+			m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
+			{
+				m_editor.withDocumentLocked([&] { updateTargets(); });
+			});
 		refresh();
 	}
 
@@ -129,7 +146,10 @@ namespace mdDrums
 	{
 		m_onTarget.reset();
 		if(auto* p = target())
-			m_onTarget.set(p->onValueChanged, [this](pluginLib::Parameter* const&) { update(); });
+			m_onTarget.set(p->onValueChanged, [this](pluginLib::Parameter* const&)
+			{
+				m_editor.withDocumentLocked([&] { update(); });
+			});
 	}
 
 	void LfoView::update()

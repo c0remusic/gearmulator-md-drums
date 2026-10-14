@@ -89,8 +89,12 @@ namespace mdDrums
 						setStripOut(t, out->getUnnormalizedValue() + (delta > 0.0f ? 1 : -1));
 					_event.StopPropagation();
 				});
+			// The parameters' notifications come from the message loop, outside an RmlUi event: they lock the document
 			if(auto* out = controller.getParameter("Out", t))
-				m_onOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&) { updateOut(t); });
+				m_onOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&)
+				{
+					m_editor.withDocumentLocked([&] { updateOut(t); });
+				});
 			updateStripOut(t);
 		}
 		m_editor.addClick("track_prev", [this](Rml::Event&) { stepTrack(-1); });
@@ -157,7 +161,12 @@ namespace mdDrums
 		m_editor.addClick("kit", [this](Rml::Event&) { setOverlay(m_overlay == Overlay::Kits ? Overlay::None : Overlay::Kits); });
 		m_editor.addClick("kits_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
 
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part) { onPartChanged(_part); });
+		// The Track shown changes from a click, within an RmlUi event, but also from the Controller's timer (Push's
+		// relay Track) and from a state restored: the handler locks the document
+		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
+		{
+			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
+		});
 		onPartChanged(controller.getCurrentPart());
 		updateSize();
 	}
@@ -393,11 +402,17 @@ namespace mdDrums
 		if(auto* machine = controller.getParameter("Machine", _part))
 			m_onMachineChanged.set(machine->onValueChanged, [this](pluginLib::Parameter* const&)
 			{
-				updateMachine();
-				updateLfoMenu();
+				m_editor.withDocumentLocked([&]
+				{
+					updateMachine();
+					updateLfoMenu();
+				});
 			});
 		if(auto* lfoTrack = controller.getParameter("LfoTrack", _part))
-			m_onLfoTrackChanged.set(lfoTrack->onValueChanged, [this](pluginLib::Parameter* const&) { updateLfoMenu(); });
+			m_onLfoTrackChanged.set(lfoTrack->onValueChanged, [this](pluginLib::Parameter* const&)
+			{
+				m_editor.withDocumentLocked([&] { updateLfoMenu(); });
+			});
 		updateMachine();
 		updateOutput();
 		updateLfoMenu();
