@@ -35,6 +35,7 @@ namespace baseLib
 namespace synthLib
 {
 	struct DeviceCreateParams;
+	class DeviceException;
 	class Plugin;
 	struct SMidiEvent;
 }
@@ -167,6 +168,11 @@ namespace pluginLib
 		const Properties& getProperties() const { return m_properties; }
 
 		virtual void processBpm(float _bpm) {}
+
+		// The device could not be made when the plug-in loaded (the stand-in DummyDevice plays instead); not called in a
+		// headless process. By default a message box two seconds later, which names the folder for the firmware; a product
+		// whose editor says it overrides this.
+		virtual void onDeviceCreationFailed(const synthLib::DeviceException& _e);
 
 		bool rebootDevice();
 

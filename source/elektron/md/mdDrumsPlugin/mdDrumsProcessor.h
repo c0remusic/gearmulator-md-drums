@@ -9,7 +9,9 @@
 #include "jucePluginEditorLib/pluginProcessor.h"
 
 #include <atomic>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace mdDrums
@@ -37,6 +39,12 @@ namespace mdDrums
 
 		// Where the flash image was looked for, for the dialog when it is missing
 		std::vector<std::string> romFolders() const;
+		// Whether a Device plays, rather than the stack's silent stand-in when no flash image was found
+		bool hasDevice();
+		// A flash image the user chose in the editor (ticket 35): checked, the Device made again from it (with the Kit the
+		// stand-in kept, if any), the parameters following the Device's Kit, then written into the data folder's roms
+		// under the name MD Drums looks for. Empty when it went, else why not, for the editor.
+		std::string loadFlashImage(const std::filesystem::path& _file);
 
 		// What the editor shows of the sound, which every Device this Processor creates writes (ticket 16)
 		Telemetry& getTelemetry() const { return *m_telemetry; }
@@ -55,6 +63,8 @@ namespace mdDrums
 		// Main, then the 15 Outs (messages::OutCount), off until the host enables them
 		static BusesProperties buses();
 		bool isBusesLayoutSupported(const BusesLayout& _layouts) const override;
+		// No flash image: the editor's status line says it, not the stack's message box
+		void onDeviceCreationFailed(const synthLib::DeviceException& _e) override;
 
 		std::shared_ptr<Telemetry> m_telemetry = std::make_shared<Telemetry>();
 		std::shared_ptr<const md::engine::TrackFx::Tables> m_fxTables;
@@ -62,5 +72,6 @@ namespace mdDrums
 		std::atomic<float> m_bpm{0.0f};
 		bool m_forTests = false;
 		std::unique_ptr<Bank> m_bank;
+		std::vector<uint8_t> m_chosenFlash;		// loadFlashImage's, for createDevice, while it makes the Device
 	};
 }

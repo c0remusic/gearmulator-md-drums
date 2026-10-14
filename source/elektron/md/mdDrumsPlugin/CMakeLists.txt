@@ -6,6 +6,13 @@ cmake_minimum_required(VERSION 3.15)
 # and codes: it never replaces md-mm's "Gearmulator MD".
 project(mdDrumsPlugin VERSION ${CMAKE_PROJECT_VERSION})
 
+# MD Drums' own version, which the editor shows and the update check compares with the releases' md-drums-vX.Y.Z tags.
+# The host shows the Gearmulator base's, PluginVersion* below. A release build gives its own (-DMD_DRUMS_VERSION=), so
+# that the files' names and the version the editor shows are one.
+if(NOT DEFINED MD_DRUMS_VERSION)
+	set(MD_DRUMS_VERSION "0.1.1")
+endif()
+
 set(SOURCES
 	mdDrumsController.cpp mdDrumsController.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
@@ -18,7 +25,9 @@ set(SOURCES
 	mdDrumsLinksView.cpp mdDrumsLinksView.h
 	mdDrumsMeterView.cpp mdDrumsMeterView.h
 	mdDrumsProcessor.cpp mdDrumsProcessor.h
+	mdDrumsStatusView.cpp mdDrumsStatusView.h
 	mdDrumsTrackView.cpp mdDrumsTrackView.h
+	mdDrumsUpdates.cpp mdDrumsUpdates.h
 	parameterDescriptions_mddrums.json
 	skins/mdDrums/mdDrums.rml
 	skins/mdDrums/mdDrums.rcss
@@ -60,6 +69,7 @@ target_compile_definitions(mdDrumsPlugin PUBLIC
 	PluginVersionMinor=${CMAKE_PROJECT_VERSION_MINOR}
 	PluginVersionPatch=${CMAKE_PROJECT_VERSION_PATCH}
 	Plugin4CC="Mddr"
+	MdDrumsVersion="${MD_DRUMS_VERSION}"
 	JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
 	JucePlugin_Lv2Uri="urn:c0remusic:mddrums")
 target_link_libraries(mdDrumsPlugin PRIVATE mdDrumsPlugin_BinaryData mdDrums jucePluginEditorLib juce_plugin_modules)
@@ -97,6 +107,16 @@ if(BUILD_TESTING)
 		set_tests_properties(mdDrumsVst3HostTest PROPERTIES LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 180)
 		set_property(TARGET mdDrumsVst3HostTest PROPERTY FOLDER "Elektron/test")
 	endif()
+
+	# The update check's reading of GitHub's release list and its version order, without the network (ticket 35)
+	# The update check's reading alone: JUCE's modules, not the plug-in
+	add_executable(mdDrumsUpdateTest mdDrumsUpdateTest.cpp mdDrumsUpdates.cpp mdDrumsUpdates.h)
+	target_link_libraries(mdDrumsUpdateTest PRIVATE juce_plugin_modules)
+	target_compile_definitions(mdDrumsUpdateTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
+		MdDrumsVersion="${MD_DRUMS_VERSION}")
+	add_test(NAME mdDrumsUpdateTest COMMAND mdDrumsUpdateTest)
+	set_tests_properties(mdDrumsUpdateTest PROPERTIES TIMEOUT 60)
+	set_property(TARGET mdDrumsUpdateTest PROPERTY FOLDER "Elektron/test")
 
 	# Measurement, not a gate: several instances in one process, their memory and CPU (ticket 31). Run by hand
 	add_executable(mdDrumsInstancesTest mdDrumsInstancesTest.cpp)

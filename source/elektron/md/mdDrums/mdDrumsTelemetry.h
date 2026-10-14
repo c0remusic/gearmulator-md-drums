@@ -55,6 +55,17 @@ namespace mdDrums
 			m_hits[static_cast<size_t>(_track)].fetch_add(1, std::memory_order_release);
 		}
 
+		// Audio thread: a note on that plays nothing, outside 36-51 (Tracks) and 64-87 (Locks): the editor says which
+		// notes do (ticket 35; Live's computer keyboard starts at C3, 60)
+		void unplayed(const uint8_t _note)
+		{
+			m_unplayedNote.store(_note, std::memory_order_relaxed);
+			m_unplayed.fetch_add(1, std::memory_order_release);
+		}
+		// Message thread: how many such notes so far, and the last one
+		uint32_t unplayedCount() const { return m_unplayed.load(std::memory_order_acquire); }
+		uint8_t lastUnplayed() const { return m_unplayedNote.load(std::memory_order_relaxed); }
+
 		// Audio thread: a new capture for a struck Track, in the slot the previous one does not use
 		void beginCapture(const int _track, const uint8_t _velocity)
 		{
@@ -142,5 +153,7 @@ namespace mdDrums
 		std::array<std::atomic<float>, OutputCount> m_peaks{};
 		std::array<std::atomic<uint32_t>, TrackCount> m_hits{};
 		std::array<TrackCaptures, TrackCount> m_captures{};
+		std::atomic<uint32_t> m_unplayed{0};
+		std::atomic<uint8_t> m_unplayedNote{0};
 	};
 }

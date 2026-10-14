@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -385,6 +387,89 @@ namespace
 		block();
 	}
 
+	void setEnvironment(const char* _name, const std::string& _value)
+	{
+#if defined(_MSC_VER)
+		_putenv_s(_name, _value.c_str());
+#else
+		setenv(_name, _value.c_str(), 1);
+#endif
+	}
+
+	// A flash image chosen in the editor (ticket 35), from where a tester without one stands: the stack's silent stand-in
+	// (DummyDevice) in place of the Device, a set opened there. The stand-in keeps the set's Kit, and a set saved then
+	// keeps it too. A file that is no flash image is refused, with why. The image makes the Device again, which receives
+	// the set's Kit (EFM-BD on Track 1, not factory Kit 1's TRX-B2), the parameters following it (one moved while nothing
+	// played comes back); it is then written into the data folder's roms under the name MD Drums looks for, and note 36
+	// sounds. The data folder is a temporary one (GEARMULATOR_DATA_ROOT), never the user's.
+	void flashLoader(const double _rate)
+	{
+		const auto flash = mdDrums::Engine::findFlashImage({});
+		if(flash.empty())
+		{
+			std::printf("flash loader: no flash image on this PC, skipped\n");
+			return;
+		}
+		const auto root = std::filesystem::temp_directory_path() / ("MDDrumsFlash_" + juce::Uuid().toString().toStdString());
+		std::filesystem::create_directories(root);
+		const auto chosen = root / "chosen.bin";
+		std::ofstream(chosen, std::ios::binary).write(reinterpret_cast<const char*>(flash.data()),
+			static_cast<std::streamsize>(flash.size()));
+		const auto* kept = std::getenv("GEARMULATOR_DATA_ROOT");
+		const std::string keptRoot = kept ? kept : "";
+		setEnvironment("GEARMULATOR_DATA_ROOT", root.string());
+		{
+			mdDrums::Processor processor(true);
+			juce::AudioProcessor& host = processor;
+			host.setRateAndBufferSizeDetails(_rate, g_block);
+			host.prepareToPlay(_rate, g_block);
+			require(processor.hasDevice(), "no Device to start from");
+			automate(processor, "Machine", 0, 32);
+			juce::MemoryBlock set;
+			host.getStateInformation(set);
+			processor.setDeviceType(pluginLib::DeviceType::Dummy, true);
+			require(!processor.hasDevice(), "the stand-in passes for a Device");
+
+			host.setStateInformation(set.getData(), static_cast<int>(set.getSize()));
+			juce::MemoryBlock saved;
+			host.getStateInformation(saved);
+			{
+				mdDrums::Processor reopened(true);
+				static_cast<juce::AudioProcessor&>(reopened).setStateInformation(saved.getData(),
+					static_cast<int>(saved.getSize()));
+				require(device(reopened).kit().machine(0) == 32, "a set saved while the stand-in played lost its Kit");
+			}
+			automate(processor, "Machine", 0, 33);
+
+			const auto wrong = root / "not-a-flash.bin";
+			std::ofstream(wrong, std::ios::binary) << "Machinedrum";
+			const auto* before = processor.getPlugin().getDevice();
+			const auto refused = processor.loadFlashImage(wrong);
+			require(!refused.empty() && processor.getPlugin().getDevice() == before && !processor.hasDevice(),
+				"a file that is no flash image was taken");
+
+			const auto loaded = processor.loadFlashImage(chosen);
+			require(loaded.empty(), "the flash image was refused: " + loaded);
+			require(processor.hasDevice() && processor.getPlugin().getDevice() != before, "the Device was not made again");
+			require(device(processor).kit().machine(0) == 32, "the new Device did not receive the set's Kit");
+			require(parameter(processor, "Machine", 0).getUnnormalizedValue() == 32,
+				"the parameters did not follow the new Device's Kit");
+			const auto written = std::filesystem::u8path(processor.getPublicRomFolder()) / mdDrums::Engine::FlashImageName;
+			std::error_code error;
+			require(std::filesystem::file_size(written, error) == flash.size(),
+				"the flash image was not written into the data folder");
+			host.prepareToPlay(_rate, g_block);
+			const auto hit = play(processor, 36, 0, _rate);
+			std::printf("flash loader: \"%s\" refused (%s); the set's Kit kept by the stand-in and in a set saved there, "
+				"then by the Device made from the image (Track 1 EFM-BD), written to %s; note 36 peak %.3f\n",
+				wrong.filename().string().c_str(), refused.c_str(), written.parent_path().string().c_str(), hit.peak);
+			require(hit.peak > 0.01f, "note 36 is silent after the flash image was loaded");
+		}
+		setEnvironment("GEARMULATOR_DATA_ROOT", keptRoot);
+		std::error_code error;
+		std::filesystem::remove_all(root, error);
+	}
+
 	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
 	// control); MD_DRUMS_EDITOR_PNG names a file for a picture of it
 	void editor(mdDrums::Processor& _processor)
@@ -589,6 +674,7 @@ int main()
 			}
 			latency(processor, rate);
 		}
+		flashLoader(44100.0);
 		std::cout << "mdDrumsProcessorTest: PASS\n";
 		return 0;
 	}

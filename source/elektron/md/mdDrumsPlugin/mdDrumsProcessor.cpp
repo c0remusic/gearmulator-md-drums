@@ -2,6 +2,7 @@
 
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsStatusView.h"
 
 #include "mdDrumsDevice.h"
 #include "mdDrumsMessages.h"
@@ -11,6 +12,7 @@
 #include "jucePluginLib/processorPropertiesInit.h"
 
 #include "baseLib/binarystream.h"
+#include "baseLib/filesystem.h"
 #include "synthLib/deviceException.h"
 #include "synthLib/os.h"
 
@@ -20,8 +22,6 @@ namespace mdDrums
 {
 	namespace
 	{
-		constexpr const char* g_flashName = "elektron_sps1-1uw_os1.63.bin";
-
 		juce::PropertiesFile::Options configOptions(const bool _forTests)
 		{
 			juce::PropertiesFile::Options options;
@@ -61,6 +61,9 @@ namespace mdDrums
 		: jucePluginEditorLib::Processor(buses(), configOptions(_forTests), properties(), !_forTests,
 			_forTests ? ConfigMode::Ephemeral : ConfigMode::Persistent), m_forTests(_forTests)
 	{
+		// A test's editor asks GitHub nothing
+		if(_forTests)
+			getConfig().setValue(StatusView::CheckKey, false);
 		getController();
 	}
 
@@ -85,27 +88,76 @@ namespace mdDrums
 		return folders;
 	}
 
+	bool Processor::hasDevice()
+	{
+		return dynamic_cast<const Device*>(getPlugin().getDevice()) != nullptr;
+	}
+
+	std::string Processor::loadFlashImage(const std::filesystem::path& _file)
+	{
+		std::string error;
+		m_chosenFlash = Engine::readFlashImage(_file, error);
+		if(m_chosenFlash.empty())
+			return error;
+
+		// The Device is made from the bytes just checked, and the file kept only once it plays: one that cannot start
+		// never replaces a good copy
+		const auto* before = getPlugin().getDevice();
+		try
+		{
+			setDeviceType(pluginLib::DeviceType::Local, true);
+		}
+		catch(const std::exception& _e)
+		{
+			error = _e.what();
+		}
+		const auto flash = std::move(m_chosenFlash);
+		m_chosenFlash.clear();
+		if(getPlugin().getDevice() == before || !hasDevice())
+			return "MD Drums could not start from that file" + (error.empty() ? std::string() : ": " + error);
+		static_cast<Controller&>(getController()).followDevice();
+
+		const auto target = getPublicRomFolder() + Engine::FlashImageName;
+		if(!baseLib::filesystem::writeFileAtomic(target, flash.data(), flash.size()))
+			return "MD Drums plays it, but could not keep it as " + target;
+		return {};
+	}
+
+	void Processor::onDeviceCreationFailed(const synthLib::DeviceException& _e)
+	{
+		// The editor's status line says it and chooses the file (StatusView); the stack's box would ask for a reload
+		if(_e.errorCode() == synthLib::DeviceError::FirmwareMissing)
+			return;
+		jucePluginEditorLib::Processor::onDeviceCreationFailed(_e);
+	}
+
 	synthLib::Device* Processor::createDevice()
 	{
-		std::vector<std::filesystem::path> folders;
-		for(const auto& folder : romFolders())
-			folders.emplace_back(folder);
-		auto flash = Engine::findFlashImage(folders);
+		auto flash = m_chosenFlash;
+		if(flash.empty())
+		{
+			// The stack's folders are UTF-8, which a path made from a std::string would read in the ANSI code page
+			std::vector<std::filesystem::path> folders;
+			for(const auto& folder : romFolders())
+				folders.push_back(std::filesystem::u8path(folder));
+			flash = Engine::findFlashImage(folders);
+		}
 		if(flash.empty())
 			throw synthLib::DeviceException(synthLib::DeviceError::FirmwareMissing,
-				std::string("MD Drums needs the Machinedrum UW's 8 MB flash image with OS 1.63, ") + g_flashName + ".");
+				std::string("MD Drums needs the Machinedrum UW's 8 MB flash image with OS 1.63, ") + Engine::FlashImageName
+				+ ".");
 
 		if(!m_bank)
 		{
 			const auto folder = m_forTests
 				? std::filesystem::temp_directory_path() / ("MDDrumsTest_" + juce::Uuid().toString().toStdString())
-				: std::filesystem::path(getDataFolder());
+				: std::filesystem::u8path(getDataFolder());
 			m_bank = std::make_unique<Bank>(folder / "Bank.syx", messages::factoryKits(flash));
 			m_bank->read();
 		}
 
 		synthLib::DeviceCreateParams params;
-		params.romName = g_flashName;
+		params.romName = Engine::FlashImageName;
 		params.romData = std::move(flash);
 		params.homePath = getDataFolder();
 		auto* device = new Device(params, m_telemetry);

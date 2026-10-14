@@ -9,10 +9,12 @@
 	<body id="Root" class="mdd" style="width: 1296dp; height: 824dp;">
 		<!-- ===== Top bar ===== -->
 		<div id="rule_55" class="a rule full" style="top: 55dp;"/>
-		<div id="logo" class="a c1 w3 bar logo">MD<span>Drums</span></div>
+		<div id="logo" class="a c1 w3 bar logo">MD<span>Drums</span><span id="version" class="version"></span></div>
 		<button id="tab_track" class="a c4 w1 bar tab" tabgroup="view" tabbutton="0" isToggle="1"><span>Track</span></button>
 		<button id="tab_mix" class="a c5 w1 bar tab" tabgroup="view" tabbutton="1" isToggle="1"><span>Mix</span></button>
 		<button id="tab_master" class="a c6 w1 bar tab" tabgroup="view" tabbutton="2" isToggle="1"><span>Master</span></button>
+		<!-- What the user must know now (ticket 35): no flash image, a note that plays nothing, a newer release -->
+		<div id="status" class="a c7 w5 bar status"></div>
 		<div id="size" class="a c12 w3 size inset"><span class="label">Size</span><span id="size_value">100%</span></div>
 		<div id="main_label" class="a c16 w1 label mainlabel">Main</div>
 		<div id="main_meter" class="a c16 w1 meter"><div class="bar1"><div id="main_fill_l" class="fill"/></div><div class="bar2"><div id="main_fill_r" class="fill"/></div></div>

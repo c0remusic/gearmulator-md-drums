@@ -39,6 +39,11 @@ body.mdd { background-color: #1b1c1e; color: #f2f2f2; font-family: Inter; font-s
 .bar { top: 0dp; height: 56dp; line-height: 56dp; }
 .logo { font-size: 14dp; font-weight: 700; letter-spacing: 2dp; line-height: 54dp; }
 .logo span { font-weight: 400; color: #a7aaaf; margin-left: 4dp; letter-spacing: 0dp; }
+.logo .version { font-size: 12dp; color: #8e9197; margin-left: 8dp; }
+.status { font-size: 14dp; color: #a7aaaf; display: none; }
+.status.shown { display: block; }
+.status.action { color: #6fd1c4; cursor: pointer; }
+.status.action:hover { color: #f2f2f2; }
 .tab { font-size: 14dp; font-weight: 500; color: #a7aaaf; text-align: left; cursor: pointer; }
 .tab span { display: inline-block; height: 56dp; line-height: 58dp; border-bottom: 2dp transparent; }
 .tab:hover, .tab:checked { color: #f2f2f2; }

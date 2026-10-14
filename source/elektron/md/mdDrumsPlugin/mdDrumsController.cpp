@@ -465,6 +465,13 @@ namespace mdDrums
 		m_loadedState.clear();
 	}
 
+	void Controller::followDevice()
+	{
+		std::vector<uint8_t> state;
+		if(getProcessor().getPlugin().getState(state, synthLib::StateTypeGlobal) && applyStateBytes(state))
+			tellHost();
+	}
+
 	bool Controller::applyStateBytes(const std::vector<uint8_t>& _state)
 	{
 		// synthLib::Plugin writes its version and the state type before the Device's own bytes

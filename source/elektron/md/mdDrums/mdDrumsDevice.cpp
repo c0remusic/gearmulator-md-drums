@@ -237,7 +237,11 @@ namespace mdDrums
 				return;
 			}
 			if(track < 0 || track >= Engine::TrackCount)
+			{
+				if(m_telemetry)
+					m_telemetry->unplayed(_event.b);
 				return;
+			}
 			if((_event.a & 0x0f) == 0)
 			{
 				m_lastHitTrack = track;

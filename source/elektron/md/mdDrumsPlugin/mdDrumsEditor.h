@@ -14,6 +14,7 @@ namespace mdDrums
 	class LinksView;
 	class MeterView;
 	class Processor;
+	class StatusView;
 	class TrackView;
 
 	// The editor over the skin: the v22 one (skins/mdDrums, ticket 17) with its <vknob> and <vglyph> elements and the
@@ -40,6 +41,7 @@ namespace mdDrums
 		LfoView* getLfoView() const { return m_lfoView.get(); }
 		KitsView* getKitsView() const { return m_kitsView.get(); }
 		LinksView* getLinksView() const { return m_linksView.get(); }
+		StatusView* getStatusView() const { return m_statusView.get(); }
 
 		// Esc, before the stack's own (which opens its settings): disarms ASSIGN, else leaves a Kit's renaming or a second-
 		// click question, else closes the open overlay. Ctrl+S saves the Kit played. The other keys go to KitsView::key
@@ -55,6 +57,7 @@ namespace mdDrums
 		std::unique_ptr<LfoView> m_lfoView;
 		std::unique_ptr<KitsView> m_kitsView;
 		std::unique_ptr<LinksView> m_linksView;
+		std::unique_ptr<StatusView> m_statusView;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

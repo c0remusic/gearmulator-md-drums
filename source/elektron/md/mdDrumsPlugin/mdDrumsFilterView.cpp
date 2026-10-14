@@ -2,6 +2,7 @@
 
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsProcessor.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
 #include "juceRmlUi/rmlElemCanvas.h"
@@ -38,10 +39,8 @@ namespace mdDrums
 		}
 	}
 
-	FilterView::FilterView(Editor& _editor, std::shared_ptr<const md::engine::TrackFx::Tables> _tables) : m_editor(_editor)
+	FilterView::FilterView(Editor& _editor) : m_editor(_editor)
 	{
-		if(_tables)
-			m_response = std::make_unique<FilterResponse>(std::move(_tables));
 		m_screen = find("screen_filter");
 		if(m_screen)
 		{
@@ -108,7 +107,13 @@ namespace mdDrums
 			note->SetProperty("display", srr > 0 ? "inline" : "none");
 		}
 		if(!m_response)
-			return;
+		{
+			// Only an mdDrums::Processor makes this editor
+			auto tables = static_cast<Processor&>(m_editor.getProcessor()).getFxTables();
+			if(!tables)
+				return;
+			m_response = std::make_unique<FilterResponse>(std::move(tables));
+		}
 		const FilterResponse::Settings settings{value("EQF"), value("EQG"), value("FLTF"), value("FLTW"), value("FLTQ")};
 		if(settings == m_response->settings())
 			return;

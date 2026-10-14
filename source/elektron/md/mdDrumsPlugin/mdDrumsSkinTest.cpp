@@ -28,6 +28,7 @@
 #include "mdDrumsLinksView.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
+#include "mdDrumsStatusView.h"
 #include "mdDrumsTrackView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
@@ -1167,6 +1168,30 @@ namespace
 		std::printf("outs: a click puts Track 16 on Out 15 and back, the wheel steps Main, Out 01, Out 02\n");
 	}
 
+	// The top bar (ticket 35): MD Drums' version beside the logo; the status line empty while a Device plays; a note that
+	// plays nothing said there, within the box it has
+	void status(Fixture& _f)
+	{
+		auto* version = _f.find("version");
+		require(version && std::string(version->GetInnerRML()) == MdDrumsVersion, "the version is not beside the logo");
+		auto* view = _f.editor->getStatusView();
+		auto* line = _f.find("status");
+		require(view && line, "no status line");
+		view->refresh();
+		_f.layout();
+		require(view->text().empty() && !line->IsVisible(), "the status line says \"" + view->text() + "\" with a Device");
+
+		_f.processor.getTelemetry().unplayed(60);
+		view->refresh();
+		_f.layout();
+		const auto box = _f.box(*line);
+		const auto width = line->GetScrollWidth();
+		std::printf("status: \"%s\", %g of %g dp wide, version %s\n", view->text().c_str(), width, box.w, MdDrumsVersion);
+		require(view->text() == "C3 plays nothing: Tracks are C1 to D#2" && line->IsVisible(),
+			"a note that plays nothing is not said");
+		require(width <= box.w + 0.5f, "the status line overflows its box");
+	}
+
 	void pictures(Fixture& _f, const std::string& _prefix)
 	{
 		const auto save = [&](const std::string& _name)
@@ -1216,7 +1241,7 @@ int main()
 			{"meters", meters}, {"hit screen", hitScreen}, {"hit preview", hitPreview}, {"filter screen", filterScreen},
 			{"lfo screen", lfoScreen},
 			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}, {"links", links},
-			{"outs", outs}})
+			{"outs", outs}, {"status", status}})
 		{
 			try
 			{

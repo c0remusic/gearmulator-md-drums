@@ -568,6 +568,21 @@ namespace
 		std::printf("Locks on channel 1: with the last channel-1 Hit just before at the same sample, else Track 1's\n");
 	}
 
+	// A note on that plays nothing (outside 36-51 and 64-87) counts in the Telemetry, which the editor says (ticket 35);
+	// a Hit and a Lock do not
+	void unplayed(const std::vector<uint8_t>& _flash)
+	{
+		Rig rig(_flash, 44100.0f);
+		rig.send(MidiEventSource::Host, {0x90, 36, 100});
+		rig.send(MidiEventSource::Host, {0x90, 81, 1});
+		rig.send(MidiEventSource::Host, {0x90, 60, 100});
+		rig.send(MidiEventSource::Host, {0x80, 60, 0});
+		rig.process();
+		const auto count = rig.telemetry->unplayedCount();
+		std::printf("unplayed: %u note(s), the last %d\n", count, rig.telemetry->lastUnplayed());
+		require(count == 1 && rig.telemetry->lastUnplayed() == 60, "note 60 was not the one note that plays nothing");
+	}
+
 	// Notes and CCs, inline SysEx included, on a prepared Plugin: no heap allocation
 	void allocations(const std::vector<uint8_t>& _flash)
 	{
@@ -807,6 +822,7 @@ int main()
 		behaviour(flash);
 		parameters(flash);
 		locks(flash);
+		unplayed(flash);
 		allocations(flash);
 		latency(flash, 44100.0f);
 		latency(flash, 48000.0f);

@@ -9,14 +9,12 @@
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
-#include <iterator>
 #include <stdexcept>
 
 namespace mdDrums
 {
 	namespace
 	{
-		constexpr const char* g_flashName = "elektron_sps1-1uw_os1.63.bin";
 		constexpr size_t g_flashSize = 8 * 1024 * 1024;
 
 		std::vector<uint8_t> readFlash(const std::filesystem::path& _path)
@@ -25,7 +23,10 @@ namespace mdDrums
 			if(!std::filesystem::is_regular_file(_path, error) || std::filesystem::file_size(_path, error) != g_flashSize)
 				return {};
 			std::ifstream file(_path, std::ios::binary);
-			return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+			std::vector<uint8_t> flash(g_flashSize);
+			if(!file.read(reinterpret_cast<char*>(flash.data()), static_cast<std::streamsize>(flash.size())))
+				return {};
+			return flash;
 		}
 
 		std::filesystem::path fromEnvironment(const char* _name)
@@ -216,10 +217,30 @@ namespace mdDrums
 			folders.push_back(home / "Documents" / "Gearmulator Preview" / "Machinedrum");
 		for(const auto& folder : folders)
 		{
-			if(auto flash = readFlash(folder / g_flashName); !flash.empty())
+			if(auto flash = readFlash(folder / FlashImageName); !flash.empty())
 				return flash;
 		}
 		return {};
+	}
+
+	std::vector<uint8_t> Engine::readFlashImage(const std::filesystem::path& _file, std::string& _error)
+	{
+		auto flash = readFlash(_file);
+		if(flash.empty())
+		{
+			_error = "That file is not an 8 MB flash image";
+			return {};
+		}
+		try
+		{
+			(void)md::fw::loadFirmwareFromFlash(flash);
+		}
+		catch(const std::exception&)
+		{
+			_error = "No Machinedrum OS in that file";
+			return {};
+		}
+		return flash;
 	}
 
 	Engine::Engine(const std::vector<uint8_t>& _flashImage)

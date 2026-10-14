@@ -200,36 +200,10 @@ namespace pluginLib
 			LOG("Failed to create device: " << e.what());
 
 			// Juce loads the LV2/VST3 versions of the plugin as part of the build process, if we open a message box in this case, the build process gets stuck
-			const auto host = juce::PluginHostType::getHostPath();
 			if(!Tools::isHeadless())
 			{
-				std::string msg = e.what();
-
 				m_deviceError = e.errorCode();
-
-				if(e.errorCode() == synthLib::DeviceError::FirmwareMissing)
-				{
-					msg += "\n\n";
-					msg += "The firmware file needs to be copied to\n";
-					msg += baseLib::filesystem::validatePath(getPublicRomFolder()) + "\n";
-					msg += "\n";
-					msg += "The target folder will be opened once you click OK. Copy the firmware to this folder and reload the plugin.";
-#ifdef _DEBUG
-					msg += "\n\n" + std::string("[Debug] Host ") + host.toStdString() + "\n\n";
-#endif
-				}
-				juce::Timer::callAfterDelay(2000, [this, msg]
-				{
-					genericUI::MessageBox::showOk(genericUI::MessageBox::Icon::Warning,
-						"Device Initialization failed", msg, 
-						[this]
-						{
-							const auto path = juce::File(getPublicRomFolder());
-							(void)path.createDirectory();
-							path.revealToUser();
-						}
-					);
-				});
+				onDeviceCreationFailed(e);
 			}
 		}
 
@@ -1164,6 +1138,35 @@ namespace pluginLib
 
 		if(hasController())
 			getController().onStateLoaded();
+	}
+
+	void Processor::onDeviceCreationFailed(const synthLib::DeviceException& _e)
+	{
+		std::string msg = _e.what();
+
+		if(_e.errorCode() == synthLib::DeviceError::FirmwareMissing)
+		{
+			msg += "\n\n";
+			msg += "The firmware file needs to be copied to\n";
+			msg += baseLib::filesystem::validatePath(getPublicRomFolder()) + "\n";
+			msg += "\n";
+			msg += "The target folder will be opened once you click OK. Copy the firmware to this folder and reload the plugin.";
+#ifdef _DEBUG
+			msg += "\n\n" + std::string("[Debug] Host ") + juce::PluginHostType::getHostPath().toStdString() + "\n\n";
+#endif
+		}
+		juce::Timer::callAfterDelay(2000, [this, msg]
+		{
+			genericUI::MessageBox::showOk(genericUI::MessageBox::Icon::Warning,
+				"Device Initialization failed", msg,
+				[this]
+				{
+					const auto path = juce::File(getPublicRomFolder());
+					(void)path.createDirectory();
+					path.revealToUser();
+				}
+			);
+		});
 	}
 
 	bool Processor::rebootDevice()

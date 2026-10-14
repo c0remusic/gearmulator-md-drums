@@ -192,6 +192,10 @@ mesurées avant et après. Pas de tag.
   pour Kit, état et SYN1-8 ; relais en éditions au changement de Track ; rien de ce qui suit un paramètre (en édition,
   Live prenait le relais pour le paramètre touché) ; rien au chargement. Undo après Kit sain ; une machine changée met
   l'automation de SYN en reprise en main.
+- [Flash image depuis le plug-in, version, notes muettes, mises à jour](issues/35-rom-version-mises-a-jour.md) : premiers
+  testeurs muets faute de flash image ; ligne d'état dans la barre du haut (flash image manquante, un clic la choisit,
+  copiée et Device refait sans recharger ; note qui ne joue rien ; nouvelle release lue sur GitHub une fois par jour) ;
+  version 0.1.1 près du logo ; `mdDrumsUpdateTest` au garde-fou.
 
 ## Not yet specified
 

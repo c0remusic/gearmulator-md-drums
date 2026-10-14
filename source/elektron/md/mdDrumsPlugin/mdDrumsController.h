@@ -41,6 +41,10 @@ namespace mdDrums
 		void processRealtimeParameterChanges(size_t _maximum) override;
 		void onStateLoaded() override;
 
+		// The parameters from the Device's own state, the host reading them again: after the Device was made again from a
+		// flash image the user chose (ticket 35)
+		void followDevice();
+
 		// The Device's state as the plug-in's state holds it (synthLib::Plugin's two header bytes, then the Device's):
 		// the Processor hands it over as it loads a state, so that the parameters follow without touching the Device
 		void setLoadedState(std::vector<uint8_t> _state);

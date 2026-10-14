@@ -9,6 +9,7 @@
 #include "mdDrumsLinksView.h"
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
+#include "mdDrumsStatusView.h"
 #include "mdDrumsTrackView.h"
 #include "mdDrumsController.h"
 
@@ -36,6 +37,7 @@ namespace mdDrums
 
 	Editor::~Editor()
 	{
+		m_statusView.reset();
 		m_linksView.reset();
 		m_kitsView.reset();
 		m_lfoView.reset();
@@ -59,10 +61,11 @@ namespace mdDrums
 		for(const auto& folder : processor.romFolders())
 			romFolders.emplace_back(folder);
 		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz(), std::move(romFolders));
-		m_filterView = std::make_unique<FilterView>(*this, processor.getFxTables());
+		m_filterView = std::make_unique<FilterView>(*this);
 		m_lfoView = std::make_unique<LfoView>(*this);
 		m_kitsView = std::make_unique<KitsView>(*this);
 		m_linksView = std::make_unique<LinksView>(*this);
+		m_statusView = std::make_unique<StatusView>(*this);
 
 		// Esc on the context's root, in the capture phase: before the stack's listener on the document, even when the
 		// document itself has the key
@@ -133,6 +136,18 @@ namespace mdDrums
 		_menu.addEntry("Prepare Push list (Live in Configure mode)", [this]
 		{
 			static_cast<Controller&>(m_processor.getController()).preparePushList();
+		});
+		_menu.addSeparator();
+		_menu.addEntry("Load Machinedrum flash image...", [this]
+		{
+			if(auto* editor = dynamic_cast<Editor*>(getEditor()))
+				if(auto* status = editor->getStatusView())
+					status->chooseFlashImage();
+		});
+		auto& config = m_processor.getConfig();
+		_menu.addEntry("Check for updates once a day", StatusView::checksForUpdates(config), [&config]
+		{
+			config.setValue(StatusView::CheckKey, !StatusView::checksForUpdates(config));
 		});
 	}
 }

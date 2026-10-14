@@ -52,6 +52,11 @@ namespace mdDrums
 		// The 8 MB Machinedrum UW flash image with OS 1.63: GEARMULATOR_MD_FIRMWARE_BIN, then
 		// elektron_sps1-1uw_os1.63.bin in _folders and in the folders the Gearmulator plug-ins use. Empty if none.
 		static std::vector<uint8_t> findFlashImage(const std::vector<std::filesystem::path>& _folders);
+		// The file name findFlashImage looks for in each folder
+		static constexpr const char* FlashImageName = "elektron_sps1-1uw_os1.63.bin";
+		// A file the user chose (ticket 35): its bytes when it is an 8 MB image whose OS md::fw::loadFirmwareFromFlash
+		// reads, else empty and _error says why, for the editor
+		static std::vector<uint8_t> readFlashImage(const std::filesystem::path& _file, std::string& _error);
 
 		// Throws md::fw::FirmwareError or std::runtime_error when the image holds no usable OS. Every machine's voice code
 		// is compiled before the first render (md::engine::EngineT::warmUpVoices), so that no Hit pays for it on the audio

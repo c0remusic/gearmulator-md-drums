@@ -44,14 +44,17 @@ namespace mdDrums
 		static constexpr double Decades = 3.0;	// to 20 kHz
 		static constexpr float DbAbove = 24.0f;	// at the plot's top
 
-		FilterView(Editor& _editor, std::shared_ptr<const md::engine::TrackFx::Tables> _tables);
+		// The response comes from the Processor's tables, taken when it first has them: a Device made under an open
+		// editor (a flash image chosen, ticket 35) brings the curve at the next refresh
+		explicit FilterView(Editor& _editor);
 		~FilterView();
 
 		FilterView(const FilterView&) = delete;
 		FilterView& operator=(const FilterView&) = delete;
 
 		const FilterResponse* response() const { return m_response.get(); }
-		// Reads the parameters again (their notifications reach it later, from the message loop)
+		// Reads the parameters, and the tables if it had none, again (their notifications reach it later, from the
+		// message loop)
 		void refresh() { update(); }
 		// Where the plot puts _hz and _db, in the screen's canvas, in dp
 		static float xOf(double _hz);
