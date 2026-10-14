@@ -265,7 +265,8 @@ namespace
 	// Track shown its value, the Device getting it at the next block, the host not told; the relay Track shows another
 	// Track and the relays then hold its values, the host taking them as edits without a gesture; a parameter of the
 	// Track shown moved elsewhere moves its relay, the host not told (ticket 34); the state keeps the Track shown;
-	// "Prepare Push list" moves the 64 of the list, in order, each in a gesture
+	// "Prepare Push list" moves a page of eight per Track, the Tracks' own parameters (ticket 37), and the relays' entry
+	// the 64 of ticket 27's list, each in order and in a gesture
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();
@@ -321,18 +322,33 @@ namespace
 		const auto restored = restoredFrom(host);
 		require(restored->getController().getCurrentPart() == 5, "the state did not keep the Track shown");
 
-		// "Prepare Push list": the relays then the master effects, each in its own gesture
+		// "Prepare Push list": Level, FLTF, FLTW, FLTQ, DIST, SRR, DEL and REV of Track 1, then of Track 2, and so on, each
+		// in its own gesture
 		{
 			HostWatch watch(_processor);
 			controller.preparePushList();
+			std::vector<int> expected;
+			for(uint8_t track = 0; track < mdDrums::Controller::TrackCount; ++track)
+				for(const auto* name : mdDrums::Controller::PushTrackParameters)
+					expected.push_back(parameter(_processor, name, track).getParameterIndex());
+			std::printf("Push list, a page per Track: %zu parameters moved, from \"%s\" to \"%s\", %d gestures ended\n",
+				watch.begun.size(), host.getParameters()[expected.front()]->getName(64).toRawUTF8(),
+				host.getParameters()[expected.back()]->getName(64).toRawUTF8(), watch.ended);
+			require(watch.begun == expected && watch.ended == 128 && watch.edits >= 128,
+				"Prepare Push list did not move the Tracks' 128 in order");
+		}
+		// The relays' entry: the relays then the master effects
+		{
+			HostWatch watch(_processor);
+			controller.preparePushRelays();
 			bool ordered = watch.begun.size() == 64;
 			for(size_t i = 0; ordered && i < 64; ++i)
 				ordered = watch.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
 			std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays"
-				" following (%d edits); Push list moved %zu parameters in order (no allocation setting a relay), %d"
-				" changes, %d gestures ended\n", set, shownEdits, watch.begun.size(), watch.edits, watch.ended);
+				" following (%d edits); the relays' Push list moved %zu parameters in order (no allocation setting a"
+				" relay), %d changes, %d gestures ended\n", set, shownEdits, watch.begun.size(), watch.edits, watch.ended);
 			require(ordered && watch.ended == 64 && watch.edits >= 64,
-				"Prepare Push list did not move the 64 in order");
+				"Prepare Push list (relays) did not move the 64 in order");
 		}
 		controller.setCurrentPart(0);
 		syncedBlock();
@@ -487,8 +503,9 @@ int main()
 				id(0).toRawUTF8(), parameters[0]->getName(64).toRawUTF8(), id(parameters.size() - 1).toRawUTF8(),
 				parameters.getLast()->getName(64).toRawUTF8());
 			require(parameters.size() == 608, "not 608 parameters");
-			require(id(0) == "5_0_0" && parameters[0]->getName(64) == "Track 1 Machine",
-				"track 1's machine is not the first parameter");
+			require(id(0) == "5_0_0" && parameters[0]->getName(64) == "T01 Machine",
+				"track 1's machine is not the first parameter, named for Push");
+			require(parameters[15 * 34 + 33]->getName(64) == "T16 Out", "Track 16's last parameter is not \"T16 Out\"");
 			require(id(33) == "7_0_1" && id(34) == "5_1_0", "a Track does not hold 34 parameters ending with Out");
 			require(id(544) == "8_0_0" && parameters[544]->getName(64) == "Echo TIME",
 				"the master effects do not follow the Tracks");

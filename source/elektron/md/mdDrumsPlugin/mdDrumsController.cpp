@@ -92,9 +92,10 @@ namespace mdDrums
 
 	Controller::Controller(Processor& _processor) : pluginLib::Controller(_processor, "parameterDescriptions_mddrums.json")
 	{
+		// "T03 FLTF": Push shows the first ten characters of a name ("Track 3 FLTF" was "TRACK 3 FL")
 		registerParams(_processor, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
-			return _nonPartSensitive ? juce::String("Master") : juce::String("Track ") + juce::String(_part + 1);
+			return _nonPartSensitive ? juce::String("Master") : juce::String::formatted("T%02d", _part + 1);
 		});
 
 		for(const auto& [index, parameters] : getExposedParameters())
@@ -332,20 +333,38 @@ namespace mdDrums
 		m_valuesChanged.store(true, std::memory_order_relaxed);
 	}
 
+	namespace
+	{
+		// Each parameter moved to its own value in a gesture, in order: Live adds them to the device's list as they come
+		void touchInOrder(const std::vector<pluginLib::Parameter*>& _list)
+		{
+			for(auto* parameter : _list)
+			{
+				if(!parameter)
+					continue;
+				parameter->beginChangeGesture();
+				parameter->juce::AudioProcessorParameter::setValueNotifyingHost(parameter->getValue());
+				parameter->endChangeGesture();
+			}
+		}
+	}
+
 	void Controller::preparePushList()
+	{
+		std::vector<pluginLib::Parameter*> list;
+		for(uint8_t track = 0; track < TrackCount; ++track)
+			for(const auto* name : PushTrackParameters)
+				list.push_back(getParameter(name, track));
+		touchInOrder(list);
+	}
+
+	void Controller::preparePushRelays()
 	{
 		std::vector<pluginLib::Parameter*> list(m_relays.begin(), m_relays.end());
 		for(uint8_t i = 0; i < MasterParameterCount; ++i)
 			for(auto* parameter : findSynthParam(0, pages::Master, i))
 				list.push_back(parameter);
-		for(auto* parameter : list)
-		{
-			if(!parameter)
-				continue;
-			parameter->beginChangeGesture();
-			parameter->juce::AudioProcessorParameter::setValueNotifyingHost(parameter->getValue());
-			parameter->endChangeGesture();
-		}
+		touchInOrder(list);
 	}
 
 	bool Controller::parseControllerMessage(const synthLib::SMidiEvent& _event)

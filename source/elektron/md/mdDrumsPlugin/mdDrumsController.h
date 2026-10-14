@@ -89,9 +89,14 @@ namespace mdDrums
 		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's SYN1-8 it
 		// reads again, once (ticket 34).
 		void syncRelays();
-		// For Live in Configure mode, which adds a parameter the plug-in moves: the 64 of the Push list in order (the
-		// relays, then the master effects), each moved to its own value in a gesture
+		// For Live in Configure mode, which adds the parameters the plug-in moves to the device's list in that order, each
+		// moved to its own value in a gesture (ticket 37): a page of eight per Track, the Tracks' own parameters, so that
+		// what Push records plays back on the Track it was recorded on (PushTrackParameters, 128 in all)
 		void preparePushList();
+		// The same with the list of ticket 27: the 32 relays of the Track shown, then the 32 master effects
+		void preparePushRelays();
+		static constexpr std::array<const char*, 8> PushTrackParameters{"Level", "FLTF", "FLTW", "FLTQ", "DIST", "SRR",
+			"DEL", "REV"};
 		pluginLib::Parameter* relay(size_t _index) const { return _index < RelayCount ? m_relays[_index] : nullptr; }
 
 	protected:

@@ -153,9 +153,13 @@ namespace mdDrums
 	{
 		jucePluginEditorLib::PluginEditorState::initContextMenu(_menu);
 		_menu.addSeparator();
-		_menu.addEntry("Prepare Push list (Live in Configure mode)", [this]
+		_menu.addEntry("Prepare Push list: a page per Track (Live in Configure mode)", [this]
 		{
 			static_cast<Controller&>(m_processor.getController()).preparePushList();
+		});
+		_menu.addEntry("Prepare Push list: Track shown and master (Live in Configure mode)", [this]
+		{
+			static_cast<Controller&>(m_processor.getController()).preparePushRelays();
 		});
 		_menu.addSeparator();
 		_menu.addEntry("Load Machinedrum flash image...", [this]
