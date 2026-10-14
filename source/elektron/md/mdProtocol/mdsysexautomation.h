@@ -18,6 +18,7 @@ namespace md::automation::sysex
 		template<typename Allocator>
 		MessageView(const std::vector<uint8_t, Allocator>& _message)
 			: m_data(_message.data()), m_size(_message.size()) {}
+		MessageView(const uint8_t* _data, const size_t _size) : m_data(_data), m_size(_size) {}
 
 		const uint8_t* begin() const { return m_data; }
 		const uint8_t* end() const { return m_data + m_size; }
@@ -72,6 +73,16 @@ namespace md::automation::sysex
 	constexpr uint8_t MasterEffectCount = 4;
 	constexpr uint8_t MasterEffectParameters = 8;
 	using MasterEffects = std::array<std::array<uint8_t, MasterEffectParameters>, MasterEffectCount>;
+
+	// The block of 8 bytes where a Kit keeps each master effect, by MasterEffect: the Kit holds reverb first, then
+	// echo, EQ, dynamix (mdEditorFirmwareTest checks the order)
+	constexpr std::array<uint8_t, MasterEffectCount> MdKitMasterEffectBlock{1, 0, 2, 3};
+	// The index of parameter _parameter (0..7) of master effect _effect (MasterEffect) among a Kit's 32 bytes of
+	// master effects
+	constexpr uint8_t mdKitMasterIndex(const uint8_t _effect, const uint8_t _parameter)
+	{
+		return static_cast<uint8_t>(MdKitMasterEffectBlock[_effect] * MasterEffectParameters + _parameter);
+	}
 
 	struct KitDump
 	{

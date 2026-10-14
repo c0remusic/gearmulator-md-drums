@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace mdDrums
@@ -14,12 +15,14 @@ namespace mdDrums
 	// ($52, MdKitDumpSize bytes) for slot n at n times that size, so that the file is a .syx that a Machinedrum and
 	// Machinemodule read (.scratch/md-drums-editor/research/04-kits.md); an empty Slot is a dump whose name starts with
 	// $7f, as OS 1.63 sends one. A missing file starts with the factory Kits from Slot 1 on. The file is read again
-	// before each write, and a write touches its own Slot's bytes only, so that two instances keep each other's Slots
+	// before each write, and a write touches its own Slots' bytes only, so that two instances keep each other's Slots
 	// (ticket 10 of the editor map). Without JUCE, for any thread but one at a time.
 	class Bank
 	{
 	public:
 		using Kit = md::automation::sysex::MdKit;
+		// A Slot (0-63) and what to write into it, no Kit for an empty Slot
+		using SlotKit = std::pair<int, std::optional<Kit>>;
 		static constexpr int SlotCount = 64;
 		static constexpr size_t SlotSize = md::automation::sysex::MdKitDumpSize;
 
@@ -33,8 +36,11 @@ namespace mdDrums
 		const std::optional<Kit>& slot(int _slot) const;
 		bool isEmpty(int _slot) const { return !slot(_slot).has_value(); }
 
-		// Writes a Slot, an empty one for no Kit, after reading the file again. False when the file cannot be written.
-		bool write(int _slot, const std::optional<Kit>& _kit);
+		// Writes Slots in the list's order, as an import does, after reading the file again once for them all. False
+		// when a Slot is out of range or the file cannot be written.
+		bool write(const std::vector<SlotKit>& _slots);
+		// Writes a Slot, an empty one for no Kit
+		bool write(int _slot, const std::optional<Kit>& _kit) { return write({{_slot, _kit}}); }
 
 		const std::filesystem::path& file() const { return m_file; }
 

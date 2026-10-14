@@ -26,25 +26,16 @@ namespace mdDrums
 		std::array<float, 1024> samples{};
 		std::array<float*, Engine::OutputCount> outputs{};
 		outputs[2 + static_cast<size_t>(track)] = samples.data();
-		int64_t position = 0;
-		int filled = 0;
-		float low = 0.0f, high = 0.0f;
+		size_t skip = Engine::SampleAccurateDelay;	// samples before the Hit sounds
+		Telemetry::ColumnMaker column;
 		while(_capture.count < Telemetry::CaptureColumns)
 		{
 			_engine.render(outputs.data(), samples.size());
-			for(size_t i = 0; i < samples.size() && _capture.count < Telemetry::CaptureColumns; ++i)
-			{
-				if(position + static_cast<int64_t>(i) < Engine::SampleAccurateDelay)
-					continue;
-				const auto value = samples[i];
-				low = filled ? std::min(low, value) : value;
-				high = filled ? std::max(high, value) : value;
-				if(++filled < Telemetry::ColumnSamples)
-					continue;
-				filled = 0;
-				_capture.columns[static_cast<size_t>(_capture.count++)] = {Telemetry::level(low), Telemetry::level(high)};
-			}
-			position += static_cast<int64_t>(samples.size());
+			const auto first = std::min(skip, samples.size());
+			skip -= first;
+			for(size_t i = first; i < samples.size() && _capture.count < Telemetry::CaptureColumns; ++i)
+				if(column.add(samples[i], _capture.columns[static_cast<size_t>(_capture.count)]))
+					++_capture.count;
 		}
 	}
 

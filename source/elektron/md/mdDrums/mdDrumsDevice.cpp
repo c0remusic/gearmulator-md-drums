@@ -24,17 +24,10 @@ namespace mdDrums
 		constexpr uint8_t g_chokeChange = 0x66;
 		constexpr uint8_t g_kitDump = 0x52;
 
-		// The Kit dump keeps the master effects in this order: reverb, echo, EQ, dynamix
-		constexpr uint8_t g_masterBlock[sysex::MasterEffectCount] = {1, 0, 2, 3};
-
 		constexpr uint8_t g_trackOff = 0x7f;	// a Link or Choke off on the wire
 
-		bool isMachinedrumSysex(const synthLib::SMidiEvent& _event, const uint8_t _command, const size_t _size)
-		{
-			const auto& s = _event.sysex;
-			return s.size() == _size && s[0] == 0xf0 && s[1] == 0x00 && s[2] == 0x20 && s[3] == 0x3c && s[4] == 0x02
-				&& s[5] == 0x00 && s[6] == _command && s.back() == 0xf7;
-		}
+		// The Telemetry takes the engine's outputs and Tracks by their index
+		static_assert(Telemetry::OutputCount == Engine::OutputCount && Telemetry::TrackCount == Engine::TrackCount);
 	}
 
 	Device::Device(const synthLib::DeviceCreateParams& _params, std::shared_ptr<Telemetry> _telemetry)
@@ -56,7 +49,6 @@ namespace mdDrums
 		m_kit = *kit;
 		applyKit();
 		applyMixer();
-		m_outCount = 0;
 		m_valid = true;
 	}
 
@@ -80,8 +72,6 @@ namespace mdDrums
 		m_mixer = state->mixer;
 		applyKit();
 		applyMixer();
-		m_outCount = 0;
-		m_machinesToReport = 0;
 		return true;
 	}
 #endif
@@ -111,8 +101,7 @@ namespace mdDrums
 				if(_outputs[channel])
 					std::fill_n(_outputs[channel] + done, _size - done, 0.0f);
 		}
-		reportMachines();
-		readMidiOut(_midiOut);
+		reportMachines(_midiOut);
 	}
 
 	void Device::processAudio(const synthLib::TAudioInputs&, const synthLib::TAudioOutputs& _outputs, const size_t _samples)
@@ -124,13 +113,6 @@ namespace mdDrums
 	{
 		apply(_ev);
 		return true;
-	}
-
-	void Device::readMidiOut(std::vector<synthLib::SMidiEvent>& _midiOut)
-	{
-		for(size_t i = 0; i < m_outCount; ++i)
-			_midiOut.push_back(m_out[i]);
-		m_outCount = 0;
 	}
 
 	void Device::render(const synthLib::TAudioOutputs& _outputs, const size_t _offset, const size_t _count)
@@ -175,42 +157,33 @@ namespace mdDrums
 					if(peak > 0.0f)
 						m_telemetry->raisePeak(channel, peak);
 				}
-				capture(outputs, count);
+				capture(count);
 			}
 			m_position += static_cast<int64_t>(count);
 			done += count;
 		}
 	}
 
-	void Device::capture(const std::array<float*, Engine::OutputCount>& _outputs, const size_t _count)
+	void Device::capture(const size_t _count)
 	{
 		for(int track = 0; track < Engine::TrackCount; ++track)
 		{
 			auto& c = m_captures[static_cast<size_t>(track)];
-			const auto* samples = _outputs[2 + static_cast<size_t>(track)];
-			if(!c.active || !samples)
+			if(!c.active)
 				continue;
-			for(size_t i = 0; i < _count; ++i)
+			const auto& own = m_tracks[static_cast<size_t>(track)];
+			// The capture starts at the sample the Hit sounds, which may be in this chunk
+			const auto first = std::clamp<int64_t>(c.start - m_position, 0, static_cast<int64_t>(_count));
+			Telemetry::Column column{};
+			for(auto i = static_cast<size_t>(first); i < _count; ++i)
 			{
-				if(m_position + static_cast<int64_t>(i) < c.start)
+				if(!c.column.add(own[i], column))
 					continue;
-				const auto value = samples[i];
-				c.low = c.filled ? std::min(c.low, value) : value;
-				c.high = c.filled ? std::max(c.high, value) : value;
-				if(++c.filled < Telemetry::ColumnSamples)
-					continue;
-				c.filled = 0;
-				c.active = m_telemetry->addColumn(track, Telemetry::level(c.low), Telemetry::level(c.high));
+				c.active = m_telemetry->addColumn(track, column[0], column[1]);
 				if(!c.active)
 					break;
 			}
 		}
-	}
-
-	void Device::queueOut(const synthLib::SMidiEvent& _event)
-	{
-		if(m_outCount < m_out.size())
-			m_out[m_outCount++] = _event;
 	}
 
 	void Device::apply(const synthLib::SMidiEvent& _event)
@@ -257,7 +230,7 @@ namespace mdDrums
 					continue;
 				m_telemetry->hit(t);
 				m_telemetry->beginCapture(t, _event.c);
-				m_captures[static_cast<size_t>(t)] = {true, m_position + Engine::SampleAccurateDelay, 0, 0.0f, 0.0f};
+				m_captures[static_cast<size_t>(t)] = {true, m_position + Engine::SampleAccurateDelay, {}};
 			}
 			return;
 		}
@@ -293,7 +266,7 @@ namespace mdDrums
 	void Device::applySysex(const synthLib::SMidiEvent& _event)
 	{
 		const auto& s = _event.sysex;
-		if(const auto own = messages::parse(sysex::MessageView(s)))
+		if(const auto own = messages::parse(s))
 		{
 			const auto bit = static_cast<uint16_t>(1u << own->track);
 			switch(own->command)
@@ -318,63 +291,67 @@ namespace mdDrums
 			return;
 		}
 
-		if(isMachinedrumSysex(_event, g_assignMachine, 11))
+		// The Machinedrum's messages: F0 00 20 3C 02 00 <command> ... F7
+		if(s.size() < 8 || !sysex::codec::hasHeader(g_model, s, s[6]))
+			return;
+		switch(s[6])
 		{
+		case g_assignMachine:
 			// The UW flag adds 128 to the id
-			if(s[7] < Engine::TrackCount)
+			if(s.size() == 11 && s[7] < Engine::TrackCount)
 				applyMachine(s[7], static_cast<uint8_t>(s[8] | (s[9] ? 0x80 : 0)));
 			return;
-		}
-		for(uint8_t effect = 0; effect < sysex::MasterEffectCount; ++effect)
-		{
-			if(!isMachinedrumSysex(_event, static_cast<uint8_t>(g_masterEffect + effect), 10))
-				continue;
-			if(s[7] < sysex::MasterEffectParameters)
+		case g_masterEffect:
+		case g_masterEffect + 1:
+		case g_masterEffect + 2:
+		case g_masterEffect + 3:
+			if(s.size() == 10 && s[7] < sysex::MasterEffectParameters)
 			{
-				const auto index = g_masterBlock[effect] * sysex::MasterEffectParameters + s[7];
+				const auto index = sysex::mdKitMasterIndex(static_cast<uint8_t>(s[6] - g_masterEffect), s[7]);
 				m_kit.masterEffects[index] = s[8];
 				m_engine->setMaster(index, s[8]);
 			}
 			return;
-		}
-		if(isMachinedrumSysex(_event, g_lfoChange, 10))
+		case g_lfoChange:
 		{
 			const auto track = static_cast<uint8_t>(s[7] >> 3), field = static_cast<uint8_t>(s[7] & 7);
-			constexpr uint8_t maximum[] = {15, 23, md::LfoSettings::ShapeCount - 1, md::LfoSettings::ShapeCount - 1,
-				md::LfoSettings::UpdateCount - 1};
-			if(track >= Engine::TrackCount || field >= std::size(maximum))
+			const auto& maximum = md::LfoSettings::FieldMaximum;
+			if(s.size() != 10 || track >= Engine::TrackCount || field >= maximum.size())
 				return;
 			m_kit.lfos[track][field] = std::min(s[8], maximum[field]);
 			m_engine->setLfo(track, m_kit.lfo(track));
 			return;
 		}
-		if(isMachinedrumSysex(_event, g_linkChange, 10) || isMachinedrumSysex(_event, g_chokeChange, 10))
+		case g_linkChange:
+		case g_chokeChange:
 		{
 			const auto track = s[7];
-			if(track >= Engine::TrackCount || (s[8] >= Engine::TrackCount && s[8] != g_trackOff))
+			if(s.size() != 10 || track >= Engine::TrackCount || (s[8] >= Engine::TrackCount && s[8] != g_trackOff))
 				return;
+			// MdKit::Off is past the Tracks, which switches the engine's Link or Choke off
 			const auto target = s[8] == g_trackOff ? sysex::MdKit::Off : s[8];
-			const auto toEngine = target == sysex::MdKit::Off ? Engine::NoTrack : target;
 			if(s[6] == g_linkChange)
 			{
 				m_kit.links[track] = target;
-				m_engine->setLink(track, toEngine);
+				m_engine->setLink(track, target);
 			}
 			else
 			{
 				m_kit.chokes[track] = target;
-				m_engine->setChoke(track, toEngine);
+				m_engine->setChoke(track, target);
 			}
 			return;
 		}
-		if(s.size() == sysex::MdKitDumpSize && s[6] == g_kitDump)
-		{
+		case g_kitDump:
 			// A whole Kit, the one this Device plays whatever its slot (allocates: a dump is no realtime message)
-			if(auto kit = sysex::parseMdKit(sysex::MessageView(s)))
+			if(auto kit = sysex::parseMdKit(s))
 			{
 				m_kit = *kit;
 				applyKit();
 			}
+			return;
+		default:
+			return;
 		}
 	}
 
@@ -396,7 +373,7 @@ namespace mdDrums
 		m_machinesToReport = static_cast<uint16_t>(m_machinesToReport | 1u << _track);
 	}
 
-	void Device::reportMachines()
+	void Device::reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut)
 	{
 		for(uint8_t track = 0; track < Engine::TrackCount && m_machinesToReport; ++track)
 		{
@@ -407,7 +384,7 @@ namespace mdDrums
 				const auto cc = md::automation::encodeParameterChange(g_model,
 					{machinedrum::Synthesis, track, parameter, m_kit.parameters[track][parameter]}, 0);
 				if(cc)
-					queueOut(synthLib::SMidiEvent(synthLib::MidiEventSource::Device, (*cc)[0], (*cc)[1], (*cc)[2]));
+					_midiOut.emplace_back(synthLib::MidiEventSource::Device, (*cc)[0], (*cc)[1], (*cc)[2]);
 			}
 		}
 		m_machinesToReport = 0;

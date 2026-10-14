@@ -41,10 +41,10 @@ namespace mdDrums
 			version->SetInnerRML(MdDrumsVersion);
 
 		// Notes played before the editor opened stay unsaid
-		m_unplayedSeen = processor().getTelemetry().unplayedCount();
+		m_unplayedSeen = m_editor.processor().getTelemetry().unplayedCount();
 
 		// The update check, at most once a day; meanwhile what the last one found
-		auto& config = processor().getConfig();
+		auto& config = m_editor.processor().getConfig();
 		if(checksForUpdates(config))
 		{
 			offer({config.getValue(g_latestKey).toStdString(), config.getValue(g_urlKey).toStdString()});
@@ -70,15 +70,9 @@ namespace mdDrums
 		return _config.getBoolValue(CheckKey, true);
 	}
 
-	Processor& StatusView::processor() const
-	{
-		// Only an mdDrums::Processor makes this editor
-		return static_cast<Processor&>(m_editor.getProcessor());
-	}
-
 	Rml::Element* StatusView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 
 	std::string StatusView::text() const
@@ -97,7 +91,7 @@ namespace mdDrums
 		if(const auto release = updates::Check::latest(); release && release->version != m_latestSeen)
 		{
 			m_latestSeen = release->version;
-			auto& config = processor().getConfig();
+			auto& config = m_editor.processor().getConfig();
 			config.setValue(g_latestKey, juce::String(release->version));
 			config.setValue(g_urlKey, juce::String(release->url));
 			offer(*release);
@@ -108,13 +102,13 @@ namespace mdDrums
 	std::pair<std::string, StatusView::Action> StatusView::pressing()
 	{
 		const auto now = seconds();
-		const bool device = processor().hasDevice();
+		const bool device = m_editor.processor().hasDevice();
 		if(now < m_flashErrorUntil)
 			return {device ? m_flashError : m_flashError + ": choose another", Action::ChooseFlash};
 		if(!device)
 			return {"No Machinedrum flash image: choose the file", Action::ChooseFlash};
 
-		const auto& telemetry = processor().getTelemetry();
+		const auto& telemetry = m_editor.processor().getTelemetry();
 		if(const auto count = telemetry.unplayedCount(); count != m_unplayedSeen)
 		{
 			m_unplayedSeen = count;
@@ -178,7 +172,8 @@ namespace mdDrums
 				if(file == juce::File())
 					return;
 				// JUCE's paths are UTF-8, which a path made from a std::string would read in the ANSI code page
-				m_flashError = processor().loadFlashImage(std::filesystem::u8path(file.getFullPathName().toStdString()));
+				const auto path = std::filesystem::u8path(file.getFullPathName().toStdString());
+				m_flashError = m_editor.processor().loadFlashImage(path);
 				m_flashErrorUntil = m_flashError.empty() ? 0.0 : seconds() + g_flashErrorSeconds;
 				refresh();
 				// A new Device brings the OS's tables, which the Filter and EQ screen waited for

@@ -23,15 +23,13 @@ namespace mdDrums
 		return std::abs(b0 + b1 * z1 + b2 * z2) / std::abs(1.0 - a1 * z1 - a2 * z2);
 	}
 
-	FilterResponse::FilterResponse(std::shared_ptr<const md::engine::TrackFx::Tables> _tables) : m_tables(std::move(_tables))
+	FilterResponse::FilterResponse(std::shared_ptr<const md::engine::TrackFx::Tables> _tables)
+		: m_tables(std::move(_tables)), m_fx(*m_tables)
 	{
-		m_fx = std::make_unique<md::engine::TrackFx>(*m_tables);
-		m_fx->stopAfter = md::engine::TrackFx::Stop::AfterFilter2;
+		m_fx.stopAfter = md::engine::TrackFx::Stop::AfterFilter2;
 		set({});
 		m_reference = raw(1000.0);
 	}
-
-	FilterResponse::~FilterResponse() = default;
 
 	void FilterResponse::set(const Settings& _settings)
 	{
@@ -47,8 +45,8 @@ namespace mdDrums
 		md::engine::TrackFx::init(state);
 		md::engine::TrackFx::setParams(state, words.data());
 		std::array<int32_t, md::engine::TrackFx::kBlock> silence{}, out{};
-		m_fx->resetScratch();
-		m_fx->process(state, silence.data(), out.data());
+		m_fx.resetScratch();
+		m_fx.process(state, silence.data(), out.data());
 		const auto& y = state.y;
 
 		// Each an all-pole section, twice: y[n] = 2rk y[n-1] - r^2 y[n-2] + (1 - 2rk + r^2) x[n], unity at DC
@@ -59,7 +57,7 @@ namespace mdDrums
 
 		// The EQ's words as TrackFx::eq computed them: its poles' -r^2 and rk - 1/2, then its zeros' taps, which the DSP's
 		// 24-step division scales to pass DC unchanged where it can (it saturates for the steepest boosts)
-		const auto& w = m_fx->eqWords();
+		const auto& w = m_fx.eqWords();
 		m_eq = {fraction(w[4]), fraction(w[3]), fraction(w[2]), 2.0 * fraction(w[1]) + 1.0, fraction(w[0])};
 		// Where it acts: the angle of the pair nearer the unit circle, its poles for a boost, its zeros for a cut
 		const auto poles = std::sqrt(std::max(0.0, -m_eq.a2));

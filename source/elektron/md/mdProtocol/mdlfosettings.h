@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace md
@@ -12,6 +13,9 @@ namespace md
 		// What mdPlayheadProbe --lfo traced on the firmware
 		enum Shape : uint8_t { Triangle, Saw, Square, Ramp, Exponential, Random, ShapeCount };	// ramp and exponential fall once
 		enum Update : uint8_t { Free, Trig, Hold, UpdateCount };
+
+		// The largest value of each field SET LFO PARAM sets, in its order: track, parameter, shape1, shape2, update
+		static constexpr std::array<uint8_t, 5> FieldMaximum{15, 23, ShapeCount - 1, ShapeCount - 1, UpdateCount - 1};
 
 		uint8_t track = 0;
 		uint8_t parameter = 0;

@@ -114,14 +114,14 @@ namespace
 	// The engine's own mixer (md::engine::Engine, as mdEngineFirmwareTest compares it with the firmware) against
 	// mdDrums::Engine with every Hit on an engine block, so that every Track waits as long: the same samples, at once
 	// when not sample-accurate, SampleAccurateDelay later when it is. The master effects run on the engine's buses as
-	// they are, and on the same buses SampleAccurateDelay later, each with the OS's words of every tick.
-	void equivalence(const std::vector<uint8_t>& _flash)
+	// they are, and on the same buses SampleAccurateDelay later, each with the OS's words of every tick. The two
+	// mdDrums::Engines come from the flash image, their machines and master compiled ahead, against an engine and
+	// master effects that were not: the warm-up leaves the samples as they are.
+	void equivalence(const std::vector<uint8_t>& _flash, const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
 	{
-		auto os = md::fw::loadFirmwareFromFlash(_flash);
-		const auto firmware = os.firmware;
-		md::engine::Engine raw(os.firmware, std::move(os.osImage));
-		raw.loadRomBank(md::fw::loadRomBankFromFlash(_flash));
-		md::engine::MasterEngine onBlocks(firmware), late(firmware);
+		md::engine::Engine raw(_os.firmware, _os.osImage);
+		raw.loadRomBank(_bank);
+		md::engine::MasterEngine onBlocks(_os.firmware), late(_os.firmware);
 		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
 		{
 			raw.host().setMachine(track, mdDrums::Engine::defaultMachine(track));
@@ -202,13 +202,13 @@ namespace
 	// Where the voices start, sample-accurate: from the trigger to the first sample that is not 0, a machine of each
 	// family. Every Hit waits 31 samples; what remains is the voice's own start, which the Device's reported latency
 	// takes from the most common case.
-	void voiceStarts(const std::vector<uint8_t>& _flash)
+	void voiceStarts(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
 	{
 		std::string line;
 		for(const char* name : {"TRXBD", "TRXSD", "TRXCH", "TRXCP", "EFMBD", "EFMSD", "EFMHH", "E12BD", "E12SD", "E12CH",
 			"P-IBD", "P-IHH", "ROM01", "GNDSN"})
 		{
-			mdDrums::Engine engine(_flash);
+			mdDrums::Engine engine(_os, _bank, true);
 			engine.setMachine(0, machineId(engine, name));
 			settle(engine);
 			engine.trigger(0, 127);
@@ -228,11 +228,11 @@ namespace
 	// at the Hit, which drops or doubles a few samples of the old tail. Threshold set before measuring: within 128
 	// samples from the new Hit's trigger, no sample step steeper than 1.5 times the steepest one of the same retrigger
 	// on the engine's blocks.
-	void retrigger(const std::vector<uint8_t>& _flash)
+	void retrigger(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
 	{
 		const auto steepest = [&](const bool _accurate, const int _place)
 		{
-			mdDrums::Engine engine(_flash);
+			mdDrums::Engine engine(_os, _bank, true);
 			engine.setSampleAccurate(_accurate);
 			engine.setMachine(0, machineId(engine, "E12RC"));
 			engine.setParam(0, 1, 127);
@@ -306,19 +306,25 @@ int main()
 		std::printf("TRXBD velocity 40: peak %.4f\n", soft);
 		require(soft < loud * 0.8f && soft > 0.0f, "the velocity does not scale the level");
 
+		// The latency, retrigger and voice start scenarios build their engines from the OS and the UW bank read once,
+		// without the machines and the master compiled ahead, which leaves the samples as they are
+		// (mdDrumsFirstHitTest)
+		const auto os = md::fw::loadFirmwareFromFlash(flash);
+		const auto bank = md::fw::loadRomBankFromFlash(flash);
+
 		// On engines of their own: 48 Hits leave their track's voice in another state than the tests below expect
 		for(const bool accurate : {false, true})
 		{
-			mdDrums::Engine fresh(flash);
+			mdDrums::Engine fresh(os, bank, true);
 			fresh.setSampleAccurate(accurate);
 			fresh.setMachine(0, machineId(fresh, "TRXBD"));
 			fresh.setLevel(0, 100);
 			const auto jitter = latency(fresh);
 			require(!accurate || jitter == 0, "sample-accurate Hits jitter");
 		}
-		equivalence(flash);
-		retrigger(flash);
-		voiceStarts(flash);
+		equivalence(flash, os, bank);
+		retrigger(os, bank);
+		voiceStarts(os, bank);
 
 		// Track 1 on its own output: it leaves the main mix and sounds there alone.
 		{

@@ -265,7 +265,7 @@ namespace
 		}
 
 		// Out 01-15 the host takes, the others disabled
-		void outs(const std::vector<int>& _outs, const double _rate = g_rate) const
+		void outs(const std::vector<int>& _outs) const
 		{
 			plugin->releaseResources();
 			auto layout = plugin->getBusesLayout();
@@ -275,7 +275,7 @@ namespace
 					? juce::AudioChannelSet::mono() : juce::AudioChannelSet::disabled();
 			}
 			require(plugin->setBusesLayout(layout), "the host cannot take the Outs it asks for");
-			plugin->prepareToPlay(_rate, g_block);
+			plugin->prepareToPlay(g_rate, g_block);
 		}
 	};
 
@@ -322,27 +322,27 @@ namespace
 		return notes;
 	}
 
-	// The plug-in played as a host's audio callback plays it, in blocks of _block or, with a seed, of random sizes up to
-	// it; every channel the host enabled, the whole run
+	// The plug-in played as a host's audio callback plays it, in blocks of g_block or, with a seed, of random sizes up
+	// to it; every channel the host enabled, the whole run
 	juce::AudioBuffer<float> render(juce::AudioPluginInstance& _plugin, const std::vector<Note>& _notes,
-		const int64_t _samples, const int _block = g_block, uint32_t _random = 0, std::vector<double>* _blockMs = nullptr,
+		const int64_t _samples, uint32_t _random = 0, std::vector<double>* _blockMs = nullptr,
 		const std::function<void(int64_t)>& _beforeBlock = {})
 	{
 		const auto channels = _plugin.getTotalNumOutputChannels();
 		juce::AudioBuffer<float> take(channels, static_cast<int>(_samples));
 		take.clear();
-		juce::AudioBuffer<float> buffer(channels, _block);
+		juce::AudioBuffer<float> buffer(channels, g_block);
 		juce::MidiBuffer midi;
 		size_t next = 0;
 		for(int64_t position = 0; position < _samples;)
 		{
-			auto size = _block;
+			auto size = g_block;
 			if(_random)
 			{
 				_random ^= _random << 13;
 				_random ^= _random >> 17;
 				_random ^= _random << 5;
-				size = 1 + static_cast<int>(_random % static_cast<uint32_t>(_block));
+				size = 1 + static_cast<int>(_random % static_cast<uint32_t>(g_block));
 			}
 			size = static_cast<int>(std::min<int64_t>(size, _samples - position));
 			buffer.setSize(channels, size, false, false, true);
@@ -417,6 +417,12 @@ namespace
 		return _audio.getMagnitude(_channel, static_cast<int>(_from), static_cast<int>(length));
 	}
 
+	// Main's peak, its two channels together
+	float mainPeak(const juce::AudioBuffer<float>& _audio, const int64_t _from, const int64_t _length)
+	{
+		return std::max(peak(_audio, 0, _from, _length), peak(_audio, 1, _from, _length));
+	}
+
 	// The Out parameter's value for Main (0) or Out 01-15, normalised
 	float outValue(const int _out)
 	{
@@ -429,6 +435,15 @@ namespace
 		_instance.parameter(_index).setValue(_value);
 		render(*_instance.plugin, {}, g_block * 4);
 		pump(50);
+	}
+
+	// A host restoring a state: the state set, then the messages and blocks that follow it
+	void restore(Instance& _instance, const juce::MemoryBlock& _state)
+	{
+		_instance.plugin->setStateInformation(_state.getData(), static_cast<int>(_state.getSize()));
+		pump(300);
+		render(*_instance.plugin, {}, g_block * 8);
+		pump(300);
 	}
 
 	// A block far over its deadline (2.9 ms), whatever the PC does meanwhile: what a DSP's JIT compiling on the audio
@@ -590,8 +605,7 @@ namespace
 				std::printf("Main, Tracks 1-16:");
 				for(int track = 0; track < g_tracks; ++track)
 				{
-					const auto from = (track + 1) * spacing;
-					const auto value = std::max(peak(take, 0, from, spacing), peak(take, 1, from, spacing));
+					const auto value = mainPeak(take, (track + 1) * spacing, spacing);
 					std::printf(" %.3f", value);
 					require(value > g_sound, "Track " + std::to_string(track + 1) + "'s note is silent on Main");
 				}
@@ -603,14 +617,14 @@ namespace
 			instance->told.clear();
 			{
 				const auto syn1 = ids.index("SYN1", 0), level = ids.index("Level", 6), echo = ids.index("EchoTIME");
-				const auto kept = std::vector<float>{plugin.getParameters()[syn1]->getValue(),
-					plugin.getParameters()[level]->getValue(), plugin.getParameters()[echo]->getValue()};
-				render(plugin, pattern(1.5, g_rate), std::llround(1.5 * g_rate), g_block, 0, nullptr, [&](const int64_t _position)
+				const auto kept = std::vector<float>{instance->parameter(syn1).getValue(),
+					instance->parameter(level).getValue(), instance->parameter(echo).getValue()};
+				render(plugin, pattern(1.5, g_rate), std::llround(1.5 * g_rate), 0, nullptr, [&](const int64_t _sample)
 				{
-					const auto phase = static_cast<float>(_position % 22050) / 22050.0f;
-					plugin.getParameters()[syn1]->setValue(phase);
-					plugin.getParameters()[level]->setValue(1.0f - phase);
-					plugin.getParameters()[echo]->setValue(phase * 0.5f);
+					const auto phase = static_cast<float>(_sample % 22050) / 22050.0f;
+					instance->parameter(syn1).setValue(phase);
+					instance->parameter(level).setValue(1.0f - phase);
+					instance->parameter(echo).setValue(phase * 0.5f);
 				});
 				pump(300);
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
@@ -663,7 +677,7 @@ namespace
 					}
 				}
 				std::printf("15 Outs taken: each Track on its Out's channel, Track 16 on Out 15; Track 1 left Main at %.6f\n",
-					std::max(peak(take, 0, spacing, spacing), peak(take, 1, spacing, spacing)));
+					mainPeak(take, spacing, spacing));
 			}
 			// Out 15 alone: its channel follows Main's, and a Track on an Out the host left sounds nowhere
 			instance->outs({15});
@@ -674,8 +688,9 @@ namespace
 					peak(take, 2, spacing, spacing), peak(take, 0, spacing * 3, spacing), peak(take, 2, spacing * 3, spacing));
 				require(plugin.getTotalNumOutputChannels() == 3 && peak(take, 2, spacing, spacing) > g_sound,
 					"Track 16 is not on Out 15 when the host takes it alone");
-				require(peak(take, 2, spacing * 3, spacing) < g_silence && peak(take, 0, spacing * 3, spacing) < g_silence
-					&& peak(take, 1, spacing * 3, spacing) < g_silence, "Track 5 sounds although on an Out the host left");
+				require(peak(take, 2, spacing * 3, spacing) < g_silence
+					&& mainPeak(take, spacing * 3, spacing) < g_silence,
+					"Track 5 sounds although on an Out the host left");
 			}
 			for(int track = 1; track < g_tracks; ++track)
 				automate(*instance, ids.index("Out", track), 0.0f);
@@ -689,10 +704,7 @@ namespace
 			juce::MemoryBlock saved;
 			plugin.getStateInformation(saved);
 			instance->told.clear();
-			plugin.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
-			pump(300);
-			render(plugin, {}, g_block * 8);
-			pump(300);
+			restore(*instance, saved);
 			std::printf("State of %zu bytes restored where it was saved: told %s\n", saved.getSize(),
 				instance->told.summary(ids).c_str());
 			require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while restoring a state");
@@ -700,13 +712,10 @@ namespace
 			// Another instance gets every parameter back, gives the same state back, and plays Track 1 off Main as saved
 			{
 				auto restored = load(formats, description);
-				restored->plugin->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
-				pump(300);
-				render(*restored->plugin, {}, g_block * 8);
-				pump(300);
+				restore(*restored, saved);
 				for(int i = 0; i < g_relays; ++i)
 				{
-					const auto expected = plugin.getParameters()[i]->getValue(), value = restored->parameter(i).getValue();
+					const auto expected = instance->parameter(i).getValue(), value = restored->parameter(i).getValue();
 					require(std::abs(expected - value) < 1e-6f, "the restored " + ids.names[static_cast<size_t>(i)].toStdString()
 						+ " is " + std::to_string(value) + ", not " + std::to_string(expected));
 				}
@@ -716,7 +725,7 @@ namespace
 					+ std::to_string(again.getSize()) + " bytes)");
 				const auto spacing = std::llround(0.25 * g_rate);
 				const auto take = render(*restored->plugin, {{spacing, 36, 100}}, spacing * 3);
-				require(peak(take, 0, spacing, spacing) < g_silence && peak(take, 1, spacing, spacing) < g_silence,
+				require(mainPeak(take, spacing, spacing) < g_silence,
 					"the restored Track 1 sounds on Main although on its Out");
 			}
 		}
@@ -804,10 +813,10 @@ namespace
 			const auto notes = pattern(seconds, g_rate);
 			const auto samples = std::llround(seconds * g_rate);
 			auto fixed = load(formats, description);
-			const auto reference = render(*fixed->plugin, notes, samples, g_block, 0, &blockMs);
+			const auto reference = render(*fixed->plugin, notes, samples, 0, &blockMs);
 			auto varied = load(formats, description);
 			varied->plugin->setNonRealtime(true);
-			const auto other = render(*varied->plugin, notes, samples, g_block, 0x9e3779b9u);
+			const auto other = render(*varied->plugin, notes, samples, 0x9e3779b9u);
 			int64_t first = -1;
 			float largest = 0;
 			for(int channel = 0; channel < 2; ++channel)
@@ -893,7 +902,7 @@ namespace
 			const auto syn1 = ids.index("SYN1", 0);
 			for(int step = 0; step < 30; ++step)
 			{
-				plugin.getParameters()[syn1]->setValue(static_cast<float>(step % 10) / 10.0f);
+				instance->parameter(syn1).setValue(static_cast<float>(step % 10) / 10.0f);
 				pump(100);
 			}
 			stop = true;

@@ -5,6 +5,7 @@
 // note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of
 // one core.
 
+#include "mdDrumsAllocationCounter.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsTelemetry.h"
 
@@ -17,65 +18,13 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <functional>
 #include <initializer_list>
 #include <memory>
-#include <new>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-
-#if defined(_MSC_VER)
-#include <malloc.h>
-#endif
-
-namespace
-{
-	thread_local bool g_countAllocations = false;
-	thread_local size_t g_allocations = 0;
-}
-
-void* operator new(const std::size_t _size)
-{
-	if(g_countAllocations)
-		++g_allocations;
-	if(void* const result = std::malloc(_size ? _size : 1))
-		return result;
-	throw std::bad_alloc();
-}
-
-void* operator new[](const std::size_t _size) { return ::operator new(_size); }
-
-void* operator new(const std::size_t _size, const std::align_val_t _alignment)
-{
-	if(g_countAllocations)
-		++g_allocations;
-#if defined(_MSC_VER)
-	if(void* const result = _aligned_malloc(_size ? _size : 1, static_cast<std::size_t>(_alignment)))
-		return result;
-#else
-	void* result = nullptr;
-	if(posix_memalign(&result, static_cast<std::size_t>(_alignment), _size ? _size : 1) == 0)
-		return result;
-#endif
-	throw std::bad_alloc();
-}
-
-void* operator new[](const std::size_t _size, const std::align_val_t _alignment) { return ::operator new(_size, _alignment); }
-void operator delete(void* const _pointer) noexcept { std::free(_pointer); }
-void operator delete[](void* const _pointer) noexcept { std::free(_pointer); }
-void operator delete(void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
-void operator delete[](void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
-#if defined(_MSC_VER)
-void operator delete(void* const _pointer, std::align_val_t) noexcept { _aligned_free(_pointer); }
-#else
-void operator delete(void* const _pointer, std::align_val_t) noexcept { std::free(_pointer); }
-#endif
-void operator delete[](void* const _pointer, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
-void operator delete(void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
-void operator delete[](void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
 
 namespace
 {
@@ -94,7 +43,8 @@ namespace
 		return mdDrums::Engine::findFlashImage({});
 	}
 
-	// The Device behind synthLib::Plugin at a host rate, with 18 output buffers of a block each
+	// The Device behind synthLib::Plugin at a host rate, with a buffer of a block for each of its 17 outputs (Main left
+	// and right, Out 01-15)
 	struct Rig
 	{
 		static constexpr uint32_t Block = 512;
@@ -130,7 +80,7 @@ namespace
 			plugin->addMidiEvent(event);
 		}
 
-		// One host block; the peak of Main and of each Out
+		// One host block, its MIDI out kept
 		void process()
 		{
 			plugin->process(inputs, outputs, Block, 120.0f, 0.0f, false);
@@ -139,45 +89,43 @@ namespace
 			midiOut.insert(midiOut.end(), out.begin(), out.end());
 		}
 
+		// _blocks host blocks; the peak of each output (0-1 Main, 2-16 Out 01-15)
+		std::array<float, mdDrums::Device::OutputCount> peaks(const uint32_t _blocks)
+		{
+			std::array<float, mdDrums::Device::OutputCount> result{};
+			for(uint32_t b = 0; b < _blocks; ++b)
+			{
+				process();
+				for(size_t channel = 0; channel < buffers.size(); ++channel)
+					for(const auto value : buffers[channel])
+						result[channel] = std::max(result[channel], std::abs(value));
+			}
+			return result;
+		}
+
 		// A second of host blocks; the peak of output _channel (0-1 Main, 2-16 Out 01-15)
 		float listen(const size_t _channel, const uint32_t _blocks = 0)
 		{
-			float peak = 0;
-			const auto blocks = _blocks ? _blocks : static_cast<uint32_t>(rate() / Block);
-			for(uint32_t b = 0; b < blocks; ++b)
-			{
-				process();
-				for(const auto value : buffers[_channel])
-					peak = std::max(peak, std::abs(value));
-				if(_channel == 0)
-					for(const auto value : buffers[1])
-						peak = std::max(peak, std::abs(value));
-			}
-			return peak;
+			const auto p = peaks(_blocks ? _blocks : second());
+			return _channel == 0 ? std::max(p[0], p[1]) : p[_channel];
 		}
 
 		// A second of host blocks; the peak of the 15 Outs, where nothing sounds but the Tracks (Main keeps a tail of a few
 		// LSB after a Hit, the master effects' EQ and Dynamix, as on the Machinedrum)
 		float listenOuts()
 		{
-			float peak = 0;
-			for(uint32_t b = 0; b < static_cast<uint32_t>(rate() / Block); ++b)
-			{
-				process();
-				for(size_t channel = 2; channel < buffers.size(); ++channel)
-					for(const auto value : buffers[channel])
-						peak = std::max(peak, std::abs(value));
-			}
-			return peak;
+			const auto p = peaks(second());
+			return *std::max_element(p.begin() + 2, p.end());
 		}
 
 		void settle() { listen(0, static_cast<uint32_t>(rate() * 2 / Block)); }
 		float rate() const { return hostRate; }
+		uint32_t second() const { return static_cast<uint32_t>(rate() / Block); }
 
 		std::shared_ptr<mdDrums::Telemetry> telemetry;
 		std::unique_ptr<mdDrums::Device> device;
 		std::unique_ptr<synthLib::Plugin> plugin;
-		std::array<std::vector<float>, 18> buffers;
+		std::array<std::vector<float>, mdDrums::Device::OutputCount> buffers;
 		synthLib::TAudioOutputs outputs{};
 		synthLib::TAudioInputs inputs{};
 		std::vector<synthLib::SMidiEvent> midiOut;
@@ -273,17 +221,8 @@ namespace
 			rig.settle();
 			rig.settle();
 			rig.send(MidiEventSource::Host, {0x90, _note, 100});
-			float mainPeak = 0, outPeak = 0;
-			for(uint32_t b = 0; b < 86; ++b)
-			{
-				rig.process();
-				for(size_t i = 0; i < Rig::Block; ++i)
-				{
-					mainPeak = std::max({mainPeak, std::abs(rig.buffers[0][i]), std::abs(rig.buffers[1][i])});
-					outPeak = std::max(outPeak, std::abs(rig.buffers[1 + _out][i]));
-				}
-			}
-			return std::pair{mainPeak, outPeak};
+			const auto p = rig.peaks(rig.second());
+			return std::pair{std::max(p[0], p[1]), p[1 + _out]};
 		};
 		rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, 0).message());
 		const auto onMain = strike(36, 1);
@@ -595,17 +534,16 @@ namespace
 		lfoEvent.assignRawData(lfo->data(), lfo->size(), MidiEventSource::Editor, 300);
 		const auto count = [&](const bool _note, const bool _level, const bool _lfo)
 		{
-			g_allocations = 0;
-			g_countAllocations = true;
-			if(_note)
-				rig.plugin->addMidiEvent(note);
-			if(_level)
-				rig.plugin->addMidiEvent(level);
-			if(_lfo)
-				rig.plugin->addMidiEvent(lfoEvent);
-			rig.plugin->process(rig.inputs, rig.outputs, Rig::Block, 120.0f, 0.0f, false);
-			g_countAllocations = false;
-			return g_allocations;
+			return countAllocations([&]
+			{
+				if(_note)
+					rig.plugin->addMidiEvent(note);
+				if(_level)
+					rig.plugin->addMidiEvent(level);
+				if(_lfo)
+					rig.plugin->addMidiEvent(lfoEvent);
+				rig.plugin->process(rig.inputs, rig.outputs, Rig::Block, 120.0f, 0.0f, false);
+			});
 		};
 		const auto plain = count(false, false, false), withNote = count(true, false, false);
 		const auto withLevel = count(false, true, false), withLfo = count(false, false, true);
@@ -671,8 +609,8 @@ namespace
 			{
 				const auto first = own.begin() + static_cast<ptrdiff_t>(start + c * mdDrums::Telemetry::ColumnSamples);
 				const auto [low, high] = std::minmax_element(first, first + mdDrums::Telemetry::ColumnSamples);
-				const auto toColumn = [](const float _v) { return static_cast<int16_t>(std::clamp(std::lround(_v * 32767.0f), -32767L, 32767L)); };
-				wrong += capture.columns[c][0] != toColumn(*low) || capture.columns[c][1] != toColumn(*high);
+				wrong += capture.columns[c][0] != mdDrums::Telemetry::level(*low)
+					|| capture.columns[c][1] != mdDrums::Telemetry::level(*high);
 				peak = std::max({peak, std::abs(*low), std::abs(*high)});
 			}
 			std::printf("capture: Hit of velocity %u, %d columns, %zu compared with Out 01 from the note plus 31, %zu differ,"

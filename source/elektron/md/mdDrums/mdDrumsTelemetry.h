@@ -30,6 +30,26 @@ namespace mdDrums
 			return static_cast<int16_t>(std::clamp(std::lround(_sample * 32767.0f), -32767L, 32767L));
 		}
 
+		// A capture's columns made a sample at a time: the Device and the preview (HitPreview) both make theirs with
+		// it, so that the same Hit gives the same columns
+		struct ColumnMaker
+		{
+			int filled = 0;		// samples in the column being made
+			float low = 0.0f, high = 0.0f;
+
+			// True when _sample completes a column, then written into _column
+			bool add(const float _sample, Column& _column)
+			{
+				low = filled ? std::min(low, _sample) : _sample;
+				high = filled ? std::max(high, _sample) : _sample;
+				if(++filled < ColumnSamples)
+					return false;
+				filled = 0;
+				_column = {level(low), level(high)};
+				return true;
+			}
+		};
+
 		struct Capture
 		{
 			uint32_t id = 0;		// the Hit's number on its Track, from 1; 0: none

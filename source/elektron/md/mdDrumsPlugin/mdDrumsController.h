@@ -41,8 +41,8 @@ namespace mdDrums
 		void processRealtimeParameterChanges(size_t _maximum) override;
 		void onStateLoaded() override;
 
-		// The parameters from the Device's own state, the host reading them again: after the Device was made again from a
-		// flash image the user chose (ticket 35)
+		// The parameters from the Device's own state, the host reading them again: as the Controller is made, and after
+		// the Device was made again from a flash image the user chose (ticket 35)
 		void followDevice();
 
 		// The Device's state as the plug-in's state holds it (synthLib::Plugin's two header bytes, then the Device's):
@@ -60,7 +60,6 @@ namespace mdDrums
 		{
 			return _track < TrackCount ? m_auditionVelocity[_track].load(std::memory_order_relaxed) : 0;
 		}
-		static constexpr uint8_t FirstNote = 36;
 
 		// The Kit played (ticket 10 of the editor map), on the message thread: the one loaded last (its name, Links and
 		// Chokes, its LFOs' running state), with the host parameters' values as they are now
@@ -72,7 +71,7 @@ namespace mdDrums
 		// reads every value again, no edit) and changes still waiting for the Device are dropped. _slot becomes the one
 		// played.
 		void loadKit(const md::automation::sysex::MdKit& _kit, int _slot);
-		// Names the Kit played, 16 characters at most (the Device keeps the name with its Kit)
+		// Names the Kit played as MdKit::setName does, 16 characters at most (the Device keeps the name with its Kit)
 		void renameKit(const std::string& _name);
 		// The Kit played's Links and Chokes (ticket 29 of the editor map), on the message thread: the Track a Track's Hit
 		// also strikes, and the one it silences, MdKit::Off for none. Values of the Kit, not host parameters: a change
@@ -109,7 +108,9 @@ namespace mdDrums
 			uint8_t index = 0;
 		};
 
-		void applyState(const messages::State& _state);
+		// The Kit played and the parameters from _state, as a preset's (no edit for the host); _kitOnly: the Kit's
+		// alone, the mixer's (Mute, Solo, Out) left as they are
+		void applyState(const messages::State& _state, bool _kitOnly = false);
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
 		// Any thread: a relay set to _value, given to its parameter of the Track shown
 		void relayChanged(uint8_t _index, int _value);

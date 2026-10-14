@@ -1,5 +1,6 @@
 #include "mdDrumsBank.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 
@@ -39,9 +40,7 @@ namespace mdDrums
 			const auto at = static_cast<size_t>(slot) * SlotSize;
 			if(at + SlotSize > bytes.size())
 				break;
-			const std::vector<uint8_t> message(bytes.begin() + static_cast<std::ptrdiff_t>(at),
-				bytes.begin() + static_cast<std::ptrdiff_t>(at + SlotSize));
-			auto kit = sysex::parseMdKit(message);
+			auto kit = sysex::parseMdKit({bytes.data() + at, SlotSize});
 			if(kit && !kit->isEmptySlot())
 				m_slots[static_cast<size_t>(slot)] = std::move(*kit);
 		}
@@ -54,31 +53,39 @@ namespace mdDrums
 		return _slot >= 0 && _slot < SlotCount ? m_slots[static_cast<size_t>(_slot)] : none;
 	}
 
-	bool Bank::write(const int _slot, const std::optional<Kit>& _kit)
+	bool Bank::write(const std::vector<SlotKit>& _slots)
 	{
-		if(_slot < 0 || _slot >= SlotCount || !read())
+		int last = 0;
+		for(const auto& entry : _slots)
+		{
+			if(entry.first < 0 || entry.first >= SlotCount)
+				return false;
+			last = std::max(last, entry.first);
+		}
+		if(!read())
 			return false;
-		// The file holds every Slot by now: its Slot's bytes rewritten in place
+		// The file holds every Slot by now: the Slots' bytes rewritten in place
 		std::fstream file(m_file, std::ios::binary | std::ios::in | std::ios::out);
 		if(!file)
 			return false;
+		const auto put = [&file](const int _slot, const std::optional<Kit>& _kit)
+		{
+			const auto bytes = dump(_kit, _slot);
+			file.seekp(static_cast<std::streamoff>(static_cast<size_t>(_slot) * SlotSize));
+			file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+		};
 		std::error_code error;
 		const auto size = std::filesystem::file_size(m_file, error);
-		const auto at = static_cast<std::streamoff>(static_cast<size_t>(_slot) * SlotSize);
-		// A short file (written by another tool) is padded with empty Slots up to this one
-		for(auto slot = static_cast<int>(error ? 0 : size / SlotSize); slot < _slot; ++slot)
-		{
-			const auto empty = dump(std::nullopt, slot);
-			file.seekp(static_cast<std::streamoff>(static_cast<size_t>(slot) * SlotSize));
-			file.write(reinterpret_cast<const char*>(empty.data()), static_cast<std::streamsize>(empty.size()));
-		}
-		const auto bytes = dump(_kit, _slot);
-		file.seekp(at);
-		file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+		// A short file (written by another tool) is padded with empty Slots up to the last one written
+		for(auto slot = static_cast<int>(error ? 0 : size / SlotSize); slot < last; ++slot)
+			put(slot, std::nullopt);
+		for(const auto& [slot, kit] : _slots)
+			put(slot, kit);
 		if(!file)
 			return false;
 		file.close();
-		m_slots[static_cast<size_t>(_slot)] = _kit && !_kit->isEmptySlot() ? _kit : std::nullopt;
+		for(const auto& [slot, kit] : _slots)
+			m_slots[static_cast<size_t>(slot)] = kit && !kit->isEmptySlot() ? kit : std::nullopt;
 		return true;
 	}
 
@@ -103,9 +110,7 @@ namespace mdDrums
 				++end;
 			if(end == _bytes.size())
 				break;
-			const std::vector<uint8_t> message(_bytes.begin() + static_cast<std::ptrdiff_t>(at),
-				_bytes.begin() + static_cast<std::ptrdiff_t>(end + 1));
-			if(auto kit = sysex::parseMdKit(message); kit && !kit->isEmptySlot())
+			if(auto kit = sysex::parseMdKit({_bytes.data() + at, end + 1 - at}); kit && !kit->isEmptySlot())
 				kits.push_back(std::move(*kit));
 			at = end;
 		}

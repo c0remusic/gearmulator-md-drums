@@ -2,13 +2,15 @@
 
 #include "mdDrumsProcessor.h"
 
+#include "mdDrumsBank.h"
+#include "mdDrumsDevice.h"
+
 #include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdmachines.h"
 
 #include "synthLib/plugin.h"
 
 #include <algorithm>
-#include <cstring>
 
 namespace mdDrums
 {
@@ -112,9 +114,7 @@ namespace mdDrums
 		m_relayShown.fill(-1);
 
 		// The parameters start as the Device does (factory Kit 1); a loaded state replaces them in onStateLoaded
-		std::vector<uint8_t> state;
-		if(_processor.getPlugin().getState(state, synthLib::StateTypeGlobal))
-			applyStateBytes(state);
+		followDevice();
 		// The relays with Track 1's values, as the host reads them first: not as edits
 		tellHost();
 		syncRelays();
@@ -206,7 +206,8 @@ namespace mdDrums
 			const auto track = lowestBit(tracks);
 			tracks &= tracks - 1;
 			synthLib::SMidiEvent note(synthLib::MidiEventSource::Editor, synthLib::M_NOTEON,
-				static_cast<uint8_t>(FirstNote + track), m_auditionVelocity[track].load(std::memory_order_relaxed));
+				static_cast<uint8_t>(Device::FirstNote + track),
+				m_auditionVelocity[track].load(std::memory_order_relaxed));
 			if(sent >= _maximum || !getProcessor().tryAddRealtimeMidiEvent(note))
 			{
 				m_auditions.fetch_or(static_cast<uint32_t>(tracks | (1ull << track)), std::memory_order_release);
@@ -362,7 +363,7 @@ namespace mdDrums
 			if(parameter->getUnnormalizedValue() == change->value)
 				continue;
 			parameter->setValueFromSynth(change->value, pluginLib::Parameter::Origin::PresetChange);
-			m_valuesChanged.store(true, std::memory_order_relaxed);
+			tellHost();
 		}
 		return true;
 	}
@@ -382,12 +383,11 @@ namespace mdDrums
 
 	void Controller::setPlayedSlot(const int _slot)
 	{
-		m_slot = std::clamp(_slot, 0, 63);
+		m_slot = std::clamp(_slot, 0, Bank::SlotCount - 1);
 	}
 
 	void Controller::loadKit(const md::automation::sysex::MdKit& _kit, const int _slot)
 	{
-		m_kitBase = _kit;
 		setPlayedSlot(_slot);
 
 		// What waits for the Device is older than the Kit
@@ -395,33 +395,15 @@ namespace mdDrums
 			if(messages::isKitParameter(m_addresses[slot].page))
 				m_dirty[slot / 64].fetch_and(~(1ull << (slot % 64)), std::memory_order_acq_rel);
 
-		synthLib::SMidiEvent dump(synthLib::MidiEventSource::Editor);
-		const auto bytes = md::automation::sysex::mdKitDump(_kit, 0);
-		dump.sysex.assign(bytes.begin(), bytes.end());
-		getProcessor().addMidiEvent(dump);
-
-		const messages::State state{_kit, {}};
-		for(const auto& [index, parameters] : getExposedParameters())
-		{
-			if(!messages::isKitParameter(index.page))
-				continue;
-			const auto value = messages::parameterValue(state, index.page, index.partNum, index.paramNum);
-			if(!value)
-				continue;
-			for(auto* parameter : parameters)
-				parameter->setValueFromSynth(*value, pluginLib::Parameter::Origin::PresetChange);
-		}
+		sendToDevice(md::automation::sysex::mdKitDump(_kit, 0));
+		applyState({_kit, {}}, true);
 		tellHost();
 	}
 
 	void Controller::renameKit(const std::string& _name)
 	{
-		m_kitBase.name.fill(0);
-		std::memcpy(m_kitBase.name.data(), _name.data(), std::min(_name.size(), m_kitBase.name.size()));
-		const auto message = messages::kitName(m_kitBase.name);
-		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
-		event.sysex.assign(message.bytes.begin(), message.bytes.begin() + message.size);
-		getProcessor().addMidiEvent(event);
+		m_kitBase.setName(_name);
+		sendToDevice(messages::kitName(m_kitBase.name).message());
 	}
 
 	void Controller::setLink(const uint8_t _track, const uint8_t _target)
@@ -484,11 +466,13 @@ namespace mdDrums
 		return true;
 	}
 
-	void Controller::applyState(const messages::State& _state)
+	void Controller::applyState(const messages::State& _state, const bool _kitOnly)
 	{
 		m_kitBase = _state.kit;
 		for(const auto& [index, parameters] : getExposedParameters())
 		{
+			if(_kitOnly && !messages::isKitParameter(index.page))
+				continue;
 			const auto value = messages::parameterValue(_state, index.page, index.partNum, index.paramNum);
 			if(!value)
 				continue;

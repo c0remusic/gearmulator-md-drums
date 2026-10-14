@@ -1,8 +1,8 @@
 // The Kits' Bank (ticket 26 of the editor map): a new file holds the 16 factory Kits in Slots 1-16, Kit 1 the one a
 // Machinedrum boots with, the other 48 empty; each Slot is a Kit dump OS 1.63 takes, for its slot; a write keeps the
 // file's size and the other Slots; two Banks on one file keep each other's Slots; an emptied Slot reads back empty; a
-// .syx file's Kits come out in their order, the empty Slots left out. Every factory Kit, and a new one, seeds the LFO
-// RND generator.
+// .syx file's Kits come out in their order, the empty Slots left out; one write puts several Slots in place. Every
+// factory Kit, and a new one, seeds the LFO RND generator.
 
 #include "mdDrumsBank.h"
 #include "mdDrumsEngine.h"
@@ -63,13 +63,16 @@ int main()
 
 		// The LFO RND generator's two words (each LFO block's bytes 24-31, which a Kit loads into the running LFO): mdEngine
 		// starts them at 0, where RND never moves; every Kit the Device plays seeds them, a new one too
+		const auto seeds = [](const auto& _lfo)
+		{
+			return std::any_of(_lfo.begin() + 24, _lfo.begin() + 32, [](const uint8_t _b) { return _b != 0; });
+		};
 		int seeded = 0;
-		for(const auto& kit : std::vector<Kit>{factory.begin(), factory.end()})
+		for(const auto& kit : factory)
 			for(const auto& lfo : kit.lfos)
-				seeded += std::any_of(lfo.begin() + 24, lfo.begin() + 32, [](const uint8_t _b) { return _b != 0; });
+				seeded += seeds(lfo);
 		const Kit blank;
-		const bool blankSeeded = std::any_of(blank.lfos[0].begin() + 24, blank.lfos[0].begin() + 32,
-			[](const uint8_t _b) { return _b != 0; });
+		const bool blankSeeded = seeds(blank.lfos[0]);
 		std::printf("LFO RND: %d of %d factory LFO blocks seed it, a new Kit's %s\n", seeded, 16 * 16,
 			blankSeeded ? "too" : "not");
 		require(seeded == 16 * 16 && blankSeeded, "a Kit leaves the LFO RND generator unseeded");
@@ -122,6 +125,15 @@ int main()
 		require(kits.size() == 17 && kits.front() == factory[0] && kits.back() == b, "the Bank as a .syx gives "
 			+ std::to_string(kits.size()) + " Kits");
 		std::printf("as a .syx: %zu Kits, the empty Slots left out\n", kits.size());
+
+		// Several Slots in one write, as an import makes them: each in place, with the Slots between and the file's
+		// size kept
+		require(bank.write({{40, a}, {42, b}}), "the Bank cannot write two Slots at once");
+		require(third.read() && third.slot(40) && *third.slot(40) == a && third.isEmpty(41) && third.slot(42)
+			&& *third.slot(42) == b && third.slot(31) && readFile(file).size() == bytes.size(),
+			"two Slots written at once were not both kept");
+		std::printf("one write: Slots 41 \"%s\" and 43 \"%s\", 42 left empty\n", third.slot(40)->displayName().c_str(),
+			third.slot(42)->displayName().c_str());
 
 		std::filesystem::remove_all(folder);
 		std::cout << "mdDrumsBankTest: PASS\n";

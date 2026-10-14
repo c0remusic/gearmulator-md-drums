@@ -58,12 +58,13 @@ namespace mdDrums
 		const md::automation::sysex::MdKit& kit() const { return m_kit; }
 		const messages::Mixer& mixer() const { return m_mixer; }
 		// The OS's tables the Tracks' effects read (Engine::fxTables), for the editor's Filter and EQ screen
-		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const { return m_engine ? m_engine->fxTables() : nullptr; }
+		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const { return m_engine->fxTables(); }
 		// The OS's machines: their names, SYN1-8 names and defaults
 		const std::vector<md::engine::MachineInfo>& machines() const { return m_engine->machines(); }
 
 	protected:
-		void readMidiOut(std::vector<synthLib::SMidiEvent>& _midiOut) override;
+		// Nothing: process itself puts what the Device says back into its _midiOut (reportMachines)
+		void readMidiOut(std::vector<synthLib::SMidiEvent>&) override {}
 		void processAudio(const synthLib::TAudioInputs& _inputs, const synthLib::TAudioOutputs& _outputs, size_t _samples) override;
 		bool sendMidi(const synthLib::SMidiEvent& _ev, std::vector<synthLib::SMidiEvent>& _response) override;
 
@@ -73,11 +74,10 @@ namespace mdDrums
 		void applySysex(const synthLib::SMidiEvent& _event);
 		void applyKit();
 		void applyMachine(uint8_t _track, uint8_t _machine);
-		void reportMachines();
+		void reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut);
 		void applyMixer();
 		void render(const synthLib::TAudioOutputs& _outputs, size_t _offset, size_t _count);
-		void capture(const std::array<float*, Engine::OutputCount>& _outputs, size_t _count);
-		void queueOut(const synthLib::SMidiEvent& _event);
+		void capture(size_t _count);
 
 		std::unique_ptr<Engine> m_engine;
 		std::shared_ptr<Telemetry> m_telemetry;
@@ -89,8 +89,7 @@ namespace mdDrums
 		{
 			bool active = false;
 			int64_t start = 0;	// the sample the Hit sounds
-			int filled = 0;		// samples in the column being made
-			float low = 0.0f, high = 0.0f;
+			Telemetry::ColumnMaker column;
 		};
 		std::array<Capture, Engine::TrackCount> m_captures{};
 		// Each Track's own output, a chunk at a time: the Telemetry and the captures read it, the Outs sum it
@@ -103,11 +102,8 @@ namespace mdDrums
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 
-		// What the Device says back: a new machine's SYN1-8 as CCs, for the editor, once the block is done (the values
-		// the block left, should the editor have set some after the machine)
-		static constexpr size_t OutCapacity = 16 * 8;
-		std::array<synthLib::SMidiEvent, OutCapacity> m_out{};
-		size_t m_outCount = 0;
+		// The Tracks whose new machine's SYN1-8 the Device says back as CCs, for the editor, once the block is done
+		// (the values the block left, should the editor have set some after the machine)
 		uint16_t m_machinesToReport = 0;
 	};
 }

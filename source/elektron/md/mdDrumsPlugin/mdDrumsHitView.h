@@ -92,12 +92,24 @@ namespace mdDrums
 			Shown drawn{0, -1, 0, 0.0, -1, false, 0};
 		};
 
+		// A capture's window as fit() last found it. A capture's columns stay the same while its Hit, its length and,
+		// for a preview, its number do (0: a Track's capture); another Track shown starts them afresh
+		struct Fitted
+		{
+			uint32_t id = 0;
+			int count = -1;
+			uint32_t preview = 0;
+			double window = 0.1;
+		};
+
+		// fit(_capture), found again only when what _fitted holds is another capture
+		static double fitted(const Telemetry::Capture& _capture, Fitted& _fitted, uint32_t _preview = 0);
 		void timerCallback() override;
 		void createScreen(Screen& _screen, const std::string& _id, const std::string& _ticks);
 		void bindSound();
 		std::array<int, SoundCount> sound(double _nowMs);
 		void requestPreview();
-		void paint(juce::Graphics& _g, float _w, float _h, const Screen& _screen) const;
+		void paint(juce::Graphics& _g, float _w, float _h, float _dp, const Screen& _screen) const;
 		void updateTicks(const Screen& _screen) const;
 		Rml::Element* find(const std::string& _id) const;
 
@@ -110,7 +122,11 @@ namespace mdDrums
 		int m_track = -1;
 		Telemetry::Capture m_current;
 		Telemetry::Capture m_previous;
+		Fitted m_currentFit;
+		Fitted m_previousFit;
+		Fitted m_previewFit;
 		double m_window = 0.1;
+		std::string m_noteText;	// the screen's note as last written
 		double m_lastGrowthMs = 0.0;
 		bool m_playing = false;
 

@@ -2,6 +2,7 @@
 
 #include "mdDrumsBank.h"
 #include "mdDrumsController.h"
+#include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsProcessor.h"
 
@@ -11,12 +12,11 @@
 
 #include "mdProtocol/mdmachines.h"
 
-#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/StringUtilities.h"
 
 #include <algorithm>
-#include <cstdio>
+#include <array>
 #include <fstream>
 #include <iterator>
 
@@ -24,17 +24,17 @@ namespace mdDrums
 {
 	namespace
 	{
-		std::string twoDigits(const int _value)
+		// A second click's question, by KitsView::Confirm: its action (KitsView::confirming) and its button's word
+		struct Question
 		{
-			char text[8];
-			(void)std::snprintf(text, sizeof(text), "%02d", _value);
-			return text;
-		}
-
-		std::string dp(const int _value)
-		{
-			return std::to_string(_value) + "dp";
-		}
+			const char* action;
+			const char* button;
+		};
+		constexpr std::array<Question, 4> g_questions{{
+			{nullptr, nullptr},
+			{"load", "Load anyway"},
+			{"savehere", "Replace it"},
+			{"delete", "Delete it"}}};
 
 		// Slots 01-16 on columns 1-3, 17-32 on 4-6, 33-48 on 7-9, 49-64 on 10-12
 		int slotLeft(const int _slot)
@@ -69,13 +69,13 @@ namespace mdDrums
 		m_editor.addClick("kit_cancel", [this](Rml::Event&) { cancel(); });
 		m_editor.addClick("kit_confirm", [this](Rml::Event&)
 		{
-			const std::string action = m_confirm ? m_confirm : "";
-			if(action == "load")
-				load();
-			else if(action == "savehere")
-				saveHere();
-			else if(action == "delete")
-				remove();
+			switch(m_confirm)
+			{
+			case Confirm::Load:		load(); break;
+			case Confirm::SaveHere:	saveHere(); break;
+			case Confirm::Delete:	remove(); break;
+			case Confirm::None:		break;
+			}
 		});
 		m_editor.addClick("kits_import", [this](Rml::Event&) { openChooser(true); });
 		m_editor.addClick("kits_export", [this](Rml::Event&) { openChooser(false); });
@@ -89,19 +89,23 @@ namespace mdDrums
 		stopTimer();
 	}
 
-	Bank* KitsView::bank() const
+	void KitsView::timerCallback()
 	{
-		return static_cast<Processor&>(m_editor.getProcessor()).getBank();
+		// The head band also changes from elsewhere: a state restored, the parameters (Save lit), a Bank made once a
+		// flash image is chosen
+		if(head() == m_head)
+			return;
+		refresh();
 	}
 
-	Controller& KitsView::controller() const
+	Bank* KitsView::bank() const
 	{
-		return static_cast<Controller&>(m_editor.getProcessor().getController());
+		return m_editor.processor().getBank();
 	}
 
 	Rml::Element* KitsView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 
 	void KitsView::setOpen(const bool _open)
@@ -110,11 +114,11 @@ namespace mdDrums
 		{
 			if(auto* b = bank())
 				b->read();
-			m_chosen = controller().playedSlot();
+			m_chosen = m_editor.controller().playedSlot();
 			m_note.clear();
 		}
 		m_open = _open;
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		if(m_renaming)
 			commitRename(false);
 		refresh();
@@ -122,11 +126,7 @@ namespace mdDrums
 
 	bool KitsView::isChanged() const
 	{
-		const auto* b = bank();
-		if(!b)
-			return false;
-		const auto& stored = b->slot(controller().playedSlot());
-		return !stored || *stored != controller().playedKit();
+		return head().changed;
 	}
 
 	bool KitsView::save()
@@ -134,13 +134,10 @@ namespace mdDrums
 		auto* b = bank();
 		if(!b || !isChanged())
 			return false;
-		const auto slot = controller().playedSlot();
-		if(!b->write(slot, controller().playedKit()))
-		{
-			say("The Bank cannot be written: " + b->file().string());
+		const auto slot = m_editor.controller().playedSlot();
+		if(!written(b->write(slot, m_editor.controller().playedKit())))
 			return false;
-		}
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		say("Saved in slot " + twoDigits(slot + 1));
 		return true;
 	}
@@ -148,12 +145,12 @@ namespace mdDrums
 	void KitsView::choose(const int _slot)
 	{
 		const auto slot = std::clamp(_slot, 0, Bank::SlotCount - 1);
-		if(slot == m_chosen && !m_confirm)
+		if(slot == m_chosen && m_confirm == Confirm::None)
 			return;
 		if(m_renaming)
 			commitRename(false);
 		m_chosen = slot;
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		say({});
 	}
 
@@ -163,13 +160,13 @@ namespace mdDrums
 		if(!b || b->isEmpty(m_chosen))
 			return;
 		const auto& kit = *b->slot(m_chosen);
-		if(isChanged() && (!m_confirm || std::string(m_confirm) != "load"))
+		if(isChanged() && m_confirm != Confirm::Load)
 		{
-			ask("load", "Changes to " + controller().playedKit().displayName() + " will be lost");
+			ask(Confirm::Load, "Changes to " + m_editor.controller().playedKit().displayName() + " will be lost");
 			return;
 		}
-		controller().loadKit(kit, m_chosen);
-		m_confirm = nullptr;
+		m_editor.controller().loadKit(kit, m_chosen);
+		m_confirm = Confirm::None;
 		say("Playing " + twoDigits(m_chosen + 1) + ", " + kit.displayName());
 	}
 
@@ -178,19 +175,17 @@ namespace mdDrums
 		auto* b = bank();
 		if(!b)
 			return;
-		const auto playing = m_chosen == controller().playedSlot();
-		if(!b->isEmpty(m_chosen) && !playing && (!m_confirm || std::string(m_confirm) != "savehere"))
+		const auto playing = m_chosen == m_editor.controller().playedSlot();
+		if(!b->isEmpty(m_chosen) && !playing && m_confirm != Confirm::SaveHere)
 		{
-			ask("savehere", "Replaces " + b->slot(m_chosen)->displayName() + " in slot " + twoDigits(m_chosen + 1));
+			ask(Confirm::SaveHere, "Replaces " + b->slot(m_chosen)->displayName() + " in slot "
+				+ twoDigits(m_chosen + 1));
 			return;
 		}
-		if(!b->write(m_chosen, controller().playedKit()))
-		{
-			say("The Bank cannot be written: " + b->file().string());
+		if(!written(b->write(m_chosen, m_editor.controller().playedKit())))
 			return;
-		}
-		controller().setPlayedSlot(m_chosen);
-		m_confirm = nullptr;
+		m_editor.controller().setPlayedSlot(m_chosen);
+		m_confirm = Confirm::None;
 		say("Saved in slot " + twoDigits(m_chosen + 1));
 	}
 
@@ -199,7 +194,7 @@ namespace mdDrums
 		const auto* b = bank();
 		if(!b || b->isEmpty(m_chosen))
 			return;
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		m_renaming = true;
 		if(auto* edit = find("kit_name_edit"))
 		{
@@ -225,23 +220,14 @@ namespace mdDrums
 			say({});
 			return;
 		}
-		auto name = edit->GetAttribute<Rml::String>("value", "");
-		// The Machinedrum's names: 16 characters of 7 bits
-		name.erase(std::remove_if(name.begin(), name.end(), [](const char _c) { return static_cast<unsigned char>(_c) > 0x7e
-			|| static_cast<unsigned char>(_c) < 0x20; }), name.end());
-		if(name.size() > Kit::NameSize)
-			name.resize(Kit::NameSize);
+		const auto name = edit->GetAttribute<Rml::String>("value", "");
 		auto kit = *b->slot(m_chosen);
-		kit.name.fill(0);
-		std::copy(name.begin(), name.end(), kit.name.begin());
-		if(!b->write(m_chosen, kit))
-		{
-			say("The Bank cannot be written: " + b->file().string());
+		kit.setName(name);
+		if(!written(b->write(m_chosen, kit)))
 			return;
-		}
 		// The Kit played keeps its Slot's name: a renaming is no change to the sound
-		if(m_chosen == controller().playedSlot())
-			controller().renameKit(name);
+		if(m_chosen == m_editor.controller().playedSlot())
+			m_editor.controller().renameKit(name);
 		say("Renamed slot " + twoDigits(m_chosen + 1) + " " + kit.displayName());
 	}
 
@@ -250,23 +236,20 @@ namespace mdDrums
 		auto* b = bank();
 		if(!b || b->isEmpty(m_chosen))
 			return;
-		if(!m_confirm || std::string(m_confirm) != "delete")
+		if(m_confirm != Confirm::Delete)
 		{
-			ask("delete", "Empties slot " + twoDigits(m_chosen + 1));
+			ask(Confirm::Delete, "Empties slot " + twoDigits(m_chosen + 1));
 			return;
 		}
-		if(!b->write(m_chosen, std::nullopt))
-		{
-			say("The Bank cannot be written: " + b->file().string());
+		if(!written(b->write(m_chosen, std::nullopt)))
 			return;
-		}
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		say("Slot " + twoDigits(m_chosen + 1) + " is empty");
 	}
 
 	void KitsView::cancel()
 	{
-		m_confirm = nullptr;
+		m_confirm = Confirm::None;
 		say({});
 	}
 
@@ -285,28 +268,23 @@ namespace mdDrums
 			return false;
 		}
 		b->read();
-		size_t imported = 0;
-		int first = -1;
-		for(int slot = m_chosen; slot < Bank::SlotCount && imported < kits.size(); ++slot)
+		std::vector<Bank::SlotKit> slots;
+		for(int slot = m_chosen; slot < Bank::SlotCount && slots.size() < kits.size(); ++slot)
 		{
-			if(!b->isEmpty(slot))
-				continue;
-			if(!b->write(slot, kits[imported]))
-			{
-				say("The Bank cannot be written: " + b->file().string());
-				return false;
-			}
-			if(first < 0)
-				first = slot;
-			++imported;
+			if(b->isEmpty(slot))
+				slots.emplace_back(slot, kits[slots.size()]);
 		}
-		m_confirm = nullptr;
+		if(!slots.empty() && !written(b->write(slots)))
+			return false;
+		m_confirm = Confirm::None;
+		const auto imported = slots.size();
 		const auto left = kits.size() - imported;
 		if(!imported)
 		{
 			say("No empty slot from " + twoDigits(m_chosen + 1) + " on");
 			return false;
 		}
+		const auto first = slots.front().first;
 		m_chosen = first;
 		std::string text = imported == 1 ? "Imported 1 kit from " + fileName + " into slot " + twoDigits(first + 1)
 			: "Imported " + std::to_string(imported) + " kits from " + fileName + " from slot " + twoDigits(first + 1);
@@ -318,15 +296,9 @@ namespace mdDrums
 
 	bool KitsView::exportFile(const std::filesystem::path& _file)
 	{
-		const auto* b = bank();
-		if(!b)
+		if(!exportable())
 			return false;
-		if(b->isEmpty(m_chosen))
-		{
-			say("Slot " + twoDigits(m_chosen + 1) + " is empty: nothing to export");
-			return false;
-		}
-		const auto bytes = Bank::dump(b->slot(m_chosen), m_chosen);
+		const auto bytes = Bank::dump(bank()->slot(m_chosen), m_chosen);
 		std::ofstream out(_file, std::ios::binary);
 		out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 		if(!out)
@@ -341,13 +313,8 @@ namespace mdDrums
 	void KitsView::openChooser(const bool _import)
 	{
 		const auto* b = bank();
-		if(!b)
+		if(!b || (!_import && !exportable()))
 			return;
-		if(!_import && b->isEmpty(m_chosen))
-		{
-			say("Slot " + twoDigits(m_chosen + 1) + " is empty: nothing to export");
-			return;
-		}
 		const auto folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 		if(_import)
 		{
@@ -409,7 +376,7 @@ namespace mdDrums
 			commitRename(false);
 			return true;
 		}
-		if(m_confirm)
+		if(m_confirm != Confirm::None)
 		{
 			cancel();
 			return true;
@@ -417,7 +384,12 @@ namespace mdDrums
 		return false;
 	}
 
-	void KitsView::ask(const char* _action, std::string _note)
+	const char* KitsView::confirming() const
+	{
+		return g_questions[static_cast<size_t>(m_confirm)].action;
+	}
+
+	void KitsView::ask(const Confirm _action, std::string _note)
 	{
 		m_confirm = _action;
 		say(std::move(_note));
@@ -429,6 +401,24 @@ namespace mdDrums
 		refresh();
 	}
 
+	bool KitsView::written(const bool _ok)
+	{
+		if(!_ok)
+			say("The Bank cannot be written: " + bank()->file().string());
+		return _ok;
+	}
+
+	bool KitsView::exportable()
+	{
+		const auto* b = bank();
+		if(!b)
+			return false;
+		if(!b->isEmpty(m_chosen))
+			return true;
+		say("Slot " + twoDigits(m_chosen + 1) + " is empty: nothing to export");
+		return false;
+	}
+
 	void KitsView::refresh()
 	{
 		updateHead();
@@ -438,15 +428,31 @@ namespace mdDrums
 		updatePanel();
 	}
 
-	void KitsView::updateHead() const
+	KitsView::Head KitsView::head() const
 	{
-		const auto slot = controller().playedSlot();
+		const auto& controller = m_editor.controller();
+		const auto kit = controller.playedKit();
+		Head result;
+		result.bank = bank();
+		result.slot = controller.playedSlot();
+		result.name = kit.displayName();
+		if(result.bank)
+		{
+			const auto& stored = result.bank->slot(result.slot);
+			result.changed = !stored || *stored != kit;
+		}
+		return result;
+	}
+
+	void KitsView::updateHead()
+	{
+		m_head = head();
 		if(auto* e = find("kit_slot"))
-			e->SetInnerRML(twoDigits(slot + 1));
+			e->SetInnerRML(twoDigits(m_head.slot + 1));
 		if(auto* e = find("kit_name"))
-			e->SetInnerRML(escaped(controller().playedKit().displayName()));
+			e->SetInnerRML(escaped(m_head.name));
 		if(auto* e = find("kit_save"))
-			e->SetClass("on", isChanged());
+			e->SetClass("on", m_head.changed);
 	}
 
 	void KitsView::updateSlots() const
@@ -474,7 +480,7 @@ namespace mdDrums
 			bg->SetProperty("top", dp(top(m_chosen) - 8));
 			bg->SetProperty("width", dp(slotLeft(m_chosen) + 224 + 8 - from(m_chosen)));
 		}
-		const auto played = controller().playedSlot();
+		const auto played = m_editor.controller().playedSlot();
 		if(auto* mark = find("slot_play_mark"))
 		{
 			mark->SetProperty("left", dp(from(played)));
@@ -488,17 +494,7 @@ namespace mdDrums
 		if(!b)
 			return;
 		const auto& kit = b->slot(m_chosen);
-		const auto playing = m_chosen == controller().playedSlot();
-		const auto show = [this](const std::string& _id, const bool _visible)
-		{
-			if(auto* e = find(_id))
-				e->SetProperty("display", _visible ? "block" : "none");
-		};
-		const auto showInline = [this](const std::string& _id, const bool _visible)
-		{
-			if(auto* e = find(_id))
-				e->SetProperty("display", _visible ? "inline" : "none");
-		};
+		const auto playing = m_chosen == m_editor.controller().playedSlot();
 
 		if(auto* e = find("kit_caption"))
 			e->SetInnerRML("Slot " + twoDigits(m_chosen + 1) + (playing ? ", playing" : ""));
@@ -507,13 +503,13 @@ namespace mdDrums
 			e->SetInnerRML(kit ? escaped(kit->displayName()) : std::string("Empty"));
 			e->SetClass("empty", !kit);
 		}
-		show("kit_name_big", !m_renaming);
-		show("kit_name_edit", m_renaming);
-		show("kit_tracks", kit.has_value());
+		setDisplay(find("kit_name_big"), !m_renaming);
+		setDisplay(find("kit_name_edit"), m_renaming);
+		setDisplay(find("kit_tracks"), kit.has_value());
 		for(uint8_t t = 0; t < 16; ++t)
 		{
 			const auto id = "kitm" + std::to_string(t + 1);
-			show(id, kit.has_value());
+			setDisplay(find(id), kit.has_value());
 			if(!kit)
 				continue;
 			const auto* machine = md::machines::find(md::MachineModel::Machinedrum, kit->machine(t));
@@ -523,15 +519,15 @@ namespace mdDrums
 		}
 
 		// Asking for a second click, the row holds that action and Cancel only
-		const std::string confirm = m_confirm ? m_confirm : "";
-		showInline("kit_load", !m_confirm && kit.has_value());
-		showInline("kit_savehere", !m_confirm);
-		showInline("kit_rename", !m_confirm && kit.has_value());
-		showInline("kit_delete", !m_confirm && kit.has_value());
-		showInline("kit_confirm", m_confirm != nullptr);
-		showInline("kit_cancel", m_confirm != nullptr);
-		if(auto* e = find("kit_confirm"))
-			e->SetInnerRML(confirm == "load" ? "Load anyway" : confirm == "savehere" ? "Replace it" : "Delete it");
+		const bool asking = m_confirm != Confirm::None;
+		setDisplay(find("kit_load"), !asking && kit.has_value(), "inline");
+		setDisplay(find("kit_savehere"), !asking, "inline");
+		setDisplay(find("kit_rename"), !asking && kit.has_value(), "inline");
+		setDisplay(find("kit_delete"), !asking && kit.has_value(), "inline");
+		setDisplay(find("kit_confirm"), asking, "inline");
+		setDisplay(find("kit_cancel"), asking, "inline");
+		if(auto* e = find("kit_confirm"); e && asking)
+			e->SetInnerRML(g_questions[static_cast<size_t>(m_confirm)].button);
 		if(auto* e = find("kit_note"))
 			e->SetInnerRML(escaped(m_note));
 	}

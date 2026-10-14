@@ -6,13 +6,13 @@
 
 #include "mdDrumsProcessor.h"
 
+#include "mdDrumsAllocationCounter.h"	// a relay set by the host must not allocate (the audio thread sets it)
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "juceRmlUi/juceRmlComponent.h"
-#include "juceRmlUi/juceRmlLookAndFeel.h"
 #include "juceRmlUi/rmlInterfaces.h"
 #include "synthLib/plugin.h"
 
@@ -24,71 +24,11 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
-
-#include <new>
-
-// Allocations counted on this thread while asked: a relay set by the host must not allocate (the audio thread sets it)
-#if defined(_MSC_VER)
-#include <malloc.h>
-#endif
-
-namespace
-{
-	thread_local bool g_countAllocations = false;
-	thread_local size_t g_allocations = 0;
-}
-
-void* operator new(const std::size_t _size)
-{
-	if(g_countAllocations)
-		++g_allocations;
-	if(void* const result = std::malloc(_size ? _size : 1))
-		return result;
-	throw std::bad_alloc();
-}
-
-void* operator new[](const std::size_t _size) { return ::operator new(_size); }
-
-void* operator new(const std::size_t _size, const std::align_val_t _alignment)
-{
-	if(g_countAllocations)
-		++g_allocations;
-#if defined(_MSC_VER)
-	if(void* const result = _aligned_malloc(_size ? _size : 1, static_cast<std::size_t>(_alignment)))
-		return result;
-#else
-	void* result = nullptr;
-	if(posix_memalign(&result, static_cast<std::size_t>(_alignment), _size ? _size : 1) == 0)
-		return result;
-#endif
-	throw std::bad_alloc();
-}
-
-void* operator new[](const std::size_t _size, const std::align_val_t _alignment) { return ::operator new(_size, _alignment); }
-void operator delete(void* const _pointer) noexcept { std::free(_pointer); }
-void operator delete[](void* const _pointer) noexcept { std::free(_pointer); }
-void operator delete(void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
-void operator delete[](void* const _pointer, std::size_t) noexcept { std::free(_pointer); }
-#if defined(_MSC_VER)
-void operator delete(void* const _pointer, std::align_val_t) noexcept { _aligned_free(_pointer); }
-#else
-void operator delete(void* const _pointer, std::align_val_t) noexcept { std::free(_pointer); }
-#endif
-void operator delete[](void* const _pointer, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
-void operator delete(void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
-void operator delete[](void* const _pointer, std::size_t, const std::align_val_t _alignment) noexcept { ::operator delete(_pointer, _alignment); }
-
-namespace juceRmlUi
-{
-	// The friend hook the MD editor tests use: one RmlUi frame, so that paint() has geometry
-	struct RenderingTestAccess
-	{
-		static void update(RmlComponent& _component) { _component.update(); }
-	};
-}
 
 namespace
 {
@@ -102,7 +42,7 @@ namespace
 
 	// What the plug-in tells the host by itself: an edit is a parameter's listeners called, which JUCE's VST3 wrapper
 	// turns into performEdit on the message thread and Live records while it records; a re-read is a change that makes
-	// the host read every value again (restartComponent with kParamValuesChanged)
+	// the host read every value again (restartComponent with kParamValuesChanged); and the gestures it begins and ends
 	struct HostWatch final : juce::AudioProcessorListener
 	{
 		explicit HostWatch(juce::AudioProcessor& _processor) : processor(_processor) { processor.addListener(this); }
@@ -116,10 +56,17 @@ namespace
 			if(_details.programChanged)
 				++rereads;
 		}
+		void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, const int _index) override
+		{
+			begun.push_back(_index);
+		}
+		void audioProcessorParameterChangeGestureEnd(juce::AudioProcessor*, int) override { ++ended; }
 
 		juce::AudioProcessor& processor;
 		int edits = 0;
 		int rereads = 0;
+		std::vector<int> begun;	// the parameters' indices, in order
+		int ended = 0;
 	};
 
 	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
@@ -140,8 +87,10 @@ namespace
 		_midi.clear();
 	}
 
-	// A second of silence, then _note at sample _offset of a block, and a second after it
-	Result play(juce::AudioProcessor& _processor, const int _note, const int _offset, const double _rate)
+	// A second of silence, then a second struck by _strike just before its first block: _strike gives that block's
+	// MIDI, as a host does, or plays a Track another way; the first sound is counted from sample _offset of the block
+	Result play(juce::AudioProcessor& _processor, const double _rate,
+		const std::function<void(juce::MidiBuffer&)>& _strike, const int _offset = 0)
 	{
 		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
 		juce::MidiBuffer midi;
@@ -153,7 +102,7 @@ namespace
 		for(int i = 0; i < blocks; ++i)
 		{
 			if(i == 0)
-				midi.addEvent(juce::MidiMessage::noteOn(1, _note, static_cast<juce::uint8>(100)), _offset);
+				_strike(midi);
 			process(_processor, buffer, midi);
 			for(int s = 0; s < g_block; ++s)
 			{
@@ -171,6 +120,41 @@ namespace
 		return result;
 	}
 
+	// A second of silence, then _note at sample _offset of a block, and a second after it
+	Result play(juce::AudioProcessor& _processor, const int _note, const int _offset, const double _rate)
+	{
+		return play(_processor, _rate, [&](juce::MidiBuffer& _midi)
+		{
+			_midi.addEvent(juce::MidiMessage::noteOn(1, _note, static_cast<juce::uint8>(100)), _offset);
+		}, _offset);
+	}
+
+	// One block, then the Controller's pending messages, as its timer sends them
+	void block(mdDrums::Processor& _processor)
+	{
+		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
+		juce::MidiBuffer midi;
+		process(_processor, buffer, midi);
+		_processor.getController().processPendingMidiMessages();
+	}
+
+	// A new processor given a state, as a host opening a set gives it
+	std::unique_ptr<mdDrums::Processor> restoredFrom(const juce::MemoryBlock& _state)
+	{
+		auto restored = std::make_unique<mdDrums::Processor>(true);
+		static_cast<juce::AudioProcessor&>(*restored).setStateInformation(_state.getData(),
+			static_cast<int>(_state.getSize()));
+		return restored;
+	}
+
+	// A new processor given _processor's state
+	std::unique_ptr<mdDrums::Processor> restoredFrom(juce::AudioProcessor& _processor)
+	{
+		juce::MemoryBlock state;
+		_processor.getStateInformation(state);
+		return restoredFrom(state);
+	}
+
 	pluginLib::Parameter& parameter(mdDrums::Processor& _processor, const std::string& _name, const uint8_t _part)
 	{
 		auto* p = _processor.getController().getParameter(_name, _part);
@@ -178,15 +162,18 @@ namespace
 		return *p;
 	}
 
+	// A value set as a host sets it, normalised
+	void hostSets(pluginLib::Parameter& _p, const int _value)
+	{
+		_p.setValue(_p.convertTo0to1(static_cast<float>(_value)));
+	}
+
 	// As a host automates: the value set on the parameter, then a block for the Controller to send it
 	void automate(mdDrums::Processor& _processor, const std::string& _name, const uint8_t _part, const int _value)
 	{
 		auto& p = parameter(_processor, _name, _part);
-		p.setValue(p.convertTo0to1(static_cast<float>(_value)));
-		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
-		juce::MidiBuffer midi;
-		process(_processor, buffer, midi);
-		_processor.getController().processPendingMidiMessages();
+		hostSets(p, _value);
+		block(_processor);
 		// What the editor binds to follows host automation once the Controller's timer has run
 		require(static_cast<int>(p.getValueObject().getValue()) == _value, "the editor did not see " + _name + " change");
 	}
@@ -204,23 +191,16 @@ namespace
 	// its SYN1-8 the machine's values. The host reads the values again after a Kit or a machine, with no edit.
 	void kits(mdDrums::Processor& _processor)
 	{
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
+		auto& controller = _processor.controller();
 		auto* bank = _processor.getBank();
 		require(bank != nullptr && bank->slot(3).has_value(), "no Bank, or no Kit in its Slot 4");
 		const auto kit = *bank->slot(3);
 		const auto mixer = device(_processor).mixer();
-		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
-		juce::MidiBuffer midi;
-		const auto block = [&]
-		{
-			process(_processor, buffer, midi);
-			_processor.getController().processPendingMidiMessages();
-		};
 
 		{
 			HostWatch watch(_processor);
 			controller.loadKit(kit, 3);
-			block();
+			block(_processor);
 			std::printf("kits: a Kit loaded told the host %d edits, %d re-reads\n", watch.edits, watch.rereads);
 			require(watch.edits == 0 && watch.rereads > 0, "a Kit loaded did not reach the host as one re-read");
 		}
@@ -234,16 +214,13 @@ namespace
 		automate(_processor, "FLTF", 2, kit.parameters[2][12] == 99 ? 98 : 99);
 		require(controller.playedKit() != kit, "a parameter changed does not make the Kit differ from its Slot");
 
-		juce::MemoryBlock state;
-		static_cast<juce::AudioProcessor&>(_processor).getStateInformation(state);
-		mdDrums::Processor restored(true);
-		static_cast<juce::AudioProcessor&>(restored).setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-		const auto& restoredController = dynamic_cast<mdDrums::Controller&>(restored.getController());
+		const auto restored = restoredFrom(_processor);
+		const auto& restoredController = restored->controller();
 		require(restoredController.playedSlot() == 3 && restoredController.playedKit() == controller.playedKit(),
 			"the state did not bring back the Kit played and its Slot");
 
 		controller.renameKit("RENAMED");
-		block();
+		block(_processor);
 		require(device(_processor).kit().displayName() == "RENAMED" && controller.playedKit().displayName() == "RENAMED",
 			"a new name did not reach the Device");
 
@@ -253,7 +230,7 @@ namespace
 		controller.setLink(0, 4);
 		controller.setChoke(0, 2);
 		controller.setLink(1, 1);
-		block();
+		block(_processor);
 		require(device(_processor).kit().links[0] == 4 && device(_processor).kit().chokes[0] == 2,
 			"a Link or a Choke did not reach the Device");
 		require(controller.link(0) == 4 && controller.choke(0) == 2 && controller.link(1) == mdDrums::Controller::Off
@@ -261,18 +238,14 @@ namespace
 		require(controller.playedKit() != linkedKit && controller.playedKit().links[0] == 4,
 			"a Link does not make the Kit played differ");
 		{
-			juce::MemoryBlock linkedState;
-			static_cast<juce::AudioProcessor&>(_processor).getStateInformation(linkedState);
-			mdDrums::Processor restoredLinks(true);
-			static_cast<juce::AudioProcessor&>(restoredLinks).setStateInformation(linkedState.getData(),
-				static_cast<int>(linkedState.getSize()));
-			const auto& c = dynamic_cast<mdDrums::Controller&>(restoredLinks.getController());
-			require(c.link(0) == 4 && c.choke(0) == 2 && device(restoredLinks).kit().links[0] == 4,
+			const auto restoredLinks = restoredFrom(_processor);
+			const auto& c = restoredLinks->controller();
+			require(c.link(0) == 4 && c.choke(0) == 2 && device(*restoredLinks).kit().links[0] == 4,
 				"the state did not keep a Link and a Choke");
 		}
 		controller.setLink(0, mdDrums::Controller::Off);
 		controller.setChoke(0, mdDrums::Controller::Off);
-		block();
+		block(_processor);
 		require(device(_processor).kit().links[0] == mdDrums::Controller::Off
 			&& device(_processor).kit().chokes[0] == mdDrums::Controller::Off, "a Link or a Choke did not go Off");
 
@@ -295,19 +268,13 @@ namespace
 	// "Prepare Push list" moves the 64 of the list, in order, each in a gesture
 	void relays(mdDrums::Processor& _processor)
 	{
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_processor.getController());
+		auto& controller = _processor.controller();
 		auto& host = static_cast<juce::AudioProcessor&>(_processor);
-		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
-		juce::MidiBuffer midi;
-		const auto block = [&]
+		// A block, then the relays synced as the Controller's timer syncs them
+		const auto syncedBlock = [&]
 		{
-			process(_processor, buffer, midi);
-			_processor.getController().processPendingMidiMessages();
+			block(_processor);
 			controller.syncRelays();
-		};
-		const auto hostSets = [](pluginLib::Parameter& _p, const int _value)
-		{
-			_p.setValue(_p.convertTo0to1(static_cast<float>(_value)));
 		};
 		auto& relayTrack = *controller.relay(0);
 		auto& relayFltf = *controller.relay(20);
@@ -315,16 +282,13 @@ namespace
 		require(relayFltf.getDescription().name == "FocusFLTF", "relay 20 is not FLTF");
 
 		controller.setCurrentPart(0);
-		block();
+		syncedBlock();
 		const auto fltf = parameter(_processor, "FLTF", 0).getUnnormalizedValue();
-		g_allocations = 0;
-		g_countAllocations = true;
-		hostSets(relayFltf, fltf == 33 ? 34 : 33);
-		g_countAllocations = false;
-		require(g_allocations == 0, "a relay set by the host allocated " + std::to_string(g_allocations) + " times");
+		const auto allocations = countAllocations([&] { hostSets(relayFltf, fltf == 33 ? 34 : 33); });
+		require(allocations == 0, "a relay set by the host allocated " + std::to_string(allocations) + " times");
 		{
 			HostWatch watch(_processor);
-			block();
+			syncedBlock();
 			require(watch.edits == 0 && watch.rereads == 0, "the host was told a relay's parameter: "
 				+ std::to_string(watch.edits) + " edits and " + std::to_string(watch.rereads) + " re-reads");
 		}
@@ -332,14 +296,11 @@ namespace
 		require(parameter(_processor, "FLTF", 0).getUnnormalizedValue() == set
 			&& device(_processor).kit().parameters[0][12] == set, "a relay did not set its parameter of the Track shown");
 
-		g_countAllocations = true;
-		hostSets(relayTrack, 5);
-		g_countAllocations = false;
-		require(g_allocations == 0, "the relay Track set by the host allocated");
+		require(countAllocations([&] { hostSets(relayTrack, 5); }) == 0, "the relay Track set by the host allocated");
 		int shownEdits = 0;
 		{
 			HostWatch watch(_processor);
-			block();
+			syncedBlock();
 			shownEdits = watch.edits;
 			require(watch.edits > 0 && watch.rereads == 0, "the relays of another Track did not reach the host as edits");
 		}
@@ -357,34 +318,24 @@ namespace
 			require(watch.edits == 0 && watch.rereads == 0, "the host was told a relay following its parameter");
 		}
 
-		juce::MemoryBlock state;
-		host.getStateInformation(state);
-		mdDrums::Processor restored(true);
-		static_cast<juce::AudioProcessor&>(restored).setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-		require(restored.getController().getCurrentPart() == 5, "the state did not keep the Track shown");
+		const auto restored = restoredFrom(host);
+		require(restored->getController().getCurrentPart() == 5, "the state did not keep the Track shown");
 
 		// "Prepare Push list": the relays then the master effects, each in its own gesture
-		struct Recorder final : juce::AudioProcessorListener
 		{
-			std::vector<int> begun;
-			int changed = 0, ended = 0;
-			void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override { ++changed; }
-			void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails&) override {}
-			void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, const int _index) override { begun.push_back(_index); }
-			void audioProcessorParameterChangeGestureEnd(juce::AudioProcessor*, int) override { ++ended; }
-		} recorder;
-		host.addListener(&recorder);
-		controller.preparePushList();
-		host.removeListener(&recorder);
-		bool ordered = recorder.begun.size() == 64;
-		for(size_t i = 0; ordered && i < 64; ++i)
-			ordered = recorder.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
-		std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays following (%d"
-			" edits); Push list moved %zu parameters in order (no allocation setting a relay), %d changes, %d gestures"
-			" ended\n", set, shownEdits, recorder.begun.size(), recorder.changed, recorder.ended);
-		require(ordered && recorder.ended == 64 && recorder.changed >= 64, "Prepare Push list did not move the 64 in order");
+			HostWatch watch(_processor);
+			controller.preparePushList();
+			bool ordered = watch.begun.size() == 64;
+			for(size_t i = 0; ordered && i < 64; ++i)
+				ordered = watch.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
+			std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays"
+				" following (%d edits); Push list moved %zu parameters in order (no allocation setting a relay), %d"
+				" changes, %d gestures ended\n", set, shownEdits, watch.begun.size(), watch.edits, watch.ended);
+			require(ordered && watch.ended == 64 && watch.edits >= 64,
+				"Prepare Push list did not move the 64 in order");
+		}
 		controller.setCurrentPart(0);
-		block();
+		syncedBlock();
 	}
 
 	void setEnvironment(const char* _name, const std::string& _value)
@@ -431,13 +382,9 @@ namespace
 			require(!processor.hasDevice(), "the stand-in passes for a Device");
 
 			host.setStateInformation(set.getData(), static_cast<int>(set.getSize()));
-			juce::MemoryBlock saved;
-			host.getStateInformation(saved);
 			{
-				mdDrums::Processor reopened(true);
-				static_cast<juce::AudioProcessor&>(reopened).setStateInformation(saved.getData(),
-					static_cast<int>(saved.getSize()));
-				require(device(reopened).kit().machine(0) == 32, "a set saved while the stand-in played lost its Kit");
+				const auto reopened = restoredFrom(host);
+				require(device(*reopened).kit().machine(0) == 32, "a set saved while the stand-in played lost its Kit");
 			}
 			automate(processor, "Machine", 0, 33);
 
@@ -471,7 +418,7 @@ namespace
 	}
 
 	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
-	// control); MD_DRUMS_EDITOR_PNG names a file for a picture of it
+	// control)
 	void editor(mdDrums::Processor& _processor)
 	{
 		_processor.setForceSoftwareRendererForSession(true);
@@ -487,32 +434,6 @@ namespace
 		require(size.x == 1296 && size.y == 824, "the document is " + std::to_string(size.x) + "x" + std::to_string(size.y));
 		std::printf("editor: %dx%d, skin %s\n", static_cast<int>(size.x), static_cast<int>(size.y),
 			state.getCurrentSkin().filename.c_str());
-
-		if(const auto* png = std::getenv("MD_DRUMS_EDITOR_PNG"))
-		{
-			for(const auto& [index, parameters] : _processor.getController().getExposedParameters())
-				for(auto* p : parameters)
-				{
-					p->flushRealtimeValueToUi();
-					p->getValueObject().getValueSource().sendChangeMessage(true);
-				}
-			juceRmlUi::LookAndFeel lookAndFeel;
-			component->setLookAndFeel(&lookAndFeel);
-			juce::Image image;
-			for(int frame = 0; frame < 6; ++frame)
-			{
-				juceRmlUi::RenderingTestAccess::update(*component);
-				image = juce::Image(juce::Image::ARGB, component->getWidth(), component->getHeight(), true);
-				lookAndFeel.getCurrentImage() = image;
-				juce::Graphics g(image);
-				component->paint(g);
-			}
-			component->setLookAndFeel(nullptr);
-			juce::FileOutputStream out{juce::File(juce::String(png))};
-			out.setPosition(0);
-			out.truncate();
-			juce::PNGImageFormat().writeImageToStream(image, out);
-		}
 		_processor.destroyEditorState();
 	}
 
@@ -547,7 +468,7 @@ int main()
 		for(const double rate : {44100.0, 48000.0})
 		{
 			mdDrums::Processor processor(true);
-			if(!dynamic_cast<const mdDrums::Device*>(processor.getPlugin().getDevice()))
+			if(!processor.hasDevice())
 			{
 				std::cout << "mdDrumsProcessorTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
 				return 77;
@@ -558,22 +479,21 @@ int main()
 
 			// The parameters, frozen from the port's first push: per Track Machine, 24, 5 LFO, Level, Mute, Solo, Out
 			const auto& parameters = host.getParameters();
+			const auto id = [&](const int _index)
+			{
+				return dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[_index])->paramID;
+			};
 			std::printf("%.0f Hz: %d parameters, first %s \"%s\", last %s \"%s\"\n", rate, parameters.size(),
-				dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[0])->paramID.toRawUTF8(),
-				parameters[0]->getName(64).toRawUTF8(),
-				dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters.getLast())->paramID.toRawUTF8(),
+				id(0).toRawUTF8(), parameters[0]->getName(64).toRawUTF8(), id(parameters.size() - 1).toRawUTF8(),
 				parameters.getLast()->getName(64).toRawUTF8());
 			require(parameters.size() == 608, "not 608 parameters");
-			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[0])->paramID == "5_0_0"
-				&& parameters[0]->getName(64) == "Track 1 Machine", "track 1's machine is not the first parameter");
-			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[33])->paramID == "7_0_1"
-				&& dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[34])->paramID == "5_1_0",
-				"a Track does not hold 34 parameters ending with Out");
-			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[544])->paramID == "8_0_0"
-				&& parameters[544]->getName(64) == "Echo TIME", "the master effects do not follow the Tracks");
-			require(dynamic_cast<juce::AudioProcessorParameterWithID*>(parameters[576])->paramID == "9_0_0"
-				&& parameters[576]->getName(64) == "Track" && parameters[607]->getName(64) == "LFOM",
-				"the relays for Push 2 do not follow the master effects");
+			require(id(0) == "5_0_0" && parameters[0]->getName(64) == "Track 1 Machine",
+				"track 1's machine is not the first parameter");
+			require(id(33) == "7_0_1" && id(34) == "5_1_0", "a Track does not hold 34 parameters ending with Out");
+			require(id(544) == "8_0_0" && parameters[544]->getName(64) == "Echo TIME",
+				"the master effects do not follow the Tracks");
+			require(id(576) == "9_0_0" && parameters[576]->getName(64) == "Track"
+				&& parameters[607]->getName(64) == "LFOM", "the relays for Push 2 do not follow the master effects");
 
 			// The parameters start as the Device boots: factory Kit 1, TRX-B2 on track 1
 			require(parameter(processor, "Machine", 0).getUnnormalizedValue() == 28
@@ -606,23 +526,12 @@ int main()
 			// The editor plays a Track (Listen while choosing): a machine chosen, the Track played at once, sounds the
 			// machine chosen, its note reaching the Device after the machine in the same block
 			{
-				juce::AudioBuffer<float> buffer(host.getTotalNumOutputChannels(), g_block);
-				juce::MidiBuffer midi;
-				const auto blocks = static_cast<int>(rate / g_block);
-				for(int i = 0; i < blocks; ++i)
-					process(processor, buffer, midi);
-				parameter(processor, "Machine", 0).setUnnormalizedValueNotifyingHost(28, pluginLib::Parameter::Origin::Ui);
-				dynamic_cast<mdDrums::Controller&>(processor.getController()).audition(0, 100);
-				double energy = 0;
-				for(int i = 0; i < blocks; ++i)
+				const auto energy = play(processor, rate, [&](juce::MidiBuffer&)
 				{
-					process(processor, buffer, midi);
-					for(int s = 0; s < g_block; ++s)
-					{
-						const auto value = std::max(std::abs(buffer.getSample(0, s)), std::abs(buffer.getSample(1, s)));
-						energy += double(value) * value;
-					}
-				}
+					parameter(processor, "Machine", 0).setUnnormalizedValueNotifyingHost(28,
+						pluginLib::Parameter::Origin::Ui);
+					processor.controller().audition(0, 100);
+				}).energy;
 				// The same machine at its defaults, struck by the host
 				const auto host36 = play(processor, 36, 0, rate);
 				std::printf("%.0f Hz: TRX-B2 chosen and played from the editor: energy %.3f; struck by the host %.3f, EFM-BD %.3f\n",
@@ -653,15 +562,14 @@ int main()
 			automate(processor, "EqGAIN", 0, 99);
 			juce::MemoryBlock state;
 			host.getStateInformation(state);
-			mdDrums::Processor restored(true);
-			juce::AudioProcessor& restoredHost = restored;
-			restoredHost.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-			require(device(restored).kit() == device(processor).kit() && device(restored).mixer() == device(processor).mixer(),
+			const auto restored = restoredFrom(state);
+			require(device(*restored).kit() == device(processor).kit()
+				&& device(*restored).mixer() == device(processor).mixer(),
 				"the state did not bring back the Device's Kit and mixer");
-			require(parameter(restored, "Machine", 0).getUnnormalizedValue() == 32
-				&& parameter(restored, "Out", 0).getUnnormalizedValue() == 1
-				&& parameter(restored, "LfoShape1", 3).getUnnormalizedValue() == 5
-				&& parameter(restored, "EqGAIN", 0).getUnnormalizedValue() == 99,
+			require(parameter(*restored, "Machine", 0).getUnnormalizedValue() == 32
+				&& parameter(*restored, "Out", 0).getUnnormalizedValue() == 1
+				&& parameter(*restored, "LfoShape1", 3).getUnnormalizedValue() == 5
+				&& parameter(*restored, "EqGAIN", 0).getUnnormalizedValue() == 99,
 				"the restored parameters do not follow the state");
 			std::printf("%.0f Hz: state of %zu bytes restored, parameters following\n", rate, state.getSize());
 

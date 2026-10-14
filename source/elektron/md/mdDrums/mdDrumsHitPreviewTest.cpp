@@ -15,9 +15,10 @@
 
 #include "Firmware.h"
 
+#include "mdProtocol/mdsysexautomation.h"
+
 #include "synthLib/midiTypes.h"
 
-#include <array>
 #include <chrono>
 #include <cstdio>
 #include <iostream>
@@ -195,8 +196,8 @@ int main()
 			{
 				const auto machine = find(name);
 				constexpr int track = 2;
-				const auto device = live(flash, {sysex({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x5b, track,
-					static_cast<uint8_t>(machine.id & 0x7f), static_cast<uint8_t>(machine.id >> 7), 0xf7}), note(track, 100)}, track);
+				const auto device = live(flash, {sysex(*md::automation::sysex::assignMachine(
+					md::MachineModel::Machinedrum, track, machine.id)), note(track, 100)}, track);
 				require(device.kit.machine(track) == machine.id, std::string("the Device did not take ") + name);
 				mdDrums::HitPreview::Request request;
 				request.kit = device.kit;

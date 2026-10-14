@@ -1,5 +1,6 @@
 #include "mdsysexautomation.h"
 
+#include "mdkit.h"
 #include "mdmachines.h"
 #include "mdsysexcodec.h"
 
@@ -24,13 +25,34 @@ namespace md::automation::sysex::codec
 			&& _message.back() == 0xf7;
 	}
 
+	Message header(const MachineModel _model, const uint8_t _command, const size_t _size)
+	{
+		Message result;
+		result.reserve(_size);
+		result.insert(result.end(), {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, _command});
+		return result;
+	}
+
+	Message message(const MachineModel _model, const uint8_t _command, const std::initializer_list<uint8_t> _body)
+	{
+		auto result = header(_model, _command, 8 + _body.size());
+		result.insert(result.end(), _body);
+		result.push_back(0xf7);
+		return result;
+	}
+
+	bool isSevenBit(const MessageView _message)
+	{
+		return std::none_of(_message.begin() + 1, _message.end() - 1,
+			[](const uint8_t _value) { return _value > 0x7f; });
+	}
+
 	bool validDump(const MachineModel _model, const MessageView _message,
 		const uint8_t _command)
 	{
 		if(_message.size() < 13 || !hasHeader(_model, _message, _command))
 			return false;
-		if(std::any_of(_message.begin() + 1, _message.end() - 1,
-			[](const uint8_t _value) { return _value > 0x7f; }))
+		if(!isSevenBit(_message))
 			return false;
 
 		const auto checksumPosition = _message.size() - 5;
@@ -96,6 +118,16 @@ namespace md::automation::sysex::codec
 		_message.push_back(static_cast<uint8_t>(length & 0x7f));
 		_message.push_back(0xf7);
 	}
+
+	std::string kitName(const uint8_t* _name, const size_t _size)
+	{
+		std::string name;
+		for(size_t index = 0; index < _size && _name[index] != 0; ++index)
+			name.push_back(_name[index] >= 0x20 && _name[index] < 0x7f ? static_cast<char>(_name[index]) : '?');
+		while(!name.empty() && name.back() == ' ')
+			name.pop_back();
+		return name;
+	}
 }
 
 namespace md::automation::sysex
@@ -123,8 +155,7 @@ namespace md::automation::sysex
 		Message request(const MachineModel _model, const uint8_t _command,
 			const uint8_t _value)
 		{
-			return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00,
-				_command, static_cast<uint8_t>(_value & 0x7f), 0xf7};
+			return message(_model, _command, {static_cast<uint8_t>(_value & 0x7f)});
 		}
 
 		bool validStatusValue(const MachineModel _model,
@@ -142,17 +173,20 @@ namespace md::automation::sysex
 			return false;
 		}
 
+		bool validStatusParameter(const uint8_t _parameter)
+		{
+			return _parameter == static_cast<uint8_t>(StatusParameter::Global)
+				|| _parameter == static_cast<uint8_t>(StatusParameter::Kit)
+				|| _parameter == static_cast<uint8_t>(StatusParameter::Pattern);
+		}
+
 		std::optional<StatusResponse> parseStatus(const MachineModel _model,
 			const MessageView _message, const uint8_t _command)
 		{
-			if(_message.size() != 10 || !hasHeader(_model, _message, _command)
-				|| std::any_of(_message.begin() + 1, _message.end() - 1,
-					[](const uint8_t _value) { return _value > 0x7f; }))
+			if(_message.size() != 10 || !hasHeader(_model, _message, _command) || !isSevenBit(_message))
 				return std::nullopt;
 			const auto parameter = _message[7];
-			if(parameter != static_cast<uint8_t>(StatusParameter::Global)
-				&& parameter != static_cast<uint8_t>(StatusParameter::Kit)
-				&& parameter != static_cast<uint8_t>(StatusParameter::Pattern))
+			if(!validStatusParameter(parameter))
 				return std::nullopt;
 			const auto typedParameter = static_cast<StatusParameter>(parameter);
 			return validStatusValue(_model, typedParameter, _message[8])
@@ -235,21 +269,10 @@ namespace md::automation::sysex
 		// factory Global has both clear. Bits 5 and 6 are the outputs.
 		constexpr size_t g_mdGlobalSize = 0xc5;
 		constexpr size_t g_mdSyncPosition = 0xb2;
-		// Before the key map: one raw byte per track, 0 to 5 for outputs A to F, 6 for MAIN.
-		constexpr size_t g_mdRoutingPosition = 0x0a;
-
-		// Machinedrum Kit: after the LFOs, 32 raw bytes of master effects, 8 per effect,
-		// reverb first (mdEditorFirmwareTest checks the order).
-		constexpr size_t g_mdKitSize = 0x4d1;
-		constexpr size_t g_mdMasterEffectsPosition = 0x487;
-		constexpr std::array<uint8_t, MasterEffectCount> g_mdMasterEffectBlock{
-			1,      // Echo
-			0,      // Reverb
-			2,      // Eq
-			3       // Dynamix
-		};
 		constexpr uint8_t g_mdClockIn = 0x01;
 		constexpr uint8_t g_mdTransportInOff = 0x10;
+		// Before the key map: one raw byte per track, 0 to 5 for outputs A to F, 6 for MAIN.
+		constexpr size_t g_mdRoutingPosition = 0x0a;
 
 		// Monomachine Global, decoded payload: five MIDI channels, then a byte
 		// whose bit 0 is CLOCK IN (its bits 4 to 6 are CTRL IN, CLOCK OUT and
@@ -299,21 +322,6 @@ namespace md::automation::sysex
 		constexpr size_t g_patternRows = 64;
 		constexpr uint8_t g_patternParameters = 24;
 		constexpr uint8_t g_noLock = 0xff;
-
-		// 16 big-endian 32-bit masks
-		uint32_t readMask32(const uint8_t* _bytes)
-		{
-			return static_cast<uint32_t>(_bytes[0]) << 24 | static_cast<uint32_t>(_bytes[1]) << 16
-				| static_cast<uint32_t>(_bytes[2]) << 8 | _bytes[3];
-		}
-
-		void writeMask32(uint8_t* _bytes, const uint32_t _mask)
-		{
-			_bytes[0] = static_cast<uint8_t>(_mask >> 24);
-			_bytes[1] = static_cast<uint8_t>(_mask >> 16);
-			_bytes[2] = static_cast<uint8_t>(_mask >> 8);
-			_bytes[3] = static_cast<uint8_t>(_mask);
-		}
 	}
 
 	bool PatternDump::hasTrig(const uint8_t _track, const uint8_t _step) const
@@ -367,19 +375,19 @@ namespace md::automation::sysex
 		if(!read7Bit(_message, position, raw.size(), raw.data()))
 			return std::nullopt;
 		for(size_t track = 0; track < 16; ++track)
-			result.trigs[track] = readMask32(&raw[track * 4]);
+			result.trigs[track] = readBigEndian32(&raw[track * 4]);
 		if(!read7Bit(_message, position, raw.size(), raw.data()))
 			return std::nullopt;
 		for(size_t track = 0; track < 16; ++track)
-			result.lockMasks[track] = readMask32(&raw[track * 4]);
+			result.lockMasks[track] = readBigEndian32(&raw[track * 4]);
 		// Accent, slide and swing patterns (steps 1 to 32) and the swing amount, then six plain
 		// bytes: accent amount, length, double tempo, scale, kit, locked rows.
 		std::array<uint8_t, 16> flags{};
 		if(!read7Bit(_message, position, flags.size(), flags.data()))
 			return std::nullopt;
 		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
-			result.flags[flag] = readMask32(&flags[flag * 4]);
-		result.swingAmount = readMask32(&flags[12]);
+			result.flags[flag] = readBigEndian32(&flags[flag * 4]);
+		result.swingAmount = readBigEndian32(&flags[12]);
 		// The row count byte is not needed: rows follow the masks, as on the machine.
 		result.accentAmount = _message[position];
 		result.length = _message[position + 1];
@@ -404,9 +412,9 @@ namespace md::automation::sysex
 			return std::nullopt;
 		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
 		{
-			result.flagPerTrack[flag] = readMask32(&tail[flag * 4]) == 0;
+			result.flagPerTrack[flag] = readBigEndian32(&tail[flag * 4]) == 0;
 			for(size_t track = 0; track < 16; ++track)
-				result.trackFlags[flag][track] = readMask32(&tail[g_patternTrackFlags + (flag * 16 + track) * 4]);
+				result.trackFlags[flag][track] = readBigEndian32(&tail[g_patternTrackFlags + (flag * 16 + track) * 4]);
 		}
 		// The 64-step form: steps 33 to 64 of the trigs, the flags and each lock row, after the tail
 		if(result.steps == 64)
@@ -415,14 +423,14 @@ namespace md::automation::sysex
 			if(!read7Bit(_message, position, extension.size(), extension.data()))
 				return std::nullopt;
 			for(size_t track = 0; track < 16; ++track)
-				result.trigs[track] |= static_cast<uint64_t>(readMask32(&extension[track * 4])) << 32;
+				result.trigs[track] |= static_cast<uint64_t>(readBigEndian32(&extension[track * 4])) << 32;
 			for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
 			{
-				const auto everyTrack = readMask32(&extension[g_patternExtensionFlags + flag * 4]);
+				const auto everyTrack = readBigEndian32(&extension[g_patternExtensionFlags + flag * 4]);
 				result.flags[flag] |= static_cast<uint64_t>(everyTrack) << 32;
 				for(size_t track = 0; track < 16; ++track)
 				{
-					result.trackFlags[flag][track] |= static_cast<uint64_t>(readMask32(
+					result.trackFlags[flag][track] |= static_cast<uint64_t>(readBigEndian32(
 						&extension[g_patternExtensionTrackFlags + (flag * 16 + track) * 4])) << 32;
 				}
 			}
@@ -463,14 +471,6 @@ namespace md::automation::sysex
 		constexpr size_t g_mmPatternSize = g_mmLockRows + MmPatternDump::LockRowCount * 64 + 400 * 2 + 192 * 2 + 1;
 		static_assert(g_mmPatternSize == 6520, "MNMPattern layout");
 		constexpr size_t g_mmPatternMaximum = 8192;
-
-		uint64_t readMask(const uint8_t* _bytes)
-		{
-			uint64_t mask = 0;
-			for(size_t i = 0; i < 8; ++i)
-				mask = (mask << 8) | _bytes[i];
-			return mask;
-		}
 
 		std::optional<std::vector<uint8_t>> decodeMmPattern(const MessageView _message)
 		{
@@ -536,17 +536,17 @@ namespace md::automation::sysex
 		size_t rows = 0;
 		for(uint8_t track = 0; track < MmPatternDump::TrackCount; ++track)
 		{
-			result.ampTrigs[track] = readMask(&data[g_mmAmpTrigs + track * 8]);
-			result.filterTrigs[track] = readMask(&data[g_mmFilterTrigs + track * 8]);
-			result.lfoTrigs[track] = readMask(&data[g_mmLfoTrigs + track * 8]);
-			result.trigs[track] = readMask(&data[g_mmTrigs + track * 8]);
-			result.lockMasks[track] = readMask(&data[g_mmLockMasks + track * 8]);
-			result.slides[track] = readMask(&data[g_mmSlides + track * 8]);
-			result.swings[track] = readMask(&data[g_mmSwings + track * 8]);
+			result.ampTrigs[track] = readBigEndian64(&data[g_mmAmpTrigs + track * 8]);
+			result.filterTrigs[track] = readBigEndian64(&data[g_mmFilterTrigs + track * 8]);
+			result.lfoTrigs[track] = readBigEndian64(&data[g_mmLfoTrigs + track * 8]);
+			result.trigs[track] = readBigEndian64(&data[g_mmTrigs + track * 8]);
+			result.lockMasks[track] = readBigEndian64(&data[g_mmLockMasks + track * 8]);
+			result.slides[track] = readBigEndian64(&data[g_mmSlides + track * 8]);
+			result.swings[track] = readBigEndian64(&data[g_mmSwings + track * 8]);
 			std::copy_n(&data[g_mmNotes + track * 64], 64, result.notes[track].begin());
 			rows += std::bitset<64>(result.lockMasks[track]).count();
 		}
-		result.swingAmount = readMask32(&data[g_mmSwingAmount]);
+		result.swingAmount = readBigEndian32(&data[g_mmSwingAmount]);
 		// As MCL reads them: a row per set bit, as many as the pattern holds
 		result.lockRows.resize(std::min<size_t>(rows, MmPatternDump::LockRowCount));
 		for(size_t row = 0; row < result.lockRows.size(); ++row)
@@ -567,16 +567,12 @@ namespace md::automation::sysex
 
 	uint64_t MmPatternEditor::mask(const size_t _offset) const
 	{
-		return readMask(&m_payload[_offset]);
+		return readBigEndian64(&m_payload[_offset]);
 	}
 
-	void MmPatternEditor::setMask(const size_t _offset, uint64_t _mask)
+	void MmPatternEditor::setMask(const size_t _offset, const uint64_t _mask)
 	{
-		for(size_t i = 8; i-- > 0;)
-		{
-			m_payload[_offset + i] = static_cast<uint8_t>(_mask & 0xff);
-			_mask >>= 8;
-		}
+		writeBigEndian64(&m_payload[_offset], _mask);
 	}
 
 	size_t MmPatternEditor::rowPosition(const size_t _row)
@@ -714,7 +710,7 @@ namespace md::automation::sysex
 	{
 		if(_percent < 50 || _percent > 80)
 			return false;
-		writeMask32(&m_payload[g_mmSwingAmount], swingWord(_percent));
+		writeBigEndian32(&m_payload[g_mmSwingAmount], swingWord(_percent));
 		return true;
 	}
 
@@ -936,14 +932,14 @@ namespace md::automation::sysex
 		for(const auto flag : {StepFlag::Accent, StepFlag::Slide})
 		{
 			const auto kind = static_cast<uint8_t>(flag);
-			writeMask32(&m_swing[kind * 4], 0);
+			writeBigEndian32(&m_swing[kind * 4], 0);
 			if(!m_extension.empty())
-				writeMask32(&m_extension[g_patternExtensionFlags + kind * 4], 0);
+				writeBigEndian32(&m_extension[g_patternExtensionFlags + kind * 4], 0);
 			for(uint8_t track = 0; track < 16; ++track)
 			{
-				writeMask32(&m_tail[g_patternTrackFlags + (kind * 16 + track) * 4], 0);
+				writeBigEndian32(&m_tail[g_patternTrackFlags + (kind * 16 + track) * 4], 0);
 				if(!m_extension.empty())
-					writeMask32(&m_extension[g_patternExtensionTrackFlags + (kind * 16 + track) * 4], 0);
+					writeBigEndian32(&m_extension[g_patternExtensionTrackFlags + (kind * 16 + track) * 4], 0);
 			}
 		}
 	}
@@ -1013,15 +1009,15 @@ namespace md::automation::sysex
 		// Its trigs and its own flags: steps 1 to 32, then 33 to 64 in the long form
 		const auto low = [](const uint64_t _mask) { return static_cast<uint32_t>(_mask); };
 		const auto high = [](const uint64_t _mask) { return static_cast<uint32_t>(_mask >> 32); };
-		writeMask32(&m_trigs[_track * 4], low(_steps.trigs));
+		writeBigEndian32(&m_trigs[_track * 4], low(_steps.trigs));
 		if(!m_extension.empty())
-			writeMask32(&m_extension[_track * 4], high(_steps.trigs));
+			writeBigEndian32(&m_extension[_track * 4], high(_steps.trigs));
 		for(uint8_t flag = 0; flag < StepFlagCount; ++flag)
 		{
 			const auto word = (flag * 16 + _track) * 4;
-			writeMask32(&m_tail[g_patternTrackFlags + word], low(_steps.flags[flag]));
+			writeBigEndian32(&m_tail[g_patternTrackFlags + word], low(_steps.flags[flag]));
 			if(!m_extension.empty())
-				writeMask32(&m_extension[g_patternExtensionTrackFlags + word], high(_steps.flags[flag]));
+				writeBigEndian32(&m_extension[g_patternExtensionTrackFlags + word], high(_steps.flags[flag]));
 		}
 		// A row per locked parameter, in track then parameter order, its values on the steps with a trig
 		for(uint8_t parameter = 0; parameter < g_patternParameters; ++parameter)
@@ -1054,7 +1050,7 @@ namespace md::automation::sysex
 		else
 			word = &m_extension[g_patternExtensionFlags + flag * 4];
 		const auto bit = uint32_t{1} << (_step % 32);
-		writeMask32(word, _on ? readMask32(word) | bit : readMask32(word) & ~bit);
+		writeBigEndian32(word, _on ? readBigEndian32(word) | bit : readBigEndian32(word) & ~bit);
 		return true;
 	}
 
@@ -1063,7 +1059,7 @@ namespace md::automation::sysex
 		const auto flag = static_cast<uint8_t>(_flag);
 		if(flag >= StepFlagCount)
 			return false;
-		writeMask32(&m_tail[flag * 4], _perTrack ? 0 : 1);
+		writeBigEndian32(&m_tail[flag * 4], _perTrack ? 0 : 1);
 		return true;
 	}
 
@@ -1085,7 +1081,7 @@ namespace md::automation::sysex
 
 	void MdPatternEditor::setSwingWord(const uint32_t _word)
 	{
-		writeMask32(&m_swing[12], _word);
+		writeBigEndian32(&m_swing[12], _word);
 	}
 
 	Message MdPatternEditor::toDump() const
@@ -1105,24 +1101,18 @@ namespace md::automation::sysex
 
 	bool isReadOnlyRequest(const MachineModel _model, const MessageView _message)
 	{
-		if(_message.size() != 9
-			|| std::any_of(_message.begin() + 1, _message.end() - 1,
-				[](const uint8_t _value) { return _value > 0x7f; })
-			|| !hasHeader(_model, _message, _message[6]))
+		if(_message.size() != 9 || !isSevenBit(_message) || !hasHeader(_model, _message, _message[6]))
 			return false;
 		switch(_message[6])
 		{
 		case g_globalRequest:
-			return _message[7] < 8;
+			return validStatusValue(_model, StatusParameter::Global, _message[7]);
 		case g_kitRequest:
-			return _message[7]
-				< (_model == MachineModel::Monomachine ? 128 : 64);
+			return validStatusValue(_model, StatusParameter::Kit, _message[7]);
 		case g_patternRequest:
-			return _message[7] < 128;
+			return validStatusValue(_model, StatusParameter::Pattern, _message[7]);
 		case g_statusRequest:
-			return _message[7] == static_cast<uint8_t>(StatusParameter::Global)
-					|| _message[7] == static_cast<uint8_t>(StatusParameter::Kit)
-					|| _message[7] == static_cast<uint8_t>(StatusParameter::Pattern);
+			return validStatusParameter(_message[7]);
 		default:
 			return false;
 		}
@@ -1140,8 +1130,8 @@ namespace md::automation::sysex
 
 	Message patternSelect(const MachineModel _model, const uint8_t _slot)
 	{
-		return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_setStatus,
-			static_cast<uint8_t>(StatusParameter::Pattern), static_cast<uint8_t>(_slot & 0x7f), 0xf7};
+		return message(_model, g_setStatus,
+			{static_cast<uint8_t>(StatusParameter::Pattern), static_cast<uint8_t>(_slot & 0x7f)});
 	}
 
 	std::optional<StatusResponse> parseStatusResponse(const MachineModel _model,
@@ -1165,7 +1155,7 @@ namespace md::automation::sysex
 		// The request correlation identity is the original position, not the format
 		// version (which happens to be a small in-range value on both machines).
 		const auto slot = _message[9];
-		if(slot >= 8)
+		if(!validStatusValue(_model, StatusParameter::Global, slot))
 			return std::nullopt;
 
 		uint8_t channel = 0;
@@ -1199,26 +1189,11 @@ namespace md::automation::sysex
 			? std::optional<GlobalDump>(GlobalDump{slot, channel, outputs}) : std::nullopt;
 	}
 
-	namespace
-	{
-		// A Kit name as the firmware stores it: ASCII up to a zero or the end of
-		// its field. Anything else shows as '?'.
-		std::string kitName(const uint8_t* _name, const size_t _size)
-		{
-			std::string name;
-			for(size_t index = 0; index < _size && _name[index] != 0; ++index)
-				name.push_back(_name[index] >= 0x20 && _name[index] < 0x7f ? static_cast<char>(_name[index]) : '?');
-			while(!name.empty() && name.back() == ' ')
-				name.pop_back();
-			return name;
-		}
-	}
-
 	MasterEffects masterEffectsFromKit(const uint8_t* _bytes)
 	{
 		MasterEffects values{};
 		for(uint8_t effect = 0; effect < MasterEffectCount; ++effect)
-			std::copy_n(_bytes + g_mdMasterEffectBlock[effect] * MasterEffectParameters, MasterEffectParameters, values[effect].begin());
+			std::copy_n(_bytes + mdKitMasterIndex(effect, 0), MasterEffectParameters, values[effect].begin());
 		return values;
 	}
 
@@ -1228,15 +1203,13 @@ namespace md::automation::sysex
 		if(!validDump(_model, _message, g_kitDump))
 			return std::nullopt;
 		const auto slot = _message[9];
-		if(slot >= (_model == MachineModel::Monomachine ? 128 : 64))
+		if(!validStatusValue(_model, StatusParameter::Kit, slot))
 			return std::nullopt;
 
 		std::vector<ParameterChange> result;
 		if(_model == MachineModel::Machinedrum)
 		{
-			constexpr size_t parameterPosition = 0x1a;
-			constexpr size_t levelPosition = 0x19a;
-			if(_message.size() <= levelPosition + machinedrum::TrackCount)
+			if(_message.size() <= mdKitDumpLayout::Levels + machinedrum::TrackCount)
 				return std::nullopt;
 			result.reserve(machinedrum::TrackCount * 25);
 			for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
@@ -1246,66 +1219,45 @@ namespace md::automation::sysex
 				{
 					for(uint8_t index = 0; index < 8; ++index)
 					{
-						const auto offset = parameterPosition + track * 24 + page * 8 + index;
+						const auto offset = mdKitDumpLayout::Parameters + track * 24 + page * 8 + index;
 						result.push_back({page, track, index, _message[offset]});
 					}
 				}
 				result.push_back({machinedrum::Level, track, 0,
-					_message[levelPosition + track]});
+					_message[mdKitDumpLayout::Levels + track]});
 			}
 
-			// _bytes bytes packed in 7-bit groups from _position (a byte of top bits, MSB first, then up
-			// to seven bytes); empty when the dump is too short to hold them
-			const auto unpack = [&](const size_t _position, const size_t _bytes)
-			{
-				std::vector<uint8_t> raw;
-				if(_message.size() < _position + _bytes + (_bytes + 6) / 7 + 5)
-					return raw;
-				raw.reserve(_bytes);
-				for(size_t position = _position; raw.size() < _bytes;)
-				{
-					const auto highBits = _message[position++];
-					for(uint8_t bit = 0; bit < 7 && raw.size() < _bytes; ++bit)
-					{
-						auto value = _message[position++];
-						if(highBits & (1u << (6u - bit)))
-							value |= 0x80;
-						raw.push_back(value);
-					}
-				}
-				return raw;
-			};
+			// A packed field is read when the dump holds it whole up to _end, then its checksum, length and F7
+			const auto holds = [&](const size_t _end) { return _message.size() >= _end + 5; };
 
 			// Machine assignments follow the levels: 16 big-endian 32-bit values. The id
 			// is the low byte; the upper bits carry flags such as TONAL.
-			constexpr size_t machinePosition = 0x1aa;
-			constexpr size_t machineBytes = machinedrum::TrackCount * 4;
 			std::vector<uint16_t> machines;
-			if(const auto raw = unpack(machinePosition, machineBytes); !raw.empty())
+			std::array<uint8_t, machinedrum::TrackCount * 4> words{};
+			size_t position = mdKitDumpLayout::Machines;
+			if(holds(mdKitDumpLayout::Lfos) && read7Bit(_message, position, words.size(), words.data()))
 			{
 				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
-					machines.push_back(raw[track * 4 + 3]);
+					machines.push_back(words[track * 4 + 3]);
 			}
 			// Then the LFOs, 36 bytes a track: the five fields $62 sets, then the LFO's state
-			constexpr size_t lfoPosition = machinePosition + machineBytes + (machineBytes + 6) / 7;
-			constexpr size_t lfoBytes = 36;
 			std::optional<std::array<LfoSettings, machinedrum::TrackCount>> lfos;
-			if(const auto raw = unpack(lfoPosition, machinedrum::TrackCount * lfoBytes); !raw.empty())
+			std::array<uint8_t, machinedrum::TrackCount * MdKit::LfoSize> lfoBytes{};
+			position = mdKitDumpLayout::Lfos;
+			if(holds(mdKitDumpLayout::MasterEffects) && read7Bit(_message, position, lfoBytes.size(), lfoBytes.data()))
 			{
 				lfos.emplace();
 				for(uint8_t track = 0; track < machinedrum::TrackCount; ++track)
 				{
-					const auto* lfo = &raw[track * lfoBytes];
+					const auto* lfo = &lfoBytes[track * MdKit::LfoSize];
 					(*lfos)[track] = {lfo[0], lfo[1], lfo[2], lfo[3], lfo[4]};
 				}
 			}
 			std::optional<MasterEffects> effects;
-			if(_message.size() == g_mdKitSize)
-				effects = masterEffectsFromKit(&_message[g_mdMasterEffectsPosition]);
-			// 16 raw bytes between the slot and the parameters
-			constexpr size_t namePosition = 0x0a;
+			if(_message.size() == MdKitDumpSize)
+				effects = masterEffectsFromKit(&_message[mdKitDumpLayout::MasterEffects]);
 			return KitDump{slot, std::move(result), std::move(machines),
-				kitName(&_message[namePosition], parameterPosition - namePosition), effects, lfos};
+				kitName(&_message[mdKitDumpLayout::Name], MdKit::NameSize), effects, lfos};
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -1353,10 +1305,9 @@ namespace md::automation::sysex
 		if(_track >= trackCount || !machine || !machine->assignable)
 			return std::nullopt;
 		if(_model == MachineModel::Monomachine)
-			return Message{0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_assignMachine,
-				_track, static_cast<uint8_t>(_machine), 0x00, 0xf7};
-		return Message{0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_assignMachine,
-			_track, static_cast<uint8_t>(_machine & 0x7f), static_cast<uint8_t>(_machine >= 128 ? 1 : 0), 0xf7};
+			return message(_model, g_assignMachine, {_track, static_cast<uint8_t>(_machine), 0x00});
+		return message(_model, g_assignMachine,
+			{_track, static_cast<uint8_t>(_machine & 0x7f), static_cast<uint8_t>(_machine >= 128 ? 1 : 0)});
 	}
 
 	std::optional<Message> masterEffectChange(const MasterEffect _effect, const uint8_t _parameter, const uint8_t _value)
@@ -1364,32 +1315,28 @@ namespace md::automation::sysex
 		const auto effect = static_cast<uint8_t>(_effect);
 		if(effect >= MasterEffectCount || _parameter >= MasterEffectParameters || _value > 0x7f)
 			return std::nullopt;
-		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00,
-			static_cast<uint8_t>(g_masterEffect + effect), _parameter, _value, 0xf7};
+		return message(MachineModel::Machinedrum, static_cast<uint8_t>(g_masterEffect + effect), {_parameter, _value});
 	}
 
 	std::optional<Message> lfoChange(const uint8_t _track, const uint8_t _field, const uint8_t _value)
 	{
-		constexpr uint8_t maximum[] = {machinedrum::TrackCount - 1, 23, LfoSettings::ShapeCount - 1,
-			LfoSettings::ShapeCount - 1, LfoSettings::UpdateCount - 1};
-		if(_track >= machinedrum::TrackCount || _field >= std::size(maximum) || _value > maximum[_field])
+		const auto& maximum = LfoSettings::FieldMaximum;
+		if(_track >= machinedrum::TrackCount || _field >= maximum.size() || _value > maximum[_field])
 			return std::nullopt;
-		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, g_lfoChange,
-			static_cast<uint8_t>(_track << 3 | _field), _value, 0xf7};
+		return message(MachineModel::Machinedrum, g_lfoChange, {static_cast<uint8_t>(_track << 3 | _field), _value});
 	}
 
 	std::optional<Message> trackRouting(const uint8_t _track, const TrackOutput _output)
 	{
 		if(_track >= machinedrum::TrackCount || _output > TrackOutput::Main)
 			return std::nullopt;
-		return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, g_trackRouting,
-			_track, static_cast<uint8_t>(_output), 0xf7};
+		return message(MachineModel::Machinedrum, g_trackRouting, {_track, static_cast<uint8_t>(_output)});
 	}
 
 	Message globalReload(const MachineModel _model, const uint8_t _slot)
 	{
-		return {0xf0, 0x00, 0x20, 0x3c, product(_model), 0x00, g_setStatus,
-			static_cast<uint8_t>(StatusParameter::Global), static_cast<uint8_t>(_slot & 0x07), 0xf7};
+		return message(_model, g_setStatus,
+			{static_cast<uint8_t>(StatusParameter::Global), static_cast<uint8_t>(_slot & 0x07)});
 	}
 
 	std::optional<GlobalSync> parseGlobalSync(const MachineModel _model,

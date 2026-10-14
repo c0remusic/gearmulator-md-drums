@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace md::automation::sysex
 {
@@ -17,6 +18,11 @@ namespace md::automation::sysex
 	struct MdKit
 	{
 		static constexpr size_t RecordSize = 0x460;
+		// The factory patch image (md::fw::loadPatchImageFromFlash) holds the working Kit's record at $0a and the
+		// stored Kits', one after the other, from $8ca; the factory fills the first 16 of them
+		static constexpr size_t ImageWorkingKit = 0x0a;
+		static constexpr size_t ImageStoredKits = 0x8ca;
+		static constexpr size_t FactoryKitCount = 16;
 		static constexpr size_t NameSize = 16;
 		static constexpr size_t LfoSize = 36;
 		static constexpr size_t MasterEffectsSize = MasterEffectCount * MasterEffectParameters;
@@ -54,6 +60,8 @@ namespace md::automation::sysex
 
 		// The name as the machine shows it, up to the NUL, trailing spaces removed
 		std::string displayName() const;
+		// A name typed: its characters from $20 to $7e, NameSize of them at most, the rest of the name 0
+		void setName(std::string_view _name);
 		// Whether the slot holding this Kit is empty: the OS marks it with a first name byte of $ff, sent as $7f
 		bool isEmptySlot() const { return name[0] == 0xff || name[0] == 0x7f; }
 
@@ -68,6 +76,24 @@ namespace md::automation::sysex
 
 	// The size of a Machinedrum Kit dump, $4d1 bytes
 	constexpr size_t MdKitDumpSize = 0x4d1;
+
+	// Where a Kit dump holds each field. The name, parameters, levels and master effects are raw; the machines, the
+	// LFOs, and the Links then Chokes are 7-bit packed, which takes one byte more per seven.
+	namespace mdKitDumpLayout
+	{
+		constexpr size_t packedSize(const size_t _bytes) { return _bytes + (_bytes + 6) / 7; }
+
+		constexpr size_t Name = 0x00a;
+		constexpr size_t Parameters = 0x01a;
+		constexpr size_t Levels = 0x19a;
+		constexpr size_t Machines = 0x1aa;
+		constexpr size_t Lfos = Machines + packedSize(machinedrum::TrackCount * 4);
+		constexpr size_t MasterEffects = Lfos + packedSize(machinedrum::TrackCount * MdKit::LfoSize);
+		constexpr size_t Groups = MasterEffects + MdKit::MasterEffectsSize;
+		// Then the checksum, the length and F7
+		constexpr size_t End = Groups + packedSize(machinedrum::TrackCount * 2);
+		static_assert(MasterEffects == 0x487 && Groups == 0x4a7 && End + 5 == MdKitDumpSize);
+	}
 
 	// A Kit dump ($52) of _kit for slot _slot (0-63) as OS 1.63 sends one: version 4, revision 1, the name and
 	// parameters masked to 7 bits, the machines, LFOs, Links and Chokes 7-bit packed

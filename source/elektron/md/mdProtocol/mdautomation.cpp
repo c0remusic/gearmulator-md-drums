@@ -6,6 +6,17 @@ namespace md::automation
 	{
 		constexpr uint8_t g_controlChange = 0xb0;
 
+		// The Machinedrum's CCs: four tracks (lanes) on each of its four channels, a lane's synthesis, effects and
+		// routing from its base, the four levels from g_mdLevelCc, the four mutes from g_mdMuteCc
+		constexpr uint8_t g_mdLanes = 4;
+		constexpr std::array<uint8_t, g_mdLanes> g_mdLaneBases{16, 40, 72, 96};
+		constexpr uint8_t g_mdLevelCc = 8;
+		constexpr uint8_t g_mdMuteCc = 12;
+		// The Monomachine's on a track's channel: each page's 8 parameters from its base, then LEVEL and MUTE
+		constexpr std::array<uint8_t, 7> g_mmPageBases{48, 56, 72, 80, 88, 104, 112};
+		constexpr uint8_t g_mmLevelCc = 7;
+		constexpr uint8_t g_mmMuteCc = 3;
+
 		std::optional<uint8_t> mdController(const ParameterChange& _change)
 		{
 			if(_change.track >= machinedrum::TrackCount || _change.value > 127)
@@ -13,15 +24,11 @@ namespace md::automation
 
 			const auto lane = static_cast<uint8_t>(_change.track & 3);
 			if(_change.page <= machinedrum::Routing && _change.index < 8)
-			{
-				constexpr std::array<uint8_t, 4> bases{16, 40, 72, 96};
-				return static_cast<uint8_t>(bases[lane] + _change.page * 8
-					+ _change.index);
-			}
+				return static_cast<uint8_t>(g_mdLaneBases[lane] + _change.page * 8 + _change.index);
 			if(_change.page == machinedrum::Level && _change.index == 0)
-				return static_cast<uint8_t>(8 + lane);
+				return static_cast<uint8_t>(g_mdLevelCc + lane);
 			if(_change.page == machinedrum::Mute && _change.index == 0)
-				return static_cast<uint8_t>(12 + lane);
+				return static_cast<uint8_t>(g_mdMuteCc + lane);
 			return std::nullopt;
 		}
 
@@ -30,13 +37,12 @@ namespace md::automation
 			if(_change.track >= monomachine::TrackCount || _change.value > 127)
 				return std::nullopt;
 
-			constexpr std::array<uint8_t, 7> pageBases{48, 56, 72, 80, 88, 104, 112};
-			if(_change.page < pageBases.size() && _change.index < 8)
-				return static_cast<uint8_t>(pageBases[_change.page] + _change.index);
+			if(_change.page < g_mmPageBases.size() && _change.index < 8)
+				return static_cast<uint8_t>(g_mmPageBases[_change.page] + _change.index);
 			if(_change.page == monomachine::Level && _change.index == 0)
-				return 7;
+				return g_mmLevelCc;
 			if(_change.page == monomachine::Mute && _change.index == 0)
-				return 3;
+				return g_mmMuteCc;
 			return std::nullopt;
 		}
 	}
@@ -83,26 +89,25 @@ namespace md::automation
 				return std::nullopt;
 
 			uint8_t lane = 0;
-			if(cc >= 8 && cc <= 11)
+			if(cc >= g_mdLevelCc && cc < g_mdLevelCc + g_mdLanes)
 			{
 				result.page = machinedrum::Level;
-				lane = static_cast<uint8_t>(cc - 8);
+				lane = static_cast<uint8_t>(cc - g_mdLevelCc);
 			}
-			else if(cc >= 12 && cc <= 15)
+			else if(cc >= g_mdMuteCc && cc < g_mdMuteCc + g_mdLanes)
 			{
 				result.page = machinedrum::Mute;
 				result.value = result.value > 0 ? 1 : 0;
-				lane = static_cast<uint8_t>(cc - 12);
+				lane = static_cast<uint8_t>(cc - g_mdMuteCc);
 			}
 			else
 			{
-				constexpr std::array<uint8_t, 4> bases{16, 40, 72, 96};
 				bool found = false;
-				for(uint8_t candidate = 0; candidate < bases.size(); ++candidate)
+				for(uint8_t candidate = 0; candidate < g_mdLanes; ++candidate)
 				{
-					if(cc < bases[candidate] || cc >= bases[candidate] + 24)
+					if(cc < g_mdLaneBases[candidate] || cc >= g_mdLaneBases[candidate] + 24)
 						continue;
-					const auto offset = static_cast<uint8_t>(cc - bases[candidate]);
+					const auto offset = static_cast<uint8_t>(cc - g_mdLaneBases[candidate]);
 					result.page = static_cast<uint8_t>(offset / 8);
 					result.index = static_cast<uint8_t>(offset & 7);
 					lane = candidate;
@@ -119,23 +124,22 @@ namespace md::automation
 		if(channelOffset >= monomachine::TrackCount)
 			return std::nullopt;
 		result.track = channelOffset;
-		if(cc == 7)
+		if(cc == g_mmLevelCc)
 			result.page = monomachine::Level;
-		else if(cc == 3)
+		else if(cc == g_mmMuteCc)
 		{
 			result.page = monomachine::Mute;
 			result.value = result.value > 0 ? 1 : 0;
 		}
 		else
 		{
-			constexpr std::array<uint8_t, 7> pageBases{48, 56, 72, 80, 88, 104, 112};
 			bool found = false;
-			for(uint8_t page = 0; page < pageBases.size(); ++page)
+			for(uint8_t page = 0; page < g_mmPageBases.size(); ++page)
 			{
-				if(cc < pageBases[page] || cc >= pageBases[page] + 8)
+				if(cc < g_mmPageBases[page] || cc >= g_mmPageBases[page] + 8)
 					continue;
 				result.page = page;
-				result.index = static_cast<uint8_t>(cc - pageBases[page]);
+				result.index = static_cast<uint8_t>(cc - g_mmPageBases[page]);
 				found = true;
 				break;
 			}

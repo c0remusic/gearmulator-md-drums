@@ -14,7 +14,10 @@ if(NOT DEFINED MD_DRUMS_VERSION)
 endif()
 
 set(SOURCES
+	mdDrumsCanvas.h
+	mdDrumsColours.h
 	mdDrumsController.cpp mdDrumsController.h
+	mdDrumsDom.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
 	mdDrumsFilterView.cpp mdDrumsFilterView.h
 	mdDrumsGlyph.cpp mdDrumsGlyph.h
@@ -77,22 +80,24 @@ set_property(TARGET mdDrumsPlugin PROPERTY FOLDER "Elektron")
 set_property(TARGET mdDrumsPlugin_BinaryData PROPERTY FOLDER "Elektron")
 
 if(BUILD_TESTING)
-	add_executable(mdDrumsProcessorTest mdDrumsProcessorTest.cpp)
-	target_link_libraries(mdDrumsProcessorTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
-		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
-	target_compile_definitions(mdDrumsProcessorTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1)
+	# A test over the plug-in's Processor, built from TARGET_NAME.cpp: the plug-in links its libraries PRIVATE, so the
+	# test names them again
+	function(add_md_drums_plugin_test TARGET_NAME)
+		add_executable(${TARGET_NAME} ${TARGET_NAME}.cpp)
+		target_link_libraries(${TARGET_NAME} PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
+			jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
+		target_compile_definitions(${TARGET_NAME} PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1)
+		set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "Elektron/test")
+	endfunction()
+
+	add_md_drums_plugin_test(mdDrumsProcessorTest)
 	add_test(NAME mdDrumsProcessorTest COMMAND mdDrumsProcessorTest)
 	set_tests_properties(mdDrumsProcessorTest PROPERTIES LABELS "FirmwareTest;AudioIo" SKIP_RETURN_CODE 77 TIMEOUT 180)
-	set_property(TARGET mdDrumsProcessorTest PROPERTY FOLDER "Elektron/test")
 
-	add_executable(mdDrumsSkinTest mdDrumsSkinTest.cpp)
-	target_link_libraries(mdDrumsSkinTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
-		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
-	target_compile_definitions(mdDrumsSkinTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
-		MD_DRUMS_DESIGN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Design")
+	add_md_drums_plugin_test(mdDrumsSkinTest)
+	target_compile_definitions(mdDrumsSkinTest PRIVATE MD_DRUMS_DESIGN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Design")
 	add_test(NAME mdDrumsSkinTest COMMAND mdDrumsSkinTest)
 	set_tests_properties(mdDrumsSkinTest PROPERTIES LABELS "FirmwareTest;Performance" SKIP_RETURN_CODE 77 TIMEOUT 180)
-	set_property(TARGET mdDrumsSkinTest PROPERTY FOLDER "Elektron/test")
 
 	# The VST3 itself, loaded through JUCE's VST3 hosting as Live loads it: the layer mdDrumsProcessorTest does not see
 	if(TARGET mdDrumsPlugin_VST3)
@@ -119,12 +124,8 @@ if(BUILD_TESTING)
 	set_property(TARGET mdDrumsUpdateTest PROPERTY FOLDER "Elektron/test")
 
 	# Measurement, not a gate: several instances in one process, their memory and CPU (ticket 31). Run by hand
-	add_executable(mdDrumsInstancesTest mdDrumsInstancesTest.cpp)
-	target_link_libraries(mdDrumsInstancesTest PRIVATE mdDrumsPlugin mdDrumsPlugin_BinaryData mdDrums
-		jucePluginEditorLib juceRmlUi juceUiLib juce_plugin_modules)
+	add_md_drums_plugin_test(mdDrumsInstancesTest)
 	if(WIN32)
 		target_link_libraries(mdDrumsInstancesTest PRIVATE psapi)
 	endif()
-	target_compile_definitions(mdDrumsInstancesTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1)
-	set_property(TARGET mdDrumsInstancesTest PROPERTY FOLDER "Elektron/test")
 endif()

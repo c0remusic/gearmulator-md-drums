@@ -6,7 +6,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <optional>
 #include <string>
 
 namespace Rml
@@ -18,7 +17,6 @@ namespace Rml
 namespace mdDrums
 {
 	class Bank;
-	class Controller;
 	class Editor;
 
 	// The Kits (ticket 26 of the editor map, as ticket 10 settled them): the head band's Kit row and Save, and the Kits
@@ -63,7 +61,8 @@ namespace mdDrums
 		bool importFile(const std::filesystem::path& _file);
 		bool exportFile(const std::filesystem::path& _file);
 
-		// The head band and the overlay as they are now (the timer does it RefreshHz times a second)
+		// The head band and the overlay as they are now. The overlay changes only through this view, which draws it
+		// then; the timer looks at the head band RefreshHz times a second and draws both when it changed
 		void refresh();
 
 		// Keys while the overlay is open: the arrows choose, Enter loads; while renaming, Enter keeps the name. False:
@@ -73,29 +72,58 @@ namespace mdDrums
 		bool escape();
 
 		const std::string& note() const { return m_note; }
-		const char* confirming() const { return m_confirm; }
+		// The action a second click is asked for: "load", "savehere" or "delete"; null when none is
+		const char* confirming() const;
 		bool isRenaming() const { return m_renaming; }
 		void setRenameText(const std::string& _text);
 
 	private:
-		void timerCallback() override { refresh(); }
-		void ask(const char* _action, std::string _note);
+		// The actions that ask for a second click, in the order of g_questions in the .cpp
+		enum class Confirm
+		{
+			None,
+			Load,
+			SaveHere,
+			Delete
+		};
+
+		// What the head band shows: the timer draws it again only when it changed
+		struct Head
+		{
+			const Bank* bank = nullptr;
+			int slot = -1;
+			std::string name;
+			bool changed = false;
+
+			bool operator==(const Head& _other) const
+			{
+				return bank == _other.bank && slot == _other.slot && name == _other.name && changed == _other.changed;
+			}
+		};
+
+		void timerCallback() override;
+		void ask(Confirm _action, std::string _note);
 		void say(std::string _note);
+		// A Bank write's outcome, with a note when it failed
+		bool written(bool _ok);
+		// Whether the chosen Slot holds a Kit to export, with a note when it does not
+		bool exportable();
 		void commitRename(bool _keep);
 		void openChooser(bool _import);
-		void updateHead() const;
+		Head head() const;
+		void updateHead();
 		void updateSlots() const;
 		void updatePanel() const;
 		Bank* bank() const;
-		Controller& controller() const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;
 		bool m_open = false;
 		int m_chosen = 0;
-		const char* m_confirm = nullptr;	// "load", "savehere" or "delete" while a second click is asked for
+		Confirm m_confirm = Confirm::None;
 		bool m_renaming = false;
 		std::string m_note;
+		Head m_head;	// as last drawn
 		std::unique_ptr<juce::FileChooser> m_chooser;
 	};
 }

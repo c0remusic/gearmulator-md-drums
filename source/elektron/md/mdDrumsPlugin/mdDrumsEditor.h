@@ -4,9 +4,12 @@
 #include "jucePluginEditorLib/pluginEditorState.h"
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace mdDrums
 {
+	class Controller;
 	class FilterView;
 	class HitView;
 	class KitsView;
@@ -18,7 +21,8 @@ namespace mdDrums
 	class TrackView;
 
 	// The editor over the skin: the v22 one (skins/mdDrums, ticket 17) with its <vknob> and <vglyph> elements and the
-	// Track tab's behaviour (TrackView), or the minimal one, which binds every parameter until ticket 18
+	// Track tab's behaviour (TrackView). A skin without the Track tab (#page_track), such as a user's own, gets the
+	// stack's editor alone.
 	class Editor final : public jucePluginEditorLib::Editor
 	{
 	public:
@@ -33,6 +37,15 @@ namespace mdDrums
 		int getAcceleratedRefreshRateHz() const override;
 
 		void onRmlContextCreated(juceRmlUi::RmlComponent& _rmlComponent, Rml::Context& _context) override;
+
+		// MD Drums' own Processor, the only one that makes this editor, and its Controller
+		Processor& processor() const;
+		Controller& controller() const;
+
+		// The skin's element with this ID, or null. Found once, then kept: an element with an ID lives as long as the
+		// editor, so no view may rewrite (SetInnerRML) or remove an element that holds one. A missing ID is looked for
+		// again each time.
+		Rml::Element* element(const std::string& _id) const;
 
 		TrackView* getTrackView() const { return m_trackView.get(); }
 		MeterView* getMeterView() const { return m_meterView.get(); }
@@ -58,6 +71,7 @@ namespace mdDrums
 		std::unique_ptr<KitsView> m_kitsView;
 		std::unique_ptr<LinksView> m_linksView;
 		std::unique_ptr<StatusView> m_statusView;
+		mutable std::unordered_map<std::string, Rml::Element*> m_elements;	// element()'s, found ones only
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

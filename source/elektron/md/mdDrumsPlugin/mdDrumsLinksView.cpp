@@ -1,10 +1,10 @@
 #include "mdDrumsLinksView.h"
 
 #include "mdDrumsController.h"
+#include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsTrackView.h"
 
-#include "jucePluginEditorLib/pluginProcessor.h"
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlInterfaces.h"
 
@@ -12,14 +12,6 @@
 
 namespace mdDrums
 {
-	namespace
-	{
-		std::string twoDigits(const int _n)
-		{
-			return (_n < 10 ? "0" : "") + std::to_string(_n);
-		}
-	}
-
 	LinksView::LinksView(Editor& _editor) : m_editor(_editor)
 	{
 		const auto toggle = [this](Rml::Event&)
@@ -56,12 +48,12 @@ namespace mdDrums
 
 	Rml::Element* LinksView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 
 	void LinksView::choose(const bool _choke, const uint8_t _target)
 	{
-		auto& controller = static_cast<Controller&>(m_editor.getProcessor().getController());
+		auto& controller = m_editor.controller();
 		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
 		// The Track itself does nothing on the Machinedrum: its cell is inert
 		if(_target == track)
@@ -75,7 +67,7 @@ namespace mdDrums
 
 	void LinksView::timerCallback()
 	{
-		auto& controller = static_cast<Controller&>(m_editor.getProcessor().getController());
+		auto& controller = m_editor.controller();
 		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
 		if(track == m_shownTrack && controller.link(track) == m_shownLink && controller.choke(track) == m_shownChoke)
 			return;
@@ -88,7 +80,7 @@ namespace mdDrums
 
 	void LinksView::refresh()
 	{
-		auto& controller = static_cast<Controller&>(m_editor.getProcessor().getController());
+		auto& controller = m_editor.controller();
 		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
 		const auto link = controller.link(track);
 		const auto choke = controller.choke(track);

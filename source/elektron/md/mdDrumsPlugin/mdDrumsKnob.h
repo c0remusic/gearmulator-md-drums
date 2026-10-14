@@ -7,7 +7,6 @@
 namespace juce
 {
 	class Graphics;
-	class Image;
 }
 
 namespace juceRmlUi
@@ -51,11 +50,15 @@ namespace mdDrums
 
 	private:
 		void step(float _steps);
+		// The value drawn: the default until the parameter gives one
+		float shownValue() const;
+		// Where _value lies in the range, 0 to 1
+		float fraction(float _value) const;
 		void updateSpeed();
 		void repaint() const;
-		void paint(const juce::Image& _image, juce::Graphics& _g) const;
+		void paint(juce::Graphics& _g, float _w, float _h, float _dp) const;
 		void paintFader(juce::Graphics& _g, float _dp) const;
-		void paintRing(juce::Graphics& _g) const;
+		void paintRing(juce::Graphics& _g, float _dp) const;
 
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
 		juceRmlUi::ElemCanvas* m_ring = nullptr;

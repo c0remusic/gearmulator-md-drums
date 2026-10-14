@@ -63,12 +63,11 @@ namespace mdDrums
 	private:
 		void onPartChanged(uint8_t _part);
 		void update();
-		void paint(juce::Graphics& _g) const;
+		void paint(juce::Graphics& _g, float _dp) const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;
 		std::unique_ptr<FilterResponse> m_response;
-		Rml::Element* m_screen = nullptr;
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
 		uint8_t m_part = 0;
 		baseLib::EventListener<uint8_t> m_onPartChanged;

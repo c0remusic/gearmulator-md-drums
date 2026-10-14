@@ -16,7 +16,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <string>

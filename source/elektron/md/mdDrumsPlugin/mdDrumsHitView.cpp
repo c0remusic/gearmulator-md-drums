@@ -1,7 +1,11 @@
 #include "mdDrumsHitView.h"
 
+#include "mdDrumsCanvas.h"
+#include "mdDrumsColours.h"
 #include "mdDrumsController.h"
+#include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsEngine.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
 
@@ -12,7 +16,6 @@
 
 #include "juce_graphics/juce_graphics.h"
 
-#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/Element.h"
 
 #include <algorithm>
@@ -22,12 +25,6 @@ namespace mdDrums
 {
 	namespace
 	{
-		// HANDOFF.md, "Colour"
-		const juce::Colour g_ink(0xfff2f2f2);
-		const juce::Colour g_track(0xff6e7177);
-		const juce::Colour g_accent(0xff6fd1c4);
-		const juce::Colour g_tick(0xff3c3e43);
-
 		constexpr double g_columnSeconds = Telemetry::ColumnSamples / HitView::SampleRate;
 		constexpr double g_release = 0.03;	// the envelope's, in seconds (the mockup's)
 		constexpr float g_fullScale = 0.5f;	// at the plot's edges
@@ -37,14 +34,10 @@ namespace mdDrums
 		constexpr float g_plotLeft = 15.0f, g_plotRight = 16.0f, g_plotTop = 48.0f, g_plotFoot = 36.0f;
 		constexpr float g_screenWidth = 399.0f;	// the canvas, inside the rule
 
-		// A Track's sound (HitView::SoundCount): Machine, SYN1-8 from index 1, the other 16 parameters, the LFO, Level
-		constexpr std::array<const char*, HitView::SoundCount> g_sound{
-			"Machine",
-			"SYN1", "SYN2", "SYN3", "SYN4", "SYN5", "SYN6", "SYN7", "SYN8",
-			"AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR",
-			"DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM",
-			"LfoTrack", "LfoParam", "LfoShape1", "LfoShape2", "LfoMode",
-			"Level"};
+		// A Track's sound (HitView::SoundCount): Machine, the engine's 24 parameters (SYN1-8 from index 1), then these
+		constexpr std::array<const char*, 6> g_soundAfter{
+			"LfoTrack", "LfoParam", "LfoShape1", "LfoShape2", "LfoMode", "Level"};
+		static_assert(HitView::SoundCount == 1 + Engine::ParamCount + static_cast<int>(g_soundAfter.size()));
 		constexpr size_t g_syn = 1;
 
 		double tickMs(const double _window)
@@ -55,11 +48,6 @@ namespace mdDrums
 		float amplitude(const Telemetry::Column& _column)
 		{
 			return static_cast<float>(std::max(std::abs(static_cast<int>(_column[0])), std::abs(static_cast<int>(_column[1])))) / 32767.0f;
-		}
-
-		std::string dp(const double _value)
-		{
-			return std::to_string(_value) + "dp";
 		}
 	}
 
@@ -81,24 +69,17 @@ namespace mdDrums
 		_screen.ticks = _ticks;
 		_screen.element = find(_id);
 		if(_screen.element)
-		{
-			auto* canvas = juceRmlUi::ElemCanvas::create(_screen.element);
-			_screen.canvas = canvas;
-			canvas->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
-			canvas->setPixelAligned(true);
-			canvas->setClearEveryFrame(true);
-			canvas->setRepaintGraphicsCallback([this, &_screen](const juce::Image&, juce::Graphics& _g)
-			{
-				const auto size = _screen.canvas->getPaintSize();
-				paint(_g, static_cast<float>(size.x), static_cast<float>(size.y), _screen);
-			});
-		}
+			_screen.canvas = createCanvas(_screen.element,
+				[this, &_screen](juce::Graphics& _g, const float _w, const float _h, const float _dp)
+				{
+					paint(_g, _w, _h, _dp, _screen);
+				});
 		updateTicks(_screen);
 	}
 
 	Rml::Element* HitView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 
 	void HitView::timerCallback()
@@ -136,15 +117,29 @@ namespace mdDrums
 		return Windows.back();
 	}
 
+	double HitView::fitted(const Telemetry::Capture& _capture, Fitted& _fitted, const uint32_t _preview)
+	{
+		if(_capture.id != _fitted.id || _capture.count != _fitted.count || _preview != _fitted.preview)
+			_fitted = {_capture.id, _capture.count, _preview, fit(_capture)};
+		return _fitted.window;
+	}
+
 	void HitView::bindSound()
 	{
 		auto& controller = m_editor.getProcessor().getController();
 		const auto part = static_cast<uint8_t>(m_track);
-		for(size_t i = 0; i < SoundCount; ++i)
+		size_t i = 0;
+		const auto bind = [&](const char* _name)
 		{
-			m_soundParameters[i] = controller.getParameter(g_sound[i], part);
+			m_soundParameters[i] = controller.getParameter(_name, part);
 			m_raw[i] = m_soundParameters[i] ? m_soundParameters[i]->getUnnormalizedValue() : 0;
-		}
+			++i;
+		};
+		bind("Machine");
+		for(const auto* name : Engine::paramNames())
+			bind(name);
+		for(const auto* name : g_soundAfter)
+			bind(name);
 		m_sound = m_raw;
 		m_chosenMachine = -1;
 		m_soundChanged = false;
@@ -176,8 +171,7 @@ namespace mdDrums
 			m_chosenMachine = -1;
 			return raw;
 		}
-		auto& processor = static_cast<Processor&>(m_editor.getProcessor());
-		if(const auto machines = processor.getMachines())
+		if(const auto machines = m_editor.processor().getMachines())
 		{
 			for(const auto& machine : *machines)
 			{
@@ -193,7 +187,7 @@ namespace mdDrums
 
 	void HitView::requestPreview()
 	{
-		auto& controller = static_cast<Controller&>(m_editor.getProcessor().getController());
+		auto& controller = m_editor.controller();
 		const auto track = static_cast<uint8_t>(m_track);
 		HitPreview::Request request;
 		request.kit = controller.playedKit();
@@ -214,6 +208,8 @@ namespace mdDrums
 			m_track = track;
 			m_current = {};
 			m_previous = {};
+			m_currentFit = {};
+			m_previousFit = {};
 			m_requested = 0;
 			m_previewReady = false;
 			m_showPreview = false;
@@ -266,8 +262,9 @@ namespace mdDrums
 		m_showPreview = m_previewReady && !m_playing;
 
 		// While the Hit plays, the window keeps the Hit before it if that was longer: it does not grow under the playhead
-		const auto window = m_showPreview ? fit(m_preview)
-			: m_playing && m_previous.id ? std::max(fit(m_current), fit(m_previous)) : fit(m_current);
+		const auto window = m_showPreview ? fitted(m_preview, m_previewFit, m_previews)
+			: m_playing && m_previous.id ? std::max(fitted(m_current, m_currentFit), fitted(m_previous, m_previousFit))
+			: fitted(m_current, m_currentFit);
 		if(window != m_window)
 		{
 			m_window = window;
@@ -275,12 +272,13 @@ namespace mdDrums
 				updateTicks(screen);
 		}
 
-		if(auto* note = find("hit_note"))
+		auto text = m_showPreview ? "Preview, velocity " + std::to_string(m_preview.velocity)
+			: m_current.id ? "Last hit, velocity " + std::to_string(m_current.velocity) : std::string("Not played yet");
+		if(text != m_noteText)
 		{
-			const auto text = m_showPreview ? "Preview, velocity " + std::to_string(m_preview.velocity)
-				: m_current.id ? "Last hit, velocity " + std::to_string(m_current.velocity) : std::string("Not played yet");
-			if(note->GetInnerRML() != text)
-				note->SetInnerRML(text);
+			m_noteText = std::move(text);
+			if(auto* note = find("hit_note"))
+				note->SetInnerRML(m_noteText);
 		}
 
 		const auto& shownCapture = shown();
@@ -317,11 +315,11 @@ namespace mdDrums
 		}
 	}
 
-	void HitView::paint(juce::Graphics& _g, const float _w, const float _h, const Screen& _screen) const
+	void HitView::paint(juce::Graphics& _g, const float _w, const float _h, const float _dp,
+		const Screen& _screen) const
 	{
-		const auto* context = _screen.element->GetContext();
-		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
-		const auto left = g_plotLeft * dp, right = _w - g_plotRight * dp, top = g_plotTop * dp, bottom = _h - g_plotFoot * dp;
+		const auto left = g_plotLeft * _dp, right = _w - g_plotRight * _dp;
+		const auto top = g_plotTop * _dp, bottom = _h - g_plotFoot * _dp;
 		const auto width = right - left, mid = std::round((top + bottom) * 0.5f), half = (bottom - top) * 0.5f;
 		if(width <= 0.0f || half <= 0.0f)
 			return;
@@ -329,8 +327,8 @@ namespace mdDrums
 		_g.setColour(g_tick);
 		const auto step = tickMs(m_window);
 		for(double ms = 0.0; ms < m_window * 1000.0 - 1.0; ms += step)
-			_g.fillRect(std::round(left + static_cast<float>(ms / 1000.0 / m_window) * width), top, dp, bottom - top);
-		_g.fillRect(left, mid, width, dp);
+			_g.fillRect(std::round(left + static_cast<float>(ms / 1000.0 / m_window) * width), top, _dp, bottom - top);
+		_g.fillRect(left, mid, width, _dp);
 
 		// What is shown: the live capture and the Hit before it, or a preview alone
 		const auto& current = shown();
@@ -378,7 +376,7 @@ namespace mdDrums
 		if(started)
 		{
 			_g.setColour(g_accent);
-			_g.strokePath(envelopePath, juce::PathStrokeType(2.0f * dp));
+			_g.strokePath(envelopePath, juce::PathStrokeType(2.0f * _dp));
 		}
 
 		if(playing)
@@ -387,7 +385,7 @@ namespace mdDrums
 			if(x < right)
 			{
 				_g.setColour(g_accent);
-				_g.fillRect(std::round(x), top, dp, bottom - top);
+				_g.fillRect(std::round(x), top, _dp, bottom - top);
 			}
 		}
 	}

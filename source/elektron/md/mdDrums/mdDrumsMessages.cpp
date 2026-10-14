@@ -4,6 +4,7 @@
 
 #include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdmachines.h"
+#include "mdProtocol/mdsysexcodec.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,17 +15,11 @@ namespace mdDrums::messages
 	{
 		constexpr uint8_t g_header[] = {0xf0, 0x7d, 0x4d, 0x44, 0x44};
 		constexpr size_t g_commandAt = sizeof(g_header);
-		constexpr size_t g_workingKit = 0x0a;	// in the factory patch image
-		constexpr size_t g_storedKits = 0x8ca;	// the 16 stored Kits, a record each
-		constexpr size_t g_factoryKitCount = 16;
 
 		constexpr uint8_t g_machinedrum[] = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00};
 		constexpr uint8_t g_assignMachine = 0x5b;
 		constexpr uint8_t g_masterEffect = 0x5d;	// to $60: echo, reverb, EQ, dynamix
 		constexpr uint8_t g_lfoChange = 0x62;
-
-		// The Kit dump keeps the master effects in this order: reverb, echo, EQ, dynamix
-		constexpr uint8_t g_masterBlock[] = {1, 0, 2, 3};
 
 		struct Writer
 		{
@@ -74,6 +69,32 @@ namespace mdDrums::messages
 		{
 			return (_mask >> _track) & 1;
 		}
+
+		// The byte of _kit that holds a Kit host parameter, _track in range; null for one that is not a byte of the
+		// Kit (the machine is the low byte of a word). parameterValue reads through it, setKitValue writes.
+		template<typename Kit>
+		auto kitByte(Kit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index)
+			-> decltype(&_kit.levels[0])
+		{
+			switch(_page)
+			{
+			case pages::Synthesis:
+			case pages::Effects:
+			case pages::Routing:
+				return _index < 8 ? &_kit.parameters[_track][_page * 8 + _index] : nullptr;
+			case pages::Level:
+				return _index == 0 ? &_kit.levels[_track] : nullptr;
+			case pages::Lfo:
+				return _index < md::LfoSettings::FieldMaximum.size() ? &_kit.lfos[_track][_index] : nullptr;
+			case pages::Master:
+				if(_index >= 32)
+					return nullptr;
+				return &_kit.masterEffects[md::automation::sysex::mdKitMasterIndex(static_cast<uint8_t>(_index / 8),
+					static_cast<uint8_t>(_index % 8))];
+			default:
+				return nullptr;
+			}
+		}
 	}
 
 	Raw solo(const uint8_t _track, const bool _on)
@@ -114,7 +135,7 @@ namespace mdDrums::messages
 		if(_message.size() < g_commandAt + 2 || !std::equal(std::begin(g_header), std::end(g_header), _message.begin())
 			|| _message.back() != 0xf7)
 			return std::nullopt;
-		if(std::any_of(_message.begin() + 1, _message.end() - 1, [](const uint8_t _byte) { return _byte > 0x7f; }))
+		if(!md::automation::sysex::codec::isSevenBit(_message))
 			return std::nullopt;
 		Parsed parsed;
 		parsed.command = static_cast<Command>(_message[g_commandAt]);
@@ -184,10 +205,8 @@ namespace mdDrums::messages
 		constexpr auto dumpSize = md::automation::sysex::MdKitDumpSize;
 		if(!_data || _size <= dumpSize)
 			return std::nullopt;
-		const std::vector<uint8_t> dump(_data, _data + dumpSize);
-		const std::vector<uint8_t> masks(_data + dumpSize, _data + _size);
-		auto kit = md::automation::sysex::parseMdKit(dump);
-		const auto mixerMessage = parse(masks);
+		auto kit = md::automation::sysex::parseMdKit({_data, dumpSize});
+		const auto mixerMessage = parse({_data + dumpSize, _size - dumpSize});
 		if(!kit || !mixerMessage || mixerMessage->command != Command::Mixer)
 			return std::nullopt;
 		return State{*kit, mixerMessage->mixer};
@@ -195,10 +214,11 @@ namespace mdDrums::messages
 
 	std::optional<md::automation::sysex::MdKit> factoryKit(const std::vector<uint8_t>& _flashImage)
 	{
+		using md::automation::sysex::MdKit;
 		const auto image = md::fw::loadPatchImageFromFlash(_flashImage);
-		if(image.size() < g_workingKit + md::automation::sysex::MdKit::RecordSize)
+		if(image.size() < MdKit::ImageWorkingKit + MdKit::RecordSize)
 			return std::nullopt;
-		return md::automation::sysex::MdKit::fromRecord(&image[g_workingKit]);
+		return MdKit::fromRecord(&image[MdKit::ImageWorkingKit]);
 	}
 
 	std::vector<md::automation::sysex::MdKit> factoryKits(const std::vector<uint8_t>& _flashImage)
@@ -206,9 +226,9 @@ namespace mdDrums::messages
 		using md::automation::sysex::MdKit;
 		const auto image = md::fw::loadPatchImageFromFlash(_flashImage);
 		std::vector<MdKit> kits;
-		for(size_t k = 0; k < g_factoryKitCount; ++k)
+		for(size_t k = 0; k < MdKit::FactoryKitCount; ++k)
 		{
-			const auto at = g_storedKits + k * MdKit::RecordSize;
+			const auto at = MdKit::ImageStoredKits + k * MdKit::RecordSize;
 			if(image.size() < at + MdKit::RecordSize)
 				break;
 			kits.push_back(MdKit::fromRecord(&image[at]));
@@ -250,9 +270,8 @@ namespace mdDrums::messages
 		}
 		case pages::Lfo:
 		{
-			constexpr uint8_t maximum[] = {15, 23, md::LfoSettings::ShapeCount - 1, md::LfoSettings::ShapeCount - 1,
-				md::LfoSettings::UpdateCount - 1};
-			if(_index >= std::size(maximum))
+			const auto& maximum = md::LfoSettings::FieldMaximum;
+			if(_index >= maximum.size())
 				return std::nullopt;
 			return Writer::machinedrum(g_lfoChange).add(static_cast<uint8_t>(_track << 3 | _index))
 				.add(std::min(value, maximum[_index])).add(0xf7).raw;
@@ -260,7 +279,7 @@ namespace mdDrums::messages
 		case pages::Mixer:
 			if(_index > 1)
 				return std::nullopt;
-			return _index == 0 ? solo(_track, value != 0) : out(_track, static_cast<uint8_t>(std::min(value, OutCount)));
+			return _index == 0 ? solo(_track, value != 0) : out(_track, value);
 		case pages::Master:
 			if(_index >= 32)
 				return std::nullopt;
@@ -275,32 +294,21 @@ namespace mdDrums::messages
 	{
 		if(_track >= md::automation::machinedrum::TrackCount)
 			return std::nullopt;
-		const auto& kit = _state.kit;
 		switch(_page)
 		{
-		case pages::Synthesis:
-		case pages::Effects:
-		case pages::Routing:
-			return _index < 8 ? std::optional<int>(kit.parameters[_track][_page * 8 + _index]) : std::nullopt;
-		case pages::Level:
-			return _index == 0 ? std::optional<int>(kit.levels[_track]) : std::nullopt;
 		case pages::Mute:
 			return _index == 0 ? std::optional<int>(bit(_state.mixer.mute, _track)) : std::nullopt;
 		case pages::Machine:
-			return _index == 0 ? std::optional<int>(kit.machine(_track)) : std::nullopt;
-		case pages::Lfo:
-			return _index < 5 ? std::optional<int>(kit.lfos[_track][_index]) : std::nullopt;
+			return _index == 0 ? std::optional<int>(_state.kit.machine(_track)) : std::nullopt;
 		case pages::Mixer:
 			if(_index == 0)
 				return bit(_state.mixer.solo, _track);
 			if(_index == 1)
 				return _state.mixer.outs[_track];
 			return std::nullopt;
-		case pages::Master:
-			if(_index >= 32)
-				return std::nullopt;
-			return kit.masterEffects[g_masterBlock[_index / 8] * 8 + _index % 8];
 		default:
+			if(const auto* byte = kitByte(_state.kit, _page, _track, _index))
+				return *byte;
 			return std::nullopt;
 		}
 	}
@@ -316,37 +324,17 @@ namespace mdDrums::messages
 		if(_track >= md::automation::machinedrum::TrackCount)
 			return false;
 		const auto value = static_cast<uint8_t>(std::clamp(_value, 0, 255));
-		switch(_page)
+		if(_page == pages::Machine)
 		{
-		case pages::Synthesis:
-		case pages::Effects:
-		case pages::Routing:
-			if(_index >= 8)
-				return false;
-			_kit.parameters[_track][_page * 8 + _index] = value;
-			return true;
-		case pages::Level:
-			if(_index != 0)
-				return false;
-			_kit.levels[_track] = value;
-			return true;
-		case pages::Machine:
 			if(_index != 0)
 				return false;
 			_kit.machines[_track] = (_kit.machines[_track] & ~0xffu) | value;
 			return true;
-		case pages::Lfo:
-			if(_index >= 5)
-				return false;
-			_kit.lfos[_track][_index] = value;
-			return true;
-		case pages::Master:
-			if(_index >= 32)
-				return false;
-			_kit.masterEffects[g_masterBlock[_index / 8] * 8 + _index % 8] = value;
-			return true;
-		default:
-			return false;
 		}
+		auto* byte = kitByte(_kit, _page, _track, _index);
+		if(!byte)
+			return false;
+		*byte = value;
+		return true;
 	}
 }

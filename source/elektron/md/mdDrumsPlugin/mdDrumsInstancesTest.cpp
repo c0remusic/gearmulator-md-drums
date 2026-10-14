@@ -16,7 +16,6 @@
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlInterfaces.h"
-#include "synthLib/plugin.h"
 
 #include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/Element.h"
@@ -91,7 +90,6 @@ namespace
 		int64_t position = 0;
 		int64_t offset = 0;	// where its pattern starts, so that instances do not strike together
 		double totalMs = 0.0;
-		double worstMs = 0.0;
 		int lastNotes = 0;	// notes the last block took
 	};
 
@@ -113,8 +111,6 @@ namespace
 			static_cast<double>(step) * g_sixteenth < static_cast<double>(to); ++step)
 		{
 			const auto at = static_cast<int64_t>(static_cast<double>(step) * g_sixteenth) - from;
-			if(at < 0 || at >= g_block)
-				continue;
 			for(const auto track : struck(step))
 				_instance.midi.addEvent(juce::MidiMessage::noteOn(1, mdDrums::Device::FirstNote + track, static_cast<juce::uint8>(100)),
 					static_cast<int>(at));
@@ -146,7 +142,7 @@ int main(const int _argc, char** _argv)
 		{
 			Instance instance;
 			instance.processor = std::make_unique<mdDrums::Processor>(true);
-			if(!dynamic_cast<const mdDrums::Device*>(instance.processor->getPlugin().getDevice()))
+			if(!instance.processor->hasDevice())
 			{
 				std::cout << "mdDrumsInstancesTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
 				return 77;
@@ -188,7 +184,6 @@ int main(const int _argc, char** _argv)
 				auto& instance = instances[i];
 				const auto ms = render(instance);
 				instance.totalMs += ms;
-				instance.worstMs = std::max(instance.worstMs, ms);
 				total += ms;
 				times.push_back(ms);
 				if(ms > deadline)

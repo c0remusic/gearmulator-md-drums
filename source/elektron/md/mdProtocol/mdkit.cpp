@@ -19,7 +19,7 @@ namespace md::automation::sysex
 
 		constexpr size_t g_tracks = machinedrum::TrackCount;
 
-		// The record (patch memory) ...
+		// The record (patch memory); the dump's layout is mdKitDumpLayout
 		constexpr size_t g_recordName = 0x000;
 		constexpr size_t g_recordParameters = 0x010;
 		constexpr size_t g_recordLevels = 0x190;
@@ -29,35 +29,9 @@ namespace md::automation::sysex
 		constexpr size_t g_recordLinks = 0x440;
 		constexpr size_t g_recordChokes = 0x450;
 
-		// ... and the dump, whose packed fields take one byte more per seven
-		constexpr size_t packedSize(const size_t _bytes) { return _bytes + (_bytes + 6) / 7; }
-		constexpr size_t g_dumpName = 0x00a;
-		constexpr size_t g_dumpParameters = 0x01a;
-		constexpr size_t g_dumpLevels = 0x19a;
-		constexpr size_t g_dumpMachines = 0x1aa;
-		constexpr size_t g_dumpLfos = g_dumpMachines + packedSize(g_tracks * 4);
-		constexpr size_t g_dumpMasterEffects = g_dumpLfos + packedSize(g_tracks * MdKit::LfoSize);
-		constexpr size_t g_dumpGroups = g_dumpMasterEffects + MdKit::MasterEffectsSize;
-		constexpr size_t g_dumpEnd = g_dumpGroups + packedSize(g_tracks * 2);
-		static_assert(g_dumpMasterEffects == 0x487 && g_dumpGroups == 0x4a7 && g_dumpEnd + 5 == MdKitDumpSize);
-
 		// The LFO state word OS 1.63 writes into every LFO it initialises ($207a62, $23dcc2)
 		constexpr std::array<uint8_t, 4> g_lfoStateWord{0x00, 0x00, 0x02, 0x9a};
 		constexpr size_t g_lfoStateWordAt = 28;
-
-		uint32_t readBigEndian(const uint8_t* _bytes)
-		{
-			return static_cast<uint32_t>(_bytes[0]) << 24 | static_cast<uint32_t>(_bytes[1]) << 16
-				| static_cast<uint32_t>(_bytes[2]) << 8 | _bytes[3];
-		}
-
-		void writeBigEndian(uint8_t* _bytes, const uint32_t _value)
-		{
-			_bytes[0] = static_cast<uint8_t>(_value >> 24);
-			_bytes[1] = static_cast<uint8_t>(_value >> 16);
-			_bytes[2] = static_cast<uint8_t>(_value >> 8);
-			_bytes[3] = static_cast<uint8_t>(_value);
-		}
 
 		void appendMasked(Message& _out, const uint8_t* _data, const size_t _count)
 		{
@@ -69,8 +43,8 @@ namespace md::automation::sysex
 		{
 			if(_track >= g_tracks || (_target >= g_tracks && _target != MdKit::Off))
 				return std::nullopt;
-			return Message{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, _command, _track,
-				_target == MdKit::Off ? g_offOnTheWire : _target, 0xf7};
+			return message(MachineModel::Machinedrum, _command,
+				{_track, _target == MdKit::Off ? g_offOnTheWire : _target});
 		}
 	}
 
@@ -89,7 +63,7 @@ namespace md::automation::sysex
 		for(size_t t = 0; t < g_tracks; ++t)
 		{
 			std::copy_n(_record + g_recordParameters + t * ParameterCount, ParameterCount, kit.parameters[t].begin());
-			kit.machines[t] = readBigEndian(_record + g_recordMachines + t * 4);
+			kit.machines[t] = readBigEndian32(_record + g_recordMachines + t * 4);
 			std::copy_n(_record + g_recordLfos + t * LfoSize, LfoSize, kit.lfos[t].begin());
 		}
 		std::copy_n(_record + g_recordLevels, g_tracks, kit.levels.begin());
@@ -105,7 +79,7 @@ namespace md::automation::sysex
 		for(size_t t = 0; t < g_tracks; ++t)
 		{
 			std::copy(parameters[t].begin(), parameters[t].end(), _record + g_recordParameters + t * ParameterCount);
-			writeBigEndian(_record + g_recordMachines + t * 4, machines[t]);
+			writeBigEndian32(_record + g_recordMachines + t * 4, machines[t]);
 			std::copy(lfos[t].begin(), lfos[t].end(), _record + g_recordLfos + t * LfoSize);
 		}
 		std::copy(levels.begin(), levels.end(), _record + g_recordLevels);
@@ -116,16 +90,22 @@ namespace md::automation::sysex
 
 	std::string MdKit::displayName() const
 	{
-		std::string result;
-		for(const auto c : name)
+		return kitName(name.data(), NameSize);
+	}
+
+	void MdKit::setName(const std::string_view _name)
+	{
+		// The Machinedrum's names: 16 characters of 7 bits
+		name.fill(0);
+		size_t length = 0;
+		for(const auto c : _name)
 		{
-			if(c == 0)
+			if(length == NameSize)
 				break;
-			result.push_back(c >= 0x20 && c < 0x7f ? static_cast<char>(c) : '?');
+			const auto byte = static_cast<uint8_t>(c);
+			if(byte >= 0x20 && byte <= 0x7e)
+				name[length++] = byte;
 		}
-		while(!result.empty() && result.back() == ' ')
-			result.pop_back();
-		return result;
 	}
 
 	LfoSettings MdKit::lfo(const uint8_t _track) const
@@ -153,9 +133,8 @@ namespace md::automation::sysex
 
 	Message mdKitDump(const MdKit& _kit, const uint8_t _slot)
 	{
-		Message dump{0xf0, 0x00, 0x20, 0x3c, product(MachineModel::Machinedrum), 0x00, g_kitDump, g_version,
-			g_revision, static_cast<uint8_t>(_slot & 0x7f)};
-		dump.reserve(MdKitDumpSize);
+		auto dump = header(MachineModel::Machinedrum, g_kitDump, MdKitDumpSize);
+		dump.insert(dump.end(), {g_version, g_revision, static_cast<uint8_t>(_slot & 0x7f)});
 
 		std::array<uint8_t, MdKit::RecordSize> record{};
 		_kit.toRecord(record.data());
@@ -182,17 +161,19 @@ namespace md::automation::sysex
 			return std::nullopt;
 
 		std::array<uint8_t, MdKit::RecordSize> record{};
-		std::copy_n(&_message[g_dumpName], MdKit::NameSize, &record[g_recordName]);
-		std::copy_n(&_message[g_dumpParameters], g_tracks * MdKit::ParameterCount, &record[g_recordParameters]);
-		std::copy_n(&_message[g_dumpLevels], g_tracks, &record[g_recordLevels]);
-		std::copy_n(&_message[g_dumpMasterEffects], MdKit::MasterEffectsSize, &record[g_recordMasterEffects]);
+		std::copy_n(&_message[mdKitDumpLayout::Name], MdKit::NameSize, &record[g_recordName]);
+		std::copy_n(&_message[mdKitDumpLayout::Parameters], g_tracks * MdKit::ParameterCount,
+			&record[g_recordParameters]);
+		std::copy_n(&_message[mdKitDumpLayout::Levels], g_tracks, &record[g_recordLevels]);
+		std::copy_n(&_message[mdKitDumpLayout::MasterEffects], MdKit::MasterEffectsSize,
+			&record[g_recordMasterEffects]);
 
-		size_t position = g_dumpMachines;
+		size_t position = mdKitDumpLayout::Machines;
 		if(!read7Bit(_message, position, g_tracks * 4, &record[g_recordMachines])
 			|| !read7Bit(_message, position, g_tracks * MdKit::LfoSize, &record[g_recordLfos]))
 			return std::nullopt;
-		position = g_dumpGroups;
-		if(!read7Bit(_message, position, g_tracks * 2, &record[g_recordLinks]) || position != g_dumpEnd)
+		position = mdKitDumpLayout::Groups;
+		if(!read7Bit(_message, position, g_tracks * 2, &record[g_recordLinks]) || position != mdKitDumpLayout::End)
 			return std::nullopt;
 
 		if(_slot)

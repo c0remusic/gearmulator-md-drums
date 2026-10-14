@@ -16,6 +16,8 @@
 
 namespace mdDrums
 {
+	class Controller;
+
 	// MD Drums on the TUS plug-in stack (ADR 0001): a jucePluginEditorLib::Processor over mdDrums::Device, which speaks
 	// the Machinedrum's MIDI (ADR 0002), with a Controller from parameterDescriptions_mddrums.json and an RmlUi skin.
 	// Host notes 36-51 trigger Tracks 1-16; the outputs are Main, then "Out 01" to "Out 15", each optional, a Track's
@@ -31,13 +33,16 @@ namespace mdDrums
 		jucePluginEditorLib::PluginEditorState* createEditorState() override;
 		synthLib::Device* createDevice() override;
 		pluginLib::Controller* createController() override;
+		// MD Drums' own Controller, the only one createController makes
+		Controller& controller();
 
 		// The host's tempo, sent to the Device as MD Drums' own message when it changes
 		void processBpm(float _bpm) override;
 		void saveChunkData(baseLib::BinaryStream& _s) override;
 		void loadChunkData(baseLib::ChunkReader& _cr) override;
 
-		// Where the flash image was looked for, for the dialog when it is missing
+		// Where the flash image is looked for, by the Device and by the Hit screen's preview: the data folder's roms,
+		// then the plug-in's own folder, as the stack gives them (UTF-8)
 		std::vector<std::string> romFolders() const;
 		// Whether a Device plays, rather than the stack's silent stand-in when no flash image was found
 		bool hasDevice();

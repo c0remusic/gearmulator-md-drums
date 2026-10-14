@@ -1,7 +1,9 @@
 #include "mdDrumsTrackView.h"
 
 #include "mdDrumsController.h"
+#include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsEngine.h"
 #include "mdDrumsKitsView.h"
 #include "mdDrumsLfoView.h"
 #include "mdDrumsLinksView.h"
@@ -20,7 +22,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <map>
 
 namespace mdDrums
@@ -30,18 +31,6 @@ namespace mdDrums
 		constexpr int g_window = 1296;
 		constexpr const char* g_listenKey = "listenWhileChoosing";
 		constexpr const char* g_velocityKey = "playVelocity";
-
-		std::string twoDigits(const int _value)
-		{
-			char text[8];
-			(void)std::snprintf(text, sizeof(text), "%02d", _value);
-			return text;
-		}
-
-		std::string dp(const int _value)
-		{
-			return std::to_string(_value) + "dp";
-		}
 
 		// Column c (1-16) starts at 16 + 80 (c - 1)
 		int column(const int _c)
@@ -67,10 +56,6 @@ namespace mdDrums
 			const auto it = kinds.find(_code);
 			return it != kinds.end() ? it->second : "";
 		}
-
-		// The Track parameters 8-23 by their names, as the bands and the LFO's menu show them
-		constexpr std::array<const char*, 16> g_effectNames{"AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR",
-			"DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"};
 	}
 
 	TrackView::TrackView(Editor& _editor) : m_editor(_editor)
@@ -105,7 +90,7 @@ namespace mdDrums
 					_event.StopPropagation();
 				});
 			if(auto* out = controller.getParameter("Out", t))
-				m_onStripOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&) { updateStripOut(t); });
+				m_onOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&) { updateOut(t); });
 			updateStripOut(t);
 		}
 		m_editor.addClick("track_prev", [this](Rml::Event&) { stepTrack(-1); });
@@ -126,7 +111,7 @@ namespace mdDrums
 			if(m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
 			{
 				if(isListening())
-					static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, ListenVelocity);
+					m_editor.controller().audition(m_part, ListenVelocity);
 			}))
 				m_machines.push_back(id);
 		m_editor.addClick("preview_listen", [this](Rml::Event&) { setListening(!isListening()); });
@@ -167,7 +152,7 @@ namespace mdDrums
 		});
 		m_editor.addClick("lfomenu_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
 		// Choosing the parameter closes the menu, after the button has set it
-		for(int p = 1; p <= 24; ++p)
+		for(int p = 1; p <= Engine::ParamCount; ++p)
 			m_editor.addClick("lfomenu_param" + std::to_string(p), [this](Rml::Event&) { setOverlay(Overlay::None); });
 		m_editor.addClick("kit", [this](Rml::Event&) { setOverlay(m_overlay == Overlay::Kits ? Overlay::None : Overlay::Kits); });
 		m_editor.addClick("kits_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
@@ -248,7 +233,7 @@ namespace mdDrums
 
 	void TrackView::play() const
 	{
-		static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, static_cast<uint8_t>(getPlayVelocity()));
+		m_editor.controller().audition(m_part, static_cast<uint8_t>(getPlayVelocity()));
 	}
 
 	void TrackView::choose(const int _machine) const
@@ -258,7 +243,7 @@ namespace mdDrums
 			return;
 		machine->setUnnormalizedValueNotifyingHost(_machine, pluginLib::Parameter::Origin::Ui);
 		if(isListening())
-			static_cast<Controller&>(m_editor.getProcessor().getController()).audition(m_part, ListenVelocity);
+			m_editor.controller().audition(m_part, ListenVelocity);
 	}
 
 	void TrackView::stepMachine(const int _delta) const
@@ -350,14 +335,14 @@ namespace mdDrums
 			kits->setOpen(_overlay == Overlay::Kits);
 
 		// The Kits take the Track tab under the kit row; the browser takes the bands' place; the menu, the LFO screen's
-		show("track_main", _overlay != Overlay::Kits);
-		show("kits", _overlay == Overlay::Kits);
-		show("track_bands", _overlay != Overlay::Browser);
-		show("browser", _overlay == Overlay::Browser);
-		show("lfomenu", _overlay == Overlay::LfoMenu);
+		setDisplay(find("track_main"), _overlay != Overlay::Kits);
+		setDisplay(find("kits"), _overlay == Overlay::Kits);
+		setDisplay(find("track_bands"), _overlay != Overlay::Browser);
+		setDisplay(find("browser"), _overlay == Overlay::Browser);
+		setDisplay(find("lfomenu"), _overlay == Overlay::LfoMenu);
 		if(_overlay == Overlay::LfoMenu)
 			updateLfoMenu();
-		show("linksmenu", _overlay == Overlay::Links);
+		setDisplay(find("linksmenu"), _overlay == Overlay::Links);
 		if(_overlay == Overlay::Links)
 			if(auto* links = m_editor.getLinksView())
 				links->refresh();
@@ -404,12 +389,13 @@ namespace mdDrums
 			forTrack->SetInnerRML("for track " + twoDigits(_part + 1));
 
 		m_onMachineChanged.reset();
-		m_onOutChanged.reset();
 		m_onLfoTrackChanged.reset();
 		if(auto* machine = controller.getParameter("Machine", _part))
-			m_onMachineChanged.set(machine->onValueChanged, [this](pluginLib::Parameter* const&) { updateMachine(); });
-		if(auto* out = controller.getParameter("Out", _part))
-			m_onOutChanged.set(out->onValueChanged, [this](pluginLib::Parameter* const&) { updateOutput(); });
+			m_onMachineChanged.set(machine->onValueChanged, [this](pluginLib::Parameter* const&)
+			{
+				updateMachine();
+				updateLfoMenu();
+			});
 		if(auto* lfoTrack = controller.getParameter("LfoTrack", _part))
 			m_onLfoTrackChanged.set(lfoTrack->onValueChanged, [this](pluginLib::Parameter* const&) { updateLfoMenu(); });
 		updateMachine();
@@ -436,8 +422,9 @@ namespace mdDrums
 		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, id);
 		for(size_t i = 0; i < 8; ++i)
 		{
-			const auto suffix = "_SYN" + std::to_string(i + 1);
-			const auto name = names ? std::string((*names)[i]) : "SYN" + std::to_string(i + 1);
+			const auto* syn = Engine::paramNames()[i];
+			const auto suffix = std::string("_") + syn;
+			const auto name = names ? std::string((*names)[i]) : std::string(syn);
 			const auto unused = name.empty();
 			if(auto* label = find("n" + suffix))
 			{
@@ -452,7 +439,6 @@ namespace mdDrums
 					e->SetProperty("visibility", unused && prefix == std::string("v") ? "hidden" : "visible");
 				}
 		}
-		updateLfoMenu();
 	}
 
 	void TrackView::updateOutput() const
@@ -475,6 +461,13 @@ namespace mdDrums
 		}
 	}
 
+	void TrackView::updateOut(const uint8_t _track) const
+	{
+		updateStripOut(_track);
+		if(_track == m_part)
+			updateOutput();
+	}
+
 	uint8_t TrackView::naturalOut(const uint8_t _track)
 	{
 		return static_cast<uint8_t>(std::min<int>(_track + 1, mdDrums::messages::OutCount));
@@ -488,13 +481,14 @@ namespace mdDrums
 		out->setUnnormalizedValueNotifyingHost(std::clamp(_out, 0, static_cast<int>(mdDrums::messages::OutCount)),
 			pluginLib::Parameter::Origin::Ui);
 		// At once, not when the parameter tells its listeners from the message loop
-		updateStripOut(_track);
-		if(_track == m_part)
-			updateOutput();
+		updateOut(_track);
 	}
 
 	void TrackView::updateLfoMenu() const
 	{
+		// Hidden, the menu waits: setOverlay builds it as it opens
+		if(m_overlay != Overlay::LfoMenu)
+			return;
 		auto& controller = m_editor.getProcessor().getController();
 		const auto* lfoTrack = controller.getParameter("LfoTrack", m_part);
 		const auto target = static_cast<uint8_t>(lfoTrack ? lfoTrack->getUnnormalizedValue() : m_part);
@@ -511,12 +505,13 @@ namespace mdDrums
 
 		// The target Track's parameters by its machine's names: "—", dimmed, for a SYN slot it does not use
 		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, id);
-		for(size_t i = 0; i < 24; ++i)
+		const auto& paramNames = Engine::paramNames();
+		for(size_t i = 0; i < paramNames.size(); ++i)
 		{
 			auto* cell = find("lfomenu_param" + std::to_string(i + 1));
 			if(!cell)
 				continue;
-			std::string name = i < 8 ? (names ? std::string((*names)[i]) : "SYN" + std::to_string(i + 1)) : g_effectNames[i - 8];
+			const auto name = i < 8 && names ? std::string((*names)[i]) : std::string(paramNames[i]);
 			cell->SetClass("off", name.empty());
 			cell->SetInnerRML(name.empty() ? "—" : name);
 		}
@@ -529,14 +524,8 @@ namespace mdDrums
 			value->SetInnerRML(std::to_string(scale) + "%");
 	}
 
-	void TrackView::show(const std::string& _id, const bool _visible) const
-	{
-		if(auto* e = find(_id))
-			e->SetProperty("display", _visible ? "block" : "none");
-	}
-
 	Rml::Element* TrackView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 }

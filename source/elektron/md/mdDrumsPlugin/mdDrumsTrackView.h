@@ -89,11 +89,13 @@ namespace mdDrums
 		// A Mix strip's Out: a click moves the Track between Main and its natural Out (its own number, 16 to 15), the
 		// wheel through Main and Out 01-15 (ticket 33)
 		void updateStripOut(uint8_t _track) const;
+		// A Track's Out changed: its strip, and the head band's output when it is the Track shown
+		void updateOut(uint8_t _track) const;
 		void setStripOut(uint8_t _track, int _out) const;
 		static uint8_t naturalOut(uint8_t _track);
+		// The LFO's target menu, only while it is open
 		void updateLfoMenu() const;
 		void updateSize() const;
-		void show(const std::string& _id, bool _visible) const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;
@@ -105,8 +107,7 @@ namespace mdDrums
 		int m_dragFrom = 0;
 		baseLib::EventListener<uint8_t> m_onPartChanged;
 		baseLib::EventListener<pluginLib::Parameter*> m_onMachineChanged;
-		baseLib::EventListener<pluginLib::Parameter*> m_onOutChanged;
 		baseLib::EventListener<pluginLib::Parameter*> m_onLfoTrackChanged;
-		std::array<baseLib::EventListener<pluginLib::Parameter*>, 16> m_onStripOutChanged;
+		std::array<baseLib::EventListener<pluginLib::Parameter*>, 16> m_onOutChanged;	// every Track's
 	};
 }

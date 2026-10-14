@@ -5,7 +5,6 @@
 namespace juce
 {
 	class Graphics;
-	class Image;
 }
 
 namespace juceRmlUi
@@ -29,7 +28,7 @@ namespace mdDrums
 		void onPropertyChanged(const std::string& _key) override;
 
 	private:
-		void paint(juce::Graphics& _g) const;
+		void paint(juce::Graphics& _g, float _w, float _h, float _dp) const;
 
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
 		std::string m_shape;

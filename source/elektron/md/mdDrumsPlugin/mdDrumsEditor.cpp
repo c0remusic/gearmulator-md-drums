@@ -50,15 +50,14 @@ namespace mdDrums
 	void Editor::create()
 	{
 		jucePluginEditorLib::Editor::create();
+		// A skin without the Track tab, such as a user's own, gets no view
 		if(!findChild("page_track", false))
 			return;
 		m_trackView = std::make_unique<TrackView>(*this);
-		// Only an mdDrums::Processor makes this editor
-		auto& processor = static_cast<Processor&>(getProcessor());
-		auto& telemetry = processor.getTelemetry();
+		auto& telemetry = processor().getTelemetry();
 		m_meterView = std::make_unique<MeterView>(*this, telemetry, getAcceleratedRefreshRateHz());
 		std::vector<std::filesystem::path> romFolders;
-		for(const auto& folder : processor.romFolders())
+		for(const auto& folder : processor().romFolders())
 			romFolders.emplace_back(folder);
 		m_hitView = std::make_unique<HitView>(*this, telemetry, getAcceleratedRefreshRateHz(), std::move(romFolders));
 		m_filterView = std::make_unique<FilterView>(*this);
@@ -96,6 +95,27 @@ namespace mdDrums
 		if(m_kitsView && m_kitsView->escape())
 			return true;
 		return m_trackView && m_trackView->escape();
+	}
+
+	Processor& Editor::processor() const
+	{
+		// Only an mdDrums::Processor makes this editor
+		return static_cast<Processor&>(getProcessor());
+	}
+
+	Controller& Editor::controller() const
+	{
+		return processor().controller();
+	}
+
+	Rml::Element* Editor::element(const std::string& _id) const
+	{
+		if(const auto it = m_elements.find(_id); it != m_elements.end())
+			return it->second;
+		auto* e = findChild(_id, false);
+		if(e)
+			m_elements.emplace(_id, e);
+		return e;
 	}
 
 	int Editor::getAcceleratedRefreshRateHz() const

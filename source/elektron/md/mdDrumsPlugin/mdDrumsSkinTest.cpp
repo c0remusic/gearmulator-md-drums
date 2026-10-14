@@ -18,8 +18,8 @@
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
-#include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsEngine.h"
 #include "mdDrumsFilterView.h"
 #include "mdDrumsHitView.h"
 #include "mdDrumsKitsView.h"
@@ -36,7 +36,6 @@
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/juceRmlLookAndFeel.h"
 #include "juceRmlUi/rmlInterfaces.h"
-#include "synthLib/plugin.h"
 
 #include "mdProtocol/mdmachines.h"
 
@@ -135,6 +134,13 @@ namespace
 		return boxesOnly.count(_key) == 0;
 	}
 
+	using Clock = std::chrono::steady_clock;
+
+	double since(const Clock::time_point _start)
+	{
+		return std::chrono::duration<double, std::milli>(Clock::now() - _start).count();
+	}
+
 	struct Fixture
 	{
 		mdDrums::Processor& processor;
@@ -163,7 +169,11 @@ namespace
 
 		Rml::Context& context() const { return *component->getContext(); }
 
+		mdDrums::Controller& controller() const { return processor.controller(); }
+
 		Rml::Element* find(const std::string& _id) const { return editor->findChild(_id, false); }
+		std::string text(const std::string& _id) const { return find(_id)->GetInnerRML(); }
+		bool on(const std::string& _id) const { return find(_id)->IsClassSet("on"); }
 
 		void layout() const
 		{
@@ -193,6 +203,25 @@ namespace
 		}
 
 		float dp() const { return context().GetDensityIndependentPixelRatio(); }
+
+		// The mouse moved to a point of the document, in dp
+		void moveTo(const float _x, const float _y) const
+		{
+			const auto r = dp();
+			context().ProcessMouseMove(juce::roundToInt(_x * r), juce::roundToInt(_y * r), 0);
+		}
+
+		// A click at a point, from the button going down to the pixels of the next frame, in ms
+		double timedClick(const float _x, const float _y)
+		{
+			moveTo(_x, _y);
+			frame();
+			const auto start = Clock::now();
+			context().ProcessMouseButtonDown(0, 0);
+			context().ProcessMouseButtonUp(0, 0);
+			frame();
+			return since(start);
+		}
 
 		Box box(Rml::Element& _element) const
 		{
@@ -267,6 +296,22 @@ namespace
 		require(wrong.empty(), "boxes differ from the mockup's");
 	}
 
+	// A 0 x 0 inline-block at the end of an element's text, on its line: once laid out, its top is the text's baseline
+	Rml::Element* appendProbe(Rml::ElementDocument& _document, Rml::Element& _element)
+	{
+		auto probe = _document.CreateElement("span");
+		probe->SetProperty("display", "inline-block");
+		probe->SetProperty("width", "0dp");
+		probe->SetProperty("height", "0dp");
+		return _element.AppendChild(std::move(probe));
+	}
+
+	// On a multiple of 4, to half a pixel
+	bool onStep(const float _y)
+	{
+		return std::abs(_y - std::round(_y / 4.0f) * 4.0f) <= 0.5f;
+	}
+
 	void baselines(Fixture& _f)
 	{
 		auto& document = *_f.component->getDocument();
@@ -286,19 +331,14 @@ namespace
 				// In a flex row (a group's name and its rule) the text is the first item's
 				if(element->GetComputedValues().display() == Rml::Style::Display::Flex && element->GetNumChildren())
 					element = element->GetChild(0);
-				auto probe = document.CreateElement("span");
-				probe->SetProperty("display", "inline-block");
-				probe->SetProperty("width", "0dp");
-				probe->SetProperty("height", "0dp");
-				probes.emplace_back(key, element->AppendChild(std::move(probe)));
+				probes.emplace_back(key, appendProbe(document, *element));
 			}
 			_f.layout();
 			for(const auto& [key, probe] : probes)
 			{
 				++texts;
 				const auto y = probe->GetAbsoluteOffset(Rml::BoxArea::Border).y / _f.dp();
-				const auto step = std::round(y / 4.0f) * 4.0f;
-				if(std::abs(y - step) > 0.5f)
+				if(!onStep(y))
 				{
 					char text[96];
 					(void)std::snprintf(text, sizeof(text), "%s %s: %.2f", view.name.c_str(), key.c_str(), y);
@@ -350,18 +390,10 @@ namespace
 		require(bound == total, "a host parameter has no control");
 	}
 
-	using Clock = std::chrono::steady_clock;
-
-	double since(const Clock::time_point _start)
-	{
-		return std::chrono::duration<double, std::milli>(Clock::now() - _start).count();
-	}
-
 	void inputToPixel(Fixture& _f)
 	{
 		_f.showView("track");
 		auto& context = _f.context();
-		const auto r = _f.dp();
 		auto* knob = dynamic_cast<mdDrums::Knob*>(_f.find("k_FLTF"));
 		require(knob != nullptr, "k_FLTF is not a vknob");
 		const auto kb = _f.box(*knob);
@@ -381,7 +413,7 @@ namespace
 					brightest = std::max(brightest, _f.pixel(kb.x + 32 - 20.5f + dx, kb.y + 32 + 20.5f + dy).getBrightness());
 			return brightest;
 		};
-		context.ProcessMouseMove(juce::roundToInt(cx * r), juce::roundToInt(cy * r), 0);
+		_f.moveTo(cx, cy);
 		context.ProcessMouseButtonDown(0, 0);
 		_f.frame();
 		double worst = 0, sum = 0;
@@ -389,7 +421,7 @@ namespace
 		for(int i = 1; i <= moves; ++i)
 		{
 			const auto start = Clock::now();
-			context.ProcessMouseMove(juce::roundToInt(cx * r), juce::roundToInt((cy - 3.0f * i) * r), 0);
+			_f.moveTo(cx, cy - 3.0f * i);
 			_f.frame();
 			const auto ms = since(start);
 			worst = std::max(worst, ms);
@@ -407,13 +439,7 @@ namespace
 		// A click on track 03's row: the bands show it on the next frame
 		auto* row = _f.find("row3_num");
 		const auto rb = _f.box(*row);
-		context.ProcessMouseMove(juce::roundToInt((rb.x + 8) * r), juce::roundToInt((rb.y + 12) * r), 0);
-		_f.frame();
-		const auto start = Clock::now();
-		context.ProcessMouseButtonDown(0, 0);
-		context.ProcessMouseButtonUp(0, 0);
-		_f.frame();
-		const auto ms = since(start);
+		const auto ms = _f.timedClick(rb.x + 8, rb.y + 12);
 		const auto mark = _f.box(*_f.find("row_sel_mark"));
 		std::printf("click: track 03 shown, event to pixel %.2f ms; part %d, its row's mark at y %g\n", ms,
 			controller.getCurrentPart(), mark.y);
@@ -522,8 +548,35 @@ namespace
 		require(!view->playing(), "the playhead stays after the Hit");
 	}
 
-	void set(Fixture& _f, const char* _name, uint8_t _part, int _value);
-	void click(Fixture& _f, const std::string& _id);
+	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
+	{
+		auto* p = _f.processor.getController().getParameter(_name, _part);
+		require(p != nullptr, std::string("no parameter ") + _name);
+		p->setUnnormalizedValueNotifyingHost(_value, pluginLib::Parameter::Origin::Ui);
+		// A parameter tells the views later, from the message loop, which the test does not run
+		_f.editor->getFilterView()->refresh();
+		_f.editor->getLfoView()->refresh();
+	}
+
+	// A click as the mouse makes it, at an element's centre
+	void click(Fixture& _f, const std::string& _id)
+	{
+		auto* element = _f.find(_id);
+		require(element != nullptr, "no element " + _id);
+		const auto b = _f.box(*element);
+		_f.moveTo(b.x + b.w * 0.5f, b.y + b.h * 0.5f);
+		auto& context = _f.context();
+		context.ProcessMouseButtonDown(0, 0);
+		context.ProcessMouseButtonUp(0, 0);
+	}
+
+	// A click on an element as it is laid out, then the layout that follows it
+	void clickNow(Fixture& _f, const std::string& _id)
+	{
+		_f.layout();
+		click(_f, _id);
+		_f.layout();
+	}
 
 	// Pixel columns of a screen's plot holding the Hit's ink
 	int inkColumns(Fixture& _f, const std::string& _screen)
@@ -551,7 +604,7 @@ namespace
 		auto* view = _f.editor->getHitView();
 		auto* tracks = _f.editor->getTrackView();
 		auto& telemetry = _f.processor.getTelemetry();
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto& controller = _f.controller();
 		_f.showView("track");
 		_f.editor->setCurrentPart(0);
 		double now = 3.0e6;
@@ -647,29 +700,6 @@ namespace
 		set(_f, "FLTF", 0, 0);
 	}
 
-	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
-	{
-		auto* p = _f.processor.getController().getParameter(_name, _part);
-		require(p != nullptr, std::string("no parameter ") + _name);
-		p->setUnnormalizedValueNotifyingHost(_value, pluginLib::Parameter::Origin::Ui);
-		// A parameter tells the views later, from the message loop, which the test does not run
-		_f.editor->getFilterView()->refresh();
-		_f.editor->getLfoView()->refresh();
-	}
-
-	// A click as the mouse makes it, at an element's centre
-	void click(Fixture& _f, const std::string& _id)
-	{
-		auto* element = _f.find(_id);
-		require(element != nullptr, "no element " + _id);
-		const auto b = _f.box(*element);
-		const auto r = _f.dp();
-		auto& context = _f.context();
-		context.ProcessMouseMove(juce::roundToInt((b.x + b.w * 0.5f) * r), juce::roundToInt((b.y + b.h * 0.5f) * r), 0);
-		context.ProcessMouseButtonDown(0, 0);
-		context.ProcessMouseButtonUp(0, 0);
-	}
-
 	// The texts the screens' views write, on the 4 px steps like the mockup's
 	void viewBaselines(Fixture& _f, const std::vector<std::string>& _ids)
 	{
@@ -678,15 +708,11 @@ namespace
 		{
 			auto* element = _f.find(id);
 			require(element != nullptr, "no element " + id);
-			auto probe = document.CreateElement("span");
-			probe->SetProperty("display", "inline-block");
-			probe->SetProperty("width", "0dp");
-			probe->SetProperty("height", "0dp");
-			auto* p = element->AppendChild(std::move(probe));
+			auto* p = appendProbe(document, *element);
 			_f.layout();
 			const auto y = p->GetAbsoluteOffset(Rml::BoxArea::Border).y / _f.dp();
 			element->RemoveChild(p);
-			require(std::abs(y - std::round(y / 4.0f) * 4.0f) <= 0.5f, id + "'s baseline at " + std::to_string(y));
+			require(onStep(y), id + "'s baseline at " + std::to_string(y));
 		}
 	}
 
@@ -844,7 +870,7 @@ namespace
 	// Listen while choosing (ticket 22): ticked by default, kept in the settings; a machine chosen plays the Track
 	void listen(Fixture& _f)
 	{
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto& controller = _f.controller();
 		auto* tracks = _f.editor->getTrackView();
 		_f.showView("browser");
 		require(tracks->isListening() && _f.find("preview_listen")->IsClassSet("on"), "Listen while choosing is not ticked");
@@ -864,7 +890,7 @@ namespace
 	// drag sets; the wheel on the machine's name; the browser's arrows and Enter
 	void playAndStep(Fixture& _f)
 	{
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto& controller = _f.controller();
 		auto* tracks = _f.editor->getTrackView();
 		const auto flush = [&] { controller.processRealtimeParameterChanges(256); };
 		_f.showView("track");
@@ -875,13 +901,12 @@ namespace
 
 		// A drag up of 15 px: 10 steps
 		auto& context = _f.context();
-		const auto r = _f.dp();
 		const auto vb = _f.box(*_f.find("velocity"));
 		const auto vx = vb.x + vb.w * 0.5f, vy = vb.y + vb.h * 0.5f;
-		context.ProcessMouseMove(juce::roundToInt(vx * r), juce::roundToInt(vy * r), 0);
+		_f.moveTo(vx, vy);
 		context.ProcessMouseButtonDown(0, 0);
 		for(int i = 1; i <= 5; ++i)
-			context.ProcessMouseMove(juce::roundToInt(vx * r), juce::roundToInt((vy - 3.0f * i) * r), 0);
+			_f.moveTo(vx, vy - 3.0f * i);
 		context.ProcessMouseButtonUp(0, 0);
 		_f.layout();
 		const auto fill = _f.box(*_f.find("velocity_fill")).w;
@@ -892,7 +917,7 @@ namespace
 		// The play key, as it goes down, and Space: the shown Track at that velocity
 		auto* play = _f.find("play");
 		const auto pb = _f.box(*play);
-		context.ProcessMouseMove(juce::roundToInt((pb.x + 32) * r), juce::roundToInt((pb.y + 32) * r), 0);
+		_f.moveTo(pb.x + 32, pb.y + 32);
 		context.ProcessMouseButtonDown(0, 0);
 		require((controller.pendingAuditions() & 1) && controller.auditionVelocity(0) == 110, "the play key does not play the Track");
 		context.ProcessMouseButtonUp(0, 0);
@@ -909,7 +934,7 @@ namespace
 		set(_f, "Machine", 0, 28);
 		flush();
 		const auto mb = _f.box(*_f.find("machine"));
-		context.ProcessMouseMove(juce::roundToInt((mb.x + 40) * r), juce::roundToInt((mb.y + 20) * r), 0);
+		_f.moveTo(mb.x + 40, mb.y + 20);
 		context.ProcessMouseWheel(Rml::Vector2f(0.0f, 1.0f), 0);
 		const auto wheeled = machine->getUnnormalizedValue();
 		context.ProcessMouseWheel(Rml::Vector2f(0.0f, -1.0f), 0);
@@ -946,16 +971,17 @@ namespace
 	void kits(Fixture& _f)
 	{
 		using Overlay = mdDrums::TrackView::Overlay;
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto& controller = _f.controller();
 		auto* view = _f.editor->getKitsView();
 		auto* bank = _f.processor.getBank();
 		require(view != nullptr && bank != nullptr, "no Kits view or no Bank");
 		auto& context = _f.context();
-		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
-		const auto has = [&](const std::string& _id, const std::string& _what) { return text(_id).find(_what) != std::string::npos; };
+		const auto has = [&](const std::string& _id, const std::string& _what)
+		{
+			return _f.text(_id).find(_what) != std::string::npos;
+		};
 		const auto visible = [&](const std::string& _id) { return _f.find(_id)->IsVisible(); };
-		const auto saveLit = [&] { view->refresh(); return _f.find("kit_save")->IsClassSet("on"); };
-		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
+		const auto saveLit = [&] { view->refresh(); return _f.on("kit_save"); };
 
 		_f.showView("track");
 		_f.editor->getTrackView()->setOverlay(Overlay::Kits);
@@ -967,20 +993,13 @@ namespace
 		_f.frame();
 		auto* slot4 = _f.find("slot4");
 		const auto sb = _f.box(*slot4);
-		const auto r = _f.dp();
-		context.ProcessMouseMove(juce::roundToInt((sb.x + 40) * r), juce::roundToInt((sb.y + 12) * r), 0);
-		_f.frame();
-		const auto start = Clock::now();
-		context.ProcessMouseButtonDown(0, 0);
-		context.ProcessMouseButtonUp(0, 0);
-		_f.frame();
-		const auto ms = since(start);
+		const auto ms = _f.timedClick(sb.x + 40, sb.y + 12);
 		const auto lit = _f.box(*_f.find("slot_sel_bg"));
 		const auto kit4 = *bank->slot(3);
 		const auto* machine = md::machines::find(md::MachineModel::Machinedrum, kit4.machine(0));
 		std::printf("kits: slot 04 chosen, event to pixel %.2f ms; lit at y %g, \"%s\", track 1 %s\n", ms, lit.y,
-			text("kit_caption").c_str(), machine ? std::string(machine->name).c_str() : "--");
-		require(view->chosen() == 3 && std::abs(lit.y - 296) < 0.5f && text("kit_caption") == "Slot 04"
+			_f.text("kit_caption").c_str(), machine ? std::string(machine->name).c_str() : "--");
+		require(view->chosen() == 3 && std::abs(lit.y - 296) < 0.5f && _f.text("kit_caption") == "Slot 04"
 			&& has("kit_name_big", "P-I UW") && machine && has("kitm1", std::string(machine->name)),
 			"a Slot clicked is not chosen with its panel");
 		require(ms <= 33.0, "a Slot clicked took over 33 ms to reach the pixels");
@@ -988,13 +1007,14 @@ namespace
 		// Load, the Kit played changed: asked again, then played
 		set(_f, "FLTF", 0, 77);
 		require(saveLit(), "Save is not lit with a parameter changed");
-		clickNow("kit_load");
+		clickNow(_f, "kit_load");
 		require(view->confirming() && std::string(view->confirming()) == "load" && visible("kit_confirm")
-			&& text("kit_confirm") == "Load anyway" && visible("kit_cancel") && !visible("kit_load"),
+			&& _f.text("kit_confirm") == "Load anyway" && visible("kit_cancel") && !visible("kit_load"),
 			"Load does not ask again when the Kit played has changed");
-		clickNow("kit_confirm");
-		require(controller.playedSlot() == 3 && controller.playedKit() == kit4 && !saveLit() && text("kit_slot") == "04"
-			&& has("kit_name", "P-I UW") && view->note() == "Playing 04, P-I UW", "Load anyway did not play the Slot");
+		clickNow(_f, "kit_confirm");
+		require(controller.playedSlot() == 3 && controller.playedKit() == kit4 && !saveLit()
+			&& _f.text("kit_slot") == "04" && has("kit_name", "P-I UW") && view->note() == "Playing 04, P-I UW",
+			"Load anyway did not play the Slot");
 		std::printf("kits: Load asked again, then \"%s\"\n", view->note().c_str());
 
 		// Save lit by a change, Ctrl+S
@@ -1004,14 +1024,14 @@ namespace
 		require(!saveLit() && *bank->slot(3) == controller.playedKit(), "Ctrl+S did not save the Kit in its Slot");
 
 		// Save here into an empty Slot: it is the one played
-		clickNow("slot20");
+		clickNow(_f, "slot20");
 		require(!visible("kit_load") && visible("kit_savehere") && has("kit_name_big", "Empty"), "an empty Slot's panel is wrong");
-		clickNow("kit_savehere");
+		clickNow(_f, "kit_savehere");
 		require(controller.playedSlot() == 19 && bank->slot(19) && *bank->slot(19) == controller.playedKit()
 			&& view->note() == "Saved in slot 20", "Save here did not put the Kit played into slot 20");
 
 		// Rename in place: Enter keeps the name, for the Slot and the Kit played
-		clickNow("kit_rename");
+		clickNow(_f, "kit_rename");
 		_f.layout();
 		require(view->isRenaming() && visible("kit_name_edit") && !visible("kit_name_big"), "Rename does not open the name");
 		view->setRenameText("MY KIT");
@@ -1021,12 +1041,12 @@ namespace
 
 		// Delete: asked again, Esc leaves the question; asked and confirmed, the Slot is empty and Save lit; Ctrl+S puts
 		// the Kit back
-		clickNow("kit_delete");
-		require(view->confirming() && text("kit_confirm") == "Delete it", "Delete does not ask again");
+		clickNow(_f, "kit_delete");
+		require(view->confirming() && _f.text("kit_confirm") == "Delete it", "Delete does not ask again");
 		context.ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
 		require(!view->confirming() && view->isOpen() && bank->slot(19), "Esc did not leave the question alone");
-		clickNow("kit_delete");
-		clickNow("kit_confirm");
+		clickNow(_f, "kit_delete");
+		clickNow(_f, "kit_confirm");
 		require(!bank->slot(19) && saveLit() && has("slot20", "Empty"), "Delete did not empty the Slot played");
 		context.ProcessKeyDown(Rml::Input::KI_S, Rml::Input::KM_CTRL | Rml::Input::KM_META);
 		require(bank->slot(19) && !saveLit(), "Ctrl+S did not put the Kit back into its emptied Slot");
@@ -1063,14 +1083,11 @@ namespace
 	{
 		using Overlay = mdDrums::TrackView::Overlay;
 		constexpr auto off = mdDrums::Controller::Off;
-		auto& controller = dynamic_cast<mdDrums::Controller&>(_f.processor.getController());
+		auto& controller = _f.controller();
 		auto* view = _f.editor->getLinksView();
 		auto* tracks = _f.editor->getTrackView();
 		auto* kits = _f.editor->getKitsView();
 		require(view != nullptr, "the editor has no Links view");
-		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
-		const auto on = [&](const std::string& _id) { return _f.find(_id)->IsClassSet("on"); };
-		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
 
 		_f.showView("track");
 		_f.editor->setCurrentPart(0);
@@ -1078,45 +1095,46 @@ namespace
 		controller.setChoke(0, off);
 		view->refresh();
 		_f.layout();
-		require(text("link_text") == "Strikes no other track" && text("choke_text") == "Silences no track",
+		require(_f.text("link_text") == "Strikes no other track" && _f.text("choke_text") == "Silences no track",
 			"the lines without a Link or a Choke");
 		viewBaselines(_f, {"link_text", "choke_text"});
 		const auto line = _f.box(*_f.find("link"));
 		require(std::abs(line.x - 576) < 0.5f && std::abs(line.y - 84) < 0.5f, "the Link's line is not on column 8 at y 84");
 
-		clickNow("link_word");
+		clickNow(_f, "link_word");
 		require(tracks->getOverlay() == Overlay::Links && _f.find("linksmenu")->IsVisible(true)
-			&& text("linksmenu_label") == "Track 01" && on("links_link_off") && on("links_choke_off"),
+			&& _f.text("linksmenu_label") == "Track 01" && _f.on("links_link_off") && _f.on("links_choke_off"),
 			"the Link's line does not open the menu");
 		kits->refresh();
-		const bool savedBefore = _f.find("kit_save")->IsClassSet("on");
+		const bool savedBefore = _f.on("kit_save");
 
 		// A cell clicked: the line and the cell on the next frame
 		_f.frame();
 		const auto start = Clock::now();
-		clickNow("links_link5");
+		clickNow(_f, "links_link5");
 		_f.frame();
 		const auto ms = since(start);
-		require(controller.link(0) == 4 && on("links_link5") && !on("links_link_off")
-			&& text("link_text") == "Also strikes <b>track 05</b>", "a cell does not set the Link");
+		require(controller.link(0) == 4 && _f.on("links_link5") && !_f.on("links_link_off")
+			&& _f.text("link_text") == "Also strikes <b>track 05</b>", "a cell does not set the Link");
 		require(ms <= 33.0, "a cell clicked took over 33 ms to reach the pixels");
-		clickNow("links_choke1");
-		require(controller.choke(0) == off && on("links_choke_off") && _f.find("links_choke1")->IsClassSet("self"),
+		clickNow(_f, "links_choke1");
+		require(controller.choke(0) == off && _f.on("links_choke_off") && _f.find("links_choke1")->IsClassSet("self"),
 			"the Track itself is not inert");
-		clickNow("links_choke3");
-		require(controller.choke(0) == 2 && text("choke_text") == "Silences <b>track 03</b>", "a cell does not set the Choke");
+		clickNow(_f, "links_choke3");
+		require(controller.choke(0) == 2 && _f.text("choke_text") == "Silences <b>track 03</b>",
+			"a cell does not set the Choke");
 		require(tracks->getOverlay() == Overlay::Links, "a choice closed the menu");
 		kits->refresh();
-		require(_f.find("kit_save")->IsClassSet("on"), "Save does not light after a Link");
+		require(_f.on("kit_save"), "Save does not light after a Link");
 		std::printf("links: track 05 struck and track 03 silenced from track 01, cell to pixel %.2f ms; Save %s, then lit\n",
 			ms, savedBefore ? "lit" : "unlit");
 
 		_f.context().ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
 		_f.layout();
 		require(tracks->getOverlay() == Overlay::None && !_f.find("linksmenu")->IsVisible(true), "Esc does not close the menu");
-		clickNow("choke_word");
+		clickNow(_f, "choke_word");
 		require(tracks->getOverlay() == Overlay::Links, "the Choke's line does not open the menu");
-		clickNow("linksmenu_done");
+		clickNow(_f, "linksmenu_done");
 		require(tracks->getOverlay() == Overlay::None, "Done does not close the menu");
 
 		controller.setLink(0, off);
@@ -1130,39 +1148,38 @@ namespace
 	void outs(Fixture& _f)
 	{
 		auto& controller = _f.processor.getController();
-		const auto text = [&](const std::string& _id) { return std::string(_f.find(_id)->GetInnerRML()); };
-		const auto lit = [&](const std::string& _id) { return _f.find(_id)->IsClassSet("on"); };
 		const auto value = [&](const uint8_t _track) { return controller.getParameter("Out", _track)->getUnnormalizedValue(); };
-		const auto clickNow = [&](const std::string& _id) { _f.layout(); click(_f, _id); _f.layout(); };
 		const auto wheel = [&](const std::string& _id, const float _y)
 		{
 			_f.layout();
 			const auto b = _f.box(*_f.find(_id));
-			const auto r = _f.dp();
-			_f.context().ProcessMouseMove(juce::roundToInt((b.x + b.w * 0.5f) * r), juce::roundToInt((b.y + b.h * 0.5f) * r), 0);
+			_f.moveTo(b.x + b.w * 0.5f, b.y + b.h * 0.5f);
 			_f.context().ProcessMouseWheel(Rml::Vector2f(0.0f, _y), 0);
 			_f.layout();
 		};
 
 		_f.showView("mix");
 		_f.editor->setCurrentPart(15);
-		require(value(15) == 0 && text("strip16_out") == "Out 15" && !lit("strip16_out"),
+		require(value(15) == 0 && _f.text("strip16_out") == "Out 15" && !_f.on("strip16_out"),
 			"Track 16 on Main does not offer Out 15");
-		clickNow("strip16_out");
-		require(value(15) == 15 && text("strip16_out") == "Out 15" && lit("strip16_out")
-			&& text("output_text") == "Out 15", "a click does not put Track 16 on Out 15");
-		clickNow("strip16_out");
-		require(value(15) == 0 && !lit("strip16_out") && text("output_text") == "Main", "a second click does not bring it back");
+		clickNow(_f, "strip16_out");
+		require(value(15) == 15 && _f.text("strip16_out") == "Out 15" && _f.on("strip16_out")
+			&& _f.text("output_text") == "Out 15", "a click does not put Track 16 on Out 15");
+		clickNow(_f, "strip16_out");
+		require(value(15) == 0 && !_f.on("strip16_out") && _f.text("output_text") == "Main",
+			"a second click does not bring it back");
 		wheel("strip16_out", 1.0f);
 		wheel("strip16_out", 1.0f);
-		require(value(15) == 2 && text("strip16_out") == "Out 02" && lit("strip16_out"), "the wheel does not step the Outs");
+		require(value(15) == 2 && _f.text("strip16_out") == "Out 02" && _f.on("strip16_out"),
+			"the wheel does not step the Outs");
 		wheel("strip16_out", -1.0f);
 		wheel("strip16_out", -1.0f);
 		wheel("strip16_out", -1.0f);
-		require(value(15) == 0 && !lit("strip16_out"), "the wheel does not stop at Main");
-		clickNow("strip1_out");
-		require(value(0) == 1 && text("strip1_out") == "Out 01" && lit("strip1_out"), "a click does not put Track 1 on Out 01");
-		clickNow("strip1_out");
+		require(value(15) == 0 && !_f.on("strip16_out"), "the wheel does not stop at Main");
+		clickNow(_f, "strip1_out");
+		require(value(0) == 1 && _f.text("strip1_out") == "Out 01" && _f.on("strip1_out"),
+			"a click does not put Track 1 on Out 01");
+		clickNow(_f, "strip1_out");
 		require(value(0) == 0, "Track 1 does not come back to Main");
 		_f.editor->setCurrentPart(0);
 		std::printf("outs: a click puts Track 16 on Out 15 and back, the wheel steps Main, Out 01, Out 02\n");
@@ -1223,7 +1240,7 @@ int main()
 	try
 	{
 		mdDrums::Processor processor(true);
-		if(!dynamic_cast<const mdDrums::Device*>(processor.getPlugin().getDevice()))
+		if(!processor.hasDevice())
 		{
 			std::cout << "mdDrumsSkinTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
 			return 77;

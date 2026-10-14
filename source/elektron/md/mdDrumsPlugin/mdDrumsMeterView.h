@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mdDrumsTelemetry.h"
+
 #include "juce_events/juce_events.h"
 
 #include <array>
@@ -25,7 +27,6 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
-	class Telemetry;
 
 	// The v22 skin's meters, scopes and Hit lights (ticket 20), from the Telemetry the Device writes: the Main meter
 	// (the top bar's two bars), each Mix strip's meter, each list row's scope (its strip's level over the last second)
@@ -40,8 +41,6 @@ namespace mdDrums
 		static constexpr int ScopeColumns = 32;
 		static constexpr double ScopeColumnMs = 1000.0 / ScopeColumns;	// a second across the scope
 		static constexpr double LightMs = 140.0;
-		static constexpr int OutputCount = 18;
-		static constexpr int TrackCount = 16;
 
 		MeterView(Editor& _editor, Telemetry& _telemetry, int _refreshHz);
 		~MeterView() override;
@@ -63,26 +62,29 @@ namespace mdDrums
 			int drawn = -1;	// what it shows, in its own units (pixels, a column count): repainted when it changes
 		};
 
+		// What a canvas paints: its size in pixels and its dp ratio (createCanvas)
+		using Paint = std::function<void(juce::Graphics& _g, float _w, float _h, float _dp)>;
+
 		void timerCallback() override;
-		Canvas attach(const std::string& _id, const std::function<void(juce::Graphics&, float, float)>& _paint);
+		Canvas attach(const std::string& _id, const Paint& _paint);
 		void repaint(Canvas& _canvas, int _shows) const;
-		void paintScope(int _track, juce::Graphics& _g, float _w, float _h) const;
+		void paintScope(int _track, juce::Graphics& _g, float _w, float _h, float _dp) const;
 
 		Editor& m_editor;
 		Telemetry& m_telemetry;
 		double m_lastMs = -1.0;
 
-		std::array<float, OutputCount> m_db{};	// the meters' level in dB, after the fall
+		std::array<float, Telemetry::OutputCount> m_db{};	// the meters' level in dB, after the fall
 		Canvas m_main;
-		std::array<Canvas, TrackCount> m_strips;
-		std::array<Canvas, TrackCount> m_scopes;
-		std::array<std::array<float, ScopeColumns>, TrackCount> m_history{};	// oldest first
-		std::array<float, TrackCount> m_columnPeak{};	// the column being filled
+		std::array<Canvas, Telemetry::TrackCount> m_strips;
+		std::array<Canvas, Telemetry::TrackCount> m_scopes;
+		std::array<std::array<float, ScopeColumns>, Telemetry::TrackCount> m_history{};	// oldest first
+		std::array<float, Telemetry::TrackCount> m_columnPeak{};	// the column being filled
 		double m_columnStartMs = 0.0;
 		int m_columns = 0;	// columns shifted so far, to know when the scopes moved
 
-		std::array<uint32_t, TrackCount> m_hits{};
-		std::array<double, TrackCount> m_litUntil{};
-		std::array<bool, TrackCount> m_lit{};
+		std::array<uint32_t, Telemetry::TrackCount> m_hits{};
+		std::array<double, Telemetry::TrackCount> m_litUntil{};
+		std::array<bool, Telemetry::TrackCount> m_lit{};
 	};
 }

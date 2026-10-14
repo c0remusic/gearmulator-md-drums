@@ -18,7 +18,6 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
-	class Processor;
 
 	// The top bar's version and status line (ticket 35 of the editor map). The version stays beside the logo; the status
 	// line says the most pressing of these, or nothing:
@@ -62,7 +61,6 @@ namespace mdDrums
 		// A release the check found or the config kept, said when it is newer than this build
 		void offer(const updates::Release& _release);
 		void click();
-		Processor& processor() const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;

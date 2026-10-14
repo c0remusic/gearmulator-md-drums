@@ -1,11 +1,12 @@
 #include "mdDrumsGlyph.h"
 
+#include "mdDrumsCanvas.h"
+
 #include "juceRmlUi/rmlElemCanvas.h"
 
 #include "juce_graphics/juce_graphics.h"
 
 #include "RmlUi/Core/ComputedValues.h"
-#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/PropertyIdSet.h"
 
 namespace mdDrums
@@ -18,11 +19,10 @@ namespace mdDrums
 	{
 		if(!m_canvas)
 		{
-			m_canvas = juceRmlUi::ElemCanvas::create(this);
-			m_canvas->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
-			m_canvas->setPixelAligned(true);
-			m_canvas->setClearEveryFrame(true);
-			m_canvas->setRepaintGraphicsCallback([this](const juce::Image&, juce::Graphics& _g) { paint(_g); });
+			m_canvas = createCanvas(this, [this](juce::Graphics& _g, const float _w, const float _h, const float _dp)
+			{
+				paint(_g, _w, _h, _dp);
+			});
 		}
 		Element::OnUpdate();
 	}
@@ -44,14 +44,10 @@ namespace mdDrums
 			m_canvas->repaint();
 	}
 
-	void Glyph::paint(juce::Graphics& _g) const
+	void Glyph::paint(juce::Graphics& _g, const float _w, const float _h, const float _dp) const
 	{
-		const auto size = m_canvas->getPaintSize();
-		const auto w = static_cast<float>(size.x), h = static_cast<float>(size.y);
-		if(w <= 0.0f || h <= 0.0f)
+		if(_w <= 0.0f || _h <= 0.0f)
 			return;
-		const auto* context = GetContext();
-		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
 		const auto colour = GetComputedValues().color();
 		_g.setColour(juce::Colour(colour.red, colour.green, colour.blue, colour.alpha));
 
@@ -59,22 +55,24 @@ namespace mdDrums
 		if(m_shape == "play")
 		{
 			// M2 1 L13 8 L2 15 Z in a 14 x 16 box, drawn to the element's size
-			path.addTriangle(2.0f / 14.0f * w, 1.0f / 16.0f * h, 13.0f / 14.0f * w, 8.0f / 16.0f * h, 2.0f / 14.0f * w, 15.0f / 16.0f * h);
+			path.addTriangle(2.0f / 14.0f * _w, 1.0f / 16.0f * _h, 13.0f / 14.0f * _w, 8.0f / 16.0f * _h,
+				2.0f / 14.0f * _w, 15.0f / 16.0f * _h);
 			_g.fillPath(path);
 		}
 		else if(m_shape == "chevron")
 		{
 			// Arms of 8 px at 45 degrees, centred
-			const auto arm = 8.0f * dp * 0.70710678f;
-			const auto cx = w * 0.5f, cy = h * 0.5f;
+			const auto arm = 8.0f * _dp * 0.70710678f;
+			const auto cx = _w * 0.5f, cy = _h * 0.5f;
 			path.startNewSubPath(cx - arm, cy - arm * 0.5f);
 			path.lineTo(cx, cy + arm * 0.5f);
 			path.lineTo(cx + arm, cy - arm * 0.5f);
-			_g.strokePath(path, juce::PathStrokeType(2.0f * dp, juce::PathStrokeType::mitered, juce::PathStrokeType::square));
+			_g.strokePath(path,
+				juce::PathStrokeType(2.0f * _dp, juce::PathStrokeType::mitered, juce::PathStrokeType::square));
 		}
 		else if(m_shape == "down")
 		{
-			path.addTriangle(0.0f, h * 0.25f, w, h * 0.25f, w * 0.5f, h * 0.75f);
+			path.addTriangle(0.0f, _h * 0.25f, _w, _h * 0.25f, _w * 0.5f, _h * 0.75f);
 			_g.fillPath(path);
 		}
 	}

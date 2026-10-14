@@ -4,7 +4,6 @@
 
 #include "baseLib/event.h"
 
-#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -62,19 +61,20 @@ namespace mdDrums
 
 	private:
 		void onPartChanged(uint8_t _part);
+		// The parameter the shown Track's LFO moves: LfoParam's, of LfoTrack
+		pluginLib::Parameter* target() const;
 		void listenToTarget();
 		void update();
 		void updateUnderlines() const;
 		void updateTargets();
 		void updateTitle() const;
 		void pick(int _param);
-		void paint(juce::Graphics& _g) const;
+		void paint(juce::Graphics& _g, float _dp) const;
 		int value(const char* _name, uint8_t _part) const;
 		pluginLib::Parameter* parameter(const char* _name, uint8_t _part) const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;
-		Rml::Element* m_screen = nullptr;
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
 		uint8_t m_part = 0;
 		bool m_armed = false;

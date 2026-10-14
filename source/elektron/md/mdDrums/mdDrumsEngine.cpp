@@ -44,7 +44,7 @@ namespace mdDrums
 	// the engine's own mix, shifted.
 	struct Engine::State
 	{
-		State(md::fw::FlashOs _os, const bool _master) : engine(_os.firmware, std::move(_os.osImage))
+		State(const md::fw::FlashOs& _os, const bool _master) : engine(_os.firmware, _os.osImage)
 		{
 			engine.mixOn = false;
 			if(_master)
@@ -431,6 +431,8 @@ namespace mdDrums
 	void applyKit(Engine& _engine, const md::automation::sysex::MdKit& _kit)
 	{
 		using md::automation::sysex::MdKit;
+		static_assert(MdKit::ParameterCount == Engine::ParamCount && MdKit::LfoSize == Engine::LfoBytes
+			&& MdKit::MasterEffectsSize == Engine::MasterCount);
 		for(uint8_t track = 0; track < Engine::TrackCount; ++track)
 		{
 			_engine.setMachine(track, _kit.machine(track));
@@ -438,8 +440,9 @@ namespace mdDrums
 				_engine.setParam(track, parameter, _kit.parameters[track][parameter]);
 			_engine.setLevel(track, _kit.levels[track]);
 			_engine.loadLfo(track, _kit.lfos[track].data());
-			_engine.setLink(track, _kit.links[track] == MdKit::Off ? Engine::NoTrack : _kit.links[track]);
-			_engine.setChoke(track, _kit.chokes[track] == MdKit::Off ? Engine::NoTrack : _kit.chokes[track]);
+			// MdKit::Off is past the Tracks, which switches a Link or a Choke off
+			_engine.setLink(track, _kit.links[track]);
+			_engine.setChoke(track, _kit.chokes[track]);
 		}
 		// The dump keeps the master effects in the engine's order
 		for(int index = 0; index < Engine::MasterCount; ++index)

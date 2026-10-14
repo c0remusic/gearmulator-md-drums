@@ -1,11 +1,12 @@
 #include "mdDrumsKnob.h"
 
+#include "mdDrumsCanvas.h"
+#include "mdDrumsColours.h"
+
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlHelper.h"
 
 #include "juce_graphics/juce_graphics.h"
-
-#include "RmlUi/Core/Context.h"
 
 #include <cmath>
 
@@ -13,11 +14,6 @@ namespace mdDrums
 {
 	namespace
 	{
-		// HANDOFF.md, "Colour"
-		const juce::Colour g_track(0xff6e7177);
-		const juce::Colour g_ink(0xfff2f2f2);
-		const juce::Colour g_inkDim(0xffa7aaaf);
-
 		// The track runs 270 degrees, from the lower left to the lower right through the top (JUCE's angles run
 		// clockwise from 12 o'clock)
 		constexpr float g_start = juce::MathConstants<float>::pi * 1.25f;
@@ -45,15 +41,14 @@ namespace mdDrums
 		if(!m_ring && m_onPick)
 		{
 			// The ring lies outside the knob's box: a canvas of its own, 2 px larger each way
-			m_ring = juceRmlUi::ElemCanvas::create(this);
-			m_ring->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
+			m_ring = createCanvas(this, [this](juce::Graphics& _g, float, float, const float _dp)
+			{
+				paintRing(_g, _dp);
+			});
 			m_ring->SetProperty(Rml::PropertyId::Left, Rml::Property(-2.0f, Rml::Unit::DP));
 			m_ring->SetProperty(Rml::PropertyId::Top, Rml::Property(-2.0f, Rml::Unit::DP));
 			m_ring->SetProperty(Rml::PropertyId::Width, Rml::Property(68.0f, Rml::Unit::DP));
 			m_ring->SetProperty(Rml::PropertyId::Height, Rml::Property(68.0f, Rml::Unit::DP));
-			m_ring->setPixelAligned(true);
-			m_ring->setClearEveryFrame(true);
-			m_ring->setRepaintGraphicsCallback([this](const juce::Image&, juce::Graphics& _g) { paintRing(_g); });
 		}
 		if(!m_onPick)
 			m_hover = false;
@@ -64,15 +59,13 @@ namespace mdDrums
 		}
 	}
 
-	void Knob::paintRing(juce::Graphics& _g) const
+	void Knob::paintRing(juce::Graphics& _g, const float _dp) const
 	{
 		// HANDOFF.md, "LFO": the mockup's box-shadow, 0 0 0 1px (2px hovered) around the knob's circle
-		const auto* context = GetContext();
-		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
-		const auto centre = 34.0f * dp;
-		const auto width = (m_hover ? 2.0f : 1.0f) * dp;
-		const auto radius = 32.0f * dp + width * 0.5f;
-		_g.setColour(juce::Colour(0xff6fd1c4));
+		const auto centre = 34.0f * _dp;
+		const auto width = (m_hover ? 2.0f : 1.0f) * _dp;
+		const auto radius = 32.0f * _dp + width * 0.5f;
+		_g.setColour(g_accent);
 		_g.drawEllipse(centre - radius, centre - radius, radius * 2.0f, radius * 2.0f, width);
 	}
 
@@ -80,11 +73,10 @@ namespace mdDrums
 	{
 		if(!m_canvas)
 		{
-			m_canvas = juceRmlUi::ElemCanvas::create(this);
-			m_canvas->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
-			m_canvas->setPixelAligned(true);
-			m_canvas->setClearEveryFrame(true);
-			m_canvas->setRepaintGraphicsCallback([this](const juce::Image& _image, juce::Graphics& _g) { paint(_image, _g); });
+			m_canvas = createCanvas(this, [this](juce::Graphics& _g, const float _w, const float _h, const float _dp)
+			{
+				paint(_g, _w, _h, _dp);
+			});
 		}
 		ElemKnob::OnUpdate();
 	}
@@ -208,6 +200,17 @@ namespace mdDrums
 		setValue(from + _steps);
 	}
 
+	float Knob::shownValue() const
+	{
+		return getValue() == UninitializedValue ? getDefaultValue() : getValue();
+	}
+
+	float Knob::fraction(const float _value) const
+	{
+		const auto range = getRange();
+		return range > 0.0f ? std::clamp((_value - getMinValue()) / range, 0.0f, 1.0f) : 0.0f;
+	}
+
 	void Knob::updateSpeed()
 	{
 		// ElemKnob's speed is the drag for a full sweep; a fader's is its height, set in the skin
@@ -221,36 +224,29 @@ namespace mdDrums
 			m_canvas->repaint();
 	}
 
-	void Knob::paint(const juce::Image&, juce::Graphics& _g) const
+	void Knob::paint(juce::Graphics& _g, const float _w, const float _h, const float _dp) const
 	{
-		const auto paintSize = m_canvas->getPaintSize();
-		const auto size = static_cast<float>(std::min(paintSize.x, paintSize.y));
+		const auto size = std::min(_w, _h);
 		if(size <= 0.0f)
 			return;
-		const auto* context = GetContext();
-		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
 		if(m_fader)
 		{
-			paintFader(_g, dp);
+			paintFader(_g, _dp);
 			return;
 		}
 
 		// The mockup's geometry (v22-ui.js, knobSvg): radius size/2 - 3, the pointer from 35 % of it to 5 px short of it
 		const auto centre = size * 0.5f;
-		const auto radius = centre - 3.0f * dp;
+		const auto radius = centre - 3.0f * _dp;
 		const auto range = getRange();
-		const auto fraction = [&](const float _value)
-		{
-			return range > 0.0f ? std::clamp((_value - getMinValue()) / range, 0.0f, 1.0f) : 0.0f;
-		};
-		const auto angleOf = [&](const float _value) { return g_start + g_sweep * fraction(_value); };
+		const auto angleOf = [this](const float _value) { return g_start + g_sweep * fraction(_value); };
 
 		juce::Path track;
 		track.addCentredArc(centre, centre, radius, radius, 0.0f, g_start, g_start + g_sweep, true);
 		_g.setColour(g_track);
-		_g.strokePath(track, juce::PathStrokeType(2.0f * dp));
+		_g.strokePath(track, juce::PathStrokeType(2.0f * _dp));
 
-		const auto value = getValue() == UninitializedValue ? getDefaultValue() : getValue();
+		const auto value = shownValue();
 		const auto edited = isEdited();
 		const auto angle = angleOf(value);
 		const auto from = m_bipolar ? angleOf(getMinValue() + std::ceil(range * 0.5f)) : g_start;
@@ -260,13 +256,13 @@ namespace mdDrums
 			juce::Path arc;
 			arc.addCentredArc(centre, centre, radius, radius, 0.0f, std::min(from, angle), std::max(from, angle), true);
 			_g.setColour(g_ink);
-			_g.strokePath(arc, juce::PathStrokeType(3.0f * dp));
+			_g.strokePath(arc, juce::PathStrokeType(3.0f * _dp));
 		}
 
-		const auto inner = radius * 0.35f, outer = radius - 5.0f * dp;
+		const auto inner = radius * 0.35f, outer = radius - 5.0f * _dp;
 		const auto sin = std::sin(angle), cos = std::cos(angle);
 		_g.setColour(edited ? g_ink : g_inkDim);
-		_g.drawLine(centre + inner * sin, centre - inner * cos, centre + outer * sin, centre - outer * cos, 2.0f * dp);
+		_g.drawLine(centre + inner * sin, centre - inner * cos, centre + outer * sin, centre - outer * cos, 2.0f * _dp);
 	}
 
 	void Knob::paintFader(juce::Graphics& _g, const float _dp) const
@@ -274,12 +270,10 @@ namespace mdDrums
 		// HANDOFF.md, Mix: the rail a 2 px --track stroke at x + 39 of the strip's column, the cap 48 x 8 ink at x + 16,
 		// its foot at the value's height less 4 px (the mockup's bottom: calc(level / 127 - 4px))
 		const auto height = static_cast<float>(m_canvas->getPaintSize().y);
-		const auto range = getRange();
-		const auto value = getValue() == UninitializedValue ? getDefaultValue() : getValue();
-		const auto fraction = range > 0.0f ? std::clamp((value - getMinValue()) / range, 0.0f, 1.0f) : 0.0f;
+		const auto level = fraction(shownValue());
 		_g.setColour(g_track);
 		_g.fillRect(39.0f * _dp, 0.0f, 2.0f * _dp, height);
-		const auto foot = height - fraction * height + 4.0f * _dp;
+		const auto foot = height - level * height + 4.0f * _dp;
 		_g.setColour(g_ink);
 		_g.fillRect(16.0f * _dp, foot - 8.0f * _dp, 48.0f * _dp, 8.0f * _dp);
 	}

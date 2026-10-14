@@ -21,8 +21,6 @@ namespace
 	namespace sysex = md::automation::sysex;
 	using sysex::MdKit;
 
-	constexpr size_t g_firstKit = 0x8ca;
-	constexpr size_t g_workingKit = 0x0a;
 	constexpr uint8_t g_tracks = 16;
 
 	void require(const bool _condition, const std::string& _message)
@@ -76,11 +74,16 @@ namespace
 		const auto image = md::fw::loadPatchImageFromFlash(_flash, _uw);
 		const std::string which = _uw ? "UW" : "non-UW";
 		require(image.size() == 0x80000, which + " factory image missing");
+		// The record of stored Kit _kit, 0 for Kit 1
+		const auto stored = [&](const size_t _kit)
+		{
+			return &image[MdKit::ImageStoredKits + _kit * MdKit::RecordSize];
+		};
 
 		const MdKit fresh;
-		for(uint8_t slot = 0; slot < 16; ++slot)
+		for(uint8_t slot = 0; slot < MdKit::FactoryKitCount; ++slot)
 		{
-			const auto* record = &image[g_firstKit + MdKit::RecordSize * slot];
+			const auto* record = stored(slot);
 			const auto kit = MdKit::fromRecord(record);
 			const auto what = which + " Kit " + std::to_string(slot + 1) + " " + kit.displayName();
 
@@ -114,17 +117,16 @@ namespace
 		}
 
 		// Known Kits: Kit 1 and 16 of each image, the closed hat on track 9 choking the open hat on track 10
-		const auto first = MdKit::fromRecord(&image[g_firstKit]);
-		const auto last = MdKit::fromRecord(&image[g_firstKit + MdKit::RecordSize * 15]);
+		const auto first = MdKit::fromRecord(stored(0));
+		const auto last = MdKit::fromRecord(stored(MdKit::FactoryKitCount - 1));
 		require(first.displayName() == (_uw ? "TRX UW" : "TRX"), which + ": Kit 1 is " + first.displayName());
 		require(last.displayName() == (_uw ? "SEACLONES" : "FUGLESANG"), which + ": Kit 16 is " + last.displayName());
 		require(first.chokes[8] == 9, which + ": Kit 1's track 9 does not choke track 10");
 		for(uint8_t t = 0; t < g_tracks; ++t)
 			require(t == 8 || first.chokes[t] == MdKit::Off, which + ": Kit 1 has another Choke");
-		require(MdKit::fromRecord(&image[g_firstKit + MdKit::RecordSize * 16]).isEmptySlot(),
-			which + ": Kit 17 is not empty");
+		require(MdKit::fromRecord(stored(MdKit::FactoryKitCount)).isEmptySlot(), which + ": Kit 17 is not empty");
 		if(_uw)
-			require(MdKit::fromRecord(&image[g_workingKit]) == first, "the working Kit is not Kit 1");
+			require(MdKit::fromRecord(&image[MdKit::ImageWorkingKit]) == first, "the working Kit is not Kit 1");
 	}
 
 	void groupMessages()

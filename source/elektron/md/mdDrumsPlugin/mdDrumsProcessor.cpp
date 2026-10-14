@@ -115,7 +115,7 @@ namespace mdDrums
 		m_chosenFlash.clear();
 		if(getPlugin().getDevice() == before || !hasDevice())
 			return "MD Drums could not start from that file" + (error.empty() ? std::string() : ": " + error);
-		static_cast<Controller&>(getController()).followDevice();
+		controller().followDevice();
 
 		const auto target = getPublicRomFolder() + Engine::FlashImageName;
 		if(!baseLib::filesystem::writeFileAtomic(target, flash.data(), flash.size()))
@@ -171,6 +171,11 @@ namespace mdDrums
 		return new Controller(*this);
 	}
 
+	Controller& Processor::controller()
+	{
+		return static_cast<Controller&>(getController());
+	}
+
 	void Processor::processBpm(const float _bpm)
 	{
 		if(std::abs(_bpm - m_bpm.load(std::memory_order_relaxed)) < 0.005f)
@@ -188,7 +193,7 @@ namespace mdDrums
 		// The Bank's Slot the Kit played came from (its Kit is the Device's, in "MIDI")
 		{
 			baseLib::ChunkWriter cw(_s, "KSLT", 1);
-			_s.write<uint32_t>(static_cast<uint32_t>(dynamic_cast<Controller&>(getController()).playedSlot()));
+			_s.write<uint32_t>(static_cast<uint32_t>(controller().playedSlot()));
 		}
 		// The Track shown, which the editor and the relays for Push 2 aim at
 		baseLib::ChunkWriter cw(_s, "FOCS", 1);
@@ -199,7 +204,7 @@ namespace mdDrums
 	{
 		_cr.add("KSLT", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
-			dynamic_cast<Controller&>(getController()).setPlayedSlot(static_cast<int>(_stream.read<uint32_t>()));
+			controller().setPlayedSlot(static_cast<int>(_stream.read<uint32_t>()));
 		});
 		_cr.add("FOCS", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
 		{
@@ -214,7 +219,7 @@ namespace mdDrums
 			std::vector<uint8_t> state;
 			_stream.read(state);
 			getPlugin().setState(state);
-			dynamic_cast<Controller&>(getController()).setLoadedState(std::move(state));
+			controller().setLoadedState(std::move(state));
 		});
 		jucePluginEditorLib::Processor::loadChunkData(_cr);
 	}

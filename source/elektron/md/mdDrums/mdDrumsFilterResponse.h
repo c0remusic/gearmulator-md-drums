@@ -35,7 +35,6 @@ namespace mdDrums
 		};
 
 		explicit FilterResponse(std::shared_ptr<const md::engine::TrackFx::Tables> _tables);
-		~FilterResponse();
 
 		FilterResponse(const FilterResponse&) = delete;
 		FilterResponse& operator=(const FilterResponse&) = delete;
@@ -48,23 +47,20 @@ namespace mdDrums
 		// Where the EQ acts: the angle of its poles for a boost, of its zeros for a cut (the pair nearer the unit circle)
 		double eqCentre() const;
 
+	private:
 		// A 2-pole section as the DSP runs it: y[n] = a1 y[n-1] + a2 y[n-2] + b0 x[n] + b1 x[n-1] + b2 x[n-2]
 		struct Biquad
 		{
 			double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
 			double magnitude(double _hz) const;
 		};
-		const Biquad& eq() const { return m_eq; }
-		const Biquad& lowPass() const { return m_lowPass; }	// twice over
-		const Biquad& highPass() const { return m_highPass; }	// twice over
 
-	private:
 		double raw(double _hz) const;
 
 		std::shared_ptr<const md::engine::TrackFx::Tables> m_tables;
-		std::unique_ptr<md::engine::TrackFx> m_fx;
+		md::engine::TrackFx m_fx;
 		Settings m_settings;
-		Biquad m_eq, m_lowPass, m_highPass;
+		Biquad m_eq, m_lowPass, m_highPass;	// the low-pass and the high-pass twice over
 		double m_eqCentre = 0.0;
 		double m_reference = 0.0;	// an untouched Track's chain at 1 kHz, in dB
 	};

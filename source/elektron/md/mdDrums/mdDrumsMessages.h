@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdkit.h"
 
 #include <array>
@@ -98,11 +99,11 @@ namespace mdDrums::messages
 	// that a parameter's (page, track, index) is its CC
 	namespace pages
 	{
-		constexpr uint8_t Synthesis = 0;	// SYN1-8
-		constexpr uint8_t Effects = 1;		// AMD AMF EQF EQG FLTF FLTW FLTQ SRR
-		constexpr uint8_t Routing = 2;		// DIST VOL PAN DEL REV LFOS LFOD LFOM
-		constexpr uint8_t Level = 3;
-		constexpr uint8_t Mute = 4;
+		constexpr uint8_t Synthesis = md::automation::machinedrum::Synthesis;	// SYN1-8
+		constexpr uint8_t Effects = md::automation::machinedrum::Effects;		// AMD AMF EQF EQG FLTF FLTW FLTQ SRR
+		constexpr uint8_t Routing = md::automation::machinedrum::Routing;		// DIST VOL PAN DEL REV LFOS LFOD LFOM
+		constexpr uint8_t Level = md::automation::machinedrum::Level;
+		constexpr uint8_t Mute = md::automation::machinedrum::Mute;
 		constexpr uint8_t Machine = 5;		// the machine id, 0 to 191
 		constexpr uint8_t Lfo = 6;			// destination track, destination parameter, shape 1, shape 2, mode
 		constexpr uint8_t Mixer = 7;		// Solo at index 0, Out at 1

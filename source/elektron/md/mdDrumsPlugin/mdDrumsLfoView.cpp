@@ -1,5 +1,7 @@
 #include "mdDrumsLfoView.h"
 
+#include "mdDrumsCanvas.h"
+#include "mdDrumsColours.h"
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsEngine.h"
@@ -14,18 +16,16 @@
 
 #include "juce_graphics/juce_graphics.h"
 
-#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/Element.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace mdDrums
 {
 	namespace
 	{
-		const juce::Colour g_accent(0xff6fd1c4);	// HANDOFF.md, "Colour"
-
 		// The plot, in the screen's canvas (which starts after the screen's 1 px left rule): from the chips' column (x 964)
 		// to the screen's right inset (x 1280), from 48 px under the screen's top to the first row of chips less 8 (y 712)
 		constexpr float g_left = 67.0f, g_right = 383.0f, g_top = 48.0f, g_bottom = 104.0f;
@@ -35,15 +35,11 @@ namespace mdDrums
 
 	LfoView::LfoView(Editor& _editor) : m_editor(_editor)
 	{
-		m_screen = find("screen_lfo");
-		if(m_screen)
-		{
-			m_canvas = juceRmlUi::ElemCanvas::create(m_screen);
-			m_canvas->SetProperty(Rml::PropertyId::PointerEvents, Rml::Style::PointerEvents::None);
-			m_canvas->setPixelAligned(true);
-			m_canvas->setClearEveryFrame(true);
-			m_canvas->setRepaintGraphicsCallback([this](const juce::Image&, juce::Graphics& _g) { paint(_g); });
-		}
+		if(auto* screen = find("screen_lfo"))
+			m_canvas = createCanvas(screen, [this](juce::Graphics& _g, float, float, const float _dp)
+			{
+				paint(_g, _dp);
+			});
 
 		// ASSIGN: armed by its word, which then reads Cancel and brings the LFO's own Track back; while armed, the title
 		// opens the target menu as the target does; a tab disarms it
@@ -81,7 +77,7 @@ namespace mdDrums
 
 	Rml::Element* LfoView::find(const std::string& _id) const
 	{
-		return m_editor.findChild(_id, false);
+		return m_editor.element(_id);
 	}
 
 	pluginLib::Parameter* LfoView::parameter(const char* _name, const uint8_t _part) const
@@ -111,10 +107,7 @@ namespace mdDrums
 				});
 		if(auto* p = parameter("Machine", _part))
 			m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&) { updateTargets(); });
-		listenToTarget();
-		update();
-		updateUnderlines();
-		updateTargets();
+		refresh();
 	}
 
 	void LfoView::refresh()
@@ -125,12 +118,17 @@ namespace mdDrums
 		updateTargets();
 	}
 
-	void LfoView::listenToTarget()
+	pluginLib::Parameter* LfoView::target() const
 	{
 		const auto track = static_cast<uint8_t>(std::clamp(value("LfoTrack", m_part), 0, Controller::TrackCount - 1));
 		const auto param = std::clamp(value("LfoParam", m_part), 0, Engine::ParamCount - 1);
+		return parameter(Engine::paramNames()[static_cast<size_t>(param)], track);
+	}
+
+	void LfoView::listenToTarget()
+	{
 		m_onTarget.reset();
-		if(auto* p = parameter(Engine::paramNames()[static_cast<size_t>(param)], track))
+		if(auto* p = target())
 			m_onTarget.set(p->onValueChanged, [this](pluginLib::Parameter* const&) { update(); });
 	}
 
@@ -138,13 +136,12 @@ namespace mdDrums
 	{
 		const Lfo lfo{static_cast<uint8_t>(value("LfoShape1", m_part)), static_cast<uint8_t>(value("LfoShape2", m_part)),
 			static_cast<uint8_t>(value("LfoMode", m_part))};
-		const auto track = static_cast<uint8_t>(std::clamp(value("LfoTrack", m_part), 0, Controller::TrackCount - 1));
-		const auto param = std::clamp(value("LfoParam", m_part), 0, Engine::ParamCount - 1);
+		const auto* moved = target();
 		const auto speed = value("LFOS", m_part), mix = value("LFOM", m_part);
-		const auto bpm = static_cast<Processor&>(m_editor.getProcessor()).getBpm();
+		const auto bpm = m_editor.processor().getBpm();
 		const auto tempo = bpm > 0.0f ? static_cast<double>(bpm) : g_defaultBpm;
 		m_depth = value("LFOD", m_part);
-		m_trace = lfo.trace(speed, m_depth, mix, value(Engine::paramNames()[static_cast<size_t>(param)], track), tempo,
+		m_trace = lfo.trace(speed, m_depth, mix, moved ? moved->getUnnormalizedValue() : 0, tempo,
 			lfo.window(speed, mix, tempo));
 
 		// The values it reaches, in the label column at the plot's top and foot; without depth, why there is no wave
@@ -256,14 +253,12 @@ namespace mdDrums
 		m_editor.setCurrentPart(owner);
 	}
 
-	void LfoView::paint(juce::Graphics& _g) const
+	void LfoView::paint(juce::Graphics& _g, const float _dp) const
 	{
 		if(m_depth <= 0 || m_trace.words.empty())
 			return;
-		const auto* context = m_screen->GetContext();
-		const auto dp = context ? context->GetDensityIndependentPixelRatio() : 1.0f;
-		const auto left = g_left * dp, top = g_top * dp, bottom = g_bottom * dp;
-		const auto pixels = static_cast<int>(std::round((g_right - g_left) * dp));
+		const auto left = g_left * _dp, top = g_top * _dp, bottom = g_bottom * _dp;
+		const auto pixels = static_cast<int>(std::round((g_right - g_left) * _dp));
 		const auto span = static_cast<float>(m_trace.highest - m_trace.lowest);
 		const auto yOf = [&](const uint16_t _word)
 		{
@@ -292,6 +287,6 @@ namespace mdDrums
 			wave.lineTo(px + 1.0f, yOf(m_trace.words[to - 1]));
 		}
 		_g.setColour(g_accent);
-		_g.strokePath(wave, juce::PathStrokeType(2.0f * dp));
+		_g.strokePath(wave, juce::PathStrokeType(2.0f * _dp));
 	}
 }
