@@ -92,12 +92,15 @@ jobs:
           ditto "${products}/AU/MD Drums.component" "${root}/Library/Audio/Plug-Ins/Components/MD Drums.component"
           plist="${RUNNER_TEMP}/components.plist"
           pkgbuild --analyze --root "${root}" "${plist}"
-          # plutil cannot walk a plist whose root is an array; PlistBuddy can
+          # plutil cannot walk a plist whose root is an array; PlistBuddy can. The analysis does not always write the key:
+          # remove it where it is, then add it as false
           i=0
           while /usr/libexec/PlistBuddy -c "Print :${i}" "${plist}" > /dev/null 2>&1; do
-            /usr/libexec/PlistBuddy -c "Set :${i}:BundleIsRelocatable false" "${plist}"
+            /usr/libexec/PlistBuddy -c "Delete :${i}:BundleIsRelocatable" "${plist}" > /dev/null 2>&1 || true
+            /usr/libexec/PlistBuddy -c "Add :${i}:BundleIsRelocatable bool false" "${plist}"
             i=$((i + 1))
           done
+          /usr/libexec/PlistBuddy -c "Print" "${plist}"
           echo "${i} bundles, none relocatable"
           test "${i}" -ge 2
           pkgbuild --root "${root}" --component-plist "${plist}" \
