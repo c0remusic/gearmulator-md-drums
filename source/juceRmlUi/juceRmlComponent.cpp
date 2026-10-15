@@ -1007,7 +1007,9 @@ namespace juceRmlUi
 			m_rmlContext->ActivateTheme("advancedrenderer", isAdvanced);
 			}
 
+			m_inPreUpdate = true;
 			evPreUpdate(this);
+			m_inPreUpdate = false;
 
 			m_rmlContext->Update();
 			if (onScreen)
@@ -1106,6 +1108,10 @@ namespace juceRmlUi
 
 	void RmlComponent::scheduleUpdate(const bool _allowPropertySettling)
 	{
+		// Asked once before the context's update: this update draws it
+		if (m_inPreUpdate && !_allowPropertySettling)
+			return;
+
 		if (_allowPropertySettling)
 		{
 			// Some OnPropertyChange callbacks set another property which is only

@@ -55,6 +55,8 @@ namespace juceRmlUi
 
 		using ScreenshotCallback = std::function<void(const juce::Image&)>;
 
+		// Before the context's update and render, under the access lock: what a listener changes is drawn in that
+		// frame, and an update it asks for once (enqueueUpdateOnce, a canvas repainted) is that frame
 		baseLib::Event<RmlComponent*> evPreUpdate;
 		baseLib::Event<RmlComponent*> evPostUpdate;
 
@@ -217,6 +219,7 @@ namespace juceRmlUi
 		juce::ModifierKeys m_currentModifierKeys;
 
 		bool m_updating = true;
+		bool m_inPreUpdate = false;	// evPreUpdate's listeners run
 
 		Rml::Vector2i m_documentSize{0,0};
 		bool m_heightResizable = false;
