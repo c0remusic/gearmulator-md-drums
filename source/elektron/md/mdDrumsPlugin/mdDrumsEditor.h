@@ -3,12 +3,26 @@
 #include "jucePluginEditorLib/pluginEditor.h"
 #include "jucePluginEditorLib/pluginEditorState.h"
 
+#include "baseLib/event.h"
+
+#include "juce_events/juce_events.h"
+
+#include <cstdint>
+#include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 namespace mdDrums
 {
+	// A file a JUCE file chooser gave, as a path: JUCE's paths are UTF-8, which a path made from a std::string would
+	// read in the ANSI code page
+	inline std::filesystem::path pathOf(const juce::File& _file)
+	{
+		return std::filesystem::u8path(_file.getFullPathName().toStdString());
+	}
+
 	class Controller;
 	class FilterView;
 	class HitView;
@@ -23,9 +37,26 @@ namespace mdDrums
 	// The editor over the skin: the v22 one (skins/mdDrums, ticket 17) with its <vknob> and <vglyph> elements and the
 	// Track tab's behaviour (TrackView). A skin without the Track tab (#page_track), such as a user's own, gets the
 	// stack's editor alone.
+	//
+	// The views change the document in two places only, both under the document's access lock, which the OpenGL thread
+	// renders under: an RmlUi event (a click, a key, a drag: they write at once), and the editor's frame, where each
+	// view reads what it shows (the parameters, the Telemetry, the Controller, the Bank), compares it with what it drew
+	// and writes only what differs. The frame runs before every RmlUi update, so that what an event changed shows in
+	// the frame that draws the event; at the display's rate while the window shows, for what changes by itself (the
+	// host's automation, the Telemetry, a Track shown by Push or a state restored); and at once when a click shows
+	// another Track or a file has been chosen.
 	class Editor final : public jucePluginEditorLib::Editor
 	{
 	public:
+		// A pause longer than this between two frames makes the next one Frame::resumed
+		static constexpr double ResumeMs = 1000.0;
+
+		struct FrameCount
+		{
+			uint64_t frames = 0;
+			uint64_t wrote = 0;	// the frames in which a view changed the document
+		};
+
 		Editor(jucePluginEditorLib::Processor& _processor, const jucePluginEditorLib::Skin& _skin);
 		~Editor() override;
 
@@ -46,19 +77,19 @@ namespace mdDrums
 		// editor, so no view may rewrite (SetInnerRML) or remove an element that holds one. A missing ID is looked for
 		// again each time.
 		Rml::Element* element(const std::string& _id) const;
+		// The lookups that found nothing: a frame should cause none
+		uint32_t elementMisses() const { return m_elementMisses; }
 
-		// Runs _func under the document's access lock, which the OpenGL thread renders under, for a view that changes
-		// the document from outside an RmlUi event (whose dispatch holds the lock): a timer, a parameter's notification
-		// from the message loop, the Track shown changed by the Controller's timer or a state restored, a file chosen.
-		// The lock is recursive. Without a component nothing runs.
-		template<typename T> void withDocumentLocked(const T& _func) const
-		{
-			auto* component = getRmlComponent();
-			if(!component)
-				return;
-			juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-			_func();
-		}
+		// The editor's frame, now: asks RmlUi for a render when a view wrote, and is then true. Nothing happens without
+		// the views, or inside a frame (a view's step never shows another Track: the next frame sees what it changed).
+		bool frame();
+		// The frame's clock, in ms: the display's, or a test's
+		void setClock(std::function<double()> _clock);
+		double lastFrameMs() const { return m_lastFrameMs; }
+		const FrameCount& frameCount() const { return m_frameCount; }
+
+		// The Track shown, which the views draw at once: a handler that follows in the same event acts on it
+		void setCurrentPart(uint8_t _part) override;
 
 		TrackView* getTrackView() const { return m_trackView.get(); }
 		MeterView* getMeterView() const { return m_meterView.get(); }
@@ -76,6 +107,10 @@ namespace mdDrums
 		bool escape() const;
 
 	private:
+		// The views stepped under the lock, without asking for a render: true when one wrote
+		bool step();
+		void onFrameTimer();
+
 		std::unique_ptr<TrackView> m_trackView;
 		std::unique_ptr<MeterView> m_meterView;
 		std::unique_ptr<HitView> m_hitView;
@@ -85,6 +120,16 @@ namespace mdDrums
 		std::unique_ptr<LinksView> m_linksView;
 		std::unique_ptr<StatusView> m_statusView;
 		mutable std::unordered_map<std::string, Rml::Element*> m_elements;	// element()'s, found ones only
+		mutable uint32_t m_elementMisses = 0;
+
+		std::function<double()> m_clock;
+		juce::TimedCallback m_frameTimer;
+		double m_framePeriodMs = 1000.0 / 60.0;
+		baseLib::EventListener<juceRmlUi::RmlComponent*> m_onPreUpdate;
+		double m_lastFrameMs = -1.0;
+		int m_lastShown = -1;
+		bool m_inFrame = false;
+		FrameCount m_frameCount;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

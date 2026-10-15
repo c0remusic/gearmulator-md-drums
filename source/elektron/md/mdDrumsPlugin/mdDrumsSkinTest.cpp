@@ -14,7 +14,11 @@
 //   and Esc work as the HANDOFF says, and a machine chosen in the browser plays its Track (ticket 22);
 // - the play key and Space play the shown Track at the velocity a drag sets, the wheel and the arrows step its machine
 //   (ticket 23);
-// - the head band's Link and Choke lines open their menu, whose cells set the Kit played's values (ticket 29).
+// - the head band's Link and Choke lines open their menu, whose cells set the Kit played's values (ticket 29);
+// - the editor's frame: what the host changes shows after one frame, what piled up while no frame ran shows nothing,
+//   a frame with nothing new writes nothing, and what a frame costs.
+// The test is the editor's clock (Editor::setClock): Fixture::step is a display tick, Fixture::frame an RmlUi update
+// and render, which runs the frame first as the plug-in's does.
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
 #include "mdDrumsController.h"
@@ -148,6 +152,8 @@ namespace
 		juceRmlUi::RmlComponent* component = nullptr;
 		juceRmlUi::LookAndFeel lookAndFeel;
 		juce::Image image;
+		// The editor's clock, in ms: it moves only with step(), from where the editor's first frame left it
+		double now = 0.0;
 
 		explicit Fixture(mdDrums::Processor& _processor) : processor(_processor)
 		{
@@ -159,6 +165,8 @@ namespace
 			require(component && component->getContext() && component->getDocument(), "the editor has no RmlUi document");
 			require(editor->getTrackView() != nullptr, "the default skin is not the v22 one");
 			component->setLookAndFeel(&lookAndFeel);
+			now = editor->lastFrameMs();
+			editor->setClock([this] { return now; });
 		}
 
 		~Fixture()
@@ -192,7 +200,14 @@ namespace
 			layout();
 		}
 
-		// One frame: RmlUi's update, then the software render into an image
+		// A display tick: the clock forward, then the editor's frame
+		void step(const double _ms = 0.0)
+		{
+			now += _ms;
+			editor->frame();
+		}
+
+		// One frame: RmlUi's update (the editor's frame first), then the software render into an image
 		void frame()
 		{
 			juceRmlUi::RenderingTestAccess::update(*component);
@@ -399,11 +414,11 @@ namespace
 		const auto kb = _f.box(*knob);
 		const auto cx = kb.x + kb.w * 0.5f, cy = kb.y + kb.h * 0.5f;
 		auto& controller = _f.processor.getController();
-		auto* fltf = controller.getParameter("FLTF", 0);
-		const auto before = fltf->getUnnormalizedValue();
 
-		// A drag up, 3 px a frame: 2 steps each, its arc on screen the frame it happens
+		// A drag up, 3 px a frame: 2 steps each, its arc on screen the frame it happens. It steps from the knob's own
+		// value, which follows its parameter from the message loop (that this test does not run)
 		_f.frame();
+		const auto before = juce::roundToInt(knob->getValue());
 		// The arc's start, at the track's lower left (radius 29 at 225 degrees), brightest of a 3 x 3 patch
 		const auto arcPixel = [&]
 		{
@@ -430,10 +445,14 @@ namespace
 		context.ProcessMouseButtonUp(0, 0);
 		const auto after = knob->getValue();
 		const auto edited = arcPixel();
-		std::printf("drag: FLTF %d to %.0f over %d frames, event to pixel %.2f ms mean, %.2f ms at worst\n", before,
-			after, moves, sum / moves, worst);
+		// The curve follows the knob in the frame that draws its arc: the editor's frame runs before RmlUi's update
+		const auto* filter = _f.editor->getFilterView()->response();
+		const auto curve = filter ? filter->settings().fltf : -1;
+		std::printf("drag: FLTF %d to %.0f over %d frames, event to pixel %.2f ms mean, %.2f ms at worst; the curve at %d\n",
+			before, after, moves, sum / moves, worst, curve);
 		require(after >= static_cast<float>(before) + 2.0f * moves - 2.0f, "the drag did not move the knob 2 steps a frame");
 		require(edited > 0.8f, "the knob's arc is not drawn after the drag");
+		require(curve == juce::roundToInt(after), "the Filter and EQ curve does not follow the knob in the same frame");
 		require(worst <= 33.0, "a dragged knob took over 33 ms to reach the pixels");
 
 		// A click on track 03's row: the bands show it on the next frame
@@ -463,13 +482,12 @@ namespace
 		require(view != nullptr, "the editor has no meter view");
 		auto& telemetry = _f.processor.getTelemetry();
 		_f.showView("mix");
-		const double now = 1.0e6;
-		view->update(now);
+		_f.step(10);
 		telemetry.raisePeak(0, 1.0f);		// Main left at 0 dBFS
 		telemetry.raisePeak(1, 0.1f);		// right at -20
 		telemetry.raisePeak(2, 0.5f);		// Track 1 at -6
 		telemetry.hit(0);
-		view->update(now + 10);
+		_f.step(10);
 		_f.frame();
 		const auto strip = _f.box(*_f.find("strip1_meter")), main = _f.box(*_f.find("main_meter"));
 		const auto stripTop = strip.y + strip.h * (1.0f - view->level(2));
@@ -482,19 +500,19 @@ namespace
 			&& isAccent(_f.pixel(main.x + 30, main.y + 6)), "the Main meter does not show its levels");
 		require(_f.find("strip1_num")->IsClassSet("trig") && _f.find("row1_num")->IsClassSet("trig"),
 			"a Hit does not light its Track's numbers");
-		view->update(now + 10 + 200);
+		_f.step(200);
 		require(!_f.find("strip1_num")->IsClassSet("trig"), "a Hit's light lasts past 140 ms");
-		view->update(now + 10 + 1000);
+		_f.step(800);
 		std::printf("meters: Track 1 a second later at %.3f\n", view->level(2));
 		require(std::abs(view->level(2) - (60.0f - 26.0f) / 60.0f) < 0.01f, "the meters do not fall 20 dB a second");
 
 		// The list's scopes: half a second of Track 1 at -6 dBFS, read at 60 Hz, fills the right half of its scope
 		_f.showView("track");
-		double t = now + 2000;
-		for(int i = 0; i < 30; ++i, t += 1000.0 / 60.0)
+		_f.step(990);
+		for(int i = 0; i < 30; ++i)
 		{
 			telemetry.raisePeak(2, 0.5f);
-			view->update(t);
+			_f.step(1000.0 / 60.0);
 		}
 		_f.frame();
 		const auto scope = _f.box(*_f.find("row1_scope"));
@@ -514,8 +532,7 @@ namespace
 		auto& telemetry = _f.processor.getTelemetry();
 		_f.showView("track");
 		_f.editor->setCurrentPart(0);
-		const double now = 2.0e6;
-		view->update(now);
+		_f.step(10);
 		require(_f.find("hit_note")->GetInnerRML() == "Not played yet", "the Hit screen's note before a Hit");
 
 		// A Hit decaying from 0.4 over 200 columns, 600 columns in (0.109 s): audible for 0.127 s, so a window of 0.2 s
@@ -525,7 +542,7 @@ namespace
 			const auto a = static_cast<int16_t>(0.4f * std::exp(-c / 200.0f) * 32767.0f);
 			telemetry.addColumn(0, static_cast<int16_t>(-a), a);
 		}
-		view->update(now + 10);
+		_f.step(10);
 		_f.frame();
 		const auto screen = _f.box(*_f.find("screen_hit"));
 		const auto left = screen.x + 16, width = screen.w - 32, top = screen.y + 48, mid = screen.y + (216 - 36 + 48) / 2.0f;
@@ -544,18 +561,16 @@ namespace
 			"the graduations do not follow the window");
 
 		// The capture stops growing: the playhead goes
-		view->update(now + 200);
+		_f.step(190);
 		require(!view->playing(), "the playhead stays after the Hit");
 	}
 
+	// A parameter set as the editor's controls set it: the views read it at the next frame
 	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
 	{
 		auto* p = _f.processor.getController().getParameter(_name, _part);
 		require(p != nullptr, std::string("no parameter ") + _name);
 		p->setUnnormalizedValueNotifyingHost(_value, pluginLib::Parameter::Origin::Ui);
-		// A parameter tells the views later, from the message loop, which the test does not run
-		_f.editor->getFilterView()->refresh();
-		_f.editor->getLfoView()->refresh();
 	}
 
 	// A click as the mouse makes it, at an element's centre
@@ -607,27 +622,26 @@ namespace
 		auto& controller = _f.controller();
 		_f.showView("track");
 		_f.editor->setCurrentPart(0);
-		double now = 3.0e6;
-		view->update(now);
+		_f.step(10);
 		require(!view->previewing() && _f.find("hit_note")->GetInnerRML() == "Last hit, velocity 110",
 			"the Hit screen does not start on the last Hit");
 
-		// The engine renders on its own thread: the screen reads its result at each frame (fake time barely moves, so that
-		// a machine chosen keeps its own SYN1-8 meanwhile)
+		// The engine renders on its own thread: the screen reads its result at each frame (the clock barely moves, so
+		// that a machine chosen keeps its own SYN1-8 meanwhile)
 		const auto untilPreview = [&](const std::chrono::steady_clock::time_point _start)
 		{
 			while(view->previewPending() || !view->previewing())
 			{
 				require(std::chrono::steady_clock::now() - _start < std::chrono::seconds(10), "no preview within 10 s");
 				std::this_thread::sleep_for(std::chrono::milliseconds(2));
-				view->update(now += 0.05);
+				_f.step(0.05);
 			}
 			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _start).count();
 		};
 
 		auto start = std::chrono::steady_clock::now();
 		set(_f, "FLTF", 0, 30);
-		view->update(now += 1);
+		_f.step(1);
 		require(view->previewPending(), "a change of the sound asks for no preview");
 		const auto first = untilPreview(start);
 		_f.frame();
@@ -642,7 +656,7 @@ namespace
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		start = std::chrono::steady_clock::now();
 		set(_f, "FLTF", 0, 31);
-		view->update(now += 1);
+		_f.step(1);
 		const auto next = untilPreview(start);
 		std::printf("hit preview: the next knob turn shown in %.0f ms\n", next);
 
@@ -650,10 +664,10 @@ namespace
 		telemetry.beginCapture(0, 90);
 		for(int c = 0; c < 100; ++c)
 			telemetry.addColumn(0, -8000, 8000);
-		view->update(now += 1);
+		_f.step(1);
 		require(!view->previewing() && _f.find("hit_note")->GetInnerRML() == "Last hit, velocity 90",
 			"a Hit does not take the screen back from the preview");
-		view->update(now += 100);
+		_f.step(100);
 
 		// The browser, listening off (no audio runs here): EFM-SD chosen on Track 1
 		tracks->setListening(false);
@@ -661,7 +675,7 @@ namespace
 		start = std::chrono::steady_clock::now();
 		click(_f, "mach_33");
 		require(controller.getParameter("Machine", 0)->getUnnormalizedValue() == 33, "the cell did not choose its machine");
-		view->update(now += 1);
+		_f.step(1);
 		const auto chosen = untilPreview(start);
 		_f.frame();
 		const auto browserInk = inkColumns(_f, "screen_preview");
@@ -981,11 +995,11 @@ namespace
 			return _f.text(_id).find(_what) != std::string::npos;
 		};
 		const auto visible = [&](const std::string& _id) { return _f.find(_id)->IsVisible(); };
-		const auto saveLit = [&] { view->refresh(); return _f.on("kit_save"); };
+		// The frame looks at the head band ten times a second
+		const auto saveLit = [&] { _f.step(1000.0 / mdDrums::KitsView::RefreshHz); return _f.on("kit_save"); };
 
 		_f.showView("track");
-		_f.editor->getTrackView()->setOverlay(Overlay::Kits);
-		_f.layout();
+		clickNow(_f, "kit");
 		require(view->isOpen() && has("slot1", "TRX UW") && has("slot16", "SEACLONES") && has("slot17", "Empty"),
 			"the overlay does not show the Bank");
 
@@ -1063,14 +1077,20 @@ namespace
 			controller.playedSlot() + 1);
 		require(down == 20 && left == 4 && up == 3 && controller.playedSlot() == 3, "the arrows or Enter do not work");
 
-		// Export the chosen Slot, import it into the empty ones from slot 40 on
-		const auto file = std::filesystem::temp_directory_path() / "mdDrumsSkinTest_kit.syx";
-		require(view->exportFile(file), "Export failed: " + view->note());
-		view->choose(39);
-		require(view->importFile(file) && bank->slot(39) && *bank->slot(39) == *bank->slot(3)
-			&& view->note() == "Imported 1 kit from mdDrumsSkinTest_kit.syx into slot 40", "Import failed: " + view->note());
+		// Export the chosen Slot, import it into the empty ones from slot 40 on: as the file chooser gives them, a name
+		// outside the ANSI code page (Cyrillic "Kit", in UTF-8)
+		const std::string name = "mdDrumsSkinTest_\xD0\x9A\xD0\xB8\xD1\x82.syx";
+		const juce::File chosen(juce::String::fromUTF8(
+			(std::filesystem::temp_directory_path() / std::filesystem::u8path(name)).u8string().c_str()));
+		const auto file = mdDrums::pathOf(chosen);
+		view->fileChosen(false, file);
+		require(std::filesystem::exists(file) && view->note() == "Exported slot 04 as " + name, "Export failed: " + view->note());
+		clickNow(_f, "slot40");
+		view->fileChosen(true, file);
+		require(bank->slot(39) && *bank->slot(39) == *bank->slot(3) && view->note() == "Imported 1 kit from " + name
+			+ " into slot 40", "Import failed: " + view->note());
 		std::filesystem::remove(file);
-		std::printf("kits: exported slot 04, \"%s\"\n", view->note().c_str());
+		std::printf("kits: exported slot 04 and imported it into slot 40, through the chooser's path, as a Cyrillic name\n");
 
 		context.ProcessKeyDown(Rml::Input::KI_ESCAPE, 0);
 		require(_f.editor->getTrackView()->getOverlay() == Overlay::None && !view->isOpen(), "Esc did not close the Kits");
@@ -1086,14 +1106,15 @@ namespace
 		auto& controller = _f.controller();
 		auto* view = _f.editor->getLinksView();
 		auto* tracks = _f.editor->getTrackView();
-		auto* kits = _f.editor->getKitsView();
 		require(view != nullptr, "the editor has no Links view");
+
+		const auto headBand = [&] { _f.step(1000.0 / mdDrums::KitsView::RefreshHz); };
 
 		_f.showView("track");
 		_f.editor->setCurrentPart(0);
 		controller.setLink(0, off);
 		controller.setChoke(0, off);
-		view->refresh();
+		_f.step();
 		_f.layout();
 		require(_f.text("link_text") == "Strikes no other track" && _f.text("choke_text") == "Silences no track",
 			"the lines without a Link or a Choke");
@@ -1105,7 +1126,7 @@ namespace
 		require(tracks->getOverlay() == Overlay::Links && _f.find("linksmenu")->IsVisible(true)
 			&& _f.text("linksmenu_label") == "Track 01" && _f.on("links_link_off") && _f.on("links_choke_off"),
 			"the Link's line does not open the menu");
-		kits->refresh();
+		headBand();
 		const bool savedBefore = _f.on("kit_save");
 
 		// A cell clicked: the line and the cell on the next frame
@@ -1124,7 +1145,7 @@ namespace
 		require(controller.choke(0) == 2 && _f.text("choke_text") == "Silences <b>track 03</b>",
 			"a cell does not set the Choke");
 		require(tracks->getOverlay() == Overlay::Links, "a choice closed the menu");
-		kits->refresh();
+		headBand();
 		require(_f.on("kit_save"), "Save does not light after a Link");
 		std::printf("links: track 05 struck and track 03 silenced from track 01, cell to pixel %.2f ms; Save %s, then lit\n",
 			ms, savedBefore ? "lit" : "unlit");
@@ -1137,9 +1158,14 @@ namespace
 		clickNow(_f, "linksmenu_done");
 		require(tracks->getOverlay() == Overlay::None, "Done does not close the menu");
 
+		// A Link set outside an event (a Kit loaded, a state restored): its line after one frame
+		controller.setLink(0, 6);
+		_f.step();
+		require(_f.text("link_text") == "Also strikes <b>track 07</b>", "a Link set by the Controller does not show at the next frame");
+
 		controller.setLink(0, off);
 		controller.setChoke(0, off);
-		view->refresh();
+		_f.step();
 	}
 
 	// A Mix strip's Out (ticket 33): Main, or one of 15 Outs, any Track on any. A click moves the Track between Main and
@@ -1194,19 +1220,157 @@ namespace
 		auto* view = _f.editor->getStatusView();
 		auto* line = _f.find("status");
 		require(view && line, "no status line");
-		view->refresh();
-		_f.layout();
+		// The frame looks at the line ten times a second
+		const auto look = [&](const double _ms)
+		{
+			_f.step(_ms);
+			_f.layout();
+		};
+		look(1000.0 / mdDrums::StatusView::RefreshHz);
 		require(view->text().empty() && !line->IsVisible(), "the status line says \"" + view->text() + "\" with a Device");
 
 		_f.processor.getTelemetry().unplayed(60);
-		view->refresh();
-		_f.layout();
+		look(1000.0 / mdDrums::StatusView::RefreshHz);
 		const auto box = _f.box(*line);
 		const auto width = line->GetScrollWidth();
 		std::printf("status: \"%s\", %g of %g dp wide, version %s\n", view->text().c_str(), width, box.w, MdDrumsVersion);
 		require(view->text() == "C3 plays nothing: Tracks are C1 to D#2" && line->IsVisible(),
 			"a note that plays nothing is not said");
 		require(width <= box.w + 0.5f, "the status line overflows its box");
+
+		// For five seconds, on the frame's clock
+		look(4800);
+		require(!view->text().empty(), "the note that plays nothing is said for less than 5 s");
+		look(300);
+		require(view->text().empty() && !line->IsVisible(), "the note that plays nothing is said for more than 5 s");
+		std::printf("status: said for 5 s, then gone\n");
+	}
+
+	std::string spread(std::vector<double> _us)
+	{
+		std::sort(_us.begin(), _us.end());
+		double sum = 0;
+		for(const auto u : _us)
+			sum += u;
+		char text[128];
+		std::snprintf(text, sizeof(text), "mean %.1f us, 99 %% %.1f us, worst %.1f us", sum / static_cast<double>(_us.size()),
+			_us[std::min(_us.size() - 1, _us.size() * 99 / 100)], _us.back());
+		return text;
+	}
+
+	// The editor's frame (one for every view, under the document's lock):
+	// - what the host changes on the shown Track (its own path: Parameter::setValue, normalised) shows after one frame;
+	// - what piled up in the Telemetry while no frame ran (a window closed) shows nothing;
+	// - no view looks for an element the skin lacks, which would search the whole document every frame;
+	// - what a frame costs over 600 frames at 164 Hz, the views idle on the Track tab and on the Mix tab, then busy on
+	//   each, the frames writing: all 16 Tracks struck, every output peaking, the shown Track's Hit growing;
+	// - once that has settled, a frame with nothing new writes nothing
+	void frame(Fixture& _f)
+	{
+		auto* editor = _f.editor;
+		auto& controller = _f.controller();
+		auto& telemetry = _f.processor.getTelemetry();
+		constexpr double tick = 1000.0 / 164.0;
+		const auto misses = editor->elementMisses();
+		_f.showView("track");
+		editor->setCurrentPart(0);
+		_f.step(tick);
+
+		const auto host = [&](const char* _name, const int _value)
+		{
+			auto* p = controller.getParameter(_name, 0);
+			require(p != nullptr, std::string("no parameter ") + _name);
+			const auto before = p->getUnnormalizedValue();
+			p->setValue(p->convertTo0to1(static_cast<float>(_value)));
+			return before;
+		};
+		// Track 1's LFO on its own FLTF, then each value to one it does not hold
+		set(_f, "LfoTrack", 0, 0);
+		set(_f, "LfoParam", 0, 12);
+		set(_f, "LFOD", 0, 127);
+		_f.step(tick);
+		require(_f.find("n_FLTF")->IsClassSet("lfo"), "Track 1's LFO does not modulate its FLTF");
+		const auto holds = [&](const char* _name, const int _value)
+		{
+			return controller.getParameter(_name, 0)->getUnnormalizedValue() == _value;
+		};
+		const auto outTo = holds("Out", 3) ? 4 : 3, machineTo = holds("Machine", 33) ? 32 : 33, srrTo = holds("SRR", 12) ? 13 : 12;
+		const auto out = host("Out", outTo), machine = host("Machine", machineTo), depth = host("LFOD", 0);
+		const auto srr = host("SRR", srrTo);
+		_f.step(tick);
+		std::printf("frame: the host's changes after one frame: \"%s\", \"%s\", FLTF underlined %d, \"%s\"\n",
+			_f.text("output_text").c_str(), _f.text("family_code").c_str(), _f.find("n_FLTF")->IsClassSet("lfo"),
+			_f.text("filter_srr").c_str());
+		require(_f.text("output_text") == "Out 0" + std::to_string(outTo) && _f.text("family_code") == "EFM"
+			&& !_f.find("n_FLTF")->IsClassSet("lfo") && _f.text("filter_srr") == "SRR " + std::to_string(srrTo),
+			"a host change on the shown Track does not show at the next frame");
+		host("Out", out);
+		host("Machine", machine);
+		host("LFOD", depth);
+		host("SRR", srr);
+		_f.step(tick);
+
+		// A Hit and a note that plays nothing while no frame runs
+		telemetry.hit(5);
+		telemetry.unplayed(61);
+		_f.step(mdDrums::Editor::ResumeMs + 500.0);
+		require(!_f.find("row6_num")->IsClassSet("trig") && _f.editor->getStatusView()->text().empty(),
+			"what piled up while no frame ran shows after the pause");
+
+		// Busy: every output peaks every other frame (the meters fall in between), each Track is struck every 25 frames
+		// (its light goes off after 23), the shown Track's Hit grows at each frame
+		const auto scene = [&](const char* _name, const bool _busy)
+		{
+			std::vector<double> us;
+			const auto before = editor->frameCount().wrote;
+			for(int i = 0; i < 600; ++i)
+			{
+				if(_busy)
+				{
+					if(i % 2 == 0)
+						for(int o = 0; o < mdDrums::Telemetry::OutputCount; ++o)
+							telemetry.raisePeak(o, 0.5f);
+					for(int t = 0; t < mdDrums::Telemetry::TrackCount; ++t)
+						if((i + t) % 25 == 0)
+							telemetry.hit(t);
+					if(i % 100 == 0)
+						telemetry.beginCapture(0, 100);
+					for(int c = 0; c < 5; ++c)
+						telemetry.addColumn(0, -8000, 8000);
+				}
+				const auto start = Clock::now();
+				_f.step(tick);
+				us.push_back(since(start) * 1000.0);
+			}
+			const auto wrote = editor->frameCount().wrote - before;
+			std::printf("frame: %s, %s, %llu of 600 frames wrote\n", _name, spread(us).c_str(),
+				static_cast<unsigned long long>(wrote));
+			double sum = 0;
+			for(const auto u : us)
+				sum += u;
+			require(sum / static_cast<double>(us.size()) < 100.0, std::string("a frame costs over 100 us on average, ") + _name);
+			require(!_busy || wrote >= 300, std::string("the busy scene does not write, ") + _name);
+		};
+		scene("Track tab idle", false);
+		_f.showView("mix");
+		scene("Mix tab idle", false);
+		_f.showView("track");
+		scene("Track tab busy", true);
+		_f.showView("mix");
+		scene("Mix tab busy", true);
+
+		// Settled (Main falls from -6 dBFS for 2.7 s, the scopes hold a second), the frames write nothing
+		for(int i = 0; i < 700; ++i)
+			_f.step(tick);
+		const auto settled = editor->frameCount().wrote;
+		for(int i = 0; i < 200; ++i)
+			_f.step(tick);
+		const auto wrote = editor->frameCount().wrote - settled;
+		std::printf("frame: %llu of 200 frames with nothing new wrote; %u elements looked for in vain\n",
+			static_cast<unsigned long long>(wrote), editor->elementMisses() - misses);
+		require(wrote == 0, "a frame with nothing new changed the document");
+		require(editor->elementMisses() == misses, "a view looks for an element the skin lacks");
+		_f.showView("track");
 	}
 
 	void pictures(Fixture& _f, const std::string& _prefix)
@@ -1254,11 +1418,11 @@ int main()
 
 		std::string failures;
 		for(const auto& [name, check] : std::vector<std::pair<std::string, void (*)(Fixture&)>>{
-			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"input to pixel", inputToPixel},
-			{"meters", meters}, {"hit screen", hitScreen}, {"hit preview", hitPreview}, {"filter screen", filterScreen},
+			{"boxes", boxes}, {"baselines", baselines}, {"bound", bound}, {"meters", meters}, {"hit screen", hitScreen},
+			{"hit preview", hitPreview}, {"input to pixel", inputToPixel}, {"filter screen", filterScreen},
 			{"lfo screen", lfoScreen},
 			{"assign", assign}, {"listen", listen}, {"play and step", playAndStep}, {"kits", kits}, {"links", links},
-			{"outs", outs}, {"status", status}})
+			{"outs", outs}, {"status", status}, {"frame", frame}})
 		{
 			try
 			{

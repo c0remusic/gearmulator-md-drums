@@ -3,8 +3,6 @@
 #include "mdDrumsHitPreview.h"
 #include "mdDrumsTelemetry.h"
 
-#include "juce_events/juce_events.h"
-
 #include <array>
 #include <cstdint>
 #include <filesystem>
@@ -35,6 +33,7 @@ namespace pluginLib
 namespace mdDrums
 {
 	class Editor;
+	struct Frame;
 
 	// The Hit screen (Design/HANDOFF.md, "Hit"; tickets 21 and 28 of the editor map), and the machine browser's preview
 	// screen, which shows the same: the shown Track's last Hit from the captures the Device writes in the Telemetry, as
@@ -45,9 +44,9 @@ namespace mdDrums
 	// of the Track sounds again; a Hit still playing when the sound changed plays to its end first. A machine just chosen
 	// previews with its own SYN1-8, which the Device reports a block later.
 	// The window fits the Hit (0.1 to 0.8 s, ticks in ms); full scale is ±0.5 at the plot's edges, as the mockup draws
-	// it. A timer at the display's rate reads the captures, the sound and the preview's result, and repaints a visible
-	// screen only when what it shows changed.
-	class HitView : juce::Timer
+	// it. The editor's frame reads the captures, the sound and the preview's result, and repaints a visible screen only
+	// when what it shows changed.
+	class HitView
 	{
 	public:
 		static constexpr std::array<double, 6> Windows{0.1, 0.2, 0.3, 0.4, 0.6, 0.8};
@@ -59,14 +58,14 @@ namespace mdDrums
 		static constexpr double MachineReportMs = 500.0;
 
 		// _romFolders: where the Processor looks for the flash image, for the preview's engine
-		HitView(Editor& _editor, Telemetry& _telemetry, int _refreshHz, std::vector<std::filesystem::path> _romFolders);
-		~HitView() override;
+		HitView(Editor& _editor, Telemetry& _telemetry, std::vector<std::filesystem::path> _romFolders);
+		~HitView();
 
 		HitView(const HitView&) = delete;
 		HitView& operator=(const HitView&) = delete;
 
-		// One read of the captures, the sound and the preview at _nowMs (the timer's, or a test's)
-		void update(double _nowMs);
+		// The editor's frame: one read of the captures, the sound and the preview; true when it changed the document
+		bool step(const Frame& _frame);
 
 		double window() const { return m_window; }
 		const Telemetry::Capture& current() const { return m_current; }
@@ -104,7 +103,6 @@ namespace mdDrums
 
 		// fit(_capture), found again only when what _fitted holds is another capture
 		static double fitted(const Telemetry::Capture& _capture, Fitted& _fitted, uint32_t _preview = 0);
-		void timerCallback() override;
 		void createScreen(Screen& _screen, const std::string& _id, const std::string& _ticks);
 		void bindSound();
 		std::array<int, SoundCount> sound(double _nowMs);

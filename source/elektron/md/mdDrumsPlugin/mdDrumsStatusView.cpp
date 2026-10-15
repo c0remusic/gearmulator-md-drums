@@ -2,11 +2,8 @@
 
 #include "mdDrumsDevice.h"
 #include "mdDrumsEditor.h"
-#include "mdDrumsFilterView.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsProcessor.h"
-
-#include "juceRmlUi/juceRmlComponent.h"
-#include "juceRmlUi/rmlInterfaces.h"
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/StringUtilities.h"
@@ -21,11 +18,6 @@ namespace mdDrums
 		constexpr juce::int64 g_checkSeconds = 24 * 60 * 60;
 		constexpr double g_unplayedSeconds = 5.0;
 		constexpr double g_flashErrorSeconds = 8.0;
-
-		double seconds()
-		{
-			return juce::Time::getMillisecondCounterHiRes() / 1000.0;
-		}
 
 		// A note's name as Live writes it: 60 is C3
 		std::string noteName(const int _note)
@@ -56,14 +48,9 @@ namespace mdDrums
 				m_check->start();
 			}
 		}
-		refresh();
-		startTimerHz(10);
 	}
 
-	StatusView::~StatusView()
-	{
-		stopTimer();
-	}
+	StatusView::~StatusView() = default;
 
 	bool StatusView::checksForUpdates(const juce::PropertiesFile& _config)
 	{
@@ -86,8 +73,23 @@ namespace mdDrums
 			m_newer = _release;
 	}
 
-	void StatusView::timerCallback()
+	bool StatusView::step(const Frame& _frame)
 	{
+		const auto& telemetry = m_editor.processor().getTelemetry();
+		// A note played while no frame ran is old news
+		if(_frame.resumed)
+			m_unplayedSeen = telemetry.unplayedCount();
+		const auto seconds = _frame.now / 1000.0;
+		if(m_flashErrorNew)
+		{
+			m_flashErrorNew = false;
+			m_flashErrorUntil = seconds + g_flashErrorSeconds;
+			m_nextMs = 0.0;
+		}
+		if(_frame.now < m_nextMs)
+			return false;
+		m_nextMs = _frame.now + 1000.0 / RefreshHz;
+
 		if(const auto release = updates::Check::latest(); release && release->version != m_latestSeen)
 		{
 			m_latestSeen = release->version;
@@ -96,12 +98,24 @@ namespace mdDrums
 			config.setValue(g_urlKey, juce::String(release->url));
 			offer(*release);
 		}
-		refresh();
+
+		const auto [text, action] = pressing(seconds);
+		if(text == m_shown && action == m_action)
+			return false;
+		auto* status = find("status");
+		if(!status)
+			return false;
+		m_shown = text;
+		m_action = action;
+		status->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
+		status->SetClass("shown", !text.empty());
+		status->SetClass("action", action != Action::None);
+		return true;
 	}
 
-	std::pair<std::string, StatusView::Action> StatusView::pressing()
+	std::pair<std::string, StatusView::Action> StatusView::pressing(const double _seconds)
 	{
-		const auto now = seconds();
+		const auto now = _seconds;
 		const bool device = m_editor.processor().hasDevice();
 		if(now < m_flashErrorUntil)
 			return {device ? m_flashError : m_flashError + ": choose another", Action::ChooseFlash};
@@ -123,25 +137,6 @@ namespace mdDrums
 		if(m_newer)
 			return {"MD Drums " + m_newer->version + " is out", Action::OpenRelease};
 		return {{}, Action::None};
-	}
-
-	void StatusView::refresh()
-	{
-		const auto [text, action] = pressing();
-		if(text == m_shown && action == m_action)
-			return;
-		auto* component = m_editor.getRmlComponent();
-		if(!component)
-			return;
-		juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-		auto* status = find("status");
-		if(!status)
-			return;
-		m_shown = text;
-		m_action = action;
-		status->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
-		status->SetClass("shown", !text.empty());
-		status->SetClass("action", action != Action::None);
 	}
 
 	void StatusView::click()
@@ -171,18 +166,12 @@ namespace mdDrums
 				const auto file = _chooser.getResult();
 				if(file == juce::File())
 					return;
-				// JUCE's paths are UTF-8, which a path made from a std::string would read in the ANSI code page
-				const auto path = std::filesystem::u8path(file.getFullPathName().toStdString());
-				m_flashError = m_editor.processor().loadFlashImage(path);
-				m_flashErrorUntil = m_flashError.empty() ? 0.0 : seconds() + g_flashErrorSeconds;
-				refresh();
-				// A new Device brings the OS's tables, which the Filter and EQ screen waited for
-				auto* filter = m_editor.getFilterView();
-				auto* component = m_editor.getRmlComponent();
-				if(!m_flashError.empty() || !filter || !component)
-					return;
-				juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-				filter->refresh();
+				m_flashError = m_editor.processor().loadFlashImage(pathOf(file));
+				m_flashErrorNew = !m_flashError.empty();
+				m_flashErrorUntil = 0.0;
+				m_nextMs = 0.0;
+				// Said at once; a new Device's tables reach the Filter and EQ screen in the same frame
+				m_editor.frame();
 			});
 	}
 }

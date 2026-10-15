@@ -4,9 +4,9 @@
 #include "mdDrumsController.h"
 #include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsProcessor.h"
 
-#include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlEventListener.h"
 #include "juceRmlUi/rmlHelper.h"
 
@@ -79,23 +79,44 @@ namespace mdDrums
 		});
 		m_editor.addClick("kits_import", [this](Rml::Event&) { openChooser(true); });
 		m_editor.addClick("kits_export", [this](Rml::Event&) { openChooser(false); });
-
-		refresh();
-		startTimerHz(RefreshHz);
 	}
 
-	KitsView::~KitsView()
-	{
-		stopTimer();
-	}
+	KitsView::~KitsView() = default;
 
-	void KitsView::timerCallback()
+	bool KitsView::step(const Frame& _frame)
 	{
-		// The head band also changes from elsewhere: a state restored, the parameters (Save lit), a Bank made once a
-		// flash image is chosen
+		if(m_chosenFile)
+		{
+			const auto [importing, file] = std::move(*m_chosenFile);
+			m_chosenFile.reset();
+			// Nothing may leave the frame: a file system error is the note
+			try
+			{
+				if(importing)
+					importFile(file);
+				else
+					exportFile(file);
+			}
+			catch(const std::exception& _e)
+			{
+				say(std::string(importing ? "Cannot import: " : "Cannot export: ") + _e.what());
+			}
+			return true;
+		}
+		// The head band, RefreshHz times a second: the Kit played is made of every parameter. The first frame draws it
+		if(_frame.now < m_nextHeadMs)
+			return false;
+		m_nextHeadMs = _frame.now + 1000.0 / RefreshHz;
 		if(head() == m_head)
-			return;
-		m_editor.withDocumentLocked([this] { refresh(); });
+			return false;
+		refresh();
+		return true;
+	}
+
+	void KitsView::fileChosen(const bool _import, std::filesystem::path _file)
+	{
+		m_chosenFile.emplace(_import, std::move(_file));
+		m_editor.frame();
 	}
 
 	Bank* KitsView::bank() const
@@ -261,7 +282,8 @@ namespace mdDrums
 		std::ifstream in(_file, std::ios::binary);
 		const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 		const auto kits = Bank::parseSyx(bytes);
-		const auto fileName = _file.filename().string();
+		// UTF-8, as RmlUi reads it: string() would throw on a name outside the ANSI code page
+		const auto fileName = _file.filename().u8string();
 		if(kits.empty())
 		{
 			say("No Machinedrum kit in " + fileName);
@@ -303,10 +325,10 @@ namespace mdDrums
 		out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 		if(!out)
 		{
-			say("Cannot write " + _file.string());
+			say("Cannot write " + _file.u8string());
 			return false;
 		}
-		say("Exported slot " + twoDigits(m_chosen + 1) + " as " + _file.filename().string());
+		say("Exported slot " + twoDigits(m_chosen + 1) + " as " + _file.filename().u8string());
 		return true;
 	}
 
@@ -315,30 +337,26 @@ namespace mdDrums
 		const auto* b = bank();
 		if(!b || (!_import && !exportable()))
 			return;
-		// The file chosen arrives from the message loop, outside an RmlUi event: its handling locks the document
+		// The file chosen arrives from the message loop, outside an RmlUi event: a frame handles it
+		const auto chosen = [this, _import](const juce::FileChooser& _chooser)
+		{
+			const auto file = _chooser.getResult();
+			if(file != juce::File())
+				fileChosen(_import, pathOf(file));
+		};
 		const auto folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 		if(_import)
 		{
 			m_chooser = std::make_unique<juce::FileChooser>("Import Machinedrum kits", folder, "*.syx");
 			m_chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-				[this](const juce::FileChooser& _chooser)
-				{
-					const auto file = _chooser.getResult();
-					if(file != juce::File())
-						m_editor.withDocumentLocked([&] { importFile(file.getFullPathName().toStdString()); });
-				});
+				chosen);
 			return;
 		}
 		const auto name = b->slot(m_chosen)->displayName();
 		m_chooser = std::make_unique<juce::FileChooser>("Export a Machinedrum kit",
 			folder.getChildFile(juce::String(name.empty() ? "Kit" : name) + ".syx"), "*.syx");
 		m_chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-			| juce::FileBrowserComponent::warnAboutOverwriting, [this](const juce::FileChooser& _chooser)
-			{
-				const auto file = _chooser.getResult();
-				if(file != juce::File())
-					m_editor.withDocumentLocked([&] { exportFile(file.getFullPathName().toStdString()); });
-			});
+			| juce::FileBrowserComponent::warnAboutOverwriting, chosen);
 	}
 
 	bool KitsView::key(Rml::Event& _event)
@@ -405,7 +423,7 @@ namespace mdDrums
 	bool KitsView::written(const bool _ok)
 	{
 		if(!_ok)
-			say("The Bank cannot be written: " + bank()->file().string());
+			say("The Bank cannot be written: " + bank()->file().u8string());
 		return _ok;
 	}
 

@@ -4,9 +4,9 @@
 #include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsEngine.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsKitsView.h"
 #include "mdDrumsLfoView.h"
-#include "mdDrumsLinksView.h"
 #include "mdDrumsMessages.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
@@ -61,6 +61,15 @@ namespace mdDrums
 	TrackView::TrackView(Editor& _editor) : m_editor(_editor)
 	{
 		auto& controller = m_editor.getProcessor().getController();
+		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
+		{
+			m_machineParameters[t] = controller.getParameter("Machine", t);
+			m_outParameters[t] = controller.getParameter("Out", t);
+			m_lfoTrackParameters[t] = controller.getParameter("LfoTrack", t);
+		}
+		// Nothing drawn yet: the first frame draws it all
+		m_outs.fill(-1);
+		m_menuKey.fill(-1);
 
 		// The shown Track: the list's rows, the Mix strips' and the sends' numbers and machines, ‹ ›
 		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
@@ -76,26 +85,17 @@ namespace mdDrums
 			const auto id = "strip" + std::to_string(t + 1) + "_out";
 			m_editor.addClick(id, [this, t](Rml::Event&)
 			{
-				const auto* out = m_editor.getProcessor().getController().getParameter("Out", t);
-				setStripOut(t, out && out->getUnnormalizedValue() ? 0 : naturalOut(t));
+				setStripOut(t, value(m_outParameters[t]) ? 0 : naturalOut(t));
 			});
 			if(auto* e = find(id))
 				juceRmlUi::EventListener::Add(e, Rml::EventId::Mousescroll, [this, t](Rml::Event& _event)
 				{
 					const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
 					const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
-					const auto* out = m_editor.getProcessor().getController().getParameter("Out", t);
-					if(out && delta != 0.0f)
-						setStripOut(t, out->getUnnormalizedValue() + (delta > 0.0f ? 1 : -1));
+					if(delta != 0.0f)
+						setStripOut(t, value(m_outParameters[t]) + (delta > 0.0f ? 1 : -1));
 					_event.StopPropagation();
 				});
-			// The parameters' notifications come from the message loop, outside an RmlUi event: they lock the document
-			if(auto* out = controller.getParameter("Out", t))
-				m_onOutChanged[t].set(out->onValueChanged, [this, t](pluginLib::Parameter* const&)
-				{
-					m_editor.withDocumentLocked([&] { updateOut(t); });
-				});
-			updateStripOut(t);
 		}
 		m_editor.addClick("track_prev", [this](Rml::Event&) { stepTrack(-1); });
 		m_editor.addClick("track_next", [this](Rml::Event&) { stepTrack(1); });
@@ -110,10 +110,12 @@ namespace mdDrums
 		});
 		m_editor.addClick("browser_keep", [this](Rml::Event&) { setOverlay(Overlay::None); });
 		m_editor.addClick("browser_cancel", [this](Rml::Event&) { escape(); });
-		// A machine chosen (its cell has set Machine by then: its own listener came first) plays the Track when listening
+		// A machine chosen (its cell has set Machine by then: its own listener came first) shows in the head band and
+		// plays the Track when listening
 		for(int id = 0; id < 256; ++id)
 			if(m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
 			{
+				followMachine();
 				if(isListening())
 					m_editor.controller().audition(m_part, ListenVelocity);
 			}))
@@ -161,17 +163,29 @@ namespace mdDrums
 		m_editor.addClick("kit", [this](Rml::Event&) { setOverlay(m_overlay == Overlay::Kits ? Overlay::None : Overlay::Kits); });
 		m_editor.addClick("kits_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
 
-		// The Track shown changes from a click, within an RmlUi event, but also from the Controller's timer (Push's
-		// relay Track) and from a state restored: the handler locks the document
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
-		{
-			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
-		});
-		onPartChanged(controller.getCurrentPart());
 		updateSize();
 	}
 
 	TrackView::~TrackView() = default;
+
+	int TrackView::value(const pluginLib::Parameter* _parameter)
+	{
+		return _parameter ? _parameter->getUnnormalizedValue() : 0;
+	}
+
+	bool TrackView::step(const Frame& _frame)
+	{
+		bool wrote = false;
+		if(_frame.shownChanged)
+		{
+			showPart(_frame.shown);
+			wrote = true;
+		}
+		wrote |= followMachine();
+		wrote |= followOuts();
+		wrote |= followLfoMenu();
+		return wrote;
+	}
 
 	void TrackView::showTrack(const uint8_t _track) const
 	{
@@ -204,9 +218,10 @@ namespace mdDrums
 		if(m_overlay == Overlay::Browser)
 		{
 			// Back to the machine the browser opened on
-			auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+			auto* machine = m_machineParameters[m_part];
 			if(machine && m_machineBeforeBrowser >= 0 && machine->getUnnormalizedValue() != m_machineBeforeBrowser)
 				machine->setUnnormalizedValueNotifyingHost(m_machineBeforeBrowser, pluginLib::Parameter::Origin::Ui);
+			followMachine();
 		}
 		setOverlay(Overlay::None);
 		return true;
@@ -245,22 +260,22 @@ namespace mdDrums
 		m_editor.controller().audition(m_part, static_cast<uint8_t>(getPlayVelocity()));
 	}
 
-	void TrackView::choose(const int _machine) const
+	void TrackView::choose(const int _machine)
 	{
-		auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+		auto* machine = m_machineParameters[m_part];
 		if(!machine)
 			return;
 		machine->setUnnormalizedValueNotifyingHost(_machine, pluginLib::Parameter::Origin::Ui);
+		followMachine();
 		if(isListening())
 			m_editor.controller().audition(m_part, ListenVelocity);
 	}
 
-	void TrackView::stepMachine(const int _delta) const
+	void TrackView::stepMachine(const int _delta)
 	{
 		if(m_machines.empty())
 			return;
-		const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
-		const auto current = machine ? machine->getUnnormalizedValue() : 0;
+		const auto current = value(m_machineParameters[m_part]);
 		const auto n = static_cast<int>(m_machines.size());
 		// A machine the browser does not offer steps from where it would sit among them
 		const auto at = static_cast<int>(std::lower_bound(m_machines.begin(), m_machines.end(), current) - m_machines.begin());
@@ -269,7 +284,7 @@ namespace mdDrums
 		choose(m_machines[static_cast<size_t>((next % n + n) % n)]);
 	}
 
-	void TrackView::stepFamily(const int _delta) const
+	void TrackView::stepFamily(const int _delta)
 	{
 		if(m_machines.empty())
 			return;
@@ -283,8 +298,7 @@ namespace mdDrums
 		for(const auto id : m_machines)
 			if(families.empty() || families.back().first != familyName(id))
 				families.emplace_back(familyName(id), id);
-		const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
-		const auto current = familyName(machine ? machine->getUnnormalizedValue() : 0);
+		const auto current = familyName(value(m_machineParameters[m_part]));
 		const auto n = static_cast<int>(families.size());
 		int at = 0;
 		while(at < n && families[static_cast<size_t>(at)].first != current)
@@ -336,7 +350,7 @@ namespace mdDrums
 				lfo->disarm();
 		if(_overlay == Overlay::Browser && m_overlay != Overlay::Browser)
 		{
-			const auto* machine = m_editor.getProcessor().getController().getParameter("Machine", m_part);
+			const auto* machine = m_machineParameters[m_part];
 			m_machineBeforeBrowser = machine ? machine->getUnnormalizedValue() : -1;
 		}
 		m_overlay = _overlay;
@@ -349,17 +363,14 @@ namespace mdDrums
 		setDisplay(find("track_bands"), _overlay != Overlay::Browser);
 		setDisplay(find("browser"), _overlay == Overlay::Browser);
 		setDisplay(find("lfomenu"), _overlay == Overlay::LfoMenu);
-		if(_overlay == Overlay::LfoMenu)
-			updateLfoMenu();
 		setDisplay(find("linksmenu"), _overlay == Overlay::Links);
-		if(_overlay == Overlay::Links)
-			if(auto* links = m_editor.getLinksView())
-				links->refresh();
+		// The menu is drawn while it is open only: anew as it opens
+		m_menuKey.fill(-1);
+		followLfoMenu();
 	}
 
-	void TrackView::onPartChanged(const uint8_t _part)
+	void TrackView::showPart(const uint8_t _part)
 	{
-		auto& controller = m_editor.getProcessor().getController();
 		m_part = _part;
 		if(m_overlay == Overlay::Browser)
 			setOverlay(Overlay::None);
@@ -397,33 +408,58 @@ namespace mdDrums
 		if(auto* forTrack = find("browser_for"))
 			forTrack->SetInnerRML("for track " + twoDigits(_part + 1));
 
-		m_onMachineChanged.reset();
-		m_onLfoTrackChanged.reset();
-		if(auto* machine = controller.getParameter("Machine", _part))
-			m_onMachineChanged.set(machine->onValueChanged, [this](pluginLib::Parameter* const&)
-			{
-				m_editor.withDocumentLocked([&]
-				{
-					updateMachine();
-					updateLfoMenu();
-				});
-			});
-		if(auto* lfoTrack = controller.getParameter("LfoTrack", _part))
-			m_onLfoTrackChanged.set(lfoTrack->onValueChanged, [this](pluginLib::Parameter* const&)
-			{
-				m_editor.withDocumentLocked([&] { updateLfoMenu(); });
-			});
+		// Another Track's machine, Out and LFO menu: drawn by the follow functions that come next
+		m_machineShown = -1;
+		m_outShown = -1;
+		m_menuKey.fill(-1);
+	}
+
+	bool TrackView::followMachine()
+	{
+		const auto machine = value(m_machineParameters[m_part]);
+		if(machine == m_machineShown)
+			return false;
+		m_machineShown = machine;
 		updateMachine();
+		return true;
+	}
+
+	bool TrackView::followOuts()
+	{
+		bool wrote = false;
+		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
+		{
+			const auto out = value(m_outParameters[t]);
+			if(out == m_outs[t])
+				continue;
+			m_outs[t] = out;
+			updateStripOut(t);
+			wrote = true;
+		}
+		if(m_outs[m_part] == m_outShown)
+			return wrote;
+		m_outShown = m_outs[m_part];
 		updateOutput();
+		return true;
+	}
+
+	bool TrackView::followLfoMenu()
+	{
+		// Hidden, the menu waits: drawn anew as it opens
+		if(m_overlay != Overlay::LfoMenu)
+			return false;
+		const auto target = std::clamp(value(m_lfoTrackParameters[m_part]), 0, Controller::TrackCount - 1);
+		const std::array<int, 3> key{m_part, target, value(m_machineParameters[target])};
+		if(key == m_menuKey)
+			return false;
+		m_menuKey = key;
 		updateLfoMenu();
+		return true;
 	}
 
 	void TrackView::updateMachine() const
 	{
-		const auto* parameter = m_editor.getProcessor().getController().getParameter("Machine", m_part);
-		if(!parameter)
-			return;
-		const auto id = static_cast<uint16_t>(parameter->getUnnormalizedValue());
+		const auto id = static_cast<uint16_t>(m_machineShown);
 
 		const auto* family = md::machines::familyOf(md::MachineModel::Machinedrum, id);
 		if(auto* code = find("family_code"))
@@ -458,29 +494,19 @@ namespace mdDrums
 
 	void TrackView::updateOutput() const
 	{
-		const auto* out = m_editor.getProcessor().getController().getParameter("Out", m_part);
-		const auto value = out ? out->getUnnormalizedValue() : 0;
 		if(auto* text = find("output_text"))
-			text->SetInnerRML(value ? "Out " + twoDigits(value) : std::string("Main"));
+			text->SetInnerRML(m_outShown ? "Out " + twoDigits(m_outShown) : std::string("Main"));
 	}
 
 	void TrackView::updateStripOut(const uint8_t _track) const
 	{
-		const auto* out = m_editor.getProcessor().getController().getParameter("Out", _track);
-		const auto value = out ? out->getUnnormalizedValue() : 0;
+		const auto out = m_outs[_track];
 		if(auto* e = find("strip" + std::to_string(_track + 1) + "_out"))
 		{
 			// On an Out: the Out it plays on; on Main: the one a click sends it to
-			e->SetInnerRML("Out " + twoDigits(value ? value : naturalOut(_track)));
-			e->SetClass("on", value != 0);
+			e->SetInnerRML("Out " + twoDigits(out ? out : naturalOut(_track)));
+			e->SetClass("on", out != 0);
 		}
-	}
-
-	void TrackView::updateOut(const uint8_t _track) const
-	{
-		updateStripOut(_track);
-		if(_track == m_part)
-			updateOutput();
 	}
 
 	uint8_t TrackView::naturalOut(const uint8_t _track)
@@ -488,27 +514,20 @@ namespace mdDrums
 		return static_cast<uint8_t>(std::min<int>(_track + 1, mdDrums::messages::OutCount));
 	}
 
-	void TrackView::setStripOut(const uint8_t _track, const int _out) const
+	void TrackView::setStripOut(const uint8_t _track, const int _out)
 	{
-		auto* out = m_editor.getProcessor().getController().getParameter("Out", _track);
+		auto* out = m_outParameters[_track];
 		if(!out)
 			return;
 		out->setUnnormalizedValueNotifyingHost(std::clamp(_out, 0, static_cast<int>(mdDrums::messages::OutCount)),
 			pluginLib::Parameter::Origin::Ui);
-		// At once, not when the parameter tells its listeners from the message loop
-		updateOut(_track);
+		followOuts();
 	}
 
 	void TrackView::updateLfoMenu() const
 	{
-		// Hidden, the menu waits: setOverlay builds it as it opens
-		if(m_overlay != Overlay::LfoMenu)
-			return;
-		auto& controller = m_editor.getProcessor().getController();
-		const auto* lfoTrack = controller.getParameter("LfoTrack", m_part);
-		const auto target = static_cast<uint8_t>(lfoTrack ? lfoTrack->getUnnormalizedValue() : m_part);
-		const auto* machine = controller.getParameter("Machine", target);
-		const auto id = static_cast<uint16_t>(machine ? machine->getUnnormalizedValue() : 0);
+		const auto target = static_cast<uint8_t>(m_menuKey[1]);
+		const auto id = static_cast<uint16_t>(m_menuKey[2]);
 
 		if(auto* label = find("lfomenu_label"))
 			label->SetInnerRML("LFO " + twoDigits(m_part + 1) + " modulates");

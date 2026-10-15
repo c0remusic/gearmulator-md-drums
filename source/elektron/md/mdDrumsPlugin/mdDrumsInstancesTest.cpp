@@ -246,12 +246,16 @@ int main(const int _argc, char** _argv)
 		require(view != nullptr, "no Hit view");
 		auto* fltf = instances.front().processor->getController().getParameter("FLTF", 0);
 		require(fltf != nullptr, "no FLTF");
-		double now = 1.0e6;
-		view->update(now);
+		// The editor's frames on this test's clock, from where the editor's first frame left it
+		double now = first.lastFrameMs();
+		first.setClock([&now] { return now; });
+		first.frame();
 		// The audio stopped with the pattern: its last Hit is no longer playing 100 ms later, and the preview may show
-		view->update(now += 100.0);
+		now += 100.0;
+		first.frame();
 		fltf->setUnnormalizedValueNotifyingHost(fltf->getUnnormalizedValue() == 40 ? 41 : 40, pluginLib::Parameter::Origin::Ui);
-		view->update(now += 1.0);
+		now += 1.0;
+		first.frame();
 		const auto start = Clock::now();
 		while(view->previewPending() || !view->previewing())
 		{
@@ -264,8 +268,10 @@ int main(const int _argc, char** _argv)
 				throw std::runtime_error("no preview within 10 s");
 			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(2));
-			view->update(now += 0.05);
+			now += 0.05;
+			first.frame();
 		}
+		first.setClock([] { return juce::Time::getMillisecondCounterHiRes(); });
 		// The next engine is built while nothing waits
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		const auto withPreview = privateMb() - beforeEditors;

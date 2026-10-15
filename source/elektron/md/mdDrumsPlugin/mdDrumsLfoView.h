@@ -2,11 +2,9 @@
 
 #include "mdDrumsLfo.h"
 
-#include "baseLib/event.h"
-
+#include <array>
 #include <cstdint>
 #include <string>
-#include <vector>
 
 namespace juce
 {
@@ -31,6 +29,7 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
+	struct Frame;
 
 	// The LFO screen's behaviour (Design/HANDOFF.md, "LFO"; ticket 22):
 	// - the plot: the shown Track's LFO as the OS runs it (Lfo, bit-exact), moving its target's value from a Hit of the
@@ -40,6 +39,8 @@ namespace mdDrums
 	//   Track or on another one shown meanwhile, gives the LFO that armed it its target, and shows its Track again; Cancel,
 	//   Esc, a tab or an overlay disarm it;
 	// - the bands' names that an LFO modulates (its target, with some depth), underlined in accent.
+	// The editor's frame traces the plot again when its LFO, its target's value or the tempo changed, underlines the
+	// names whose modulation changed and, armed, rings the knobs the shown Track's machine uses.
 	class LfoView
 	{
 	public:
@@ -49,6 +50,9 @@ namespace mdDrums
 		LfoView(const LfoView&) = delete;
 		LfoView& operator=(const LfoView&) = delete;
 
+		// The editor's frame: true when it changed the document
+		bool step(const Frame& _frame);
+
 		void arm();
 		void disarm();
 		bool isArmed() const { return m_armed; }
@@ -56,35 +60,43 @@ namespace mdDrums
 		bool escape();
 
 		const Lfo::Trace& trace() const { return m_trace; }
-		// Reads the parameters again (their notifications reach it later, from the message loop)
-		void refresh();
 
 	private:
-		void onPartChanged(uint8_t _part);
-		// The parameter the shown Track's LFO moves: LfoParam's, of LfoTrack
-		pluginLib::Parameter* target() const;
-		void listenToTarget();
-		void update();
-		void updateUnderlines() const;
+		// A Track's parameters that the screen reads, in m_parameters
+		enum Index
+		{
+			Shape1, Shape2, Mode, Speed, Depth, Mix, Track, Param, Machine, IndexCount
+		};
+
+		// What the plot was traced from: the LFO, its target's value, the tempo as the OS takes it, the Track
+		using TraceKey = std::array<int, 11>;
+
+		bool followTrace();
+		bool followUnderlines();
+		bool followTargets();
 		void updateTargets();
 		void updateTitle() const;
 		void pick(int _param);
 		void paint(juce::Graphics& _g, float _dp) const;
-		int value(const char* _name, uint8_t _part) const;
-		pluginLib::Parameter* parameter(const char* _name, uint8_t _part) const;
+		int value(Index _index, uint8_t _part) const;
 		Rml::Element* find(const std::string& _id) const;
 
 		Editor& m_editor;
 		juceRmlUi::ElemCanvas* m_canvas = nullptr;
+		std::array<std::array<pluginLib::Parameter*, IndexCount>, 16> m_parameters{};
 		uint8_t m_part = 0;
 		bool m_armed = false;
 		uint8_t m_owner = 0;
 		Lfo::Trace m_trace;
 		int m_depth = 0;
 
-		baseLib::EventListener<uint8_t> m_onPartChanged;
-		std::vector<baseLib::EventListener<pluginLib::Parameter*>> m_onShown;		// the shown Track's LFO and machine
-		baseLib::EventListener<pluginLib::Parameter*> m_onTarget;					// the value it moves
-		std::vector<baseLib::EventListener<pluginLib::Parameter*>> m_onAnyLfo;	// every Track's target and depth
+		// The LFO's target, found by name when LfoTrack or LfoParam change
+		pluginLib::Parameter* m_target = nullptr;
+		std::array<int, 2> m_targetOf{-1, -1};
+		// What the document shows: -1 for not yet
+		TraceKey m_traced{};
+		int m_labelsMove = -1;		// the plot's labels shown as values (1) or as "no modulation" (0)
+		int64_t m_underlined = -1;	// a bit per name of Engine::paramNames
+		int m_ringedFor = -1;		// the Track and its machine the rings were drawn for, while armed
 	};
 }

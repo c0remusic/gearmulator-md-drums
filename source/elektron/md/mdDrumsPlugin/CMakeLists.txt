@@ -20,6 +20,7 @@ set(SOURCES
 	mdDrumsDom.h
 	mdDrumsEditor.cpp mdDrumsEditor.h
 	mdDrumsFilterView.cpp mdDrumsFilterView.h
+	mdDrumsFrame.h
 	mdDrumsGlyph.cpp mdDrumsGlyph.h
 	mdDrumsHitView.cpp mdDrumsHitView.h
 	mdDrumsKitsView.cpp mdDrumsKitsView.h

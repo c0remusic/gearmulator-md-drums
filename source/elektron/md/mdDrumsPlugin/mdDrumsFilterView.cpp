@@ -4,6 +4,7 @@
 #include "mdDrumsColours.h"
 #include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsProcessor.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
@@ -46,14 +47,10 @@ namespace mdDrums
 			if(auto* tick = find("filter_tick" + std::to_string(i + 1)))
 				tick->SetProperty("left", dp(xOf(g_ticks[i]) + 4.0f));
 
-		// The Track shown and the parameters change outside an RmlUi event too (the Controller's timer, the message
-		// loop's notifications): the handlers lock the document
 		auto& controller = m_editor.getProcessor().getController();
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
-		{
-			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
-		});
-		onPartChanged(controller.getCurrentPart());
+		for(uint8_t t = 0; t < m_parameters.size(); ++t)
+			for(size_t i = 0; i < g_parameters.size(); ++i)
+				m_parameters[t][i] = controller.getParameter(g_parameters[i], t);
 	}
 
 	FilterView::~FilterView() = default;
@@ -73,49 +70,42 @@ namespace mdDrums
 		return m_editor.element(_id);
 	}
 
-	void FilterView::onPartChanged(const uint8_t _part)
+	bool FilterView::step(const Frame& _frame)
 	{
-		m_part = _part;
-		auto& controller = m_editor.getProcessor().getController();
-		for(size_t i = 0; i < g_parameters.size(); ++i)
+		// Hidden too (another tab, an overlay over it): RmlUi knows it shows only after the update that follows the
+		// frame, and a hidden canvas paints nothing until then
+		const auto& parameters = m_parameters[_frame.shown];
+		const auto value = [&](const size_t _index)
 		{
-			m_onChanged[i].reset();
-			if(auto* parameter = controller.getParameter(g_parameters[i], _part))
-				m_onChanged[i].set(parameter->onValueChanged, [this](pluginLib::Parameter* const&)
-				{
-					m_editor.withDocumentLocked([&] { update(); });
-				});
-		}
-		update();
-	}
-
-	void FilterView::update()
-	{
-		auto& controller = m_editor.getProcessor().getController();
-		const auto value = [&](const char* _name)
-		{
-			const auto* parameter = controller.getParameter(_name, m_part);
+			const auto* parameter = parameters[_index];
 			return parameter ? parameter->getUnnormalizedValue() : 0;
 		};
-		if(auto* note = find("filter_srr"))
+		bool wrote = false;
+		if(const auto srr = value(SrrIndex); srr != m_srr)
 		{
-			const auto srr = value("SRR");
-			note->SetInnerRML(srr > 0 ? "SRR " + std::to_string(srr) : std::string());
-			note->SetProperty("display", srr > 0 ? "inline" : "none");
+			m_srr = srr;
+			if(auto* note = find("filter_srr"))
+			{
+				note->SetInnerRML(srr > 0 ? "SRR " + std::to_string(srr) : std::string());
+				setDisplay(note, srr > 0, "inline");
+			}
+			wrote = true;
 		}
 		if(!m_response)
 		{
 			auto tables = m_editor.processor().getFxTables();
 			if(!tables)
-				return;
+				return wrote;
 			m_response = std::make_unique<FilterResponse>(std::move(tables));
 		}
-		const FilterResponse::Settings settings{value("EQF"), value("EQG"), value("FLTF"), value("FLTW"), value("FLTQ")};
-		if(settings == m_response->settings())
-			return;
+		const FilterResponse::Settings settings{value(0), value(1), value(2), value(3), value(4)};
+		if(m_curve && settings == m_response->settings())
+			return wrote;
 		m_response->set(settings);
+		m_curve = m_canvas != nullptr;
 		if(m_canvas)
 			m_canvas->repaint();
+		return true;
 	}
 
 	void FilterView::paint(juce::Graphics& _g, const float _dp) const

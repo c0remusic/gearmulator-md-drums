@@ -6,7 +6,9 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace Rml
 {
@@ -18,14 +20,17 @@ namespace mdDrums
 {
 	class Bank;
 	class Editor;
+	struct Frame;
 
 	// The Kits (ticket 26 of the editor map, as ticket 10 settled them): the head band's Kit row and Save, and the Kits
 	// overlay over the Bank's 64 Slots. The Kit played is the Controller's, its Slot the one it came from; Save is lit
 	// while it differs from that Slot, whatever changed it. The overlay chooses a Slot, loads it, saves the Kit played
 	// into it, renames it in place or empties it, a click that would lose something asking for a second one; it imports
-	// .syx files into the empty Slots from the chosen one on and exports the chosen Slot. Everything runs on the message
-	// thread; the Bank is read again whenever the overlay opens.
-	class KitsView : juce::Timer
+	// .syx files into the empty Slots from the chosen one on and exports the chosen Slot. The overlay changes only through
+	// this view, which draws it then; the editor's frame looks at the head band RefreshHz times a second (a state
+	// restored, the parameters, a Bank made once a flash image is chosen change it too). The Bank is read again whenever
+	// the overlay opens.
+	class KitsView
 	{
 	public:
 		using Kit = md::automation::sysex::MdKit;
@@ -34,10 +39,13 @@ namespace mdDrums
 		static constexpr int RefreshHz = 10;
 
 		explicit KitsView(Editor& _editor);
-		~KitsView() override;
+		~KitsView();
 
 		KitsView(const KitsView&) = delete;
 		KitsView& operator=(const KitsView&) = delete;
+
+		// The editor's frame: true when it changed the document
+		bool step(const Frame& _frame);
 
 		// The overlay opened (the Bank read again, the Slot played chosen) or closed
 		void setOpen(bool _open);
@@ -57,13 +65,8 @@ namespace mdDrums
 		void remove();
 		void cancel();
 
-		// What Import and Export do with a file once chosen; false and a note when it cannot be read or written
-		bool importFile(const std::filesystem::path& _file);
-		bool exportFile(const std::filesystem::path& _file);
-
-		// The head band and the overlay as they are now. The overlay changes only through this view, which draws it
-		// then; the timer looks at the head band RefreshHz times a second and draws both when it changed
-		void refresh();
+		// A file the chooser gave Import or Export: imported or exported by a frame at once
+		void fileChosen(bool _import, std::filesystem::path _file);
 
 		// Keys while the overlay is open: the arrows choose, Enter loads; while renaming, Enter keeps the name. False:
 		// not handled
@@ -101,7 +104,11 @@ namespace mdDrums
 			}
 		};
 
-		void timerCallback() override;
+		// What Import and Export do with a file once chosen; false and a note when it cannot be read or written
+		bool importFile(const std::filesystem::path& _file);
+		bool exportFile(const std::filesystem::path& _file);
+		// The head band and the overlay as they are now
+		void refresh();
 		void ask(Confirm _action, std::string _note);
 		void say(std::string _note);
 		// A Bank write's outcome, with a note when it failed
@@ -124,6 +131,8 @@ namespace mdDrums
 		bool m_renaming = false;
 		std::string m_note;
 		Head m_head;	// as last drawn
+		double m_nextHeadMs = 0.0;	// when the frame looks at the head band again
 		std::unique_ptr<juce::FileChooser> m_chooser;
+		std::optional<std::pair<bool, std::filesystem::path>> m_chosenFile;	// Import (true) or Export, for the frame
 	};
 }

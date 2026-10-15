@@ -3,10 +3,8 @@
 #include "mdDrumsController.h"
 #include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsTrackView.h"
-
-#include "juceRmlUi/juceRmlComponent.h"
-#include "juceRmlUi/rmlInterfaces.h"
 
 #include "RmlUi/Core/Element.h"
 
@@ -37,51 +35,46 @@ namespace mdDrums
 			m_editor.addClick("links_link" + n, [this, t](Rml::Event&) { choose(false, t); });
 			m_editor.addClick("links_choke" + n, [this, t](Rml::Event&) { choose(true, t); });
 		}
-		refresh();
-		startTimerHz(10);
 	}
 
-	LinksView::~LinksView()
-	{
-		stopTimer();
-	}
+	LinksView::~LinksView() = default;
 
 	Rml::Element* LinksView::find(const std::string& _id) const
 	{
 		return m_editor.element(_id);
 	}
 
+	bool LinksView::step(const Frame& _frame)
+	{
+		const auto& controller = m_editor.controller();
+		const auto track = _frame.shown;
+		if(track == m_shownTrack && controller.link(track) == m_shownLink && controller.choke(track) == m_shownChoke)
+			return false;
+		refresh(track);
+		return true;
+	}
+
 	void LinksView::choose(const bool _choke, const uint8_t _target)
 	{
-		auto& controller = m_editor.controller();
-		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
+		// The Track the menu shows
+		if(m_shownTrack < 0)
+			return;
+		const auto track = static_cast<uint8_t>(m_shownTrack);
 		// The Track itself does nothing on the Machinedrum: its cell is inert
 		if(_target == track)
 			return;
+		auto& controller = m_editor.controller();
 		if(_choke)
 			controller.setChoke(track, _target);
 		else
 			controller.setLink(track, _target);
-		refresh();
+		refresh(track);
 	}
 
-	void LinksView::timerCallback()
+	void LinksView::refresh(const uint8_t _track)
 	{
-		auto& controller = m_editor.controller();
-		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
-		if(track == m_shownTrack && controller.link(track) == m_shownLink && controller.choke(track) == m_shownChoke)
-			return;
-		auto* component = m_editor.getRmlComponent();
-		if(!component)
-			return;
-		juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-		refresh();
-	}
-
-	void LinksView::refresh()
-	{
-		auto& controller = m_editor.controller();
-		const auto track = static_cast<uint8_t>(controller.getCurrentPart());
+		const auto& controller = m_editor.controller();
+		const auto track = _track;
 		const auto link = controller.link(track);
 		const auto choke = controller.choke(track);
 		m_shownTrack = track;

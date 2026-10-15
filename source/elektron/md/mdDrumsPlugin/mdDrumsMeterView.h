@@ -2,8 +2,6 @@
 
 #include "mdDrumsTelemetry.h"
 
-#include "juce_events/juce_events.h"
-
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -27,13 +25,14 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
+	struct Frame;
 
 	// The v22 skin's meters, scopes and Hit lights (ticket 20), from the Telemetry the Device writes: the Main meter
 	// (the top bar's two bars), each Mix strip's meter, each list row's scope (its strip's level over the last second)
 	// and each Track's number lit in accent for 140 ms when it is struck. Meters rise at once and fall 20 dB a second,
-	// on a scale from -60 to 0 dBFS. A timer at the display's rate reads the Telemetry; a canvas is repainted only when
-	// what it shows moves, and not at all while it is hidden.
-	class MeterView : juce::Timer
+	// on a scale from -60 to 0 dBFS. The editor's frame reads the Telemetry; a canvas is repainted only when what it
+	// shows moves, and not at all while it is hidden.
+	class MeterView
 	{
 	public:
 		static constexpr float FloorDb = -60.0f;
@@ -42,14 +41,14 @@ namespace mdDrums
 		static constexpr double ScopeColumnMs = 1000.0 / ScopeColumns;	// a second across the scope
 		static constexpr double LightMs = 140.0;
 
-		MeterView(Editor& _editor, Telemetry& _telemetry, int _refreshHz);
-		~MeterView() override;
+		MeterView(Editor& _editor, Telemetry& _telemetry);
+		~MeterView();
 
 		MeterView(const MeterView&) = delete;
 		MeterView& operator=(const MeterView&) = delete;
 
-		// One read of the Telemetry at _nowMs (the timer's, or a test's)
-		void update(double _nowMs);
+		// The editor's frame: one read of the Telemetry; true when it changed the document
+		bool step(const Frame& _frame);
 
 		// An output's level as the meters show it, 0 (-60 dBFS or less) to 1 (0 dBFS)
 		float level(int _output) const;
@@ -65,14 +64,16 @@ namespace mdDrums
 		// What a canvas paints: its size in pixels and its dp ratio (createCanvas)
 		using Paint = std::function<void(juce::Graphics& _g, float _w, float _h, float _dp)>;
 
-		void timerCallback() override;
 		Canvas attach(const std::string& _id, const Paint& _paint);
-		void repaint(Canvas& _canvas, int _shows) const;
+		// True when it repainted
+		bool repaint(Canvas& _canvas, int _shows) const;
 		void paintScope(int _track, juce::Graphics& _g, float _w, float _h, float _dp) const;
 
 		Editor& m_editor;
 		Telemetry& m_telemetry;
 		double m_lastMs = -1.0;
+		int m_shown = -1;	// the Track shown, whose scope is drawn in ink
+		std::array<std::array<Rml::Element*, 3>, Telemetry::TrackCount> m_numbers{};	// lit by a Hit
 
 		std::array<float, Telemetry::OutputCount> m_db{};	// the meters' level in dB, after the fall
 		Canvas m_main;

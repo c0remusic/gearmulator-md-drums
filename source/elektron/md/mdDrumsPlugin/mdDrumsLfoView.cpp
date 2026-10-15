@@ -3,8 +3,10 @@
 #include "mdDrumsCanvas.h"
 #include "mdDrumsColours.h"
 #include "mdDrumsController.h"
+#include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsEngine.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsKnob.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
@@ -31,10 +33,20 @@ namespace mdDrums
 		constexpr float g_left = 67.0f, g_right = 383.0f, g_top = 48.0f, g_bottom = 104.0f;
 
 		constexpr double g_defaultBpm = 125.0;	// the engine's until the host gives its tempo
+
+		constexpr std::array<const char*, 9> g_parameters{
+			"LfoShape1", "LfoShape2", "LfoMode", "LFOS", "LFOD", "LFOM", "LfoTrack", "LfoParam", "Machine"};
 	}
 
 	LfoView::LfoView(Editor& _editor) : m_editor(_editor)
 	{
+		static_assert(g_parameters.size() == IndexCount);
+		auto& controller = m_editor.getProcessor().getController();
+		for(uint8_t t = 0; t < m_parameters.size(); ++t)
+			for(size_t i = 0; i < g_parameters.size(); ++i)
+				m_parameters[t][i] = controller.getParameter(g_parameters[i], t);
+		m_traced.fill(-1);
+
 		if(auto* screen = find("screen_lfo"))
 			m_canvas = createCanvas(screen, [this](juce::Graphics& _g, float, float, const float _dp)
 			{
@@ -61,23 +73,6 @@ namespace mdDrums
 		for(const auto* tab : {"tab_mix", "tab_master"})
 			m_editor.addClick(tab, [this](Rml::Event&) { disarm(); });
 
-		// Every Track's LFO target and depth, for the names it underlines. The parameters' notifications come from the
-		// message loop and the Track shown also changes from the Controller's timer, outside an RmlUi event: the
-		// handlers lock the document.
-		auto& controller = m_editor.getProcessor().getController();
-		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
-			for(const auto* name : {"LfoTrack", "LfoParam", "LFOD"})
-				if(auto* p = controller.getParameter(name, t))
-					m_onAnyLfo.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
-					{
-						m_editor.withDocumentLocked([&] { updateUnderlines(); });
-					});
-
-		m_onPartChanged.set(controller.onCurrentPartChanged, [this](const uint8_t& _part)
-		{
-			m_editor.withDocumentLocked([&] { onPartChanged(_part); });
-		});
-		onPartChanged(controller.getCurrentPart());
 		updateTitle();
 	}
 
@@ -88,122 +83,120 @@ namespace mdDrums
 		return m_editor.element(_id);
 	}
 
-	pluginLib::Parameter* LfoView::parameter(const char* _name, const uint8_t _part) const
+	int LfoView::value(const Index _index, const uint8_t _part) const
 	{
-		return m_editor.getProcessor().getController().getParameter(_name, _part);
-	}
-
-	int LfoView::value(const char* _name, const uint8_t _part) const
-	{
-		const auto* p = parameter(_name, _part);
+		const auto* p = m_parameters[_part][_index];
 		return p ? p->getUnnormalizedValue() : 0;
 	}
 
-	void LfoView::onPartChanged(const uint8_t _part)
+	bool LfoView::step(const Frame& _frame)
 	{
-		m_part = _part;
-		m_onShown.clear();
-		for(const auto* name : {"LfoShape1", "LfoShape2", "LfoMode", "LFOS", "LFOD", "LFOM"})
-			if(auto* p = parameter(name, _part))
-				m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
-				{
-					m_editor.withDocumentLocked([&] { update(); });
-				});
-		for(const auto* name : {"LfoTrack", "LfoParam"})
-			if(auto* p = parameter(name, _part))
-				m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
-				{
-					m_editor.withDocumentLocked([&]
-					{
-						listenToTarget();
-						update();
-					});
-				});
-		if(auto* p = parameter("Machine", _part))
-			m_onShown.emplace_back(p->onValueChanged, [this](pluginLib::Parameter* const&)
-			{
-				m_editor.withDocumentLocked([&] { updateTargets(); });
-			});
-		refresh();
+		m_part = _frame.shown;
+		bool wrote = followTrace();
+		wrote |= followUnderlines();
+		wrote |= followTargets();
+		return wrote;
 	}
 
-	void LfoView::refresh()
+	bool LfoView::followTrace()
 	{
-		listenToTarget();
-		update();
-		updateUnderlines();
-		updateTargets();
-	}
+		// Hidden too (another tab, an overlay over it): RmlUi knows it shows only after the update that follows the
+		// frame, and a hidden canvas paints nothing until then
 
-	pluginLib::Parameter* LfoView::target() const
-	{
-		const auto track = static_cast<uint8_t>(std::clamp(value("LfoTrack", m_part), 0, Controller::TrackCount - 1));
-		const auto param = std::clamp(value("LfoParam", m_part), 0, Engine::ParamCount - 1);
-		return parameter(Engine::paramNames()[static_cast<size_t>(param)], track);
-	}
+		// The parameter the shown Track's LFO moves: LfoParam's, of LfoTrack
+		const auto track = std::clamp(value(Track, m_part), 0, Controller::TrackCount - 1);
+		const auto param = std::clamp(value(Param, m_part), 0, Engine::ParamCount - 1);
+		if(m_targetOf != std::array<int, 2>{track, param})
+		{
+			m_targetOf = {track, param};
+			m_target = m_editor.getProcessor().getController().getParameter(
+				Engine::paramNames()[static_cast<size_t>(param)], static_cast<uint8_t>(track));
+		}
 
-	void LfoView::listenToTarget()
-	{
-		m_onTarget.reset();
-		if(auto* p = target())
-			m_onTarget.set(p->onValueChanged, [this](pluginLib::Parameter* const&)
-			{
-				m_editor.withDocumentLocked([&] { update(); });
-			});
-	}
-
-	void LfoView::update()
-	{
-		const Lfo lfo{static_cast<uint8_t>(value("LfoShape1", m_part)), static_cast<uint8_t>(value("LfoShape2", m_part)),
-			static_cast<uint8_t>(value("LfoMode", m_part))};
-		const auto* moved = target();
-		const auto speed = value("LFOS", m_part), mix = value("LFOM", m_part);
+		// The tempo as the OS's routines take it: a key on the bpm itself would trace again for nothing
 		const auto bpm = m_editor.processor().getBpm();
 		const auto tempo = bpm > 0.0f ? static_cast<double>(bpm) : g_defaultBpm;
-		m_depth = value("LFOD", m_part);
-		m_trace = lfo.trace(speed, m_depth, mix, moved ? moved->getUnnormalizedValue() : 0, tempo,
-			lfo.window(speed, mix, tempo));
+		const TraceKey key{value(Shape1, m_part), value(Shape2, m_part), value(Mode, m_part), value(Speed, m_part),
+			value(Depth, m_part), value(Mix, m_part), track, param, m_target ? m_target->getUnnormalizedValue() : 0,
+			static_cast<int>(std::lround(std::clamp(tempo, 30.0, 300.0) * 24.0)), m_part};
+		if(key == m_traced)
+			return false;
+		m_traced = key;
 
-		// The values it reaches, in the label column at the plot's top and foot; without depth, why there is no wave
-		const auto show = [&](const char* _id, const bool _visible, const std::string& _text)
+		const Lfo lfo{static_cast<uint8_t>(key[Shape1]), static_cast<uint8_t>(key[Shape2]), static_cast<uint8_t>(key[Mode])};
+		const auto speed = key[Speed], mix = key[Mix];
+		m_depth = key[Depth];
+		m_trace = lfo.trace(speed, m_depth, mix, key[8], tempo, lfo.window(speed, mix, tempo));	// 8: the target's value
+
+		// The values it reaches, in the label column at the plot's top and foot; without depth, why there is no wave.
+		// SetInnerRML builds the element's children again, and a display set lays the document out again: only where
+		// they changed
+		const auto show = [&](const char* _id, const std::string& _text)
 		{
-			if(auto* e = find(_id))
-			{
+			if(auto* e = find(_id); e && e->GetInnerRML() != _text)
 				e->SetInnerRML(_text);
-				e->SetProperty("display", _visible ? "block" : "none");
-			}
 		};
 		// In the knob's steps: a word's nearest, $3f80 to $3fff being 127
 		const auto steps = [](const uint16_t _word) { return std::to_string(std::min(127L, std::lround(_word / 128.0))); };
 		const bool moves = m_depth > 0;
-		show("lfo_high", moves, steps(m_trace.highest));
-		show("lfo_low", moves, steps(m_trace.lowest));
-		show("lfo_none", !moves, "LFOD 0: no modulation");
+		show("lfo_high", steps(m_trace.highest));
+		show("lfo_low", steps(m_trace.lowest));
+		show("lfo_none", "LFOD 0: no modulation");
+		if(m_labelsMove != static_cast<int>(moves))
+		{
+			m_labelsMove = moves;
+			setDisplay(find("lfo_high"), moves);
+			setDisplay(find("lfo_low"), moves);
+			setDisplay(find("lfo_none"), !moves);
+		}
 		if(m_canvas)
 			m_canvas->repaint();
+		return true;
 	}
 
-	void LfoView::updateUnderlines() const
+	bool LfoView::followUnderlines()
 	{
-		// A name is underlined when an LFO, any Track's, aims at it with some depth
-		const auto& names = Engine::paramNames();
-		std::array<bool, Engine::ParamCount> modulated{};
+		// A name is underlined when an LFO, any Track's, aims at it on the shown Track with some depth
+		int64_t modulated = 0;
 		for(uint8_t k = 0; k < Controller::TrackCount; ++k)
 		{
-			const auto param = value("LfoParam", k);
-			if(value("LfoTrack", k) == m_part && value("LFOD", k) > 0 && param >= 0 && param < Engine::ParamCount)
-				modulated[static_cast<size_t>(param)] = true;
+			const auto param = value(Param, k);
+			if(value(Track, k) == m_part && value(Depth, k) > 0 && param >= 0 && param < Engine::ParamCount)
+				modulated |= int64_t{1} << param;
 		}
+		if(modulated == m_underlined)
+			return false;
+		const auto& names = Engine::paramNames();
 		for(size_t i = 0; i < names.size(); ++i)
+		{
+			const auto on = (modulated >> i) & 1;
+			if(m_underlined >= 0 && on == ((m_underlined >> i) & 1))
+				continue;
 			if(auto* label = find(std::string("n_") + names[i]))
-				label->SetClass("lfo", modulated[i]);
+				label->SetClass("lfo", on != 0);
+		}
+		m_underlined = modulated;
+		return true;
+	}
+
+	bool LfoView::followTargets()
+	{
+		// Armed: the knobs of the shown Track's machine, a Track or a machine later
+		if(!m_armed)
+			return false;
+		const auto ringedFor = m_part * 256 + value(Machine, m_part);
+		if(ringedFor == m_ringedFor)
+			return false;
+		updateTargets();
+		return true;
 	}
 
 	void LfoView::updateTargets()
 	{
+		m_ringedFor = m_part * 256 + value(Machine, m_part);
 		// Every knob of the bands, but SYN slots the shown Track's machine does not use
 		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum,
-			static_cast<uint16_t>(value("Machine", m_part)));
+			static_cast<uint16_t>(value(Machine, m_part)));
 		for(int i = 0; i < Engine::ParamCount; ++i)
 		{
 			auto* knob = dynamic_cast<Knob*>(find(std::string("k_") + Engine::paramNames()[static_cast<size_t>(i)]));
@@ -266,9 +259,9 @@ namespace mdDrums
 		const auto owner = m_owner;
 		const auto shown = m_part;
 		disarm();
-		if(auto* p = parameter("LfoTrack", owner))
+		if(auto* p = m_parameters[owner][Track])
 			p->setUnnormalizedValueNotifyingHost(shown, pluginLib::Parameter::Origin::Ui);
-		if(auto* p = parameter("LfoParam", owner))
+		if(auto* p = m_parameters[owner][Param])
 			p->setUnnormalizedValueNotifyingHost(_param, pluginLib::Parameter::Origin::Ui);
 		m_editor.setCurrentPart(owner);
 	}

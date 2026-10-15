@@ -465,6 +465,59 @@ namespace
 		return text;
 	}
 
+	// The message thread's work and the process's CPU while _run runs: the thread in cycles (exact, where Windows counts
+	// its CPU time in 15.6 ms ticks), the process in % of one core, less a thread of the test's own (_exclude: the
+	// audio thread, which spins to each deadline)
+	struct Load
+	{
+		double mcyclesPerSecond = 0.0;
+		std::string text;
+	};
+
+	Load load(const std::function<void()>& _run, std::thread* _exclude = nullptr)
+	{
+#if JUCE_WINDOWS
+		const auto seconds = [](const FILETIME& _kernel, const FILETIME& _user)
+		{
+			const auto ticks = [](const FILETIME& _f)
+			{
+				return static_cast<double>((static_cast<uint64_t>(_f.dwHighDateTime) << 32) | _f.dwLowDateTime);
+			};
+			return (ticks(_kernel) + ticks(_user)) / 1e7;
+		};
+		// The process's CPU time, and the excluded thread's
+		const auto cpu = [&](double& _excluded)
+		{
+			FILETIME created, exited, kernel, user;
+			_excluded = 0.0;
+			if(_exclude && GetThreadTimes(static_cast<HANDLE>(_exclude->native_handle()), &created, &exited, &kernel, &user))
+				_excluded = seconds(kernel, user);
+			GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user);
+			return seconds(kernel, user);
+		};
+		ULONG64 cycles0 = 0, cycles1 = 0;
+		double excluded0 = 0.0, excluded1 = 0.0;
+		QueryThreadCycleTime(GetCurrentThread(), &cycles0);
+		const auto process0 = cpu(excluded0);
+		const auto start = Clock::now();
+		_run();
+		const auto elapsed = std::chrono::duration<double>(Clock::now() - start).count();
+		QueryThreadCycleTime(GetCurrentThread(), &cycles1);
+		const auto process1 = cpu(excluded1);
+		Load result;
+		result.mcyclesPerSecond = static_cast<double>(cycles1 - cycles0) / 1e6 / elapsed;
+		char text[200];
+		std::snprintf(text, sizeof(text), "message thread %.2f Mcycles/s, process %.1f %% of a core%s, over %.1f s",
+			result.mcyclesPerSecond, 100.0 * (process1 - process0 - (excluded1 - excluded0)) / elapsed,
+			_exclude ? " besides the test's audio thread" : "", elapsed);
+		result.text = text;
+		return result;
+#else
+		_run();
+		return {0.0, "not measured"};
+#endif
+	}
+
 	// The window a host gives the editor
 	struct Window final : juce::Component
 	{
@@ -854,6 +907,8 @@ namespace
 			auto instance = load(formats, description);
 			auto& plugin = *instance->plugin;
 			require(plugin.hasEditor(), "MD Drums has no editor through VST3");
+			const auto noEditor = load([] { pump(3000); });
+			std::printf("No editor yet: %s\n", noEditor.text.c_str());
 			const auto start = Clock::now();
 			std::unique_ptr<juce::AudioProcessorEditor> editor(plugin.createEditorIfNeeded());
 			require(editor != nullptr, "the host cannot open the editor");
@@ -872,6 +927,7 @@ namespace
 				shown);
 			require(editor->getWidth() > 0 && editor->getHeight() > 0, "the editor has no size");
 			require(shown >= 16, "the editor drew nothing in the host's window");
+			std::printf("Editor open and idle: %s\n", load([] { pump(3000); }).text.c_str());
 
 			std::atomic<bool> stop{false};
 			std::vector<double> openMs;
@@ -900,20 +956,31 @@ namespace
 				}
 			});
 			const auto syn1 = ids.index("SYN1", 0);
-			for(int step = 0; step < 30; ++step)
+			const auto playing = load([&]
 			{
-				instance->parameter(syn1).setValue(static_cast<float>(step % 10) / 10.0f);
-				pump(100);
-			}
+				for(int step = 0; step < 30; ++step)
+				{
+					instance->parameter(syn1).setValue(static_cast<float>(step % 10) / 10.0f);
+					pump(100);
+				}
+			}, &audio);
 			stop = true;
 			audio.join();
-			std::printf("Editor open, Hits playing, SYN1 automated: a block of 128 %s\n", blockStats(openMs).c_str());
+			std::printf("Editor open, Hits playing, SYN1 automated: a block of 128 %s; %s\n", blockStats(openMs).c_str(),
+				playing.text.c_str());
 			require(*std::max_element(openMs.begin(), openMs.end()) < g_stallMs,
 				"a block stalled the audio thread while the editor was open");
 
 			window.removeChildComponent(editor.get());
 			editor.reset();
 			pump(300);
+			// The plug-in keeps its editor (PluginEditorState) for when the host opens the window again: its frame stops.
+			// Measured on the reference PC: 25 Mcycles/s, against 20 to 34 with no editor at all; the views' own timers,
+			// before the editor's frame, kept 68
+			const auto closed = load([] { pump(3000); });
+			std::printf("Editor closed and kept: %s\n", closed.text.c_str());
+			require(closed.mcyclesPerSecond < noEditor.mcyclesPerSecond + 15.0,
+				"the editor keeps working on the message thread once its window is closed");
 		}
 	}
 }

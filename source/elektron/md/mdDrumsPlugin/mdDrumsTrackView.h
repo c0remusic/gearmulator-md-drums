@@ -1,7 +1,5 @@
 #pragma once
 
-#include "baseLib/event.h"
-
 #include <array>
 #include <cstdint>
 #include <string>
@@ -21,6 +19,7 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
+	struct Frame;
 
 	// The v22 skin's behaviour until the slices that give it more (tickets 17 and 18): the shown Track, chosen by a click
 	// on a list row, a Mix strip, a send or by ‹ ›, and what the views say about it (its row and strip lit, "Track 01",
@@ -29,7 +28,8 @@ namespace mdDrums
 	// browser as Cancel), and the browser's "Listen while choosing", with which a machine chosen plays the Track; playing
 	// the Track (the play key and Space, at the head band's velocity, which a drag sets) and stepping its machine (the
 	// wheel or the arrows on its name, the arrows in the browser: ticket 23); and the Size control, which steps the
-	// window through 75, 100, 125 and 150 % on TUS's own "scale" setting. Everything runs on the message thread.
+	// window through 75, 100, 125 and 150 % on TUS's own "scale" setting. The editor's frame draws the Track shown, its
+	// machine, every Track's Out and the open LFO menu where they changed (step); its clicks and keys write at once.
 	class TrackView
 	{
 	public:
@@ -53,6 +53,9 @@ namespace mdDrums
 		TrackView(const TrackView&) = delete;
 		TrackView& operator=(const TrackView&) = delete;
 
+		// The editor's frame: true when it changed the document
+		bool step(const Frame& _frame);
+
 		void showTrack(uint8_t _track) const;
 		void stepTrack(int _delta) const;
 		void stepSize() const;
@@ -74,29 +77,35 @@ namespace mdDrums
 
 		// The shown Track's machine, the next or previous in the browser's order (wrapping), or the first of the next or
 		// previous family; listening, the Track plays
-		void stepMachine(int _delta) const;
-		void stepFamily(int _delta) const;
+		void stepMachine(int _delta);
+		void stepFamily(int _delta);
 
 		// A key, before the stack's handling: Space plays (unless a text field has the focus); with the browser open the
 		// arrows step its machines and families and Enter keeps it; on the machine's name ↑ ↓ step it. False: not handled
 		bool key(Rml::Event& _event);
 
 	private:
-		void choose(int _machine) const;
-		void onPartChanged(uint8_t _part);
+		using PerTrack = std::array<pluginLib::Parameter*, 16>;
+
+		void choose(int _machine);
+		// The Track shown: its row, strip and send lit, its number in the head band and the browser
+		void showPart(uint8_t _part);
+		// The head band's family and the bands' SYN1-8 names, the shown Track's Out, every strip's Out, the LFO menu
+		// while it is open: each drawn again where its parameters changed. True when something was
+		bool followMachine();
+		bool followOuts();
+		bool followLfoMenu();
 		void updateMachine() const;
 		void updateOutput() const;
 		// A Mix strip's Out: a click moves the Track between Main and its natural Out (its own number, 16 to 15), the
 		// wheel through Main and Out 01-15 (ticket 33)
 		void updateStripOut(uint8_t _track) const;
-		// A Track's Out changed: its strip, and the head band's output when it is the Track shown
-		void updateOut(uint8_t _track) const;
-		void setStripOut(uint8_t _track, int _out) const;
+		void setStripOut(uint8_t _track, int _out);
 		static uint8_t naturalOut(uint8_t _track);
-		// The LFO's target menu, only while it is open
 		void updateLfoMenu() const;
 		void updateSize() const;
 		Rml::Element* find(const std::string& _id) const;
+		static int value(const pluginLib::Parameter* _parameter);
 
 		Editor& m_editor;
 		uint8_t m_part = 0;
@@ -105,9 +114,15 @@ namespace mdDrums
 		std::vector<int> m_machines;	// the browser's, in its order
 		float m_dragY = 0.0f;
 		int m_dragFrom = 0;
-		baseLib::EventListener<uint8_t> m_onPartChanged;
-		baseLib::EventListener<pluginLib::Parameter*> m_onMachineChanged;
-		baseLib::EventListener<pluginLib::Parameter*> m_onLfoTrackChanged;
-		std::array<baseLib::EventListener<pluginLib::Parameter*>, 16> m_onOutChanged;	// every Track's
+
+		PerTrack m_machineParameters{};
+		PerTrack m_outParameters{};
+		PerTrack m_lfoTrackParameters{};
+		// What the document shows, -1 for not yet: the shown Track's machine and Out, every strip's Out, the LFO menu's
+		// Track, target Track and that Track's machine
+		int m_machineShown = -1;
+		int m_outShown = -1;
+		std::array<int, 16> m_outs{};
+		std::array<int, 3> m_menuKey{};
 	};
 }

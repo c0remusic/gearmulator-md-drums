@@ -6,13 +6,12 @@
 #include "mdDrumsDom.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsEngine.h"
+#include "mdDrumsFrame.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsTrackView.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
-#include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlElemCanvas.h"
-#include "juceRmlUi/rmlInterfaces.h"
 
 #include "juce_graphics/juce_graphics.h"
 
@@ -51,18 +50,14 @@ namespace mdDrums
 		}
 	}
 
-	HitView::HitView(Editor& _editor, Telemetry& _telemetry, const int _refreshHz, std::vector<std::filesystem::path> _romFolders)
+	HitView::HitView(Editor& _editor, Telemetry& _telemetry, std::vector<std::filesystem::path> _romFolders)
 		: m_editor(_editor), m_telemetry(_telemetry), m_client(std::move(_romFolders))
 	{
 		createScreen(m_screens[0], "screen_hit", "hit_tick");
 		createScreen(m_screens[1], "screen_preview", "preview_tick");
-		startTimerHz(std::clamp(_refreshHz, 30, 300));
 	}
 
-	HitView::~HitView()
-	{
-		stopTimer();
-	}
+	HitView::~HitView() = default;
 
 	void HitView::createScreen(Screen& _screen, const std::string& _id, const std::string& _ticks)
 	{
@@ -80,15 +75,6 @@ namespace mdDrums
 	Rml::Element* HitView::find(const std::string& _id) const
 	{
 		return m_editor.element(_id);
-	}
-
-	void HitView::timerCallback()
-	{
-		auto* component = m_editor.getRmlComponent();
-		if(!component)
-			return;
-		juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-		update(juce::Time::getMillisecondCounterHiRes());
 	}
 
 	double HitView::fit(const Telemetry::Capture& _capture)
@@ -200,9 +186,11 @@ namespace mdDrums
 		m_requested = m_client.request(std::move(request));
 	}
 
-	void HitView::update(const double _nowMs)
+	bool HitView::step(const Frame& _frame)
 	{
-		const auto track = static_cast<int>(m_editor.getProcessor().getController().getCurrentPart());
+		const auto nowMs = _frame.now;
+		const auto track = static_cast<int>(_frame.shown);
+		bool wrote = false;
 		if(track != m_track)
 		{
 			m_track = track;
@@ -220,16 +208,16 @@ namespace mdDrums
 		m_telemetry.readCapture(track, false, m_current);
 		m_telemetry.readCapture(track, true, m_previous);
 		if(m_current.id != id || m_current.count != count)
-			m_lastGrowthMs = _nowMs;
+			m_lastGrowthMs = nowMs;
 		// Playing while the capture grows: until it is full, or 50 ms after it stopped (the Track struck again)
-		m_playing = m_current.id && m_current.count < Telemetry::CaptureColumns && _nowMs - m_lastGrowthMs < 50.0;
+		m_playing = m_current.id && m_current.count < Telemetry::CaptureColumns && nowMs - m_lastGrowthMs < 50.0;
 
 		// The sound changed: its Hit is asked for while a screen shows and no Hit of the Track plays (a sequence playing
 		// shows the sound at each Hit, and would keep the preview's thread busy for nothing), unless the Track sounds it
 		// first
 		const bool visible = std::any_of(m_screens.begin(), m_screens.end(),
 			[](const Screen& _s) { return _s.element && _s.element->IsVisible(true); });
-		if(const auto now = sound(_nowMs); now != m_sound)
+		if(const auto now = sound(nowMs); now != m_sound)
 		{
 			m_sound = now;
 			m_soundChanged = true;
@@ -270,6 +258,7 @@ namespace mdDrums
 			m_window = window;
 			for(const auto& screen : m_screens)
 				updateTicks(screen);
+			wrote = true;
 		}
 
 		auto text = m_showPreview ? "Preview, velocity " + std::to_string(m_preview.velocity)
@@ -279,6 +268,7 @@ namespace mdDrums
 			m_noteText = std::move(text);
 			if(auto* note = find("hit_note"))
 				note->SetInnerRML(m_noteText);
+			wrote = true;
 		}
 
 		const auto& shownCapture = shown();
@@ -290,7 +280,9 @@ namespace mdDrums
 				continue;
 			screen.drawn = state;
 			screen.canvas->repaint();
+			wrote = true;
 		}
+		return wrote;
 	}
 
 	void HitView::updateTicks(const Screen& _screen) const
