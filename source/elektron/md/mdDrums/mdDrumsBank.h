@@ -32,6 +32,10 @@ namespace mdDrums
 		// neither read nor written (the Slots are then all empty).
 		bool read();
 
+		// Reads the file again when its write time moved since this Bank last read or wrote it, as when another
+		// instance wrote a Slot: true when it did. For whoever compares a Slot with the Kit played (Save, Ctrl+S).
+		bool follow();
+
 		// The Kit in a Slot (0-63); empty for an empty Slot and out of range
 		const std::optional<Kit>& slot(int _slot) const;
 		bool isEmpty(int _slot) const { return !slot(_slot).has_value(); }
@@ -53,5 +57,6 @@ namespace mdDrums
 		std::filesystem::path m_file;
 		std::vector<Kit> m_factory;
 		std::array<std::optional<Kit>, SlotCount> m_slots{};
+		std::filesystem::file_time_type m_seen{};	// the file's write time when this Bank last read or wrote it
 	};
 }

@@ -1,8 +1,8 @@
 // The Kits' Bank (ticket 26 of the editor map): a new file holds the 16 factory Kits in Slots 1-16, Kit 1 the one a
 // Machinedrum boots with, the other 48 empty; each Slot is a Kit dump OS 1.63 takes, for its slot; a write keeps the
 // file's size and the other Slots; two Banks on one file keep each other's Slots; an emptied Slot reads back empty; a
-// .syx file's Kits come out in their order, the empty Slots left out; one write puts several Slots in place. Every
-// factory Kit, and a new one, seeds the LFO RND generator.
+// .syx file's Kits come out in their order, the empty Slots left out; one write puts several Slots in place; a Bank
+// follows a Slot another one wrote. Every factory Kit, and a new one, seeds the LFO RND generator.
 
 #include "mdDrumsBank.h"
 #include "mdDrumsEngine.h"
@@ -17,6 +17,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -117,6 +118,16 @@ int main()
 		require(readFile(file).size() == bytes.size(), "a write changed the file's size");
 		std::printf("two Banks on one file: Slots 31 \"%s\" and 32 \"%s\" both kept\n", third.slot(30)->displayName().c_str(),
 			third.slot(31)->displayName().c_str());
+
+		// A Bank follows a Slot another one wrote, once the file's write time moved, and reads nothing otherwise
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		require(!third.follow(), "a Bank read the file again with nothing written");
+		const auto c = named(factory[7], "FROM C");
+		require(bank.write(32, c), "the first Bank cannot write");
+		require(third.follow() && third.slot(32) && *third.slot(32) == c, "a Bank does not follow another's write");
+		require(!third.follow(), "a Bank read the file again twice for one write");
+		require(bank.write(32, std::nullopt), "the first Bank cannot empty a Slot");
+		std::printf("a Bank follows a Slot another one wrote\n");
 
 		// Emptied, a Slot reads back empty; the file read as a .syx gives its Kits in order, the empty Slots left out
 		require(bank.write(30, std::nullopt) && bank.isEmpty(30), "an emptied Slot is not empty");

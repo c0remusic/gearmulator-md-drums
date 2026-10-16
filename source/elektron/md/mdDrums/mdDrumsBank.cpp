@@ -44,7 +44,17 @@ namespace mdDrums
 			if(kit && !kit->isEmptySlot())
 				m_slots[static_cast<size_t>(slot)] = std::move(*kit);
 		}
+		m_seen = std::filesystem::last_write_time(m_file, error);
 		return true;
+	}
+
+	bool Bank::follow()
+	{
+		std::error_code error;
+		const auto time = std::filesystem::last_write_time(m_file, error);
+		if(error || time == m_seen)
+			return false;
+		return read();
 	}
 
 	const std::optional<Bank::Kit>& Bank::slot(const int _slot) const
@@ -86,6 +96,7 @@ namespace mdDrums
 		file.close();
 		for(const auto& [slot, kit] : _slots)
 			m_slots[static_cast<size_t>(slot)] = kit && !kit->isEmptySlot() ? kit : std::nullopt;
+		m_seen = std::filesystem::last_write_time(m_file, error);
 		return true;
 	}
 

@@ -107,8 +107,10 @@ namespace mdDrums
 		if(_frame.now < m_nextHeadMs)
 			return false;
 		m_nextHeadMs = _frame.now + 1000.0 / RefreshHz;
+		auto* b = bank();
+		const bool followed = b && b->follow();	// a Slot another instance wrote
 		auto now = head();
-		if(now == m_head)
+		if(now == m_head && !followed)
 			return false;
 		refresh(std::move(now));
 		return true;
@@ -154,7 +156,10 @@ namespace mdDrums
 	bool KitsView::save()
 	{
 		auto* b = bank();
-		if(!b || !isChanged())
+		if(!b)
+			return false;
+		b->follow();
+		if(!isChanged())
 			return false;
 		const auto slot = m_editor.controller().playedSlot();
 		if(!written(b->write(slot, m_editor.controller().playedKit())))

@@ -21,6 +21,7 @@
 // and render, which runs the frame first as the plug-in's does.
 // MD_DRUMS_SKIN_PNG names a prefix for a picture of each view.
 
+#include "mdDrumsBank.h"
 #include "mdDrumsController.h"
 #include "mdDrumsEditor.h"
 #include "mdDrumsEngine.h"
@@ -1066,6 +1067,20 @@ namespace
 		require(saveLit(), "Save is not lit with a parameter changed");
 		context.ProcessKeyDown(Rml::Input::KI_S, Rml::Input::KM_CTRL | Rml::Input::KM_META);
 		require(!saveLit() && *bank->slot(3) == controller.playedKit(), "Ctrl+S did not save the Kit in its Slot");
+
+		// Another instance rewrites the Slot played: Save lights, and Ctrl+S puts the Kit played back
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));	// a write time the file system tells apart
+			mdDrums::Bank other(bank->file(), {});
+			auto elsewhere = *bank->slot(3);
+			elsewhere.levels[0] = static_cast<uint8_t>(elsewhere.levels[0] ^ 1);
+			require(other.read() && other.write(3, elsewhere), "another Bank cannot write the Slot played");
+			require(saveLit(), "a Slot rewritten by another instance does not light Save");
+			context.ProcessKeyDown(Rml::Input::KI_S, Rml::Input::KM_CTRL | Rml::Input::KM_META);
+			require(!saveLit() && *bank->slot(3) == controller.playedKit() && other.read()
+				&& *other.slot(3) != elsewhere, "Ctrl+S did not put the Kit played back into its Slot rewritten elsewhere");
+			std::printf("kits: a Slot rewritten by another instance lights Save; Ctrl+S puts the Kit played back\n");
+		}
 
 		// Save here into an empty Slot: it is the one played
 		clickNow(_f, "slot20");
