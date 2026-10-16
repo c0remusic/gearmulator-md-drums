@@ -3,7 +3,7 @@
 #include "Firmware.h"
 
 #include "mdProtocol/mdautomation.h"
-#include "mdProtocol/mdmachines.h"
+#include "mdProtocol/mdkitchange.h"
 #include "mdProtocol/mdsysexcodec.h"
 
 #include <algorithm>
@@ -15,11 +15,6 @@ namespace mdDrums::messages
 	{
 		constexpr uint8_t g_header[] = {0xf0, 0x7d, 0x4d, 0x44, 0x44};
 		constexpr size_t g_commandAt = sizeof(g_header);
-
-		constexpr uint8_t g_machinedrum[] = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00};
-		constexpr uint8_t g_assignMachine = 0x5b;
-		constexpr uint8_t g_masterEffect = 0x5d;	// to $60: echo, reverb, EQ, dynamix
-		constexpr uint8_t g_lfoChange = 0x62;
 
 		struct Writer
 		{
@@ -44,20 +39,23 @@ namespace mdDrums::messages
 				w.add(static_cast<uint8_t>(_command));
 				return w;
 			}
-			static Writer machinedrum(const uint8_t _command)
-			{
-				Writer w;
-				for(const auto byte : g_machinedrum)
-					w.add(byte);
-				w.add(_command);
-				return w;
-			}
 		};
 
 		uint32_t read21(const MessageView _message, const size_t _at)
 		{
 			return static_cast<uint32_t>(_message[_at]) << 14 | static_cast<uint32_t>(_message[_at + 1]) << 7
 				| _message[_at + 2];
+		}
+
+		std::optional<Raw> kitChange(const md::automation::sysex::KitChange& _change)
+		{
+			const auto message = md::automation::sysex::encodeKitChange(_change);
+			if(!message)
+				return std::nullopt;
+			Raw raw;
+			std::copy_n(message->bytes.begin(), message->size, raw.bytes.begin());
+			raw.size = message->size;
+			return raw;
 		}
 
 		Raw trackFlag(const Command _command, const uint8_t _track, const bool _on)
@@ -239,6 +237,8 @@ namespace mdDrums::messages
 
 	std::optional<Raw> parameterMessage(const uint8_t _page, const uint8_t _track, const uint8_t _index, const int _value)
 	{
+		using md::automation::sysex::KitChange;
+		using Kind = KitChange::Kind;
 		if(_track >= md::automation::machinedrum::TrackCount)
 			return std::nullopt;
 		const auto value = static_cast<uint8_t>(std::clamp(_value, 0, 127));
@@ -260,30 +260,20 @@ namespace mdDrums::messages
 			return raw;
 		}
 		case pages::Machine:
-		{
 			if(_index != 0 || _value < 0 || _value > 191)
 				return std::nullopt;
-			// Machinedrum ids 128 and up go out as id - 128 with the UW flag
-			const auto id = static_cast<uint8_t>(_value);
-			return Writer::machinedrum(g_assignMachine).add(_track).add(static_cast<uint8_t>(id & 0x7f))
-				.add(id >= 128 ? 1 : 0).add(0xf7).raw;
-		}
+			return kitChange({Kind::Machine, _track, KitChange::AssignScope, static_cast<uint8_t>(_value)});
 		case pages::Lfo:
-		{
-			const auto& maximum = md::LfoSettings::FieldMaximum;
-			if(_index >= maximum.size() || value > maximum[_index])
+			// The LFO's five settings: LFOS, LFOD and LFOM are the routing page's
+			if(_index >= md::LfoSettings::FieldMaximum.size())
 				return std::nullopt;
-			return Writer::machinedrum(g_lfoChange).add(static_cast<uint8_t>(_track << 3 | _index)).add(value).add(0xf7).raw;
-		}
+			return kitChange({Kind::Lfo, _track, _index, value});
 		case pages::Mixer:
 			if(_index > 1)
 				return std::nullopt;
 			return _index == 0 ? solo(_track, value != 0) : out(_track, value);
 		case pages::Master:
-			if(_index >= 32)
-				return std::nullopt;
-			return Writer::machinedrum(static_cast<uint8_t>(g_masterEffect + _index / 8)).add(_index % 8).add(value)
-				.add(0xf7).raw;
+			return kitChange({Kind::Master, 0, _index, value});
 		default:
 			return std::nullopt;
 		}

@@ -10,6 +10,8 @@
 
 #include "mdDrumsDevice.h"
 #include "mdDrumsEngine.h"
+
+#include "mdProtocol/mdkitchange.h"
 #include "mdDrumsHitPreview.h"
 #include "mdDrumsMessages.h"
 
@@ -204,11 +206,13 @@ int main()
 				request.track = track;
 				request.velocity = 100;
 				// The machine's defaults, as the editor takes them before the Device reports them (HitView)
-				const auto defaults = mdDrums::Engine::machineDefaults(machine, *factory, track,
-					mdDrums::Engine::AssignScope);
-				require(defaults == device.kit.parameters[track],
+				using md::automation::sysex::KitChange;
+				auto assigned = *factory;
+				md::automation::sysex::applyKitChange({KitChange::Kind::Machine, track, KitChange::AssignScope,
+					machine.id}, assigned, &machine.defaults);
+				require(assigned.parameters[track] == device.kit.parameters[track],
 					std::string("the editor's defaults for ") + name + " are not the Device's");
-				request.kit.parameters[track] = defaults;
+				request.kit.parameters[track] = assigned.parameters[track];
 				const auto withDefaults = differing(device.capture, preview(os, bank, request));
 				// Factory Kit 1's parameters under the new machine, as the editor still has them meanwhile
 				request.kit.parameters[track] = factory->parameters[track];

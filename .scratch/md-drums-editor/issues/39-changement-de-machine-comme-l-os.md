@@ -62,8 +62,16 @@ Laissé de côté, noté dans `Engine::machineDefaults` :
   Track. Aucun paramètre hôte ne tient cette destination (LfoTrack 0-15), et le moteur ne joue aucune machine CTR.
 - TRX-S2 (29) : la table d'ids de l'OS (`$252092`) la renvoie à l'enregistrement vide de GND---, dont `$5B` prend les
   défauts ; le moteur lui donne ceux de son descripteur. Le navigateur ne la propose pas.
-- Le module de codec lui-même (décoder, encoder, appliquer sans allouer) reste le candidat d'architecture : ce ticket
-  n'en fixe que le comportement.
+
+Puis le module, le même jour (le candidat d'architecture lui-même) : `mdProtocol/mdkitchange.*`, `KitChange` (genre,
+Track, index, valeur), `decodeKitChange`, `encodeKitChange` (12 octets au plus, sans allouer), `applyKitChange` (ce que
+l'OS fait du Kit, les SYN1-8 du descripteur en entrée) et les tables de l'OS (`sysex::os163`). Le Device décode,
+applique à son Kit et pousse au moteur ce qui a changé ; `parameterMessage` encode Machine, LFO et master par lui ;
+`assignMachine`, `masterEffectChange`, `lfoChange`, `linkChange` et `chokeChange` l'enveloppent (la forme Monomachine
+de `assignMachine` reste à part) ; `Engine::machineDefaults` disparaît, l'aperçu applique le changement à une copie du
+Kit. Chaque fait (octets de commande, ordre des blocs master, maxima du LFO, Off sur le fil, mot de machine) vit une
+fois. `mdProtocolKitTest` vérifie sans ROM les allers-retours de tous les changements, les octets des encodeurs
+historiques, les refus de l'OS et chaque famille de `$5B`.
 
 Avant / après, à l'oreille : un changement de machine remet désormais filtre, EQ, distorsion, VOL, PAN, envois et LFO
 de la Track aux valeurs de l'OS, comme sur la Machinedrum ; avant, la machine nouvelle gardait les effets de

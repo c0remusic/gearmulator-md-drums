@@ -13,6 +13,8 @@
 #include "jucePluginEditorLib/pluginProcessor.h"
 #include "juceRmlUi/rmlElemCanvas.h"
 
+#include "mdProtocol/mdkitchange.h"
+
 #include "juce_graphics/juce_graphics.h"
 
 #include "RmlUi/Core/Element.h"
@@ -144,7 +146,7 @@ namespace mdDrums
 			return values;
 		};
 
-		// A machine chosen alone: the Device gives it the 24 parameters ASSIGN MACHINE sets (Engine::machineDefaults)
+		// A machine chosen alone: the Device gives it the 24 parameters ASSIGN MACHINE sets (sysex::applyKitChange)
 		// and reports them a block later. Until they change (a Kit's machine comes with its own at once), the sound is
 		// the machine's defaults.
 		if(raw[0] != m_raw[0])
@@ -153,17 +155,19 @@ namespace mdDrums
 			m_chosenMachine = -1;
 			m_chosenAtMs = _nowMs;
 			m_paramsBefore = params(m_raw);
-			const auto machines = alone ? m_editor.processor().getMachines() : nullptr;
-			for(size_t i = 0; machines && i < machines->size(); ++i)
+			if(const auto machines = alone ? m_editor.processor().getMachines() : nullptr)
 			{
-				const auto& machine = (*machines)[i];
-				if(machine.id != raw[0])
-					continue;
-				const auto defaults = Engine::machineDefaults(machine, m_editor.controller().playedKit(), m_track,
-					Engine::AssignScope);
-				std::copy(defaults.begin(), defaults.end(), m_chosenDefaults.begin());
-				m_chosenMachine = raw[0];
-				break;
+				using md::automation::sysex::KitChange;
+				const auto machine = std::find_if(machines->begin(), machines->end(),
+					[&](const md::engine::MachineInfo& _m) { return _m.id == raw[0]; });
+				auto kit = m_editor.controller().playedKit();
+				const auto track = static_cast<uint8_t>(std::clamp(m_track, 0, Engine::TrackCount - 1));
+				if(machine != machines->end() && md::automation::sysex::applyKitChange({KitChange::Kind::Machine, track,
+					KitChange::AssignScope, machine->id}, kit, &machine->defaults))
+				{
+					std::copy(kit.parameters[track].begin(), kit.parameters[track].end(), m_chosenDefaults.begin());
+					m_chosenMachine = raw[0];
+				}
 			}
 		}
 		m_raw = raw;

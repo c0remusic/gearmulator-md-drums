@@ -1,11 +1,13 @@
 // The Kit dump writer against the 32 factory Kits in OS 1.63's flash image (container sections 3 and 4, the
 // factory patch memory of a non-UW and a UW machine): each record made into an MdKit, written as a dump and read
 // back, by parseMdKit and by parseKitDump, gives its record field for field, Links and Chokes included. Also the
-// SET TRIG GROUP and SET MUTE GROUP messages, and the dumps parseMdKit refuses.
+// SET TRIG GROUP and SET MUTE GROUP messages, the Kit-change codec (mdkitchange.h: round trips, the allocating
+// encoders, what OS 1.63 ignores, what ASSIGN MACHINE does), and the dumps parseMdKit refuses.
 //
 // The flash image from GEARMULATOR_MD_FIRMWARE_BIN; 77 without it.
 
 #include "mdProtocol/mdkit.h"
+#include "mdProtocol/mdkitchange.h"
 
 #include "Firmware.h"
 
@@ -141,6 +143,134 @@ namespace
 			"a Track out of range accepted");
 	}
 
+	// The Kit-change codec (mdkitchange.h) without the ROM: every change it encodes it decodes back, the allocating
+	// encoders give its bytes, what OS 1.63 ignores it refuses, and what ASSIGN MACHINE leaves in a Track's parameters
+	void kitChanges()
+	{
+		using Kind = sysex::KitChange::Kind;
+		using sysex::KitChange;
+		const auto bytes = [](const sysex::KitChangeMessage& _m)
+		{
+			return sysex::Message(_m.bytes.begin(), _m.bytes.begin() + _m.size);
+		};
+		const auto roundTrip = [&](const KitChange& _change)
+		{
+			const auto message = sysex::encodeKitChange(_change);
+			require(message.has_value(), "a valid change was not encoded");
+			const auto view = bytes(*message);
+			const auto back = sysex::decodeKitChange(view);
+			require(back && *back == _change, "a change did not decode back from its message");
+			return view;
+		};
+		size_t count = 0;
+		for(uint8_t t = 0; t < g_tracks; ++t)
+		{
+			for(int id = 0; id <= 191; ++id)
+			{
+				for(const uint8_t scope : {uint8_t{0}, uint8_t{1}, KitChange::AssignScope})
+					roundTrip({Kind::Machine, t, scope, static_cast<uint8_t>(id)}), ++count;
+			}
+			for(uint8_t field = 0; field < KitChange::LfoFields; ++field)
+			{
+				const auto& maxima = md::LfoSettings::FieldMaximum;
+				const int maximum = field < maxima.size() ? maxima[field] : 127;
+				for(int value = 0; value <= maximum; ++value)
+					roundTrip({Kind::Lfo, t, field, static_cast<uint8_t>(value)}), ++count;
+			}
+			for(uint8_t target = 0; target <= g_tracks; ++target)
+			{
+				const auto value = target == g_tracks ? MdKit::Off : target;
+				roundTrip({Kind::Link, t, 0, value});
+				roundTrip({Kind::Choke, t, 0, value});
+				count += 2;
+			}
+		}
+		for(uint8_t index = 0; index < 32; ++index)
+			for(int value = 0; value < 128; ++value)
+				roundTrip({Kind::Master, 0, index, static_cast<uint8_t>(value)}), ++count;
+		std::printf("Kit changes: %zu encoded and decoded back\n", count);
+
+		// The allocating encoders are the codec's bytes
+		require(sysex::assignMachine(md::MachineModel::Machinedrum, 2, 130)
+			== bytes(*sysex::encodeKitChange({Kind::Machine, 2, KitChange::AssignScope, 130})), "assignMachine");
+		require(sysex::masterEffectChange(sysex::MasterEffect::Eq, 3, 99)
+			== bytes(*sysex::encodeKitChange({Kind::Master, 0, 2 * 8 + 3, 99})), "masterEffectChange");
+		require(sysex::lfoChange(4, 1, 23) == bytes(*sysex::encodeKitChange({Kind::Lfo, 4, 1, 23})), "lfoChange");
+		require(sysex::linkChange(1, 5) == bytes(*sysex::encodeKitChange({Kind::Link, 1, 0, 5})), "linkChange");
+		require(sysex::chokeChange(1, MdKit::Off) == bytes(*sysex::encodeKitChange({Kind::Choke, 1, 0, MdKit::Off})),
+			"chokeChange");
+
+		// What OS 1.63 ignores
+		const auto decode = [](std::initializer_list<uint8_t> _body)
+		{
+			sysex::Message m{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00};
+			m.insert(m.end(), _body);
+			m.push_back(0xf7);
+			return sysex::decodeKitChange(m);
+		};
+		require(decode({0x5b, 1, 0, 2})->value == 0 && decode({0x5b, 1, 0, 1})->value == 128,
+			"only a UW flag of 1 adds 128");
+		require(decode({0x5b, 1, 0})->index == KitChange::AssignScope && decode({0x5b, 1, 0, 0, 1})->index == 1,
+			"a $5B without and with its scope");
+		require(!decode({0x5b, 16, 0, 0}) && !decode({0x5b, 0, 0x40, 1}), "a $5B out of range");
+		require(!decode({0x62, 0 << 3 | 0, 16}) && !decode({0x62, 3 << 3 | 2, 6}),
+			"a $62 value past its field's range");
+		require(decode({0x62, 3 << 3 | 7, 127})->value == 127, "$62's field 7");
+		require(!decode({0x65, 0, 16}) && !decode({0x66, 0, 0x7e}) && decode({0x66, 0, 0x7f})->value == MdKit::Off,
+			"a Link or Choke target from 16 to 126");
+		require(!decode({0x5d, 8, 0}) && !decode({0x61, 0, 0}), "a master parameter or command out of range");
+
+		// What ASSIGN MACHINE leaves: the scope's pages, a machine's defaults, MID's, CTR-AL's, CTR-RE's and CTR-8P's
+		MdKit kit;
+		for(uint8_t t = 0; t < g_tracks; ++t)
+			std::fill(kit.parameters[t].begin(), kit.parameters[t].end(), static_cast<uint8_t>(90 + t));
+		const std::array<uint8_t, 8> defaults{1, 2, 3, 4, 5, 6, 7, 8};
+		const auto page = [&](const uint8_t _track, const int _page)
+		{
+			std::array<uint8_t, 8> values{};
+			std::copy_n(kit.parameters[_track].begin() + 8 * _page, 8, values.begin());
+			return values;
+		};
+		const std::array<uint8_t, 8> kept{91, 91, 91, 91, 91, 91, 91, 91};
+		require(!sysex::applyKitChange({Kind::Machine, 1, KitChange::AssignScope, 17}, kit, nullptr)
+			&& kit.machine(1) == 0, "a machine the OS lacks was taken");
+		kit.machines[1] = 0x01000000;
+		require(sysex::applyKitChange({Kind::Machine, 1, 0, 17}, kit, &defaults) && kit.machines[1] == 17,
+			"the machine word was not written whole");
+		require(page(1, 0) == defaults && page(1, 1) == kept && page(1, 2) == kept, "scope 0 set more than SYN1-8");
+		sysex::applyKitChange({Kind::Machine, 1, 1, 17}, kit, &defaults);
+		require(page(1, 1) == sysex::os163::Effects && page(1, 2) == kept,
+			"scope 1 did not set the effects page alone");
+		sysex::applyKitChange({Kind::Machine, 1, KitChange::AssignScope, 17}, kit, &defaults);
+		require(page(1, 2) == sysex::os163::Routing, "scope 2 did not set the routing page");
+		sysex::applyKitChange({Kind::Machine, 3, KitChange::AssignScope, 96}, kit, &defaults);
+		require(page(3, 1) == sysex::os163::MidEffects && page(3, 2) == sysex::os163::MidRouting, "MID-01's pages");
+		sysex::applyKitChange({Kind::Machine, 3, KitChange::AssignScope, 112}, kit, &defaults);
+		require(page(3, 1) == sysex::os163::CtrAl && page(3, 2) == sysex::os163::CtrAl, "CTR-AL's pages");
+		sysex::applyKitChange({Kind::Master, 0, 0 * 8 + 2, 99}, kit);	// the Rhythm Echo's third
+		sysex::applyKitChange({Kind::Machine, 3, KitChange::AssignScope, 120}, kit, &defaults);
+		std::array<uint8_t, 8> echo{};
+		std::copy_n(kit.masterEffects.begin() + 8, 8, echo.begin());
+		require(echo[2] == 99 && page(3, 0) == echo, "CTR-RE's SYN1-8 are not the Kit's Rhythm Echo");
+		for(uint8_t t = 0; t < 8; ++t)
+			kit.parameters[t][0] = static_cast<uint8_t>(10 + t);
+		sysex::applyKitChange({Kind::Machine, 2, KitChange::AssignScope, 113}, kit, &defaults);
+		const std::array<uint8_t, 8> aimed{10, 11, 10, 13, 14, 15, 17, 10};	// Track 3's own SYN1 after the first knob
+		require(page(2, 0) == aimed && page(2, 1) == sysex::os163::Ctr8pEffects
+			&& page(2, 2) == sysex::os163::Ctr8pRouting, "CTR-8P's parameters are not its knobs' targets");
+		kit.parameters[2][8] = 99;	// a track past 15
+		kit.parameters[2][9] = 20;	// a parameter, in range
+		sysex::applyKitChange({Kind::Machine, 2, 0, 113}, kit, &defaults);
+		require(kit.parameters[2][8] == sysex::os163::Ctr8pEffects[0] && kit.parameters[2][9] == 20,
+			"CTR-8P's scope 0 did not check its targets");
+
+		// $62's fields 5-7 are LFOS, LFOD and LFOM
+		sysex::applyKitChange({Kind::Lfo, 5, 5, 77}, kit);
+		sysex::applyKitChange({Kind::Lfo, 5, 7, 79}, kit);
+		require(kit.parameters[5][21] == 77 && kit.parameters[5][23] == 79, "$62's fields 5-7 are not LFOS to LFOM");
+		std::printf("Kit changes: refusals and ASSIGN MACHINE as OS 1.63\n");
+	}
+
 	void refusedDumps()
 	{
 		MdKit kit;
@@ -176,6 +306,7 @@ int main()
 	try
 	{
 		groupMessages();
+		kitChanges();
 		refusedDumps();
 
 		const auto* const path = std::getenv("GEARMULATOR_MD_FIRMWARE_BIN");

@@ -9,6 +9,8 @@
 #include "Firmware.h"
 #include "MdEngine.h"
 
+#include "mdProtocol/mdkitchange.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -211,27 +213,27 @@ namespace
 		require(blockDiffs == 0 && accurateDiffs == 0, "the delayed mix is not the engine's mix");
 	}
 
-	// The tables Engine::machineDefaults copies, as OS 1.63 holds them (its ASSIGN MACHINE handler, $2052fe)
+	// The tables ASSIGN MACHINE copies (md::automation::sysex::applyKitChange), as OS 1.63 holds them ($2052fe)
 	void osTables(const md::fw::FlashOs& _os)
 	{
-		using Engine = mdDrums::Engine;
+		namespace os = md::automation::sysex::os163;
 		constexpr uint32_t base = 0x200000;	// the OS image's first address
 		const auto same = [&](const uint32_t _address, const auto& _table, const char* _name)
 		{
 			require(_address >= base && _address - base + _table.size() <= _os.osImage.size(),
 				(std::string(_name) + " lies past the OS image").c_str());
-			const auto* os = _os.osImage.data() + (_address - base);
-			require(std::equal(_table.begin(), _table.end(), os), (std::string(_name) + " is not the OS's").c_str());
+			const auto* image = _os.osImage.data() + (_address - base);
+			require(std::equal(_table.begin(), _table.end(), image), (std::string(_name) + " is not the OS's").c_str());
 		};
-		same(Engine::OsEffectsAddress, Engine::OsEffects, "OsEffects");
-		same(Engine::OsEffectsAddress + 8, Engine::OsRouting, "OsRouting");
-		same(Engine::OsMidEffectsAddress, Engine::OsMidEffects, "OsMidEffects");
-		same(Engine::OsMidEffectsAddress + 8, Engine::OsMidRouting, "OsMidRouting");
-		same(Engine::OsCtrAlAddress, Engine::OsCtrAl, "OsCtrAl");
-		same(Engine::Os8pAddress, Engine::Os8pEffects, "Os8pEffects");
-		same(Engine::Os8pAddress + 8, Engine::Os8pRouting, "Os8pRouting");
-		same(Engine::Os8pAddress + 16, Engine::Os8pTargets, "Os8pTargets");
-		same(Engine::OsCtrBlocksAddress, Engine::OsCtrBlocks, "OsCtrBlocks");
+		same(os::EffectsAddress, os::Effects, "Effects");
+		same(os::EffectsAddress + 8, os::Routing, "Routing");
+		same(os::MidEffectsAddress, os::MidEffects, "MidEffects");
+		same(os::MidEffectsAddress + 8, os::MidRouting, "MidRouting");
+		same(os::CtrAlAddress, os::CtrAl, "CtrAl");
+		same(os::Ctr8pAddress, os::Ctr8pEffects, "Ctr8pEffects");
+		same(os::Ctr8pAddress + 8, os::Ctr8pRouting, "Ctr8pRouting");
+		same(os::Ctr8pAddress + 16, os::Ctr8pTargets, "Ctr8pTargets");
+		same(os::CtrBlocksAddress, os::CtrBlocks, "CtrBlocks");
 		std::printf("ASSIGN MACHINE's tables are OS 1.63's\n");
 	}
 

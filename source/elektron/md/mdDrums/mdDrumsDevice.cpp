@@ -1,6 +1,7 @@
 #include "mdDrumsDevice.h"
 
 #include "mdProtocol/mdautomation.h"
+#include "mdProtocol/mdkitchange.h"
 #include "mdProtocol/mdsysexcodec.h"
 
 #include "synthLib/deviceException.h"
@@ -17,14 +18,7 @@ namespace mdDrums
 		namespace machinedrum = md::automation::machinedrum;
 		constexpr auto g_model = md::MachineModel::Machinedrum;
 
-		constexpr uint8_t g_assignMachine = 0x5b;
-		constexpr uint8_t g_masterEffect = 0x5d;	// to $60: echo, reverb, EQ, dynamix
-		constexpr uint8_t g_lfoChange = 0x62;
-		constexpr uint8_t g_linkChange = 0x65;
-		constexpr uint8_t g_chokeChange = 0x66;
 		constexpr uint8_t g_kitDump = 0x52;
-
-		constexpr uint8_t g_trackOff = 0x7f;	// a Link or Choke off on the wire
 
 		// The Telemetry takes the engine's outputs and Tracks by their index
 		static_assert(Telemetry::OutputCount == Engine::OutputCount && Telemetry::TrackCount == Engine::TrackCount);
@@ -291,99 +285,71 @@ namespace mdDrums
 			return;
 		}
 
-		// The Machinedrum's messages: F0 00 20 3C 02 00 <command> ... F7
-		if(s.size() < 8 || !sysex::codec::hasHeader(g_model, s, s[6]))
-			return;
-		switch(s[6])
+		// The Machinedrum's messages: one change of the Kit, as the OS reads it (mdkitchange.h), or a whole Kit, the
+		// one this Device plays whatever its slot (which allocates: a dump is no realtime message)
+		if(const auto change = sysex::decodeKitChange(s))
 		{
-		case g_assignMachine:
-			// Track, id, then the UW flag and a scope if the message has them, as the OS reads it ($2052fe): only 1
-			// adds 128 to the id; without a scope, all 24 parameters (Engine::AssignScope)
-			if(s.size() >= 10 && s.size() <= 12 && s[7] < Engine::TrackCount)
-				applyMachine(s[7], static_cast<uint8_t>(s[8] | (s[9] == 1 ? 0x80 : 0)),
-					s.size() == 12 ? s[10] : Engine::AssignScope);
-			return;
-		case g_masterEffect:
-		case g_masterEffect + 1:
-		case g_masterEffect + 2:
-		case g_masterEffect + 3:
-			if(s.size() == 10 && s[7] < sysex::MasterEffectParameters)
-			{
-				const auto index = sysex::mdKitMasterIndex(static_cast<uint8_t>(s[6] - g_masterEffect), s[7]);
-				m_kit.masterEffects[index] = s[8];
-				m_engine->setMaster(index, s[8]);
-			}
-			return;
-		case g_lfoChange:
-		{
-			// Fields 0-4 are the LFO's settings, 5-7 its LFOS, LFOD and LFOM; a value past a field's range leaves it
-			// as it was, as the OS does ($205852 on)
-			const auto track = static_cast<uint8_t>(s[7] >> 3), field = static_cast<uint8_t>(s[7] & 7);
-			const auto& maximum = md::LfoSettings::FieldMaximum;
-			if(s.size() != 10 || track >= Engine::TrackCount)
-				return;
-			if(field >= maximum.size())
-			{
-				const auto parameter = static_cast<uint8_t>(Engine::ParamCount - 8 + field);	// LFOS LFOD LFOM
-				m_kit.parameters[track][parameter] = s[8];
-				m_engine->setParam(track, parameter, s[8]);
-				return;
-			}
-			if(s[8] > maximum[field])
-				return;
-			m_kit.lfos[track][field] = s[8];
-			m_engine->setLfo(track, m_kit.lfo(track));
+			applyChange(*change);
 			return;
 		}
-		case g_linkChange:
-		case g_chokeChange:
+		if(s.size() > 6 && sysex::codec::hasHeader(g_model, s, g_kitDump))
 		{
-			const auto track = s[7];
-			if(s.size() != 10 || track >= Engine::TrackCount || (s[8] >= Engine::TrackCount && s[8] != g_trackOff))
-				return;
-			// MdKit::Off is past the Tracks, which switches the engine's Link or Choke off
-			const auto target = s[8] == g_trackOff ? sysex::MdKit::Off : s[8];
-			if(s[6] == g_linkChange)
-			{
-				m_kit.links[track] = target;
-				m_engine->setLink(track, target);
-			}
-			else
-			{
-				m_kit.chokes[track] = target;
-				m_engine->setChoke(track, target);
-			}
-			return;
-		}
-		case g_kitDump:
-			// A whole Kit, the one this Device plays whatever its slot (allocates: a dump is no realtime message)
 			if(auto kit = sysex::parseMdKit(s))
 			{
 				m_kit = *kit;
 				applyKit();
 			}
-			return;
-		default:
-			return;
 		}
 	}
 
-	void Device::applyMachine(const uint8_t _track, const uint8_t _machine, const int _scope)
+	void Device::applyChange(const sysex::KitChange& _change)
 	{
-		// A machine the OS has: any other is no machine to the engine
-		const auto& machines = m_engine->machines();
-		const auto info = std::find_if(machines.begin(), machines.end(),
-			[&](const md::engine::MachineInfo& _m) { return _m.id == _machine; });
-		if(info == machines.end())
+		using Kind = sysex::KitChange::Kind;
+		const auto track = _change.track;
+		if(_change.kind == Kind::Machine)
+		{
+			// A machine the OS has, any other being no machine to the engine; the voice switches at its next Hit
+			const auto& machines = m_engine->machines();
+			const auto info = std::find_if(machines.begin(), machines.end(),
+				[&](const md::engine::MachineInfo& _m) { return _m.id == _change.value; });
+			if(info == machines.end() || !sysex::applyKitChange(_change, m_kit, &info->defaults))
+				return;
+			m_engine->setMachine(track, _change.value);
+			for(uint8_t parameter = 0; parameter < Engine::ParamCount; ++parameter)
+				m_engine->setParam(track, parameter, m_kit.parameters[track][parameter]);
+			m_machinesToReport = static_cast<uint16_t>(m_machinesToReport | 1u << track);
 			return;
-		// As the OS: the Kit takes the whole machine word and the defaults its scope sets, the voice switches at its
-		// next Hit
-		m_kit.machines[_track] = _machine;
-		m_engine->setMachine(_track, _machine);
-		m_kit.parameters[_track] = Engine::machineDefaults(*info, m_kit, _track, _scope);
-		for(uint8_t parameter = 0; parameter < Engine::ParamCount; ++parameter)
-			m_engine->setParam(_track, parameter, m_kit.parameters[_track][parameter]);
-		m_machinesToReport = static_cast<uint16_t>(m_machinesToReport | 1u << _track);
+		}
+		if(!sysex::applyKitChange(_change, m_kit))
+			return;
+		switch(_change.kind)
+		{
+		case Kind::Master:
+		{
+			constexpr auto parameters = sysex::MasterEffectParameters;
+			const auto index = sysex::mdKitMasterIndex(static_cast<uint8_t>(_change.index / parameters),
+				static_cast<uint8_t>(_change.index % parameters));
+			m_engine->setMaster(index, m_kit.masterEffects[index]);
+			return;
+		}
+		case Kind::Lfo:
+			// The LFO's five settings, or LFOS, LFOD and LFOM, the Track's last three parameters
+			if(_change.index < md::LfoSettings::FieldMaximum.size())
+				m_engine->setLfo(track, m_kit.lfo(track));
+			else
+				m_engine->setParam(track, Engine::ParamCount - sysex::KitChange::LfoFields + _change.index,
+					_change.value);
+			return;
+		case Kind::Link:
+			// MdKit::Off is past the Tracks, which switches the engine's Link or Choke off
+			m_engine->setLink(track, m_kit.links[track]);
+			return;
+		case Kind::Choke:
+			m_engine->setChoke(track, m_kit.chokes[track]);
+			return;
+		case Kind::Machine:
+			return;
+		}
 	}
 
 	void Device::reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut)

@@ -10,6 +10,7 @@
 #include "mdDrumsTelemetry.h"
 
 #include "mdProtocol/mdautomation.h"
+#include "mdProtocol/mdkitchange.h"
 
 #include "synthLib/plugin.h"
 
@@ -325,18 +326,19 @@ namespace
 			"an LFO shape past its range was sent");
 	}
 
-	// ASSIGN MACHINE and SET LFO PARAM as OS 1.63 reads them ($2052fe, $205852): the forms of $5B, the 24 parameters each
-	// machine family gets, and $62's fields 5-7 and values out of range
+	// ASSIGN MACHINE and SET LFO PARAM through the Device (the codec's rules are mdProtocolKitTest's): a $5B sets the
+	// scope's parameters and reports the 24, a machine the OS lacks changes nothing, a $62 out of range is ignored and
+	// its fields 5-7 set LFOS, LFOD and LFOM
 	void assignAndLfo(const std::vector<uint8_t>& _flash)
 	{
-		using Engine = mdDrums::Engine;
+		namespace os = sysex::os163;
 		Rig rig(_flash, 44100.0f);
 		const auto& machines = rig.device->machines();
-		const auto info = [&](const uint8_t _id) -> const md::engine::MachineInfo&
+		const auto defaults = [&](const uint8_t _id)
 		{
 			const auto it = std::find_if(machines.begin(), machines.end(), [&](const auto& _m) { return _m.id == _id; });
 			require(it != machines.end(), "the OS has no machine " + std::to_string(_id));
-			return *it;
+			return it->defaults;
 		};
 		// $5B's body: track, id, then the UW flag and a scope when given (-1 leaves one out)
 		const auto assign = [&](const uint8_t _track, const uint8_t _id, const int _uw, const int _scope)
@@ -365,70 +367,24 @@ namespace
 		};
 		const auto kit = [&]() -> const sysex::MdKit& { return rig.device->kit(); };
 
-		// Without a scope (11 bytes, and 10 without the UW flag), the machine's SYN1-8 and the OS's effects and routing
 		setPage(1, machinedrum::Effects, 99);
 		setPage(1, machinedrum::Routing, 99);
 		assign(1, 17, 0, -1);	// TRX-SD
-		require(kit().machine(1) == 17 && page(1, 0) == info(17).defaults && page(1, 1) == Engine::OsEffects
-			&& page(1, 2) == Engine::OsRouting, "$5B did not set TRX-SD's 24 parameters");
+		require(kit().machine(1) == 17 && page(1, 0) == defaults(17) && page(1, 1) == os::Effects
+			&& page(1, 2) == os::Routing, "$5B did not set TRX-SD's 24 parameters");
 		require(reported(rig, 1) == 24, "$5B did not report the 24 parameters");
-		setPage(1, machinedrum::Routing, 99);
-		assign(1, 16, -1, -1);	// TRX-BD, without the UW flag
-		require(kit().machine(1) == 16 && page(1, 0) == info(16).defaults && page(1, 2) == Engine::OsRouting,
-			"a $5B without the UW flag was not taken");
-
-		// A scope: 0 sets SYN1-8, 1 the effects page too, 2 all 24
 		setPage(1, machinedrum::Effects, 99);
-		setPage(1, machinedrum::Routing, 99);
-		assign(1, 17, 0, 0);
+		assign(1, 0, 1, 0);	// ROM-01, scope 0
 		const std::array<uint8_t, 8> kept{99, 99, 99, 99, 99, 99, 99, 99};
-		require(page(1, 0) == info(17).defaults && page(1, 1) == kept && page(1, 2) == kept, "scope 0 set more than SYN1-8");
-		assign(1, 16, 0, 1);
-		require(page(1, 0) == info(16).defaults && page(1, 1) == Engine::OsEffects && page(1, 2) == kept,
-			"scope 1 did not set the effects page alone");
-		assign(1, 17, 0, 2);
-		require(page(1, 2) == Engine::OsRouting, "scope 2 did not set the routing page");
-
-		// Only a UW flag of 1 adds 128
-		assign(2, 0, 1, -1);
-		require(kit().machine(2) == 128, "the UW flag did not make ROM-01");
-		assign(2, 0, 2, -1);
-		require(kit().machine(2) == 0, "a UW flag of 2 added 128");
-
-		// MID machines' own pages, CTR-AL's 64s, CTR-RE's Rhythm Echo
-		assign(3, 96, 0, -1);
-		require(page(3, 1) == Engine::OsMidEffects && page(3, 2) == Engine::OsMidRouting, "MID-01's pages are not the OS's");
-		assign(3, 112, 0, -1);
-		require(page(3, 1) == Engine::OsCtrAl && page(3, 2) == Engine::OsCtrAl, "CTR-AL's pages are not 64");
-		rig.send(MidiEventSource::Editor, *sysex::masterEffectChange(sysex::MasterEffect::Echo, 2, 99));
-		rig.process();
-		assign(3, 120, 0, -1);
-		std::array<uint8_t, 8> echo{};
-		std::copy_n(kit().masterEffects.begin() + 8, 8, echo.begin());
-		require(echo[2] == 99 && page(3, 0) == echo, "CTR-RE's SYN1-8 are not the Kit's Rhythm Echo");
-
-		// CTR-8P: its knobs take the values of the SYN1 they aim at (Track 3's own before it, as the OS reads it), its
-		// pages its knobs' targets; scope 0 only puts a target out of range back
-		for(uint8_t t = 0; t < 8; ++t)
-			rig.send(MidiEventSource::Editor, cc(machinedrum::Synthesis, t, 0, static_cast<uint8_t>(10 + t)));
-		rig.process();
-		assign(2, 113, 0, -1);
-		const std::array<uint8_t, 8> aimed{10, 11, 10, 13, 14, 15, 17, 10};
-		require(page(2, 0) == aimed && page(2, 1) == Engine::Os8pEffects && page(2, 2) == Engine::Os8pRouting,
-			"CTR-8P's parameters are not its knobs' targets");
-		rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 2, 0, 99));	// a track past 15
-		rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 2, 1, 20));	// a parameter, in range
-		rig.process();
-		assign(2, 113, 0, 0);
-		require(page(2, 1)[0] == Engine::Os8pEffects[0] && page(2, 1)[1] == 20, "CTR-8P's scope 0 did not check its targets");
-
-		// A machine the OS lacks: nothing changes, nothing is reported
+		require(kit().machine(1) == 128 && page(1, 0) == defaults(128) && page(1, 1) == kept,
+			"a $5B with the UW flag and scope 0 was not taken");
+		assign(1, 16, -1, -1);	// TRX-BD, without the UW flag
+		require(kit().machine(1) == 16 && page(1, 1) == os::Effects, "a $5B without the UW flag was not taken");
 		const auto before = kit();
 		assign(4, 6, 0, -1);
 		require(kit() == before && rig.midiOut.empty(), "a machine the OS lacks was taken");
-		std::printf("$5B: scopes, UW flag, MID, CTR-AL, CTR-RE, CTR-8P and absent machines as OS 1.63\n");
+		std::printf("$5B: scopes, UW flag, the 24 parameters reported, absent machines as OS 1.63\n");
 
-		// $62: a value out of range leaves the field; fields 5-7 are LFOS, LFOD, LFOM
 		const auto lfo = [&](const uint8_t _track, const uint8_t _field, const uint8_t _value)
 		{
 			rig.send(MidiEventSource::Editor, {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x62,
@@ -437,15 +393,10 @@ namespace
 		};
 		lfo(5, 0, 7);
 		lfo(5, 0, 16);
-		lfo(5, 2, 2);
-		lfo(5, 2, md::LfoSettings::ShapeCount);
-		require(kit().lfo(5).track == 7 && kit().lfo(5).shape1 == 2, "$62 past a field's range changed it");
+		require(kit().lfo(5).track == 7, "$62 past a field's range changed it");
 		lfo(5, 5, 77);
-		lfo(5, 6, 78);
-		lfo(5, 7, 79);
-		require(kit().parameters[5][21] == 77 && kit().parameters[5][22] == 78 && kit().parameters[5][23] == 79,
-			"$62's fields 5-7 did not set LFOS, LFOD and LFOM");
-		std::printf("$62: out of range ignored, fields 5-7 set LFOS LFOD LFOM\n");
+		require(kit().parameters[5][21] == 77, "$62's field 5 did not set LFOS");
+		std::printf("$62: out of range ignored, field 5 sets LFOS\n");
 	}
 
 	// Locks (ADR 0003), heard on Main against takes that differ only in them. Every take boots the same Device, sets

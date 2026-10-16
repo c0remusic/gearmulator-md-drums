@@ -14,6 +14,7 @@
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlInterfaces.h"
+#include "mdProtocol/mdkitchange.h"
 #include "synthLib/plugin.h"
 
 #include "RmlUi/Core/Context.h"
@@ -258,7 +259,8 @@ namespace
 		const auto& names = mdDrums::Engine::paramNames();
 		for(size_t p = 8; p < names.size(); ++p)
 		{
-			const auto os = p < 16 ? mdDrums::Engine::OsEffects[p - 8] : mdDrums::Engine::OsRouting[p - 16];
+			namespace os163 = md::automation::sysex::os163;
+			const auto os = p < 16 ? os163::Effects[p - 8] : os163::Routing[p - 16];
 			require(parameter(_processor, names[p], 0).getUnnormalizedValue() == os,
 				std::string(names[p]) + " did not take the OS's default with the new machine");
 		}

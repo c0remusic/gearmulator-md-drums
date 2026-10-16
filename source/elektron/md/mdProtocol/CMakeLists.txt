@@ -8,6 +8,7 @@ project(mdProtocol)
 add_library(mdProtocol STATIC
 	mdautomation.cpp mdautomation.h
 	mdkit.cpp mdkit.h
+	mdkitchange.cpp mdkitchange.h
 	mdlfosettings.h
 	mdmachines.cpp mdmachines.h
 	mdsysexautomation.cpp mdsysexautomation.h

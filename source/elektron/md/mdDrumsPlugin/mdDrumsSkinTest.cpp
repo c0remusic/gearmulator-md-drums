@@ -41,6 +41,7 @@
 #include "juceRmlUi/juceRmlLookAndFeel.h"
 #include "juceRmlUi/rmlInterfaces.h"
 
+#include "mdProtocol/mdkitchange.h"
 #include "mdProtocol/mdmachines.h"
 
 #include "Firmware.h"
@@ -691,10 +692,11 @@ namespace
 		require(machines != nullptr, "the Processor holds no machines");
 		mdDrums::HitPreview::Request request;
 		request.kit = controller.playedKit();
+		using md::automation::sysex::KitChange;
 		for(const auto& machine : *machines)
 			if(machine.id == 33)
-				request.kit.parameters[0] = mdDrums::Engine::machineDefaults(machine, request.kit, 0,
-					mdDrums::Engine::AssignScope);
+				md::automation::sysex::applyKitChange({KitChange::Kind::Machine, 0, KitChange::AssignScope, 33},
+					request.kit, &machine.defaults);
 		request.track = 0;
 		request.velocity = 90;
 		const auto flash = mdDrums::Engine::findFlashImage({});

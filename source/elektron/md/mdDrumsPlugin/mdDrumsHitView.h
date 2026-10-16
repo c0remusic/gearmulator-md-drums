@@ -137,7 +137,7 @@ namespace mdDrums
 		int m_chosenMachine = -1;				// a machine just chosen alone, previewed with its own parameters
 		double m_chosenAtMs = 0.0;
 		std::array<int, ParamCount> m_paramsBefore{};	// the parameters it came with, until the Device reports its own
-		std::array<int, ParamCount> m_chosenDefaults{};	// its own (Engine::machineDefaults)
+		std::array<int, ParamCount> m_chosenDefaults{};	// its own (sysex::applyKitChange)
 		bool m_soundChanged = false;	// a change not asked for yet: no screen showed
 		uint32_t m_requested = 0;		// the request being rendered; 0: none
 		uint32_t m_liveAtRequest = 0;	// the live capture when the sound changed

@@ -1,5 +1,6 @@
 #include "mdkit.h"
 
+#include "mdkitchange.h"
 #include "mdsysexcodec.h"
 
 #include <algorithm>
@@ -11,11 +12,8 @@ namespace md::automation::sysex
 	namespace
 	{
 		constexpr uint8_t g_kitDump = 0x52;
-		constexpr uint8_t g_linkChange = 0x65;		// SET TRIG GROUP
-		constexpr uint8_t g_chokeChange = 0x66;		// SET MUTE GROUP
 		constexpr uint8_t g_version = 0x04;
 		constexpr uint8_t g_revision = 0x01;
-		constexpr uint8_t g_offOnTheWire = 0x7f;
 
 		constexpr size_t g_tracks = machinedrum::TrackCount;
 
@@ -37,14 +35,6 @@ namespace md::automation::sysex
 		{
 			for(size_t i = 0; i < _count; ++i)
 				_out.push_back(static_cast<uint8_t>(_data[i] & 0x7f));
-		}
-
-		std::optional<Message> groupChange(const uint8_t _command, const uint8_t _track, const uint8_t _target)
-		{
-			if(_track >= g_tracks || (_target >= g_tracks && _target != MdKit::Off))
-				return std::nullopt;
-			return message(MachineModel::Machinedrum, _command,
-				{_track, _target == MdKit::Off ? g_offOnTheWire : _target});
 		}
 	}
 
@@ -183,11 +173,11 @@ namespace md::automation::sysex
 
 	std::optional<Message> linkChange(const uint8_t _track, const uint8_t _target)
 	{
-		return groupChange(g_linkChange, _track, _target);
+		return kitChangeMessage({KitChange::Kind::Link, _track, 0, _target});
 	}
 
 	std::optional<Message> chokeChange(const uint8_t _track, const uint8_t _target)
 	{
-		return groupChange(g_chokeChange, _track, _target);
+		return kitChangeMessage({KitChange::Kind::Choke, _track, 0, _target});
 	}
 }

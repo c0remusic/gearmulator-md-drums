@@ -9,6 +9,11 @@
 #include <array>
 #include <memory>
 
+namespace md::automation::sysex
+{
+	struct KitChange;
+}
+
 namespace mdDrums
 {
 	// MD Drums' synthLib::Device: a Machinedrum seen through its MIDI (ADR 0002), the engines without the OS behind it.
@@ -73,7 +78,7 @@ namespace mdDrums
 		void applyControlChange(const synthLib::SMidiEvent& _event);
 		void applySysex(const synthLib::SMidiEvent& _event);
 		void applyKit();
-		void applyMachine(uint8_t _track, uint8_t _machine, int _scope);
+		void applyChange(const md::automation::sysex::KitChange& _change);
 		void reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut);
 		void applyMixer();
 		void render(const synthLib::TAudioOutputs& _outputs, size_t _offset, size_t _count);
@@ -102,7 +107,7 @@ namespace mdDrums
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 
-		// The Tracks whose new machine's 24 parameters (Engine::machineDefaults) the Device says back as CCs, for the
+		// The Tracks whose new machine's 24 parameters (sysex::applyKitChange) the Device says back as CCs, for the
 		// editor, once the block is done
 		// (the values the block left, should the editor have set some after the machine)
 		uint16_t m_machinesToReport = 0;

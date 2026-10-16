@@ -1,6 +1,7 @@
 #include "mdsysexautomation.h"
 
 #include "mdkit.h"
+#include "mdkitchange.h"
 #include "mdmachines.h"
 #include "mdsysexcodec.h"
 
@@ -146,8 +147,6 @@ namespace md::automation::sysex
 		constexpr uint8_t g_patternRequest = 0x68;
 		constexpr uint8_t g_assignMachine = 0x5b;
 		constexpr uint8_t g_trackRouting = 0x5c;
-		constexpr uint8_t g_masterEffect = 0x5d;    // RHYTHM ECHO; then reverb, EQ, dynamix
-		constexpr uint8_t g_lfoChange = 0x62;
 		constexpr uint8_t g_statusRequest = 0x70;
 		constexpr uint8_t g_setStatus = 0x71;
 		constexpr uint8_t g_statusResponse = 0x72;
@@ -1306,24 +1305,24 @@ namespace md::automation::sysex
 			return std::nullopt;
 		if(_model == MachineModel::Monomachine)
 			return message(_model, g_assignMachine, {_track, static_cast<uint8_t>(_machine), 0x00});
-		return message(_model, g_assignMachine,
-			{_track, static_cast<uint8_t>(_machine & 0x7f), static_cast<uint8_t>(_machine >= 128 ? 1 : 0)});
+		return kitChangeMessage({KitChange::Kind::Machine, _track, KitChange::AssignScope,
+			static_cast<uint8_t>(_machine)});
 	}
 
 	std::optional<Message> masterEffectChange(const MasterEffect _effect, const uint8_t _parameter, const uint8_t _value)
 	{
 		const auto effect = static_cast<uint8_t>(_effect);
-		if(effect >= MasterEffectCount || _parameter >= MasterEffectParameters || _value > 0x7f)
+		if(effect >= MasterEffectCount || _parameter >= MasterEffectParameters)
 			return std::nullopt;
-		return message(MachineModel::Machinedrum, static_cast<uint8_t>(g_masterEffect + effect), {_parameter, _value});
+		const auto index = static_cast<uint8_t>(effect * MasterEffectParameters + _parameter);
+		return kitChangeMessage({KitChange::Kind::Master, 0, index, _value});
 	}
 
 	std::optional<Message> lfoChange(const uint8_t _track, const uint8_t _field, const uint8_t _value)
 	{
-		const auto& maximum = LfoSettings::FieldMaximum;
-		if(_track >= machinedrum::TrackCount || _field >= maximum.size() || _value > maximum[_field])
+		if(_field >= LfoSettings::FieldMaximum.size())
 			return std::nullopt;
-		return message(MachineModel::Machinedrum, g_lfoChange, {static_cast<uint8_t>(_track << 3 | _field), _value});
+		return kitChangeMessage({KitChange::Kind::Lfo, _track, _field, _value});
 	}
 
 	std::optional<Message> trackRouting(const uint8_t _track, const TrackOutput _output)

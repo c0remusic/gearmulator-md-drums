@@ -55,8 +55,8 @@ namespace mdDrums
 		Telemetry& getTelemetry() const { return *m_telemetry; }
 		// The OS's tables the Device's Tracks' effects read, for the Filter and EQ screen; none without a Device
 		std::shared_ptr<const md::engine::TrackFx::Tables> getFxTables() const { return std::atomic_load(&m_fxTables); }
-		// The OS's machines (their SYN1-8 defaults, Engine::machineDefaults), for the Hit screen's preview and the Kit
-		// played; none without a Device
+		// The OS's machines (their SYN1-8 defaults, for sysex::applyKitChange), for the Hit screen's preview and the
+		// Kit played; none without a Device
 		using Machines = std::vector<md::engine::MachineInfo>;
 		std::shared_ptr<const Machines> getMachines() const { return std::atomic_load(&m_machines); }
 		// The host's tempo as last sent to the Device; 0 before the host gives one (the engine then runs at 125)
