@@ -4,13 +4,23 @@
 
 #include "juceRmlUi/juceRmlComponent.h"
 #include "juceRmlUi/rmlElemKnob.h"
+#include "juceRmlUi/rmlInterfaces.h"
 
 #include "juce_events/juce_events.h"
 
 namespace rmlPlugin
 {
+	namespace
+	{
+		// The bindings alive, on the message thread (where bindings are made and deleted, and where an update posted
+		// from elsewhere runs): that update runs only for one still there
+		std::set<const ParameterToElementsBinding*> g_alive;
+	}
+
 	ParameterToElementsBinding::ParameterToElementsBinding(RmlParameterBinding& _binding, pluginLib::Parameter* _parameter, Rml::Element* _firstElement) : m_binding(_binding), m_parameter(_parameter)
 	{
+		g_alive.insert(this);
+
 		m_listener.set(_parameter, [this](pluginLib::Parameter* /*_p*/)
 		{
 			onParameterValueChanged();
@@ -36,6 +46,8 @@ namespace rmlPlugin
 
 	ParameterToElementsBinding::~ParameterToElementsBinding()
 	{
+		g_alive.erase(this);
+
 		while (!m_elements.empty())
 		{
 			auto it = m_elements.begin();
@@ -89,15 +101,20 @@ namespace rmlPlugin
 		}
 		else
 		{
-			juce::MessageManager::callAsync([this]()
+			// The binding may be gone by then (another Track shown, the skin reloaded, the editor closed)
+			juce::MessageManager::callAsync([self = this]()
 			{
-				updateElementsFromParameter();
+				if (g_alive.count(self))
+					self->updateElementsFromParameter();
 			});
 		}
 	}
 
 	void ParameterToElementsBinding::updateElementsFromParameter()
 	{
+		// The OpenGL thread renders the document under its access lock; an RmlUi event already holds it (it is
+		// recursive), a parameter's notification from the message loop does not
+		juceRmlUi::RmlInterfaces::ScopedAccess access(m_binding.getRmlComponent());
 		IgnoreChangeEvents ignore(*this);
 
 		for (auto* element : m_elements)
