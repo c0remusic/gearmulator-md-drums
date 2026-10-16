@@ -197,6 +197,12 @@ namespace mdDrums
 		const auto status = _event.a & 0xf0;
 		if(status == synthLib::M_NOTEON && _event.c > 0)
 		{
+			if(_event.b >= FirstHelloNote)
+			{
+				hello(_event.b - FirstHelloNote, _event.c);
+				return;
+			}
+			m_helloNotes = 0;
 			const auto track = static_cast<int>(_event.b) - FirstNote;
 			const auto param = static_cast<int>(_event.b) - FirstLockNote;
 			if(param >= 0 && param < Engine::ParamCount)
@@ -236,6 +242,25 @@ namespace mdDrums
 		}
 		if(status == synthLib::M_CONTROLCHANGE && _event.source != synthLib::MidiEventSource::Host)
 			applyControlChange(_event);
+	}
+
+	void Device::hello(const int _note, const uint8_t _velocity)
+	{
+		// A note out of order cancels the hello under way; the first note starts one
+		if(_note != m_helloNotes)
+		{
+			m_helloNotes = 0;
+			if(_note != 0)
+				return;
+		}
+		if(_note == 0)
+			m_helloId = 0;
+		m_helloId = m_helloId << 6 | ((_velocity - 1u) & 0x3fu);
+		if(++m_helloNotes < HelloNotes)
+			return;
+		m_helloNotes = 0;
+		if(m_telemetry && m_helloId)
+			m_telemetry->hello(m_helloId);
 	}
 
 	void Device::applyControlChange(const synthLib::SMidiEvent& _event)

@@ -28,6 +28,11 @@ namespace mdDrums
 	public:
 		static constexpr int FirstNote = 36;
 		static constexpr int FirstLockNote = 64;	// SYN1 to LFOM, the engine's parameter order; velocity: lockValue()
+		// md-drums-seq's hello (KitFiles): note-ons 124 to 127 in that order, on any channel, each velocity 1 + six
+		// bits of the device's id, the most significant first; another note-on between them cancels it. They play
+		// nothing.
+		static constexpr int FirstHelloNote = 124;
+		static constexpr int HelloNotes = 4;
 		// Main left and right, then Out 01 to 15, each the sum of the Tracks the mixer puts on it (messages::OutCount)
 		static constexpr int OutCount = messages::OutCount;
 		static constexpr int OutputCount = 2 + OutCount;
@@ -76,6 +81,7 @@ namespace mdDrums
 	private:
 		void apply(const synthLib::SMidiEvent& _event);
 		void applyControlChange(const synthLib::SMidiEvent& _event);
+		void hello(int _note, uint8_t _velocity);
 		void applySysex(const synthLib::SMidiEvent& _event);
 		void applyKit();
 		void applyChange(const md::automation::sysex::KitChange& _change);
@@ -104,6 +110,9 @@ namespace mdDrums
 		// The last channel-1 Hit note's Track and the sample it came at: a Lock on channel 1 at that sample goes with it
 		int m_lastHitTrack = 0;
 		int64_t m_lastHitPosition = -1;
+		// md-drums-seq's hello under way: the notes taken so far and their bits
+		int m_helloNotes = 0;
+		uint32_t m_helloId = 0;
 		md::automation::sysex::MdKit m_kit;
 		messages::Mixer m_mixer;
 

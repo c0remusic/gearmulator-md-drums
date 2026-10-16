@@ -9,9 +9,10 @@
 
 namespace mdDrums
 {
-	// What the editor shows of the sound (ticket 16 of the editor map): the Device writes it on the audio thread, the
-	// editor reads it on the message thread, without a lock or an allocation. The Processor owns it and shares it with
-	// every Device it creates, so that it outlives any Device; a replaced or dummy Device leaves it as it was.
+	// What the editor shows of the sound (ticket 16 of the editor map), and md-drums-seq's hellos (KitFiles): the
+	// Device writes it on the audio thread, the editor and the Controller read it on the message thread, without a lock
+	// or an allocation. The Processor owns it and shares it with every Device it creates, so that it outlives any
+	// Device; a replaced or dummy Device leaves it as it was.
 	class Telemetry
 	{
 	public:
@@ -85,13 +86,19 @@ namespace mdDrums
 			return static_cast<float>(word.load(std::memory_order_relaxed)) / 128.0f;
 		}
 
+		// Audio thread: md-drums-seq's hello, its device's id (KitFiles)
+		void hello(const uint32_t _id) { m_hello.store(_id, std::memory_order_release); }
+		// Controller: the last hello's id since the last take; 0 for none
+		uint32_t takeHello() { return m_hello.exchange(0, std::memory_order_acq_rel); }
+
 		// Audio thread: a Track struck (its own Hit or a Link's)
 		void hit(const int _track)
 		{
 			m_hits[static_cast<size_t>(_track)].fetch_add(1, std::memory_order_release);
 		}
 
-		// Audio thread: a note on that plays nothing, outside 36-51 (Tracks) and 64-87 (Locks): the editor says which
+		// Audio thread: a note on that plays nothing, outside 36-51 (Tracks), 64-87 (Locks) and 124-127 (md-drums-seq's
+		// hello): the editor says which
 		// notes do (ticket 35; Live's computer keyboard starts at C3, 60)
 		void unplayed(const uint8_t _note)
 		{
@@ -188,6 +195,7 @@ namespace mdDrums
 
 		std::array<std::atomic<float>, OutputCount> m_peaks{};
 		std::array<std::atomic<uint32_t>, TrackCount> m_hits{};
+		std::atomic<uint32_t> m_hello{0};
 		std::array<std::array<std::atomic<uint16_t>, ParamCount>, TrackCount> m_played{};
 		std::array<TrackCaptures, TrackCount> m_captures{};
 		std::atomic<uint32_t> m_unplayed{0};

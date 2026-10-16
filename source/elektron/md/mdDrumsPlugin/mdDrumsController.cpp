@@ -255,6 +255,16 @@ namespace mdDrums
 			for(auto* parameter : parameters)
 				parameter->flushRealtimeValueToUi();
 		syncRelays();
+		followKitFiles();
+	}
+
+	void Controller::followKitFiles()
+	{
+		const auto now = juce::Time::getMillisecondCounterHiRes();
+		if(const auto id = static_cast<Processor&>(getProcessor()).getTelemetry().takeHello())
+			m_kitFiles.hello(id, now);
+		if(m_kitFiles.due(now))
+			m_kitFiles.step(KitFiles::text(playedKit()), now);
 	}
 
 	void Controller::relayChanged(const uint8_t _index, const int _value)

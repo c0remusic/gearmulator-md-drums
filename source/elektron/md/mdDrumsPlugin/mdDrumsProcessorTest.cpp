@@ -28,6 +28,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -365,6 +366,36 @@ namespace
 			"not every Track and master parameter, or not every relay");
 	}
 
+	// md-drums-seq's hello through the host's MIDI: the file it names holds the Kit played, and goes with the processor
+	void kitFile()
+	{
+		constexpr uint32_t id = 0x1f2e3d;
+		const auto file = mdDrums::KitFiles::defaultFolder() / "1f2e3d.kit";
+		std::string text;
+		{
+			mdDrums::Processor processor(true);
+			auto& host = static_cast<juce::AudioProcessor&>(processor);
+			host.setRateAndBufferSizeDetails(44100.0, g_block);
+			host.prepareToPlay(44100.0, g_block);
+			juce::AudioBuffer<float> buffer(host.getTotalNumOutputChannels(), g_block);
+			juce::MidiBuffer midi;
+			for(int note = 0; note < mdDrums::Device::HelloNotes; ++note)
+			{
+				const auto velocity = static_cast<juce::uint8>(1 + (id >> (18 - 6 * note) & 0x3f));
+				midi.addEvent(juce::MidiMessage::noteOn(1, mdDrums::Device::FirstHelloNote + note, velocity), 10);
+			}
+			process(host, buffer, midi);
+			processor.getController().processPendingMidiMessages();
+			std::ifstream in(file, std::ios::binary);
+			text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+		}
+		std::printf("kit file for md-drums-seq: %s, %zu bytes, %s\n", file.u8string().c_str(), text.size(),
+			text.substr(0, text.find('\n', text.find("track 1 "))).c_str());
+		require(text.rfind("md-drums-kit 1\nkit ", 0) == 0 && text.find("\ntrack 1 28 TRX-B2 ") != std::string::npos,
+			"a hello did not give its device a file with the Kit played");
+		require(!std::filesystem::exists(file), "the file stayed after the processor went");
+	}
+
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();
@@ -696,6 +727,7 @@ int main()
 		}
 		flashLoader(44100.0);
 		everyParameter();
+		kitFile();
 		std::cout << "mdDrumsProcessorTest: PASS\n";
 		return 0;
 	}

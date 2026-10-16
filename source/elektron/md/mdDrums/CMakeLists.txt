@@ -10,6 +10,7 @@ add_library(mdDrums STATIC
 	mdDrumsEngine.cpp mdDrumsEngine.h
 	mdDrumsFilterResponse.cpp mdDrumsFilterResponse.h
 	mdDrumsHitPreview.cpp mdDrumsHitPreview.h
+	mdDrumsKitFiles.cpp mdDrumsKitFiles.h
 	mdDrumsLfo.cpp mdDrumsLfo.h
 	mdDrumsMessages.cpp mdDrumsMessages.h
 	mdDrumsTelemetry.h

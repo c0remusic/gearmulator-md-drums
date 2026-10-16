@@ -67,3 +67,19 @@ A Lock on channel 1 now goes with the last channel-1 Hit received just before it
 Track 1's, as before. Channels 2-16 are unchanged. Live play is too: a Max for Live device's notes all reach MD Drums on
 channel 1, so the last channel-1 Hit is the last Hit. `mdDrumsDeviceTest` and `mdDrumsVst3HostTest` add a channel-5
 (and a channel-3) Hit between a channel-1 Hit and its Locks.
+
+## Amendment (2026-10-16): notes 124-127 are md-drums-seq's hello
+
+md-drums-seq shows each Track's Machine and, later, the names of SYN1-8 and the Kit's values behind the Locks. The LOM
+shows a plug-in's parameters only once configured in Live, 128 at most, which "Prepare Push list" already fills; so
+MD Drums writes them into a file the device names through the MIDI it already sends (md-drums-seq's ADR 0003).
+
+Four note-ons 124, 125, 126 and 127, in that order, on any channel, each velocity 1 + six bits of a 24-bit id (the
+most significant first), are the device's hello; any other note-on between them cancels it, note-offs do not. They
+trigger nothing, lock nothing, and are no note that plays nothing. The Device publishes the id (`Telemetry::hello`);
+the Controller's timer writes `<temp>/md-drums-seq/<id>.kit` (`KitFiles`): the Kit played's name, each Track's
+Machine id, name and SYN1-8 names, and its 24 Kit values in the Locks' order, version 1, one record per line. The
+file is written at once for a new id and again when the Kit played changes, at most four times a second, whole
+(renamed over itself); it goes fifteen seconds after its device's last hello, and with the plug-in. Notes 36-51 and
+64-87 are unchanged. `mdDrumsDeviceTest` checks the hello and the files on a clock of its own, `mdDrumsProcessorTest`
+a hello through the host's MIDI.

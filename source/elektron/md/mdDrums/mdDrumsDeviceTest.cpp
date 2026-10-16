@@ -7,6 +7,7 @@
 
 #include "mdDrumsAllocationCounter.h"
 #include "mdDrumsDevice.h"
+#include "mdDrumsKitFiles.h"
 #include "mdDrumsTelemetry.h"
 
 #include "mdProtocol/mdautomation.h"
@@ -19,8 +20,11 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -619,6 +623,99 @@ namespace
 		require(count == 1 && rig.telemetry->lastUnplayed() == 60, "note 60 was not the one note that plays nothing");
 	}
 
+	// md-drums-seq's hello (its ADR 0003, ours amended): note-ons 124-127 in order give the device's id, sound nothing
+	// and count as no note that plays nothing; another note-on between them cancels it, note-offs do not
+	void hello(const std::vector<uint8_t>& _flash)
+	{
+		Rig rig(_flash, 44100.0f);
+		rig.settle();
+		constexpr uint32_t id = 0xa5c3e1;
+		const auto bits = [](const int _note) { return static_cast<uint8_t>(1 + (id >> (18 - 6 * _note) & 0x3f)); };
+		for(int note = 0; note < mdDrums::Device::HelloNotes; ++note)
+		{
+			const auto pitch = static_cast<uint8_t>(mdDrums::Device::FirstHelloNote + note);
+			rig.send(MidiEventSource::Host, {0x92, pitch, bits(note)});
+			rig.send(MidiEventSource::Host, {0x82, pitch, 0});
+		}
+		const auto outs = rig.listenOuts();
+		const auto heard = rig.telemetry->takeHello();
+		std::printf("hello: id %06x heard, the Outs %.4f, %u notes that play nothing\n", heard, outs,
+			rig.telemetry->unplayedCount());
+		require(heard == id && outs == 0.0f && rig.telemetry->unplayedCount() == 0,
+			"a hello was not heard as its id, or it sounded or counted as notes that play nothing");
+		require(rig.telemetry->takeHello() == 0, "a hello was taken twice");
+
+		// Interrupted by a Hit: no id
+		rig.send(MidiEventSource::Host, {0x90, 124, bits(0)});
+		rig.send(MidiEventSource::Host, {0x90, 125, bits(1)});
+		rig.send(MidiEventSource::Host, {0x90, 36, 100});
+		rig.send(MidiEventSource::Host, {0x90, 126, bits(2)});
+		rig.send(MidiEventSource::Host, {0x90, 127, bits(3)});
+		rig.process();
+		require(rig.telemetry->takeHello() == 0, "a hello interrupted by a Hit gave an id");
+	}
+
+	// The files md-drums-seq reads (KitFiles), on a clock of the test's own: a new device's file at once, a change at
+	// the next step, nothing written for nothing changed, a device forgotten ForgetMs after its last hello, every file
+	// gone with the object
+	void kitFiles()
+	{
+		using mdDrums::KitFiles;
+		const auto folder = std::filesystem::temp_directory_path()
+			/ ("mdDrumsKitFiles_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		const auto read = [](const std::filesystem::path& _file)
+		{
+			std::ifstream in(_file, std::ios::binary);
+			return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+		};
+		sysex::MdKit kit;
+		kit.setName("KIT FILE");
+		kit.machines[0] = 16;	// TRX-BD
+		kit.machines[1] = 6;	// no machine
+		kit.parameters[0][12] = 99;
+		{
+			KitFiles files(folder);
+			const auto a = files.file(0x00abcd), b = files.file(0xfedcba);
+			require(a.filename() == "00abcd.kit", "a device's file is not named by its id");
+			require(!files.due(0.0), "no device heard, and a step is due");
+			files.hello(0x00abcd, 0.0);
+			require(files.due(0.0), "a new device's file is not due at once");
+			files.step(KitFiles::text(kit), 0.0);
+			const auto text = read(a);
+			std::printf("kit file:\n%s", text.substr(0, text.find("values 2")).c_str());
+			const std::string start =
+				"md-drums-kit 1\nkit KIT FILE\ntrack 1 16 TRX-BD PTCH DEC RAMP RDEC STRT NOIS HARM CLIP\n";
+			require(text.rfind(start, 0) == 0,
+				"the file does not start with the format, the Kit and Track 1's Machine and names");
+			require(text.find("\ntrack 2 ") == std::string::npos && text.find("\nvalues 2 ") != std::string::npos,
+				"a Track without a known machine has a track line, or no values");
+			require(text.find("\nvalues 1 ") != std::string::npos
+				&& text.find(" 99 ", text.find("\nvalues 1 ")) != std::string::npos,
+				"Track 1's FLTF is not in its values");
+
+			// A second device: its file at the next step; a change reaches both, not before StepMs
+			files.hello(0xfedcba, 100.0);
+			require(files.due(100.0), "a second device's file is not due at once");
+			files.step(KitFiles::text(kit), 100.0);
+			require(std::filesystem::exists(b) && read(b) == text, "the second device has not the same file");
+			kit.parameters[0][12] = 98;
+			require(!files.due(300.0) && files.due(350.0), "a step came before StepMs");
+			files.step(KitFiles::text(kit), 350.0);
+			require(read(a) != text && read(a) == read(b), "a change did not reach both files");
+
+			// The first device goes quiet: its file goes ForgetMs after its last hello, the second stays
+			files.hello(0xfedcba, 10000.0);
+			files.step(KitFiles::text(kit), 15100.0);
+			require(!std::filesystem::exists(a) && std::filesystem::exists(b) && files.devices() == 1,
+				"a device silent for ForgetMs kept its file, or the other lost its own");
+		}
+		require(!std::filesystem::exists(folder / "fedcba.kit"), "a file stayed after the object went");
+		std::error_code error;
+		std::filesystem::remove_all(folder, error);
+		std::printf("kit files: written at once, a change at the next step, forgotten after %.0f s, gone with the"
+			" object\n", KitFiles::ForgetMs / 1000.0);
+	}
+
 	// Notes and CCs, inline SysEx included, on a prepared Plugin: no heap allocation
 	void allocations(const std::vector<uint8_t>& _flash)
 	{
@@ -885,6 +982,8 @@ int main()
 		assignAndLfo(flash);
 		locks(flash);
 		unplayed(flash);
+		hello(flash);
+		kitFiles();
 		allocations(flash);
 		latency(flash, 44100.0f);
 		latency(flash, 48000.0f);

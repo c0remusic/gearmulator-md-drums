@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mdDrumsKitFiles.h"
 #include "mdDrumsMessages.h"
 
 #include "jucePluginLib/controller.h"
@@ -120,6 +121,8 @@ namespace mdDrums
 		// alone, the mixer's (Mute, Solo, Out) left as they are
 		void applyState(const messages::State& _state, bool _kitOnly = false);
 		bool applyStateBytes(const std::vector<uint8_t>& _state);
+		// The files md-drums-seq's devices read (KitFiles): the hellos the Device heard, then the Kit played
+		void followKitFiles();
 		// Any thread: a relay set to _value, given to its parameter of the Track shown
 		void relayChanged(uint8_t _index, int _value);
 		// The host is to read every parameter's value again, for those the plug-in changed by itself, at the end of the
@@ -155,5 +158,6 @@ namespace mdDrums
 		// A value the host has yet to read again: set where the Device's messages arrive (an offline render may bring
 		// them on its own thread), taken on the message thread
 		std::atomic<bool> m_valuesChanged{false};
+		KitFiles m_kitFiles;
 	};
 }
