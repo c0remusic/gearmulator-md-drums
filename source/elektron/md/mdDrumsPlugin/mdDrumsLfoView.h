@@ -68,8 +68,10 @@ namespace mdDrums
 			Shape1, Shape2, Mode, Speed, Depth, Mix, Track, Param, Machine, IndexCount
 		};
 
-		// What the plot was traced from: the LFO, its target's value, the tempo as the OS takes it, the Track
-		using TraceKey = std::array<int, 11>;
+		// What the plot was traced from, in the order of Index for the LFO's own six: then its target's value and the
+		// tempo as the OS takes it (Lfo::tempo); all 0 without depth
+		static constexpr size_t TargetValue = 6;
+		using TraceKey = std::array<int, 8>;
 
 		bool followTrace();
 		bool followUnderlines();
@@ -95,7 +97,6 @@ namespace mdDrums
 		std::array<int, 2> m_targetOf{-1, -1};
 		// What the document shows: -1 for not yet
 		TraceKey m_traced{};
-		int m_labelsMove = -1;		// the plot's labels shown as values (1) or as "no modulation" (0)
 		int64_t m_underlined = -1;	// a bit per name of Engine::paramNames
 		int m_ringedFor = -1;		// the Track and its machine the rings were drawn for, while armed
 	};

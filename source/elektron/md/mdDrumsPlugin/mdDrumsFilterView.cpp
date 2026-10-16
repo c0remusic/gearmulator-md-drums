@@ -102,7 +102,7 @@ namespace mdDrums
 		if(m_curve && settings == m_response->settings())
 			return wrote;
 		m_response->set(settings);
-		m_curve = m_canvas != nullptr;
+		m_curve = true;
 		if(m_canvas)
 			m_canvas->repaint();
 		return true;

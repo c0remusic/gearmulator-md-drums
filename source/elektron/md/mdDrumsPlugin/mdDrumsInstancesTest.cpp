@@ -271,7 +271,7 @@ int main(const int _argc, char** _argv)
 			now += 0.05;
 			first.frame();
 		}
-		first.setClock([] { return juce::Time::getMillisecondCounterHiRes(); });
+		first.setClock({});
 		// The next engine is built while nothing waits
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		const auto withPreview = privateMb() - beforeEditors;

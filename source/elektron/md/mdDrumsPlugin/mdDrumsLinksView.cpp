@@ -81,16 +81,11 @@ namespace mdDrums
 		m_shownLink = link;
 		m_shownChoke = choke;
 
-		const auto set = [this](const std::string& _id, const std::string& _text)
-		{
-			if(auto* e = find(_id); e && e->GetInnerRML() != _text)
-				e->SetInnerRML(_text);
-		};
 		const bool linked = link < Controller::TrackCount;
 		const bool choking = choke < Controller::TrackCount;
-		set("link_text", linked ? "Also strikes <b>track " + twoDigits(link + 1) + "</b>" : std::string("Strikes no other track"));
-		set("choke_text", choking ? "Silences <b>track " + twoDigits(choke + 1) + "</b>" : std::string("Silences no track"));
-		set("linksmenu_label", "Track " + twoDigits(track + 1));
+		setText(find("link_text"), linked ? "Also strikes <b>track " + twoDigits(link + 1) + "</b>" : std::string("Strikes no other track"));
+		setText(find("choke_text"), choking ? "Silences <b>track " + twoDigits(choke + 1) + "</b>" : std::string("Silences no track"));
+		setText(find("linksmenu_label"), "Track " + twoDigits(track + 1));
 
 		if(auto* off = find("links_link_off"))
 			off->SetClass("on", !linked);

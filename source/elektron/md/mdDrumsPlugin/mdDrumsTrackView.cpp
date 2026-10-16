@@ -364,8 +364,6 @@ namespace mdDrums
 		setDisplay(find("browser"), _overlay == Overlay::Browser);
 		setDisplay(find("lfomenu"), _overlay == Overlay::LfoMenu);
 		setDisplay(find("linksmenu"), _overlay == Overlay::Links);
-		// The menu is drawn while it is open only: anew as it opens
-		m_menuKey.fill(-1);
 		followLfoMenu();
 	}
 
@@ -411,7 +409,6 @@ namespace mdDrums
 		// Another Track's machine, Out and LFO menu: drawn by the follow functions that come next
 		m_machineShown = -1;
 		m_outShown = -1;
-		m_menuKey.fill(-1);
 	}
 
 	bool TrackView::followMachine()

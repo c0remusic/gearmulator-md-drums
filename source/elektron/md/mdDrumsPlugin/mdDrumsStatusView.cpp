@@ -32,8 +32,6 @@ namespace mdDrums
 		if(auto* version = find("version"))
 			version->SetInnerRML(MdDrumsVersion);
 
-		// Notes played before the editor opened stay unsaid
-		m_unplayedSeen = m_editor.processor().getTelemetry().unplayedCount();
 
 		// The update check, at most once a day; meanwhile what the last one found
 		auto& config = m_editor.processor().getConfig();

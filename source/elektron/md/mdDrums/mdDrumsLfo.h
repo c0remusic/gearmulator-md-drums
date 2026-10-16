@@ -62,6 +62,8 @@ namespace mdDrums
 		// The window the screen shows, in ticks: 1 to 6 periods as LFOS rises (the mockup's), and the whole fall of a RMP
 		// or an EXP that LFOM lets through (5 periods for RMP, which falls for 4; 8 for EXP, whose time constant is 2)
 		int window(int _speed, int _mix, double _bpm) const;
+		// The tempo as the OS's routines take it: 30 to 300 bpm, in 1/24 bpm. Two bpm with the same tempo trace the same
+		static int32_t tempo(double _bpm);
 
 		static constexpr double TickRate = 44100.0 / (32.0 * 11.0);	// mdEngine's tick: every 11 blocks of 32 samples
 	};

@@ -474,7 +474,7 @@ namespace
 		std::string text;
 	};
 
-	Load load(const std::function<void()>& _run, std::thread* _exclude = nullptr)
+	Load cpuWhile(const std::function<void()>& _run, std::thread* _exclude = nullptr)
 	{
 #if JUCE_WINDOWS
 		const auto seconds = [](const FILETIME& _kernel, const FILETIME& _user)
@@ -907,7 +907,7 @@ namespace
 			auto instance = load(formats, description);
 			auto& plugin = *instance->plugin;
 			require(plugin.hasEditor(), "MD Drums has no editor through VST3");
-			const auto noEditor = load([] { pump(3000); });
+			const auto noEditor = cpuWhile([] { pump(3000); });
 			std::printf("No editor yet: %s\n", noEditor.text.c_str());
 			const auto start = Clock::now();
 			std::unique_ptr<juce::AudioProcessorEditor> editor(plugin.createEditorIfNeeded());
@@ -927,7 +927,7 @@ namespace
 				shown);
 			require(editor->getWidth() > 0 && editor->getHeight() > 0, "the editor has no size");
 			require(shown >= 16, "the editor drew nothing in the host's window");
-			std::printf("Editor open and idle: %s\n", load([] { pump(3000); }).text.c_str());
+			std::printf("Editor open and idle: %s\n", cpuWhile([] { pump(3000); }).text.c_str());
 
 			std::atomic<bool> stop{false};
 			std::vector<double> openMs;
@@ -956,7 +956,7 @@ namespace
 				}
 			});
 			const auto syn1 = ids.index("SYN1", 0);
-			const auto playing = load([&]
+			const auto playing = cpuWhile([&]
 			{
 				for(int step = 0; step < 30; ++step)
 				{
@@ -977,7 +977,7 @@ namespace
 			// The plug-in keeps its editor (PluginEditorState) for when the host opens the window again: its frame stops.
 			// Measured on the reference PC: 25 Mcycles/s, against 20 to 34 with no editor at all; the views' own timers,
 			// before the editor's frame, kept 68
-			const auto closed = load([] { pump(3000); });
+			const auto closed = cpuWhile([] { pump(3000); });
 			std::printf("Editor closed and kept: %s\n", closed.text.c_str());
 			require(closed.mcyclesPerSecond < noEditor.mcyclesPerSecond + 15.0,
 				"the editor keeps working on the message thread once its window is closed");

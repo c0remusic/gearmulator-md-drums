@@ -34,25 +34,14 @@ namespace mdDrums
 {
 	Editor::Editor(jucePluginEditorLib::Processor& _processor, const jucePluginEditorLib::Skin& _skin)
 		: jucePluginEditorLib::Editor(_processor, _skin)
-		, m_clock([] { return juce::Time::getMillisecondCounterHiRes(); })
 		, m_frameTimer([this] { onFrameTimer(); })
 	{
+		setClock({});
 	}
 
-	Editor::~Editor()
-	{
-		// No frame from here on (step needs TrackView): the views go first, the component with the base
-		m_frameTimer.stopTimer();
-		m_onPreUpdate.reset();
-		m_trackView.reset();
-		m_statusView.reset();
-		m_linksView.reset();
-		m_kitsView.reset();
-		m_lfoView.reset();
-		m_filterView.reset();
-		m_hitView.reset();
-		m_meterView.reset();
-	}
+	// The members' order does it: the frame's listener and timer go first, then TrackView (no frame steps without
+	// it), then the other views; the component goes with the base
+	Editor::~Editor() = default;
 
 	void Editor::create()
 	{
@@ -81,9 +70,7 @@ namespace mdDrums
 		// timer
 		m_onPreUpdate.set(component->evPreUpdate, [this](juceRmlUi::RmlComponent* const&) { step(); });
 		frame();
-		const auto hz = getAcceleratedRefreshRateHz();
-		m_framePeriodMs = 1000.0 / hz;
-		m_frameTimer.startTimerHz(hz);
+		m_frameTimer.startTimerHz(getAcceleratedRefreshRateHz());
 
 		// Esc on the context's root, in the capture phase: before the stack's listener on the document, even when the
 		// document itself has the key
@@ -144,28 +131,21 @@ namespace mdDrums
 		wrote |= m_hitView->step(f);
 		wrote |= m_meterView->step(f);
 		wrote |= m_statusView->step(f);
-
-		++m_frameCount.frames;
-		if(wrote)
-			++m_frameCount.wrote;
 		return wrote;
 	}
 
 	void Editor::onFrameTimer()
 	{
-		// Nothing shows (the window closed or minimised): the RmlUi updates that go on meanwhile run the frame
-		const auto* component = getRmlComponent();
-		if(!component || !component->isShowing())
-			return;
-		// An RmlUi update ran one within half a period
-		if(m_clock() - m_lastFrameMs < m_framePeriodMs * 0.5)
-			return;
-		frame();
+		// Every tick while something shows, even one just after an RmlUi update's own frame: the update that a frame
+		// asks for comes a period later, and skipping the tick in between halves the rate of what moves. Nothing shows
+		// (the window closed or minimised): the RmlUi updates that go on meanwhile run the frame
+		if(const auto* component = getRmlComponent(); component && component->isShowing())
+			frame();
 	}
 
 	void Editor::setClock(std::function<double()> _clock)
 	{
-		m_clock = std::move(_clock);
+		m_clock = _clock ? std::move(_clock) : [] { return juce::Time::getMillisecondCounterHiRes(); };
 	}
 
 	void Editor::setCurrentPart(const uint8_t _part)

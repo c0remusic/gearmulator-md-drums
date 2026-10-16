@@ -271,9 +271,13 @@ namespace mdDrums
 			wrote = true;
 		}
 
+		// What the window shows of the capture: a Hit growing past it (0.8 s captured, 0.1 to 0.8 s shown) draws the
+		// same columns, and its playhead has left the plot
 		const auto& shownCapture = shown();
-		const Shown state{shownCapture.id, shownCapture.count, m_showPreview ? 0 : m_previous.id, m_window, track,
-			!m_showPreview && m_playing, m_showPreview ? m_previews : 0};
+		const auto inWindow = static_cast<int>(std::ceil(m_window / g_columnSeconds)) + 1;
+		const auto drawn = std::min(shownCapture.count, inWindow);
+		const Shown state{shownCapture.id, drawn, m_showPreview ? 0 : m_previous.id, m_window, track,
+			!m_showPreview && m_playing && drawn < inWindow, m_showPreview ? m_previews : 0};
 		for(auto& screen : m_screens)
 		{
 			if(!screen.canvas || screen.drawn == state || !screen.element->IsVisible(true))

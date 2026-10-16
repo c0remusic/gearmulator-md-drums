@@ -51,12 +51,6 @@ namespace mdDrums
 		// A pause longer than this between two frames makes the next one Frame::resumed
 		static constexpr double ResumeMs = 1000.0;
 
-		struct FrameCount
-		{
-			uint64_t frames = 0;
-			uint64_t wrote = 0;	// the frames in which a view changed the document
-		};
-
 		Editor(jucePluginEditorLib::Processor& _processor, const jucePluginEditorLib::Skin& _skin);
 		~Editor() override;
 
@@ -83,10 +77,9 @@ namespace mdDrums
 		// The editor's frame, now: asks RmlUi for a render when a view wrote, and is then true. Nothing happens without
 		// the views, or inside a frame (a view's step never shows another Track: the next frame sees what it changed).
 		bool frame();
-		// The frame's clock, in ms: the display's, or a test's
+		// The frame's clock, in ms: a test's, or the display's (an empty function)
 		void setClock(std::function<double()> _clock);
 		double lastFrameMs() const { return m_lastFrameMs; }
-		const FrameCount& frameCount() const { return m_frameCount; }
 
 		// The Track shown, which the views draw at once: a handler that follows in the same event acts on it
 		void setCurrentPart(uint8_t _part) override;
@@ -111,7 +104,10 @@ namespace mdDrums
 		bool step();
 		void onFrameTimer();
 
-		std::unique_ptr<TrackView> m_trackView;
+		// Destroyed in the reverse order: the frame's listener and timer first, then TrackView (without it no frame
+		// steps), then the other views
+		mutable std::unordered_map<std::string, Rml::Element*> m_elements;	// element()'s, found ones only
+		mutable uint32_t m_elementMisses = 0;
 		std::unique_ptr<MeterView> m_meterView;
 		std::unique_ptr<HitView> m_hitView;
 		std::unique_ptr<FilterView> m_filterView;
@@ -119,17 +115,14 @@ namespace mdDrums
 		std::unique_ptr<KitsView> m_kitsView;
 		std::unique_ptr<LinksView> m_linksView;
 		std::unique_ptr<StatusView> m_statusView;
-		mutable std::unordered_map<std::string, Rml::Element*> m_elements;	// element()'s, found ones only
-		mutable uint32_t m_elementMisses = 0;
+		std::unique_ptr<TrackView> m_trackView;
 
 		std::function<double()> m_clock;
-		juce::TimedCallback m_frameTimer;
-		double m_framePeriodMs = 1000.0 / 60.0;
-		baseLib::EventListener<juceRmlUi::RmlComponent*> m_onPreUpdate;
 		double m_lastFrameMs = -1.0;
 		int m_lastShown = -1;
 		bool m_inFrame = false;
-		FrameCount m_frameCount;
+		juce::TimedCallback m_frameTimer;
+		baseLib::EventListener<juceRmlUi::RmlComponent*> m_onPreUpdate;
 	};
 
 	class EditorState final : public jucePluginEditorLib::PluginEditorState

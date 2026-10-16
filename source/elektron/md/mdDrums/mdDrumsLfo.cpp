@@ -132,8 +132,7 @@ namespace mdDrums
 	{
 		Trace result;
 		const Lfo free{shape1, shape2, static_cast<uint8_t>(type & ~Hold)};
-		const auto tempo = static_cast<int32_t>(std::lround(std::clamp(_bpm, 30.0, 300.0) * 24.0));
-		result.increment = increment(settled(_speed), tempo);
+		result.increment = increment(settled(_speed), tempo(_bpm));
 		const auto depth = settled(_depth), mixWord = settled(_mix), value = settled(_value);
 
 		State s;
@@ -156,10 +155,14 @@ namespace mdDrums
 		return result;
 	}
 
+	int32_t Lfo::tempo(const double _bpm)
+	{
+		return static_cast<int32_t>(std::lround(std::clamp(_bpm, 30.0, 300.0) * 24.0));
+	}
+
 	int Lfo::window(const int _speed, const int _mix, const double _bpm) const
 	{
-		const auto tempo = static_cast<int32_t>(std::lround(std::clamp(_bpm, 30.0, 300.0) * 24.0));
-		const auto step = increment(settled(_speed), tempo);
+		const auto step = increment(settled(_speed), tempo(_bpm));
 		if(step <= 0)
 			return static_cast<int>(TickRate * 2.0);	// a phase that does not move: two seconds of a still wave
 		auto periods = 1.0 + std::clamp(_speed, 0, 127) * 5.0 / 127.0;

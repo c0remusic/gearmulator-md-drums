@@ -109,6 +109,7 @@ namespace mdDrums
 		bool exportFile(const std::filesystem::path& _file);
 		// The head band and the overlay as they are now
 		void refresh();
+		void refresh(Head _head);
 		void ask(Confirm _action, std::string _note);
 		void say(std::string _note);
 		// A Bank write's outcome, with a note when it failed
@@ -118,7 +119,7 @@ namespace mdDrums
 		void commitRename(bool _keep);
 		void openChooser(bool _import);
 		Head head() const;
-		void updateHead();
+		void updateHead(Head _head);
 		void updateSlots() const;
 		void updatePanel() const;
 		Bank* bank() const;

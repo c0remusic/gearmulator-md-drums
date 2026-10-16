@@ -67,6 +67,8 @@ namespace mdDrums
 		Canvas attach(const std::string& _id, const Paint& _paint);
 		// True when it repainted
 		bool repaint(Canvas& _canvas, int _shows) const;
+		// A canvas's pixels along its level: its height, or its width
+		static int pixels(const Canvas& _canvas, bool _height);
 		void paintScope(int _track, juce::Graphics& _g, float _w, float _h, float _dp) const;
 
 		Editor& m_editor;

@@ -1,8 +1,11 @@
 #pragma once
 
+#include "juceRmlUi/rmlHelper.h"
+
 #include "RmlUi/Core/Element.h"
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 namespace mdDrums
@@ -26,10 +29,26 @@ namespace mdDrums
 		return text;
 	}
 
-	// Shows _element with the display _shown ("block", "inline") or hides it; nothing without an element
-	inline void setDisplay(Rml::Element* _element, const bool _visible, const char* _shown = "block")
+	// Shows _element with the display _shown ("block", "inline", "inline-block") or hides it; nothing without an
+	// element. Only a change is written: setting display, even to its value, lays the whole document out again.
+	// True when it wrote
+	inline bool setDisplay(Rml::Element* _element, const bool _visible, const char* _shown = "block")
 	{
-		if(_element)
-			_element->SetProperty("display", _visible ? _shown : "none");
+		if(!_element)
+			return false;
+		using Display = Rml::Style::Display;
+		const auto shown = std::strcmp(_shown, "inline") == 0 ? Display::Inline
+			: std::strcmp(_shown, "inline-block") == 0 ? Display::InlineBlock : Display::Block;
+		return juceRmlUi::helper::changeProperty(_element, Rml::PropertyId::Display,
+			Rml::Property(_visible ? shown : Display::None));
+	}
+
+	// _element's RML, written only when it differs: SetInnerRML builds the children again. True when it wrote
+	inline bool setText(Rml::Element* _element, const std::string& _rml)
+	{
+		if(!_element || _element->GetInnerRML() == _rml)
+			return false;
+		_element->SetInnerRML(_rml);
+		return true;
 	}
 }

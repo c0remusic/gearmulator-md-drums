@@ -107,9 +107,10 @@ namespace mdDrums
 		if(_frame.now < m_nextHeadMs)
 			return false;
 		m_nextHeadMs = _frame.now + 1000.0 / RefreshHz;
-		if(head() == m_head)
+		auto now = head();
+		if(now == m_head)
 			return false;
-		refresh();
+		refresh(std::move(now));
 		return true;
 	}
 
@@ -440,7 +441,12 @@ namespace mdDrums
 
 	void KitsView::refresh()
 	{
-		updateHead();
+		refresh(head());
+	}
+
+	void KitsView::refresh(Head _head)
+	{
+		updateHead(std::move(_head));
 		if(!m_open)
 			return;
 		updateSlots();
@@ -463,13 +469,12 @@ namespace mdDrums
 		return result;
 	}
 
-	void KitsView::updateHead()
+	void KitsView::updateHead(Head _head)
 	{
-		m_head = head();
-		if(auto* e = find("kit_slot"))
-			e->SetInnerRML(twoDigits(m_head.slot + 1));
-		if(auto* e = find("kit_name"))
-			e->SetInnerRML(escaped(m_head.name));
+		// Save lit or not, mostly: the Slot and the name are written again only when they changed
+		m_head = std::move(_head);
+		setText(find("kit_slot"), twoDigits(m_head.slot + 1));
+		setText(find("kit_name"), escaped(m_head.name));
 		if(auto* e = find("kit_save"))
 			e->SetClass("on", m_head.changed);
 	}

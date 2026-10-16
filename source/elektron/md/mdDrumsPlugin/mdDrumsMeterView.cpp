@@ -16,18 +16,11 @@
 
 namespace mdDrums
 {
-	namespace
-	{
-		constexpr int g_stripHeight = 492;	// a strip's meter, in its own pixels at 100 %
-		constexpr int g_mainWidth = 64;
-	}
-
 	MeterView::MeterView(Editor& _editor, Telemetry& _telemetry) : m_editor(_editor), m_telemetry(_telemetry)
 	{
 		m_db.fill(FloorDb - 1.0f);
 		for(int t = 0; t < Telemetry::TrackCount; ++t)
 		{
-			m_hits[static_cast<size_t>(t)] = m_telemetry.hits(t);
 			const auto n = std::to_string(t + 1);
 			m_numbers[static_cast<size_t>(t)] = {m_editor.element("row" + n + "_num"),
 				m_editor.element("strip" + n + "_num"), m_editor.element("send" + n + "_num")};
@@ -108,13 +101,16 @@ namespace mdDrums
 			shown = std::max(FloorDb - 1.0f, std::max(db, shown - fall));
 		}
 
-		bool wrote = repaint(m_main, juce::roundToInt(level(0) * g_mainWidth) * 1000 + juce::roundToInt(level(1) * g_mainWidth));
+		// In the canvases' own pixels: a finer key would repaint them for nothing at a smaller Size
+		const auto mainWidth = pixels(m_main, false);
+		bool wrote = repaint(m_main, juce::roundToInt(level(0) * mainWidth) * 100000 + juce::roundToInt(level(1) * mainWidth));
 		for(int t = 0; t < Telemetry::TrackCount; ++t)
-			wrote |= repaint(m_strips[static_cast<size_t>(t)], juce::roundToInt(level(2 + t) * g_stripHeight));
+		{
+			auto& strip = m_strips[static_cast<size_t>(t)];
+			wrote |= repaint(strip, juce::roundToInt(level(2 + t) * pixels(strip, true)));
+		}
 
-		// The scopes: a column every 1/32 s, the highest level of its time; after a pause, start afresh
-		if(nowMs - m_columnStartMs > 1000.0)
-			m_columnStartMs = nowMs;
+		// The scopes: a column every 1/32 s, the highest level of its time (after a pause they start afresh, above)
 		for(int t = 0; t < Telemetry::TrackCount; ++t)
 			m_columnPeak[static_cast<size_t>(t)] = std::max(m_columnPeak[static_cast<size_t>(t)], level(2 + t));
 		while(nowMs - m_columnStartMs >= ScopeColumnMs)
@@ -156,6 +152,14 @@ namespace mdDrums
 			wrote = true;
 		}
 		return wrote;
+	}
+
+	int MeterView::pixels(const Canvas& _canvas, const bool _height)
+	{
+		if(!_canvas.canvas)
+			return 1;
+		const auto size = _canvas.canvas->getPaintSize();
+		return std::max(1, _height ? size.y : size.x);
 	}
 
 	bool MeterView::repaint(Canvas& _canvas, const int _shows) const

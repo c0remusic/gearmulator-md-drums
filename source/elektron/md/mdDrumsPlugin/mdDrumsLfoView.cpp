@@ -46,6 +46,7 @@ namespace mdDrums
 			for(size_t i = 0; i < g_parameters.size(); ++i)
 				m_parameters[t][i] = controller.getParameter(g_parameters[i], t);
 		m_traced.fill(-1);
+		setText(find("lfo_none"), "LFOD 0: no modulation");
 
 		if(auto* screen = find("screen_lfo"))
 			m_canvas = createCanvas(screen, [this](juce::Graphics& _g, float, float, const float _dp)
@@ -100,8 +101,8 @@ namespace mdDrums
 
 	bool LfoView::followTrace()
 	{
-		// Hidden too (another tab, an overlay over it): RmlUi knows it shows only after the update that follows the
-		// frame, and a hidden canvas paints nothing until then
+		// Hidden too (another tab, an overlay over it): RmlUi knows the screen shows only after the update that follows
+		// the frame, and a hidden canvas paints nothing until then
 
 		// The parameter the shown Track's LFO moves: LfoParam's, of LfoTrack
 		const auto track = std::clamp(value(Track, m_part), 0, Controller::TrackCount - 1);
@@ -113,42 +114,36 @@ namespace mdDrums
 				Engine::paramNames()[static_cast<size_t>(param)], static_cast<uint8_t>(track));
 		}
 
-		// The tempo as the OS's routines take it: a key on the bpm itself would trace again for nothing
+		// What the plot is traced from: the LFO, its target's value, the tempo as the OS's routines take it. Without
+		// depth it shows only why there is no wave, whatever they are
+		const auto depth = value(Depth, m_part);
 		const auto bpm = m_editor.processor().getBpm();
 		const auto tempo = bpm > 0.0f ? static_cast<double>(bpm) : g_defaultBpm;
-		const TraceKey key{value(Shape1, m_part), value(Shape2, m_part), value(Mode, m_part), value(Speed, m_part),
-			value(Depth, m_part), value(Mix, m_part), track, param, m_target ? m_target->getUnnormalizedValue() : 0,
-			static_cast<int>(std::lround(std::clamp(tempo, 30.0, 300.0) * 24.0)), m_part};
+		TraceKey key{};
+		if(depth > 0)
+		{
+			key = {value(Shape1, m_part), value(Shape2, m_part), value(Mode, m_part), value(Speed, m_part), depth,
+				value(Mix, m_part), m_target ? m_target->getUnnormalizedValue() : 0, Lfo::tempo(tempo)};
+		}
 		if(key == m_traced)
 			return false;
 		m_traced = key;
+		m_depth = depth;
 
-		const Lfo lfo{static_cast<uint8_t>(key[Shape1]), static_cast<uint8_t>(key[Shape2]), static_cast<uint8_t>(key[Mode])};
-		const auto speed = key[Speed], mix = key[Mix];
-		m_depth = key[Depth];
-		m_trace = lfo.trace(speed, m_depth, mix, key[8], tempo, lfo.window(speed, mix, tempo));	// 8: the target's value
-
-		// The values it reaches, in the label column at the plot's top and foot; without depth, why there is no wave.
-		// SetInnerRML builds the element's children again, and a display set lays the document out again: only where
-		// they changed
-		const auto show = [&](const char* _id, const std::string& _text)
+		// The values it reaches, in the label column at the plot's top and foot (in the knob's steps: a word's
+		// nearest, $3f80 to $3fff being 127); without depth, why there is no wave
+		const bool moves = depth > 0;
+		if(moves)
 		{
-			if(auto* e = find(_id); e && e->GetInnerRML() != _text)
-				e->SetInnerRML(_text);
-		};
-		// In the knob's steps: a word's nearest, $3f80 to $3fff being 127
-		const auto steps = [](const uint16_t _word) { return std::to_string(std::min(127L, std::lround(_word / 128.0))); };
-		const bool moves = m_depth > 0;
-		show("lfo_high", steps(m_trace.highest));
-		show("lfo_low", steps(m_trace.lowest));
-		show("lfo_none", "LFOD 0: no modulation");
-		if(m_labelsMove != static_cast<int>(moves))
-		{
-			m_labelsMove = moves;
-			setDisplay(find("lfo_high"), moves);
-			setDisplay(find("lfo_low"), moves);
-			setDisplay(find("lfo_none"), !moves);
+			const Lfo lfo{static_cast<uint8_t>(key[Shape1]), static_cast<uint8_t>(key[Shape2]), static_cast<uint8_t>(key[Mode])};
+			m_trace = lfo.trace(key[Speed], depth, key[Mix], key[TargetValue], tempo, lfo.window(key[Speed], key[Mix], tempo));
+			const auto steps = [](const uint16_t _word) { return std::to_string(std::min(127L, std::lround(_word / 128.0))); };
+			setText(find("lfo_high"), steps(m_trace.highest));
+			setText(find("lfo_low"), steps(m_trace.lowest));
 		}
+		setDisplay(find("lfo_high"), moves);
+		setDisplay(find("lfo_low"), moves);
+		setDisplay(find("lfo_none"), !moves);
 		if(m_canvas)
 			m_canvas->repaint();
 		return true;

@@ -200,11 +200,11 @@ namespace
 			layout();
 		}
 
-		// A display tick: the clock forward, then the editor's frame
-		void step(const double _ms = 0.0)
+		// A display tick: the clock forward, then the editor's frame; true when a view wrote
+		bool step(const double _ms = 0.0)
 		{
 			now += _ms;
-			editor->frame();
+			return editor->frame();
 		}
 
 		// One frame: RmlUi's update (the editor's frame first), then the software render into an image
@@ -1246,16 +1246,25 @@ namespace
 		std::printf("status: said for 5 s, then gone\n");
 	}
 
-	std::string spread(std::vector<double> _us)
+	struct Spread
+	{
+		double mean = 0.0;
+		std::string text;
+	};
+
+	Spread spread(std::vector<double> _us)
 	{
 		std::sort(_us.begin(), _us.end());
 		double sum = 0;
 		for(const auto u : _us)
 			sum += u;
+		Spread result;
+		result.mean = sum / static_cast<double>(_us.size());
 		char text[128];
-		std::snprintf(text, sizeof(text), "mean %.1f us, 99 %% %.1f us, worst %.1f us", sum / static_cast<double>(_us.size()),
+		std::snprintf(text, sizeof(text), "mean %.1f us, 99 %% %.1f us, worst %.1f us", result.mean,
 			_us[std::min(_us.size() - 1, _us.size() * 99 / 100)], _us.back());
-		return text;
+		result.text = text;
+		return result;
 	}
 
 	// The editor's frame (one for every view, under the document's lock):
@@ -1322,7 +1331,7 @@ namespace
 		const auto scene = [&](const char* _name, const bool _busy)
 		{
 			std::vector<double> us;
-			const auto before = editor->frameCount().wrote;
+			int wrote = 0;
 			for(int i = 0; i < 600; ++i)
 			{
 				if(_busy)
@@ -1339,16 +1348,12 @@ namespace
 						telemetry.addColumn(0, -8000, 8000);
 				}
 				const auto start = Clock::now();
-				_f.step(tick);
+				wrote += _f.step(tick);
 				us.push_back(since(start) * 1000.0);
 			}
-			const auto wrote = editor->frameCount().wrote - before;
-			std::printf("frame: %s, %s, %llu of 600 frames wrote\n", _name, spread(us).c_str(),
-				static_cast<unsigned long long>(wrote));
-			double sum = 0;
-			for(const auto u : us)
-				sum += u;
-			require(sum / static_cast<double>(us.size()) < 100.0, std::string("a frame costs over 100 us on average, ") + _name);
+			const auto cost = spread(us);
+			std::printf("frame: %s, %s, %d of 600 frames wrote\n", _name, cost.text.c_str(), wrote);
+			require(cost.mean < 100.0, std::string("a frame costs over 100 us on average, ") + _name);
 			require(!_busy || wrote >= 300, std::string("the busy scene does not write, ") + _name);
 		};
 		scene("Track tab idle", false);
@@ -1362,12 +1367,11 @@ namespace
 		// Settled (Main falls from -6 dBFS for 2.7 s, the scopes hold a second), the frames write nothing
 		for(int i = 0; i < 700; ++i)
 			_f.step(tick);
-		const auto settled = editor->frameCount().wrote;
+		int wrote = 0;
 		for(int i = 0; i < 200; ++i)
-			_f.step(tick);
-		const auto wrote = editor->frameCount().wrote - settled;
-		std::printf("frame: %llu of 200 frames with nothing new wrote; %u elements looked for in vain\n",
-			static_cast<unsigned long long>(wrote), editor->elementMisses() - misses);
+			wrote += _f.step(tick);
+		std::printf("frame: %d of 200 frames with nothing new wrote; %u elements looked for in vain\n", wrote,
+			editor->elementMisses() - misses);
 		require(wrote == 0, "a frame with nothing new changed the document");
 		require(editor->elementMisses() == misses, "a view looks for an element the skin lacks");
 		_f.showView("track");
