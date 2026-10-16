@@ -29,6 +29,7 @@ namespace Rml
 namespace mdDrums
 {
 	class Editor;
+	class Knob;
 	struct Frame;
 
 	// The LFO screen's behaviour (Design/HANDOFF.md, "LFO"; ticket 22):
@@ -38,7 +39,8 @@ namespace mdDrums
 	// - ASSIGN: armed by "Assign", every knob of the bands a target, the title asking for one; a click on a knob, on this
 	//   Track or on another one shown meanwhile, gives the LFO that armed it its target, and shows its Track again; Cancel,
 	//   Esc, a tab or an overlay disarm it;
-	// - the bands' names that an LFO modulates (its target, with some depth), underlined in accent.
+	// - the bands' names that an LFO modulates (its target, with some depth), underlined in accent, and their knobs a
+	//   dot where the engine plays the value (the Telemetry's, ticket 40).
 	// The editor's frame traces the plot again when its LFO, its target's value or the tempo changed, underlines the
 	// names whose modulation changed and, armed, rings the knobs the shown Track's machine uses.
 	class LfoView
@@ -75,6 +77,7 @@ namespace mdDrums
 
 		bool followTrace();
 		bool followUnderlines();
+		bool followPlayed();
 		bool followTargets();
 		void updateTargets();
 		void updateTitle() const;
@@ -98,6 +101,8 @@ namespace mdDrums
 		// What the document shows: -1 for not yet
 		TraceKey m_traced{};
 		int64_t m_underlined = -1;	// a bit per name of Engine::paramNames
+		std::array<Knob*, 24> m_knobs{};	// the bands' knobs, by parameter (Engine::ParamCount)
+		bool m_playing = false;		// a knob shows what the engine plays
 		int m_ringedFor = -1;		// the Track and its machine the rings were drawn for, while armed
 	};
 }

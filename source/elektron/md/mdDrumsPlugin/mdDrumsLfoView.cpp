@@ -46,6 +46,9 @@ namespace mdDrums
 			for(size_t i = 0; i < g_parameters.size(); ++i)
 				m_parameters[t][i] = controller.getParameter(g_parameters[i], t);
 		m_traced.fill(-1);
+		static_assert(std::tuple_size<decltype(m_knobs)>::value == Engine::ParamCount);
+		for(size_t i = 0; i < m_knobs.size(); ++i)
+			m_knobs[i] = dynamic_cast<Knob*>(find(std::string("k_") + Engine::paramNames()[i]));
 		setText(find("lfo_none"), "LFOD 0: no modulation");
 
 		if(auto* screen = find("screen_lfo"))
@@ -95,6 +98,7 @@ namespace mdDrums
 		m_part = _frame.shown;
 		bool wrote = followTrace();
 		wrote |= followUnderlines();
+		wrote |= followPlayed();
 		wrote |= followTargets();
 		return wrote;
 	}
@@ -172,6 +176,26 @@ namespace mdDrums
 		}
 		m_underlined = modulated;
 		return true;
+	}
+
+	bool LfoView::followPlayed()
+	{
+		// The knobs whose names are underlined show what the engine plays of them, the others nothing
+		const auto modulated = std::max<int64_t>(m_underlined, 0);
+		if(!modulated && !m_playing)
+			return false;
+		const auto& telemetry = m_editor.processor().getTelemetry();
+		bool wrote = false;
+		for(size_t i = 0; i < m_knobs.size(); ++i)
+		{
+			if(auto* knob = m_knobs[i])
+			{
+				const bool moved = (modulated >> i) & 1;
+				wrote |= knob->setPlayed(moved ? telemetry.played(m_part, static_cast<int>(i)) : Knob::NoPlayed);
+			}
+		}
+		m_playing = modulated != 0;
+		return wrote;
 	}
 
 	bool LfoView::followTargets()

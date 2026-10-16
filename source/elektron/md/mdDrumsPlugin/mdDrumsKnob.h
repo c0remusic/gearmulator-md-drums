@@ -48,6 +48,13 @@ namespace mdDrums
 		void setTarget(std::function<void()> _onPick);
 		bool isTarget() const { return static_cast<bool>(m_onPick); }
 
+		// What the engine plays of the knob's parameter while an LFO moves it (ticket 40, LfoView): an accent dot on
+		// the track at that value, the pointer staying at the parameter's own; NoPlayed for none. False when it was
+		// already.
+		static constexpr float NoPlayed = -1.0f;
+		bool setPlayed(float _value);
+		float played() const { return m_played; }
+
 	private:
 		void step(float _steps);
 		// The value drawn: the default until the parameter gives one
@@ -64,6 +71,7 @@ namespace mdDrums
 		juceRmlUi::ElemCanvas* m_ring = nullptr;
 		bool m_bipolar = false;
 		bool m_fader = false;
+		float m_played = NoPlayed;
 		std::function<void()> m_onPick;
 		bool m_hover = false;
 		bool m_swallowDrag = false;

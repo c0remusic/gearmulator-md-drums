@@ -76,6 +76,9 @@ namespace mdDrums
 
 		void setMachine(int _track, uint8_t _machineId);
 		void setParam(int _track, int _param, int _value);	// 0-127
+		// What _track's voice plays of its 24 parameters, as the engine's last tick left them: after the OS's smoothing
+		// and the LFOs, a parameter's value << 7 (0 to $3fff)
+		std::array<uint16_t, ParamCount> played(int _track) const;
 		// A Lock (0-127, ADR 0003) for _track's Hit in the next block: the parameter plays it at once until the track's
 		// next Hit, which plays the Kit's value again unless it has its own; dropped if no Hit of _track comes in the block
 		void lock(int _track, int _param, int _value);

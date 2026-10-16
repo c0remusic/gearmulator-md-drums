@@ -210,6 +210,8 @@ mesurées avant et après. Pas de tag.
   (LFOS, LFOD, LFOM) ; mot de machine entier ; une seule liste de machines, celle de l'OS ; puis un seul codec sans
   allocation pour ces messages (`mdProtocol/mdkitchange.*`), que le Device, `parameterMessage` et les encodeurs de
   `mdProtocol` partagent.
+- [Le LFO sur les knobs](issues/40-lfo-sur-les-knobs.md) : la Device écrit dans la Telemetry ce que jouent les voix
+  (après lissage et LFO) ; un knob qu'un LFO module montre un point accent à cette valeur, qui bouge à chaque cadre.
 
 ## Not yet specified
 

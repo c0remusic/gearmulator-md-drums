@@ -682,6 +682,32 @@ namespace
 			require(t.hits(0) == before + 1, "a muted Track's Hit was counted");
 		}
 
+		// What the voices play (ticket 40): a free triangle at full depth on Track 1's FLTF moves it, FLTW stays at its
+		// value
+		{
+			Rig rig(_flash, 44100.0f);
+			const std::vector<std::pair<uint8_t, uint8_t>> lfo{{0, 0}, {1, 12}, {2, 0}, {3, 0}, {4, 0}};
+			for(const auto& [field, value] : lfo)
+				rig.send(MidiEventSource::Editor, *sysex::lfoChange(0, field, value));
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 5, 100));	// LFOS
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Routing, 0, 6, 127));	// LFOD
+			rig.settle();
+			float low = 128.0f, high = -1.0f;
+			for(int b = 0; b < 40; ++b)
+			{
+				rig.process();
+				const auto played = rig.telemetry->played(0, 12);
+				low = std::min(low, played);
+				high = std::max(high, played);
+			}
+			const auto fltw = rig.telemetry->played(0, 13);
+			const auto kitFltw = rig.device->kit().parameters[0][13];
+			std::printf("played: FLTF under the LFO from %.2f to %.2f, FLTW %.2f (its value %u)\n", low, high, fltw,
+				kitFltw);
+			require(high - low > 8.0f, "the LFO does not move the FLTF the voice plays");
+			require(std::abs(fltw - kitFltw) < 1.0f, "FLTW is not played at its value");
+		}
+
 		// The Hit capture (ticket 21): from the sample the Hit sounds, the note plus 31, min/max columns of 8 samples of
 		// the Track's own output exactly as it was rendered
 		{

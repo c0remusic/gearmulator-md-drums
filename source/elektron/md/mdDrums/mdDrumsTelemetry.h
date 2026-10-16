@@ -17,6 +17,7 @@ namespace mdDrums
 	public:
 		static constexpr int OutputCount = 18;	// Main left and right, then each Track's own output
 		static constexpr int TrackCount = 16;
+		static constexpr int ParamCount = 24;	// a Track's, in the engine's order
 
 		// A Hit's capture (ticket 21): the Track's own output from the sample the Hit sounds, as min/max columns of 8
 		// samples (full scale 32767), up to 0.8 s at 44.1 kHz, or until the Track's next Hit
@@ -67,6 +68,21 @@ namespace mdDrums
 			for(int attempt = 0; attempt < 4 && _peak > current; ++attempt)
 				if(slot.compare_exchange_weak(current, _peak, std::memory_order_acq_rel, std::memory_order_relaxed))
 					return;
+		}
+
+		// Audio thread: what a Track's voice plays of its 24 parameters (Engine::played: after the smoothing and the
+		// LFOs, value << 7), as of the block just rendered
+		void setPlayed(const int _track, const std::array<uint16_t, ParamCount>& _words)
+		{
+			auto& played = m_played[static_cast<size_t>(_track)];
+			for(size_t p = 0; p < played.size(); ++p)
+				played[p].store(_words[p], std::memory_order_relaxed);
+		}
+		// Editor: the same, in the parameter's steps (0 to 127.99)
+		float played(const int _track, const int _param) const
+		{
+			const auto& word = m_played[static_cast<size_t>(_track)][static_cast<size_t>(_param)];
+			return static_cast<float>(word.load(std::memory_order_relaxed)) / 128.0f;
 		}
 
 		// Audio thread: a Track struck (its own Hit or a Link's)
@@ -172,6 +188,7 @@ namespace mdDrums
 
 		std::array<std::atomic<float>, OutputCount> m_peaks{};
 		std::array<std::atomic<uint32_t>, TrackCount> m_hits{};
+		std::array<std::array<std::atomic<uint16_t>, ParamCount>, TrackCount> m_played{};
 		std::array<TrackCaptures, TrackCount> m_captures{};
 		std::atomic<uint32_t> m_unplayed{0};
 		std::atomic<uint8_t> m_unplayedNote{0};

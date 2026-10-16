@@ -311,6 +311,16 @@ namespace mdDrums
 		m_state->engine.host().setMachine(_track, _machineId);
 	}
 
+	std::array<uint16_t, Engine::ParamCount> Engine::played(const int _track) const
+	{
+		std::array<uint16_t, ParamCount> words{};
+		if(_track < 0 || _track >= TrackCount)
+			return words;
+		const auto* voice = m_state->engine.host().voiceParams(_track);
+		std::copy_n(voice, ParamCount, words.begin());
+		return words;
+	}
+
 	void Engine::setParam(const int _track, const int _param, const int _value)
 	{
 		m_state->engine.host().setParam(_track, _param, _value);

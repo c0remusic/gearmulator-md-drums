@@ -224,6 +224,15 @@ namespace mdDrums
 			m_canvas->repaint();
 	}
 
+	bool Knob::setPlayed(const float _value)
+	{
+		if(_value == m_played)
+			return false;
+		m_played = _value;
+		repaint();
+		return true;
+	}
+
 	void Knob::paint(juce::Graphics& _g, const float _w, const float _h, const float _dp) const
 	{
 		const auto size = std::min(_w, _h);
@@ -263,6 +272,16 @@ namespace mdDrums
 		const auto sin = std::sin(angle), cos = std::cos(angle);
 		_g.setColour(edited ? g_ink : g_inkDim);
 		_g.drawLine(centre + inner * sin, centre - inner * cos, centre + outer * sin, centre - outer * cos, 2.0f * _dp);
+
+		// What an LFO makes of the value: an accent dot on the track
+		if(m_played >= 0.0f)
+		{
+			const auto at = angleOf(std::clamp(m_played, getMinValue(), getMaxValue()));
+			const auto dot = 2.5f * _dp;
+			_g.setColour(g_accent);
+			const auto x = centre + radius * std::sin(at), y = centre - radius * std::cos(at);
+			_g.fillEllipse(x - dot, y - dot, 2.0f * dot, 2.0f * dot);
+		}
 	}
 
 	void Knob::paintFader(juce::Graphics& _g, const float _dp) const

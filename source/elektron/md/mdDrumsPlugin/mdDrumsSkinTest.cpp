@@ -825,11 +825,39 @@ namespace
 		std::printf("\n");
 		require(rows == std::vector<int>{564, 565}, "the underline is not 2 px, 4 px under the name's baseline");
 
-		// No depth: no wave, the reason instead; no underline. Then the depth back, for the pictures
+		// Its knob (ticket 40): a dot where the engine plays FLTF, as the Device writes it in the Telemetry, which
+		// moves with it at each frame; FLTF's own value does not move
+		auto* knob = dynamic_cast<mdDrums::Knob*>(_f.find("k_FLTF"));
+		require(knob != nullptr, "no FLTF knob");
+		const auto kb = _f.box(*knob);
+		const auto accentInKnob = [&]
+		{
+			int count = 0;
+			for(float y = kb.y; y < kb.y + kb.h; y += 1.0f)
+				for(float x = kb.x; x < kb.x + kb.w; x += 1.0f)
+					count += isAccent(_f.pixel(x, y));
+			return count;
+		};
+		auto& telemetry = _f.processor.getTelemetry();
+		std::array<uint16_t, mdDrums::Telemetry::ParamCount> words{};
+		for(const float played : {40.0f, 100.5f})
+		{
+			words[12] = static_cast<uint16_t>(played * 128.0f);
+			telemetry.setPlayed(0, words);
+			_f.frame();
+			const auto accent = accentInKnob();
+			std::printf("lfo on its knob: FLTF played %.1f, dot %.1f, %d accent pixels, FLTF %d\n", played,
+				knob->played(), accent, _f.controller().getParameter("FLTF", 0)->getUnnormalizedValue());
+			require(knob->played() == played && accent > 4, "the FLTF knob does not show what the engine plays");
+			require(_f.controller().getParameter("FLTF", 0)->getUnnormalizedValue() == 64, "the LFO moved FLTF itself");
+		}
+
+		// No depth: no wave, the reason instead; no underline, no dot. Then the depth back, for the pictures
 		set(_f, "LFOD", 0, 0);
 		_f.frame();
 		require(_f.find("lfo_none")->IsVisible(true) && !_f.find("lfo_high")->IsVisible(true), "LFOD 0 does not say so");
 		require(!label->IsClassSet("lfo"), "a name stays underlined without depth");
+		require(knob->played() == mdDrums::Knob::NoPlayed && accentInKnob() == 0, "a knob keeps its dot without depth");
 		viewBaselines(_f, {"lfo_none"});
 		set(_f, "LFOD", 0, 127);
 	}

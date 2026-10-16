@@ -156,6 +156,12 @@ namespace mdDrums
 			m_position += static_cast<int64_t>(count);
 			done += count;
 		}
+		// What the voices play of their parameters, for the knobs an LFO moves
+		if(m_telemetry)
+		{
+			for(int track = 0; track < Engine::TrackCount; ++track)
+				m_telemetry->setPlayed(track, m_engine->played(track));
+		}
 	}
 
 	void Device::capture(const size_t _count)
