@@ -104,6 +104,8 @@ if(BUILD_TESTING)
 	if(TARGET mdDrumsPlugin_VST3)
 		add_executable(mdDrumsVst3HostTest mdDrumsVst3HostTest.cpp)
 		target_link_libraries(mdDrumsVst3HostTest PRIVATE juce::juce_audio_processors juce::juce_gui_basics)
+		# mdProtocol's headers for OS 1.63's constant tables only: the test links nothing of MD Drums
+		target_include_directories(mdDrumsVst3HostTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 		target_compile_definitions(mdDrumsVst3HostTest PRIVATE JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
 			JUCE_STANDALONE_APPLICATION=1 JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_VST=0 JUCE_PLUGINHOST_AU=0
 			JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1

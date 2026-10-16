@@ -89,7 +89,10 @@ namespace mdDrums
 		// Audio thread: md-drums-seq's hello, its device's id (KitFiles)
 		void hello(const uint32_t _id) { m_hello.store(_id, std::memory_order_release); }
 		// Controller: the last hello's id since the last take; 0 for none
-		uint32_t takeHello() { return m_hello.exchange(0, std::memory_order_acq_rel); }
+		uint32_t takeHello()
+		{
+			return m_hello.load(std::memory_order_relaxed) ? m_hello.exchange(0, std::memory_order_acq_rel) : 0;
+		}
 
 		// Audio thread: a Track struck (its own Hit or a Link's)
 		void hit(const int _track)

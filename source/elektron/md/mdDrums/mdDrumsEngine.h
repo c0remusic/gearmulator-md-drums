@@ -71,6 +71,11 @@ namespace mdDrums
 		Engine& operator=(const Engine&) = delete;
 
 		const std::vector<md::engine::MachineInfo>& machines() const;
+		// A machine the OS has, null for another id (the engine's own index, for the audio thread)
+		const md::engine::MachineInfo* machine(uint8_t _id) const;
+		// The same in a list the engine gave (machines()), for whoever holds only the list
+		static const md::engine::MachineInfo* findMachine(const std::vector<md::engine::MachineInfo>& _machines,
+			uint8_t _id);
 		// The OS's tables the Tracks' effects read, immutable: the editor measures the filter and the EQ with them
 		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const;
 
@@ -97,6 +102,7 @@ namespace mdDrums
 		// Machinedrum does.
 		static constexpr int SampleAccurateDelay = BlockSize - 1;
 		static constexpr int AlignedStart = 36;
+		static constexpr int CommonVoiceStart = 4;	// most machines' start: voiceStart's default
 		static int voiceStart(uint8_t _machine);
 		void setSampleAccurate(bool _on);
 		bool isSampleAccurate() const;
@@ -117,7 +123,7 @@ namespace mdDrums
 		// From a trigger to where its Hit sounds, sample-accurate, whatever the machine; and to where the editor's
 		// capture of it starts on its Track's output, as many samples before that as most machines' voices take
 		static constexpr int HitDelay = SampleAccurateDelay + AlignedStart + MasterDelay;
-		static constexpr int CaptureDelay = HitDelay - 4;
+		static constexpr int CaptureDelay = HitDelay - CommonVoiceStart;
 		// Factory Kit 1's, which the engine starts with
 		static const std::array<uint8_t, MasterCount>& masterDefaults();
 		void setMaster(int _index, int _value);

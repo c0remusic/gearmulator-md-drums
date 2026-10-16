@@ -180,10 +180,12 @@ namespace mdDrums
 
 	bool LfoView::followPlayed()
 	{
-		// The knobs whose names are underlined show what the engine plays of them, the others nothing
-		const auto modulated = std::max<int64_t>(m_underlined, 0);
-		if(!modulated && !m_playing)
+		// The knobs whose names are underlined show what the engine plays of them, the others nothing. While the bands
+		// are hidden (another tab) nothing is drawn: the frame that shows them catches up
+		const auto* first = m_knobs.front();
+		if(!first || !first->IsVisible(true))
 			return false;
+		const auto modulated = std::max<int64_t>(m_underlined, 0);
 		const auto& telemetry = m_editor.processor().getTelemetry();
 		bool wrote = false;
 		for(size_t i = 0; i < m_knobs.size(); ++i)
@@ -194,7 +196,6 @@ namespace mdDrums
 				wrote |= knob->setPlayed(moved ? telemetry.played(m_part, static_cast<int>(i)) : Knob::NoPlayed);
 			}
 		}
-		m_playing = modulated != 0;
 		return wrote;
 	}
 

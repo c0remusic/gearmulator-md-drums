@@ -102,7 +102,6 @@ namespace mdDrums
 		TraceKey m_traced{};
 		int64_t m_underlined = -1;	// a bit per name of Engine::paramNames
 		std::array<Knob*, 24> m_knobs{};	// the bands' knobs, by parameter (Engine::ParamCount)
-		bool m_playing = false;		// a knob shows what the engine plays
 		int m_ringedFor = -1;		// the Track and its machine the rings were drawn for, while armed
 	};
 }

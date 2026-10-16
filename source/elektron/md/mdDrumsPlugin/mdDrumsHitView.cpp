@@ -39,7 +39,6 @@ namespace mdDrums
 		constexpr std::array<const char*, 6> g_soundAfter{
 			"LfoTrack", "LfoParam", "LfoShape1", "LfoShape2", "LfoMode", "Level"};
 		static_assert(HitView::SoundCount == 1 + Engine::ParamCount + static_cast<int>(g_soundAfter.size()));
-		static_assert(HitView::ParamCount == Engine::ParamCount);
 		constexpr size_t g_params = 1;
 
 		double tickMs(const double _window)
@@ -158,11 +157,10 @@ namespace mdDrums
 			if(const auto machines = alone ? m_editor.processor().getMachines() : nullptr)
 			{
 				using md::automation::sysex::KitChange;
-				const auto machine = std::find_if(machines->begin(), machines->end(),
-					[&](const md::engine::MachineInfo& _m) { return _m.id == raw[0]; });
+				const auto* machine = Engine::findMachine(*machines, static_cast<uint8_t>(raw[0]));
 				auto kit = m_editor.controller().playedKit();
 				const auto track = static_cast<uint8_t>(std::clamp(m_track, 0, Engine::TrackCount - 1));
-				if(machine != machines->end() && md::automation::sysex::applyKitChange({KitChange::Kind::Machine, track,
+				if(machine && md::automation::sysex::applyKitChange({KitChange::Kind::Machine, track,
 					KitChange::AssignScope, machine->id}, kit, &machine->defaults))
 				{
 					std::copy(kit.parameters[track].begin(), kit.parameters[track].end(), m_chosenDefaults.begin());

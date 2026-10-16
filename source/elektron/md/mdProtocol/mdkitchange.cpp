@@ -17,14 +17,13 @@ namespace md::automation::sysex
 		constexpr uint8_t g_chokeChange = 0x66;		// SET MUTE GROUP
 		constexpr uint8_t g_offOnTheWire = 0x7f;	// MdKit::Off as $65 and $66 carry it
 		constexpr uint8_t g_tracks = machinedrum::TrackCount;
-		constexpr uint8_t g_lastMachine = 191;
 
 		bool valid(const KitChange& _change)
 		{
 			switch(_change.kind)
 			{
 			case Kind::Machine:
-				return _change.track < g_tracks && _change.value <= g_lastMachine && _change.index < 0x80;
+				return _change.track < g_tracks && _change.value <= KitChange::LastMachine && _change.index < 0x80;
 			case Kind::Master:
 				return _change.index < MasterEffectCount * MasterEffectParameters && _change.value < 0x80;
 			case Kind::Lfo:
@@ -180,7 +179,7 @@ namespace md::automation::sysex
 		const auto encoded = encodeKitChange(_change);
 		if(!encoded)
 			return std::nullopt;
-		return Message(encoded->bytes.begin(), encoded->bytes.begin() + encoded->size);
+		return encoded->message();
 	}
 
 	bool applyKitChange(const KitChange& _change, MdKit& _kit, const std::array<uint8_t, 8>* _machineDefaults)
@@ -197,18 +196,14 @@ namespace md::automation::sysex
 			assign(_kit, _change.track, _change.value, _change.index, *_machineDefaults);
 			return true;
 		case Kind::Master:
-			_kit.masterEffects[mdKitMasterIndex(static_cast<uint8_t>(_change.index / MasterEffectParameters),
-				static_cast<uint8_t>(_change.index % MasterEffectParameters))] = _change.value;
+			_kit.masterEffects[_change.masterIndex()] = _change.value;
 			return true;
 		case Kind::Lfo:
 			// The LFO's five settings, then LFOS, LFOD and LFOM, the Track's last three parameters
-			if(_change.index < LfoSettings::FieldMaximum.size())
-			{
+			if(const auto parameter = _change.lfoParameter(); parameter >= 0)
+				_kit.parameters[_change.track][static_cast<size_t>(parameter)] = _change.value;
+			else
 				_kit.lfos[_change.track][_change.index] = _change.value;
-				return true;
-			}
-			_kit.parameters[_change.track][MdKit::ParameterCount - KitChange::LfoFields + _change.index]
-				= _change.value;
 			return true;
 		case Kind::Link:
 			_kit.links[_change.track] = _change.value;

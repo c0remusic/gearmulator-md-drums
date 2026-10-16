@@ -694,10 +694,10 @@ namespace
 		mdDrums::HitPreview::Request request;
 		request.kit = controller.playedKit();
 		using md::automation::sysex::KitChange;
-		for(const auto& machine : *machines)
-			if(machine.id == 33)
-				md::automation::sysex::applyKitChange({KitChange::Kind::Machine, 0, KitChange::AssignScope, 33},
-					request.kit, &machine.defaults);
+		const auto* efmSd = mdDrums::Engine::findMachine(*machines, 33);
+		require(efmSd != nullptr, "the OS has no EFM-SD");
+		md::automation::sysex::applyKitChange({KitChange::Kind::Machine, 0, KitChange::AssignScope, 33}, request.kit,
+			&efmSd->defaults);
 		request.track = 0;
 		request.velocity = 90;
 		const auto flash = mdDrums::Engine::findFlashImage({});

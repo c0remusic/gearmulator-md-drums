@@ -86,6 +86,7 @@ namespace mdDrums
 				apply(event);
 			}
 			render(_outputs, done, _size - done);
+			publishPlayed();
 		}
 		catch(const std::exception& _error)
 		{
@@ -101,6 +102,7 @@ namespace mdDrums
 	void Device::processAudio(const synthLib::TAudioInputs&, const synthLib::TAudioOutputs& _outputs, const size_t _samples)
 	{
 		render(_outputs, 0, _samples);
+		publishPlayed();
 	}
 
 	bool Device::sendMidi(const synthLib::SMidiEvent& _ev, std::vector<synthLib::SMidiEvent>&)
@@ -156,12 +158,15 @@ namespace mdDrums
 			m_position += static_cast<int64_t>(count);
 			done += count;
 		}
-		// What the voices play of their parameters, for the knobs an LFO moves
-		if(m_telemetry)
-		{
-			for(int track = 0; track < Engine::TrackCount; ++track)
-				m_telemetry->setPlayed(track, m_engine->played(track));
-		}
+	}
+
+	void Device::publishPlayed()
+	{
+		// What the voices play of their parameters, for the knobs an LFO moves: once a host block
+		if(!m_telemetry)
+			return;
+		for(int track = 0; track < Engine::TrackCount; ++track)
+			m_telemetry->setPlayed(track, m_engine->played(track));
 	}
 
 	void Device::capture(const size_t _count)
@@ -336,40 +341,28 @@ namespace mdDrums
 	void Device::applyChange(const sysex::KitChange& _change)
 	{
 		using Kind = sysex::KitChange::Kind;
+		// A machine the OS has: the Kit takes no other (applyKitChange without its defaults)
+		const auto* machine = _change.kind == Kind::Machine ? m_engine->machine(_change.value) : nullptr;
+		if(!sysex::applyKitChange(_change, m_kit, machine ? &machine->defaults : nullptr))
+			return;
 		const auto track = _change.track;
-		if(_change.kind == Kind::Machine)
+		switch(_change.kind)
 		{
-			// A machine the OS has, any other being no machine to the engine; the voice switches at its next Hit
-			const auto& machines = m_engine->machines();
-			const auto info = std::find_if(machines.begin(), machines.end(),
-				[&](const md::engine::MachineInfo& _m) { return _m.id == _change.value; });
-			if(info == machines.end() || !sysex::applyKitChange(_change, m_kit, &info->defaults))
-				return;
+		case Kind::Machine:
+			// The voice switches at its next Hit
 			m_engine->setMachine(track, _change.value);
 			for(uint8_t parameter = 0; parameter < Engine::ParamCount; ++parameter)
 				m_engine->setParam(track, parameter, m_kit.parameters[track][parameter]);
 			m_machinesToReport = static_cast<uint16_t>(m_machinesToReport | 1u << track);
 			return;
-		}
-		if(!sysex::applyKitChange(_change, m_kit))
-			return;
-		switch(_change.kind)
-		{
 		case Kind::Master:
-		{
-			constexpr auto parameters = sysex::MasterEffectParameters;
-			const auto index = sysex::mdKitMasterIndex(static_cast<uint8_t>(_change.index / parameters),
-				static_cast<uint8_t>(_change.index % parameters));
-			m_engine->setMaster(index, m_kit.masterEffects[index]);
+			m_engine->setMaster(_change.masterIndex(), m_kit.masterEffects[_change.masterIndex()]);
 			return;
-		}
 		case Kind::Lfo:
-			// The LFO's five settings, or LFOS, LFOD and LFOM, the Track's last three parameters
-			if(_change.index < md::LfoSettings::FieldMaximum.size())
-				m_engine->setLfo(track, m_kit.lfo(track));
+			if(const auto parameter = _change.lfoParameter(); parameter >= 0)
+				m_engine->setParam(track, parameter, _change.value);
 			else
-				m_engine->setParam(track, Engine::ParamCount - sysex::KitChange::LfoFields + _change.index,
-					_change.value);
+				m_engine->setLfo(track, m_kit.lfo(track));
 			return;
 		case Kind::Link:
 			// MdKit::Off is past the Tracks, which switches the engine's Link or Choke off
@@ -377,8 +370,6 @@ namespace mdDrums
 			return;
 		case Kind::Choke:
 			m_engine->setChoke(track, m_kit.chokes[track]);
-			return;
-		case Kind::Machine:
 			return;
 		}
 	}

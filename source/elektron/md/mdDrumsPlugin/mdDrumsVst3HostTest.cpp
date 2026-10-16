@@ -13,6 +13,8 @@
 
 #include "mdDrumsHostDriver.h"
 
+#include "mdProtocol/mdkitchange.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -50,7 +52,7 @@ namespace
 	constexpr int g_tracks = 16;
 	constexpr int g_outs = 15;			// Out 01-15: Live opens at most 16 output buses per plug-in, Main included
 	constexpr int g_parameters = 608;	// 16 Tracks of 34, the 32 master effects, the 32 relays for Push 2
-	constexpr int g_relays = 576;		// the first relay: those follow the Track shown (ticket 27)
+	constexpr int g_relays = mdDrums::hostDriver::Host::Relays;	// the first relay: those follow the Track shown
 	constexpr int g_latency = 83;		// what the plug-in reports at 44.1 kHz: every Hit's, on Main and the Outs
 	constexpr float g_silence = 1e-5f;	// Main keeps a tail of a few LSB after a Hit (EQ and Dynamix)
 	constexpr float g_sound = 1e-3f;
@@ -214,15 +216,12 @@ namespace
 		}
 
 		// The parameters told as edits, each once, by name; _withRelays false leaves Push 2's relays out
-		std::string edited(const Frozen& _frozen, const bool _withRelays = true)
+		std::string edited(const Frozen& _frozen)
 		{
 			const std::lock_guard lock(mutex);
 			std::map<int, int> counts;
 			for(const auto index : edits)
-			{
-				if(_withRelays || index < g_relays)
-					++counts[index];
-			}
+				++counts[index];
 			std::string result;
 			for(const auto& [index, count] : counts)
 			{
@@ -286,7 +285,6 @@ namespace
 
 		~Instance()
 		{
-			host.reset();
 			if(plugin)
 				plugin->removeListener(&told);
 		}
@@ -667,12 +665,14 @@ namespace
 			require(instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
 				"a new machine's SYN1-8 did not reach the host as a re-read");
 			{
-				// The effects and routing pages OS 1.63 gives every machine but MID and CTR ($246148, $246150)
-				const std::vector<std::pair<const char*, int>> os{{"AMD", 0}, {"AMF", 0}, {"EQF", 64}, {"EQG", 64},
-					{"FLTF", 0}, {"FLTW", 127}, {"FLTQ", 0}, {"SRR", 0}, {"DIST", 0}, {"VOL", 127}, {"PAN", 64},
-					{"DEL", 0}, {"REV", 0}, {"LFOS", 64}, {"LFOD", 0}, {"LFOM", 0}};
-				for(const auto& [name, value] : os)
+				// The effects and routing pages OS 1.63 gives every machine but MID and CTR (sysex::os163)
+				namespace os163 = md::automation::sysex::os163;
+				constexpr std::array<const char*, 16> names{"AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR",
+					"DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"};
+				for(size_t p = 0; p < names.size(); ++p)
 				{
+					const auto* name = names[p];
+					const int value = p < 8 ? os163::Effects[p] : os163::Routing[p - 8];
 					const auto read = std::lround(instance->parameter(ids.index(name, 2)).getValue() * 127.0f);
 					require(read == value, std::string("the host reads Track 3's ") + name + " at "
 						+ std::to_string(read) + " after a new machine, not the OS's " + std::to_string(value));

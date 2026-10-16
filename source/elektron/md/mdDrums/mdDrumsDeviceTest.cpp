@@ -340,10 +340,9 @@ namespace
 		const auto& machines = rig.device->machines();
 		const auto defaults = [&](const uint8_t _id)
 		{
-			const auto it = std::find_if(machines.begin(), machines.end(),
-				[&](const md::engine::MachineInfo& _m) { return _m.id == _id; });
-			require(it != machines.end(), "the OS has no machine " + std::to_string(_id));
-			return it->defaults;
+			const auto* machine = mdDrums::Engine::findMachine(machines, _id);
+			require(machine != nullptr, "the OS has no machine " + std::to_string(_id));
+			return machine->defaults;
 		};
 		// $5B's body: track, id, then the UW flag and a scope when given (-1 leaves one out)
 		const auto assign = [&](const uint8_t _track, const uint8_t _id, const int _uw, const int _scope)
@@ -630,7 +629,7 @@ namespace
 		Rig rig(_flash, 44100.0f);
 		rig.settle();
 		constexpr uint32_t id = 0xa5c3e1;
-		const auto bits = [](const int _note) { return static_cast<uint8_t>(1 + (id >> (18 - 6 * _note) & 0x3f)); };
+		const auto bits = [](const int _note) { return mdDrums::Device::helloVelocity(id, _note); };
 		for(int note = 0; note < mdDrums::Device::HelloNotes; ++note)
 		{
 			const auto pitch = static_cast<uint8_t>(mdDrums::Device::FirstHelloNote + note);

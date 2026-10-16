@@ -43,7 +43,7 @@ namespace mdDrums
 
 		// Where the flash image is looked for, by the Device and by the Hit screen's preview: the data folder's roms,
 		// then the plug-in's own folder, as the stack gives them (UTF-8)
-		std::vector<std::string> romFolders() const;
+		std::vector<std::filesystem::path> romFolders() const;
 		// Whether a Device plays, rather than the stack's silent stand-in when no flash image was found
 		bool hasDevice();
 		// A flash image the user chose in the editor (ticket 35): checked, the Device made again from it (with the Kit the

@@ -311,6 +311,19 @@ namespace mdDrums
 		m_state->engine.host().setMachine(_track, _machineId);
 	}
 
+	const md::engine::MachineInfo* Engine::machine(const uint8_t _id) const
+	{
+		return m_state->engine.os().machine(_id);
+	}
+
+	const md::engine::MachineInfo* Engine::findMachine(const std::vector<md::engine::MachineInfo>& _machines,
+		const uint8_t _id)
+	{
+		const auto it = std::find_if(_machines.begin(), _machines.end(),
+			[&](const md::engine::MachineInfo& _m) { return _m.id == _id; });
+		return it == _machines.end() ? nullptr : &*it;
+	}
+
 	std::array<uint16_t, Engine::ParamCount> Engine::played(const int _track) const
 	{
 		std::array<uint16_t, ParamCount> words{};
@@ -410,7 +423,7 @@ namespace mdDrums
 			return 68;
 		default:
 			// ROM-01 to -32, then ROM-33 to -48
-			return (_machine >= 128 && _machine < 160) || (_machine >= 176 && _machine < 192) ? 12 : 4;
+			return (_machine >= 128 && _machine < 160) || (_machine >= 176 && _machine < 192) ? 12 : CommonVoiceStart;
 		}
 	}
 

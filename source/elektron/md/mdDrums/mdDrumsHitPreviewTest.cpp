@@ -10,13 +10,12 @@
 
 #include "mdDrumsDevice.h"
 #include "mdDrumsEngine.h"
-
-#include "mdProtocol/mdkitchange.h"
 #include "mdDrumsHitPreview.h"
 #include "mdDrumsMessages.h"
 
 #include "Firmware.h"
 
+#include "mdProtocol/mdkitchange.h"
 #include "mdProtocol/mdsysexautomation.h"
 
 #include "synthLib/midiTypes.h"

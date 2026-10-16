@@ -29,10 +29,14 @@ namespace mdDrums
 		static constexpr int FirstNote = 36;
 		static constexpr int FirstLockNote = 64;	// SYN1 to LFOM, the engine's parameter order; velocity: lockValue()
 		// md-drums-seq's hello (KitFiles): note-ons 124 to 127 in that order, on any channel, each velocity 1 + six
-		// bits of the device's id, the most significant first; another note-on between them cancels it. They play
-		// nothing.
+		// bits of the device's id, the most significant first (helloVelocity); another note-on between them cancels
+		// it. They play nothing.
 		static constexpr int FirstHelloNote = 124;
 		static constexpr int HelloNotes = 4;
+		static constexpr uint8_t helloVelocity(const uint32_t _id, const int _note)
+		{
+			return static_cast<uint8_t>(1 + (_id >> (6 * (HelloNotes - 1 - _note)) & 0x3f));
+		}
 		// Main left and right, then Out 01 to 15, each the sum of the Tracks the mixer puts on it (messages::OutCount)
 		static constexpr int OutCount = messages::OutCount;
 		static constexpr int OutputCount = 2 + OutCount;
@@ -88,6 +92,7 @@ namespace mdDrums
 		void reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut);
 		void applyMixer();
 		void render(const synthLib::TAudioOutputs& _outputs, size_t _offset, size_t _count);
+		void publishPlayed();
 		void capture(size_t _count);
 
 		std::unique_ptr<Engine> m_engine;

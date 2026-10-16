@@ -53,7 +53,7 @@ namespace mdDrums
 		static constexpr double SampleRate = 44100.0;
 		static constexpr int TickCount = 8;
 		// A Track's sound as host parameters: Machine, the 24 parameters, the LFO's five, Level
-		static constexpr int ParamCount = 24;
+		static constexpr int ParamCount = Telemetry::ParamCount;
 		static constexpr int SoundCount = 1 + ParamCount + 6;
 		// How long a machine just chosen previews with its own parameters, whatever the host's still say
 		static constexpr double MachineReportMs = 500.0;

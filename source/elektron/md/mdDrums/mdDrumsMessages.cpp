@@ -70,7 +70,7 @@ namespace mdDrums::messages
 
 		// The byte of _kit that holds a Kit host parameter, _track in range; null for one that is not a byte of the
 		// Kit (the machine is a word, whose low byte parameterValue reads and setKitValue writes whole). parameterValue
-		// reads through it, setKitValue writes.
+		// reads through it, setKitValue writes through it.
 		template<typename Kit>
 		auto kitByte(Kit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index)
 			-> decltype(&_kit.levels[0])
@@ -260,7 +260,7 @@ namespace mdDrums::messages
 			return raw;
 		}
 		case pages::Machine:
-			if(_index != 0 || _value < 0 || _value > 191)
+			if(_index != 0 || _value < 0 || _value > KitChange::LastMachine)
 				return std::nullopt;
 			return kitChange({Kind::Machine, _track, KitChange::AssignScope, static_cast<uint8_t>(_value)});
 		case pages::Lfo:

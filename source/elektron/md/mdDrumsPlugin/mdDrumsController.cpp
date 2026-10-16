@@ -140,13 +140,12 @@ namespace mdDrums
 			if(row.page != pages::Focus || row.index >= RelayCount)
 				continue;
 			++relays;
-			const auto target = std::string_view(row.name).substr(g_relayPrefix.size());
-			const auto it = std::find_if(rows.begin(), rows.end(), [&](const pluginLib::Description& _row)
-			{
-				return _row.name == target && !_row.isNonPartSensitive();
-			});
-			if(it != rows.end())
-				m_relayTarget[row.index] = *at(it->page, it->index);
+			uint32_t target = 0;
+			if(!getParameterDescriptions().getIndexByName(target, row.name.substr(g_relayPrefix.size())))
+				continue;
+			const auto& targetRow = rows[target];
+			if(!targetRow.isNonPartSensitive())
+				m_relayTarget[row.index] = *at(targetRow.page, targetRow.index);
 		}
 		if(track != TrackParameterCount || master != MasterParameterCount || relays != RelayCount)
 			throw std::logic_error("parameterDescriptions_mddrums.json does not hold MD Drums' parameters");
@@ -263,8 +262,16 @@ namespace mdDrums
 		const auto now = juce::Time::getMillisecondCounterHiRes();
 		if(const auto id = static_cast<Processor&>(getProcessor()).getTelemetry().takeHello())
 			m_kitFiles.hello(id, now);
-		if(m_kitFiles.due(now))
-			m_kitFiles.step(KitFiles::text(playedKit()), now);
+		if(!m_kitFiles.due(now))
+			return;
+		// The text again only for another Kit
+		auto kit = playedKit();
+		if(m_kitFilesText.empty() || kit != m_kitFilesKit)
+		{
+			m_kitFilesText = KitFiles::text(kit);
+			m_kitFilesKit = std::move(kit);
+		}
+		m_kitFiles.step(m_kitFilesText, now);
 	}
 
 	void Controller::relayChanged(const uint8_t _index, const int _value)

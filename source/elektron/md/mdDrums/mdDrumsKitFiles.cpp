@@ -2,9 +2,10 @@
 
 #include "mdProtocol/mdmachines.h"
 
+#include "baseLib/filesystem.h"
+
 #include <algorithm>
 #include <cstdio>
-#include <fstream>
 
 namespace mdDrums
 {
@@ -35,7 +36,9 @@ namespace mdDrums
 	std::string KitFiles::text(const md::automation::sysex::MdKit& _kit)
 	{
 		constexpr auto model = md::MachineModel::Machinedrum;
-		std::string out = "md-drums-kit 1\nkit " + _kit.displayName() + "\n";
+		std::string out;
+		out.reserve(3000);
+		out.append("md-drums-kit 1\nkit ").append(_kit.displayName()).append("\n");
 		for(uint8_t t = 0; t < md::automation::machinedrum::TrackCount; ++t)
 		{
 			const auto id = _kit.machine(t);
@@ -90,16 +93,7 @@ namespace mdDrums
 	{
 		std::error_code error;
 		std::filesystem::create_directories(m_folder, error);
-		const auto target = file(_id);
-		auto temporary = target;
-		temporary += ".tmp";
-		{
-			std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-			out.write(_text.data(), static_cast<std::streamsize>(_text.size()));
-			if(!out)
-				return false;
-		}
-		std::filesystem::rename(temporary, target, error);
-		return !error;
+		const auto* bytes = reinterpret_cast<const uint8_t*>(_text.data());
+		return baseLib::filesystem::writeFileAtomic(file(_id).u8string(), bytes, _text.size());
 	}
 }

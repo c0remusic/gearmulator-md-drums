@@ -28,17 +28,29 @@ namespace md::automation::sysex
 		static constexpr uint8_t AssignScope = 2;
 		// $62's fields after LfoSettings' five: LFOS, LFOD and LFOM, the Track's parameters 21 to 23
 		static constexpr uint8_t LfoFields = 8;
+		static constexpr uint8_t LastMachine = 191;
 
 		Kind kind = Kind::Machine;
 		uint8_t track = 0;
 		uint8_t index = 0;
 		uint8_t value = 0;
 
+		// Where a Master change lands among the Kit's 32 master bytes, in the dump's order
+		uint8_t masterIndex() const
+		{
+			return mdKitMasterIndex(static_cast<uint8_t>(index / MasterEffectParameters),
+				static_cast<uint8_t>(index % MasterEffectParameters));
+		}
+		// The Track parameter an LFO change sets, LFOS, LFOD or LFOM (21 to 23); -1 for one of the LFO's settings
+		int lfoParameter() const
+		{
+			return index < LfoSettings::FieldMaximum.size() ? -1 : MdKit::ParameterCount - LfoFields + index;
+		}
+
 		bool operator==(const KitChange& _other) const
 		{
 			return kind == _other.kind && track == _other.track && index == _other.index && value == _other.value;
 		}
-		bool operator!=(const KitChange& _other) const { return !(*this == _other); }
 	};
 
 	// A message from F0 to F7, 12 bytes at most (a $5B with its scope)
@@ -46,6 +58,8 @@ namespace md::automation::sysex
 	{
 		std::array<uint8_t, 12> bytes{};
 		uint8_t size = 0;
+
+		Message message() const { return Message(bytes.begin(), bytes.begin() + size); }
 	};
 
 	// The change a message carries, as OS 1.63 reads it ($2052fe, $205852, $205a4a): a $5B of 10, 11 or 12 bytes

@@ -302,12 +302,6 @@ namespace
 			watch.rereads());
 	}
 
-	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of the
-	// Track shown its value, the Device getting it at the next block, the host not told; the relay Track shows another
-	// Track and the relays then hold its values, the host taking them as edits without a gesture; a parameter of the
-	// Track shown moved elsewhere moves its relay, the host not told (ticket 34); the state keeps the Track shown;
-	// "Prepare Push list" moves a page of eight per Track, the Tracks' own parameters (ticket 37), and the relays' entry
-	// the 64 of ticket 27's list, each in order and in a gesture
 	// Every Track and master parameter, set by the host, reaches the Device: its state reads back what the host set
 	// (the Controller numbers its slots from the JSON's rows). Every relay has its target's range, default and text,
 	// and sets its target on the Track shown.
@@ -381,7 +375,7 @@ namespace
 			juce::MidiBuffer midi;
 			for(int note = 0; note < mdDrums::Device::HelloNotes; ++note)
 			{
-				const auto velocity = static_cast<juce::uint8>(1 + (id >> (18 - 6 * note) & 0x3f));
+				const auto velocity = mdDrums::Device::helloVelocity(id, note);
 				midi.addEvent(juce::MidiMessage::noteOn(1, mdDrums::Device::FirstHelloNote + note, velocity), 10);
 			}
 			process(host, buffer, midi);
@@ -396,6 +390,12 @@ namespace
 		require(!std::filesystem::exists(file), "the file stayed after the processor went");
 	}
 
+	// The relays for Push 2 (ticket 27): a relay set by the host (as Push or automation sets it) gives its parameter of
+	// the Track shown its value, the Device getting it at the next block, the host not told; the relay Track shows
+	// another Track and the relays then hold its values, the host taking them as edits without a gesture; a parameter
+	// of the Track shown moved elsewhere moves its relay, the host not told (ticket 34); the state keeps the Track
+	// shown; "Prepare Push list" moves a page of eight per Track, the Tracks' own parameters (ticket 37), and the
+	// relays' entry the 64 of ticket 27's list, each in order and in a gesture
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();

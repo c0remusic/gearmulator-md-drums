@@ -159,5 +159,7 @@ namespace mdDrums
 		// them on its own thread), taken on the message thread
 		std::atomic<bool> m_valuesChanged{false};
 		KitFiles m_kitFiles;
+		md::automation::sysex::MdKit m_kitFilesKit;	// what m_kitFilesText was made from
+		std::string m_kitFilesText;
 	};
 }

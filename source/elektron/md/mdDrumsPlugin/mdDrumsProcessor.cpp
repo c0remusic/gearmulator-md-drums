@@ -82,10 +82,10 @@ namespace mdDrums
 		return new EditorState(*this);
 	}
 
-	std::vector<std::string> Processor::romFolders() const
+	std::vector<std::filesystem::path> Processor::romFolders() const
 	{
-		std::vector<std::string> folders{getPublicRomFolder(), synthLib::getModulePath()};
-		return folders;
+		// The stack's folders are UTF-8, which a path made from a std::string would read in the ANSI code page
+		return {std::filesystem::u8path(getPublicRomFolder()), std::filesystem::u8path(synthLib::getModulePath())};
 	}
 
 	bool Processor::hasDevice()
@@ -135,13 +135,7 @@ namespace mdDrums
 	{
 		auto flash = m_chosenFlash;
 		if(flash.empty())
-		{
-			// The stack's folders are UTF-8, which a path made from a std::string would read in the ANSI code page
-			std::vector<std::filesystem::path> folders;
-			for(const auto& folder : romFolders())
-				folders.push_back(std::filesystem::u8path(folder));
-			flash = Engine::findFlashImage(folders);
-		}
+			flash = Engine::findFlashImage(romFolders());
 		if(flash.empty())
 			throw synthLib::DeviceException(synthLib::DeviceError::FirmwareMissing,
 				std::string("MD Drums needs the Machinedrum UW's 8 MB flash image with OS 1.63, ") + Engine::FlashImageName
