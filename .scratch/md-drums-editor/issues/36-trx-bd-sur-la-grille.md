@@ -1,7 +1,7 @@
 # TRX-BD sur la grille
 
 Type: task
-Status: in progress
+Status: resolved
 Assignee: c0remusic (session du 2026-10-14)
 Blocked by: 35
 
@@ -20,5 +20,29 @@ et annoncer 32 échantillons de plus (83 sur Main à 44,1 kHz) ; les ROM pareil 
 
 ## Answer
 
-À établir : carte du chemin des Hits et des départs de voix (workflow de lecture), puis conception, construction et
-mesures avant/après.
+Construit le 2026-10-16, en autonomie (l'utilisateur dormait), sur les recommandations de la carte :
+
+- **Où** : le retard s'ajoute du côté des sorties, dans `Engine::trigger` : chaque Track frappée (la sienne et son Link)
+  attend le reste des 31 échantillons, puis ce que la voix de sa machine a d'avance sur la plus lente
+  (`Engine::AlignedStart` − `Engine::voiceStart`, lu par `HostModel::machine`, accesseur local de mdEngine). Les Locks
+  ne bougent pas : ils restent liés au bloc du Hit. Le mode par blocs (`setSampleAccurate(false)`, tests) ne retient
+  rien.
+- **Table** : statique, mesurée par `mdDrumsEngineTest` (« voice starts ») sur la sortie propre de chaque machine, à un
+  Hit répété (le premier Hit après un changement de machine démarre parfois plus tard : P-I ML 260 échantillons, TRX-MA
+  27, le son de la machine). 82 machines sonnent : la plupart démarrent 4 à 8 échantillons après leur bloc (comptées 4),
+  les ROM 12, TRX-BD et TRX-S2 36. TRX-XT (40), TRX-XC (68) et TRX-CB (102) démarrent après TRX-BD : elles ne sont
+  pas retenues et sonnent aussi tard que sur la machine (les aligner aurait coûté jusqu'à 1,5 ms de plus). Les machines
+  muettes (INP, MID, CTR, RAM, ROM-33 à -48) comptent 4. Le test exige le point exact pour TRX-BD, TRX-S2, ROM-01 et
+  -16, à 4 échantillons près pour une machine de chaque famille, et leur propre départ pour les trois tardives.
+- **Outs** : la sortie propre de chaque Track attend aussi les 16 de Dynamix, comme Main : un Hit sonne au même
+  échantillon sur Main et sur son Out. La latence annoncée passe de 51 à 83 (`Engine::HitDelay` = 31 + 36 + 16).
+- **Captures** : l'éditeur capture un Hit 4 échantillons avant qu'il sonne (`Engine::CaptureDelay`, 79), pour toutes
+  les machines ; HitPreview saute autant.
+- L'anneau des voies passe de 64 à 128 échantillons.
+
+Mesuré, avant et après :
+- TRX-BD sur Out 01 : 67 → 83 ; sur Main 85 → 85 (Main prend 2 échantillons de plus au seuil de -100 dBFS) ; une
+  machine à 4 sur Main : 51 → 83. Gigue 0 à 44,1 kHz, avant comme après.
+- Latence annoncée : 51 → 83 à 44,1 kHz, 88 → 123 à 48 kHz (avec le rééchantillonneur).
+- Les Chokes coupent toujours à l'échantillon où sonne le Hit qui coupe (+0), une Track plus basse au tick suivant
+  (+283 au lieu de +251, le Hit qui coupe sonnant 32 plus tard).

@@ -112,19 +112,25 @@ namespace
 	}
 
 	// The engine's own mixer (md::engine::Engine, as mdEngineFirmwareTest compares it with the firmware) against
-	// mdDrums::Engine with every Hit on an engine block, so that every Track waits as long: the same samples, at once
-	// when not sample-accurate, SampleAccurateDelay later when it is. The master effects run on the engine's buses as
+	// mdDrums::Engine with every Hit on an engine block and every Track on a machine whose voice is held back as long
+	// (the default ones, TRX-SD for those that start later), so that every Track waits as long: the same samples, at
+	// once when not sample-accurate, SampleAccurateDelay and the hold later when it is. The master effects run on the engine's buses as
 	// they are, and on the same buses SampleAccurateDelay later, each with the OS's words of every tick. The two
 	// mdDrums::Engines come from the flash image, their machines and master compiled ahead, against an engine and
 	// master effects that were not: the warm-up leaves the samples as they are.
 	void equivalence(const std::vector<uint8_t>& _flash, const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
 	{
+		const auto machine = [](const int _track)
+		{
+			const auto m = mdDrums::Engine::defaultMachine(_track);
+			return mdDrums::Engine::voiceStart(m) == mdDrums::Engine::voiceStart(17) ? m : uint8_t{17};	// TRX-SD
+		};
 		md::engine::Engine raw(_os.firmware, _os.osImage);
 		raw.loadRomBank(_bank);
 		md::engine::MasterEngine onBlocks(_os.firmware), late(_os.firmware);
 		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
 		{
-			raw.host().setMachine(track, mdDrums::Engine::defaultMachine(track));
+			raw.host().setMachine(track, machine(track));
 			for(int param = 8; param < mdDrums::Engine::ParamCount; ++param)
 				raw.host().setParam(track, param, mdDrums::Engine::paramDefaults()[param]);
 			raw.host().setLevel(track, mdDrums::Engine::DefaultLevel);
@@ -133,6 +139,11 @@ namespace
 			raw.host().setMaster(index, mdDrums::Engine::masterDefaults()[index]);
 		mdDrums::Engine accurate(_flash), blocks(_flash);
 		blocks.setSampleAccurate(false);
+		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
+		{
+			accurate.setMachine(track, machine(track));
+			blocks.setMachine(track, machine(track));
+		}
 		accurate.setParam(4, 18, 20);	// a panned Track, and one with a send
 		blocks.setParam(4, 18, 20);
 		raw.host().setParam(4, 18, 20);
@@ -142,11 +153,12 @@ namespace
 
 		constexpr int blockCount = 600;
 		constexpr size_t block = mdDrums::Engine::BlockSize;
-		constexpr size_t shift = mdDrums::Engine::SampleAccurateDelay;
+		const auto shift = static_cast<size_t>(mdDrums::Engine::SampleAccurateDelay + mdDrums::Engine::AlignedStart
+			- mdDrums::Engine::voiceStart(17));
 		std::vector<int32_t> rawLeft, rawRight, lateLeft, lateRight;
 		std::vector<float> accLeft(blockCount * block), accRight(blockCount * block), blkLeft(accLeft.size()), blkRight(accLeft.size());
 		md::engine::Engine::Output out;
-		std::vector<std::array<std::array<int32_t, 2>, 3>> buses(shift);	// the buses' last 31 frames, oldest first
+		std::vector<std::array<std::array<int32_t, 2>, 3>> buses(shift);	// the buses' last frames, shift of them, oldest first
 		for(int b = 0; b < blockCount; ++b)
 		{
 			if(b % 3 == 0)
@@ -199,29 +211,92 @@ namespace
 		require(blockDiffs == 0 && accurateDiffs == 0, "the delayed mix is not the engine's mix");
 	}
 
-	// Where the voices start, sample-accurate: from the trigger to the first sample that is not 0, a machine of each
-	// family. Every Hit waits 31 samples; what remains is the voice's own start, which the Device's reported latency
-	// takes from the most common case.
+	// Where the voices start (ticket 36): every machine that sounds, at velocity 127 with the Kit's defaults, on its own
+	// output (it does not go through the master effects), its first Hit after it is chosen and a Hit again once it is
+	// silent. It prints what each voice takes after the block its Hit lands in, its Hit again's (Engine::voiceStart's
+	// table). A Hit again of the machines it holds back sounds HitDelay samples after its trigger: exactly for the
+	// voices that start a block late and for ROM, within 4 samples for the others, whose own sound sets their first
+	// sample; TRX-XT, TRX-XC and TRX-CB, not held back, sound their own start later.
 	void voiceStarts(const md::fw::FlashOs& _os, const md::fw::RomBank& _bank)
 	{
-		std::string line;
-		for(const char* name : {"TRXBD", "TRXSD", "TRXCH", "TRXCP", "EFMBD", "EFMSD", "EFMHH", "E12BD", "E12SD", "E12CH",
-			"P-IBD", "P-IHH", "ROM01", "GNDSN"})
+		constexpr size_t length = 2048;
+		std::vector<float> own(length);
+		std::array<float*, mdDrums::Engine::OutputCount> outputs{};
+		outputs[2] = own.data();
+		// The first sample that is not 0 on Track 1's own output, from a trigger now; -1 when silent
+		const auto hit = [&](mdDrums::Engine& _engine)
 		{
-			mdDrums::Engine engine(_os, _bank, true);
-			engine.setMachine(0, machineId(engine, name));
-			settle(engine);
-			engine.trigger(0, 127);
-			std::vector<float> left(4410), right(4410);
-			engine.render(left.data(), right.data(), left.size());
-			int first = -1;
-			for(size_t i = 0; i < left.size() && first < 0; ++i)
-				if(left[i] != 0.0f || right[i] != 0.0f)
-					first = static_cast<int>(i);
-			line += std::string(" ") + name + " "
-				+ std::to_string(first - mdDrums::Engine::SampleAccurateDelay - mdDrums::Engine::MasterDelay);
+			_engine.trigger(0, 127);
+			_engine.render(outputs.data(), length);
+			for(size_t i = 0; i < length; ++i)
+				if(own[i] != 0.0f)
+					return static_cast<int>(i);
+			return -1;
+		};
+		// Renders until the Track's output has been silent for a while (at most 4 s); false if it never is
+		const auto quiet = [&](mdDrums::Engine& _engine)
+		{
+			size_t silent = 0;
+			for(size_t done = 0; done < 44100 * 4; done += length)
+			{
+				_engine.render(outputs.data(), length);
+				for(size_t i = 0; i < length; ++i)
+					silent = own[i] == 0.0f ? silent + 1 : 0;
+				if(silent >= 8192)
+					return true;
+			}
+			return false;
+		};
+		// Where a Hit of _machine is expected to sound on its own output, its voice starting _start after its block
+		const auto expected = [](const uint8_t _machine, const int _start)
+		{
+			const auto held = std::max(0, mdDrums::Engine::AlignedStart - mdDrums::Engine::voiceStart(_machine));
+			return mdDrums::Engine::SampleAccurateDelay + held + _start + mdDrums::Engine::MasterDelay;
+		};
+
+		std::string silentNames, starts, wrong;
+		int sounding = 0;
+		const mdDrums::Engine machines(_os, _bank, false);
+		for(const auto& machine : machines.machines())
+		{
+			mdDrums::Engine engine(_os, _bank, false);
+			engine.setMachine(0, machine.id);
+			engine.render(outputs.data(), mdDrums::Engine::BlockSize * 3);
+			const auto first = hit(engine);
+			if(first < 0)
+			{
+				silentNames += " " + machine.name;
+				continue;
+			}
+			++sounding;
+			const auto again = quiet(engine) ? hit(engine) : -1;
+			// What the voice takes after its block: the sound less the 31, the hold and the look-ahead
+			const auto start = [&](const int _at) { return _at < 0 ? -1 : _at - expected(machine.id, 0); };
+			starts += " " + machine.name + " " + std::to_string(start(first)) + "/" + std::to_string(start(again));
+
+			// The references: a machine of each family, the voices that start a block late, ROM, and the two not held
+			const std::string name = machine.name;
+			const bool exact = name == "TRXBD" || name == "TRXS2" || name == "ROM01" || name == "ROM16";
+			const bool near = name == "TRXSD" || name == "TRXCH" || name == "EFMBD" || name == "EFMSD" || name == "E12BD"
+				|| name == "E12SD" || name == "P-IBD" || name == "GNDSN";
+			const bool late = name == "TRXXT" || name == "TRXXC" || name == "TRXCB";
+			if(!exact && !near && !late)
+				continue;
+			const auto want = late ? expected(machine.id, mdDrums::Engine::voiceStart(machine.id))
+				: mdDrums::Engine::HitDelay;
+			const auto tolerance = exact ? 0 : near ? 4 : 1;
+			// A sound that never goes silent (GND-SN, a sine) gives its first Hit
+			const auto at = again >= 0 ? again : first;
+			if(at < want || at > want + tolerance)
+				wrong += " " + name + " (id " + std::to_string(machine.id) + ") at " + std::to_string(at)
+					+ ", not " + std::to_string(want) + (tolerance ? " to " + std::to_string(want + tolerance) : "") + ";";
 		}
-		std::printf("voice starts after the 31 samples (and Dynamix's 16 on Main):%s\n", line.c_str());
+		std::printf("voice starts on their own output, after the block a Hit lands in (first Hit/again):%s\n", starts.c_str());
+		std::printf("voice starts: %d machines sound, silent:%s; held back, a Hit again sounds %d samples after its trigger\n",
+			sounding, silentNames.c_str(), mdDrums::Engine::HitDelay);
+		if(!wrong.empty())
+			std::printf("voice starts elsewhere:%s\n", wrong.c_str());
+		require(sounding > 60 && wrong.empty(), "a machine's Hit does not sound where its voice's start says");
 	}
 
 	// Where a Choke cuts, sample-accurate (ticket 38 of the editor map): its target, a sustained E12-RC on its own output,
@@ -287,7 +362,13 @@ namespace
 		for(const auto& c : cases)
 		{
 			const auto on = run(c, true), off = run(c, false);
-			const auto cut = c.hits.back().first + mdDrums::Engine::SampleAccurateDelay;
+			// The cutting Hit sounds 31 samples after its note, held back as its machine's voice is quicker than the
+			// latest, on the target's own output Dynamix's look-ahead later (as on Main)
+			const auto last = c.hits.back().second;
+			const auto cutter = last == c.linkFrom ? c.linkTo : last;
+			const auto cut = c.hits.back().first + mdDrums::Engine::SampleAccurateDelay + mdDrums::Engine::MasterDelay
+				+ std::max(0, mdDrums::Engine::AlignedStart
+					- mdDrums::Engine::voiceStart(mdDrums::Engine::defaultMachine(cutter)));
 			// Where the target goes silent for good, and what differs before
 			auto silent = on.size();
 			while(silent > c.from && on[silent - 1] == 0.0f)
@@ -369,17 +450,25 @@ int main()
 		mdDrums::Engine engine(flash);
 		require(engine.machines().size() > 100, "the OS's machine table is incomplete");
 
+		// The scenarios on engines of their own build them from the OS and the UW bank read once, without the
+		// machines and the master compiled ahead, which leaves the samples as they are (mdDrumsFirstHitTest)
+		const auto os = md::fw::loadFirmwareFromFlash(flash);
+		const auto bank = md::fw::loadRomBankFromFlash(flash);
+		// First: the checks below take where the Hits sound from it
+		voiceStarts(os, bank);
+
 		engine.setMachine(0, machineId(engine, "TRXBD"));
 		engine.setLevel(0, 100);
 		settle(engine);
 		require(listen(engine).second == 0.0f, "a track sounds without a trigger");
 
-		// A trigger sounds 31 samples later, then TRX-BD's voice a block after it
+		// A trigger sounds HitDelay samples later on Main, as every machine's (TRX-BD's voice sounds a block after its
+		// trigger, the latest), and reaches -60 dBFS within a block
 		engine.trigger(0, 127);
 		const auto [first, loud] = listen(engine);
 		std::printf("TRXBD velocity 127: first audible sample %d, peak %.4f\n", first, loud);
-		require(first >= 0 && first < mdDrums::Engine::BlockSize * 2 + mdDrums::Engine::SampleAccurateDelay
-			+ mdDrums::Engine::MasterDelay, "the trigger took more than two blocks to sound");
+		require(first >= mdDrums::Engine::HitDelay && first < mdDrums::Engine::HitDelay + mdDrums::Engine::BlockSize,
+			"the trigger does not sound HitDelay samples later on Main");
 		require(loud > 0.01f, "the trigger is too quiet");
 
 		settle(engine);
@@ -387,12 +476,6 @@ int main()
 		const auto soft = listen(engine).second;
 		std::printf("TRXBD velocity 40: peak %.4f\n", soft);
 		require(soft < loud * 0.8f && soft > 0.0f, "the velocity does not scale the level");
-
-		// The latency, retrigger and voice start scenarios build their engines from the OS and the UW bank read once,
-		// without the machines and the master compiled ahead, which leaves the samples as they are
-		// (mdDrumsFirstHitTest)
-		const auto os = md::fw::loadFirmwareFromFlash(flash);
-		const auto bank = md::fw::loadRomBankFromFlash(flash);
 
 		// On engines of their own: 48 Hits leave their track's voice in another state than the tests below expect
 		for(const bool accurate : {false, true})
@@ -407,7 +490,6 @@ int main()
 		equivalence(flash, os, bank);
 		retrigger(os, bank);
 		chokes(os, bank);
-		voiceStarts(os, bank);
 
 		// Track 1 on its own output: it leaves the main mix and sounds there alone.
 		{
@@ -467,7 +549,8 @@ int main()
 			engine.setLink(1, mdDrums::Engine::NoTrack);
 			engine.setLink(2, mdDrums::Engine::NoTrack);
 
-			// A Choke: track 4 sounding, track 3's Hit silences it within the Hit's block and until its own next Hit
+			// A Choke: track 4 sounding, track 3's Hit silences it where it sounds (HitDelay after its trigger) and until
+			// its own next Hit
 			settle(engine);
 			engine.setChoke(2, 3);
 			engine.trigger(3, 100);
@@ -475,9 +558,9 @@ int main()
 			const auto before = peak(3);
 			engine.trigger(2, 100);
 			engine.render(outputs.data(), 4410);
-			std::printf("Choke 3 to 4: track 4 %.4f before, %.4f after the first block\n", before,
-				peak(3, mdDrums::Engine::BlockSize));
-			require(before > 0.01f && peak(3, mdDrums::Engine::BlockSize) == 0.0f, "a Choke did not silence its target");
+			std::printf("Choke 3 to 4: track 4 %.4f before, %.4f after where the Hit sounds\n", before,
+				peak(3, mdDrums::Engine::HitDelay));
+			require(before > 0.01f && peak(3, mdDrums::Engine::HitDelay) == 0.0f, "a Choke did not silence its target");
 			engine.trigger(3, 100);
 			engine.render(outputs.data(), 4410);
 			require(peak(3) > 0.01f, "a choked track stayed silent after its own Hit");

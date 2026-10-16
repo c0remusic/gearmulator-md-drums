@@ -14,8 +14,8 @@ namespace mdDrums
 	{
 		const int track = std::min<int>(_request.track, Engine::TrackCount - 1);
 		applyKit(_engine, _request.kit);
-		// Struck before the first block, as a Device's first note at its first sample: the Hit sounds SampleAccurateDelay
-		// samples later, where the capture starts (Device::capture)
+		// Struck before the first block, as a Device's first note at its first sample: its capture starts CaptureDelay
+		// samples later, as the Device's does
 		_engine.trigger(track, _request.velocity);
 
 		_capture.id = 1;
@@ -26,7 +26,7 @@ namespace mdDrums
 		std::array<float, 1024> samples{};
 		std::array<float*, Engine::OutputCount> outputs{};
 		outputs[2 + static_cast<size_t>(track)] = samples.data();
-		size_t skip = Engine::SampleAccurateDelay;	// samples before the Hit sounds
+		size_t skip = Engine::CaptureDelay;	// samples before the Hit's capture starts, as the Device's
 		Telemetry::ColumnMaker column;
 		while(_capture.count < Telemetry::CaptureColumns)
 		{

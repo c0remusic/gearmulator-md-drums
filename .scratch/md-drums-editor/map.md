@@ -199,6 +199,9 @@ mesurées avant et après. Pas de tag.
 - [Push : une page par Track](issues/37-push-par-track.md) : « Prepare Push list » déplace 128 paramètres des Tracks
   elles-mêmes, une page de huit par Track (Level, FLTF, FLTW, FLTQ, DIST, SRR, DEL, REV), pour que l'automation
   enregistrée depuis Push rejoue sur sa Track ; l'ancienne liste des relais en seconde entrée ; noms « T03 FLTF ».
+- [TRX-BD sur la grille](issues/36-trx-bd-sur-la-grille.md) : chaque voix attend la plus lente (TRX-BD) : table
+  des départs par machine mesurée sur toutes, les Outs à l'heure de Main, latence annoncée 51 → 83 ; TRX-XT, -XC et
+  -CB, plus lentes, ne sont pas retenues.
 - [Où une Choke coupe](issues/38-coupe-de-choke.md) : `HostModel` dit les Tracks frappées et les coupes de chaque bloc,
   le moteur aligne ses voies ; la cible s'arrête exactement là où sonne le Hit qui coupe (une Track plus basse au tick
   suivant, sans trou), Choke d'un Link comprise ; latence inchangée.

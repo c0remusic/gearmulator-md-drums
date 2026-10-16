@@ -26,10 +26,10 @@ namespace mdDrums
 		// Main left and right, then Out 01 to 15, each the sum of the Tracks the mixer puts on it (messages::OutCount)
 		static constexpr int OutCount = messages::OutCount;
 		static constexpr int OutputCount = 2 + OutCount;
-		// Every Hit sounds 31 samples after its note (Engine::SampleAccurateDelay), then its voice starts: 4 samples for
-		// most machines (TRX-SD, -CH, EFM, E12, P-I; 12 for ROM, 36 for TRX-BD, which sounds a block later;
-		// mdDrumsEngineTest). The latency reported is Main's, which comes Engine::MasterDelay after the Outs.
-		static constexpr uint32_t InternalLatency = Engine::SampleAccurateDelay + 4 + Engine::MasterDelay;
+		// Every Hit sounds Engine::HitDelay samples after its note, on Main and on its Out, whatever its machine
+		// (ticket 36): the 31 samples of a block, the latest voice's start (TRX-BD's, which sounds a block after its
+		// trigger), Dynamix's look-ahead. That is the latency reported.
+		static constexpr uint32_t InternalLatency = Engine::HitDelay;
 
 		// _params.romData: the 8 MB Machinedrum UW flash image with OS 1.63. Throws synthLib::DeviceException without
 		// a usable one. _telemetry takes its outputs' peaks and its Hits (none without it); the Device shares it, so that it

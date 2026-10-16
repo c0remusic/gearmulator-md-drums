@@ -39,9 +39,11 @@ namespace mdDrums
 	// Sample-accurate Hits (ticket 19 of the editor map). The voice DSP starts a Hit at its next 32-sample block, 0 to 31
 	// samples after the note. Each Track's contributions to the mix (main left and right, its REV and DEL sends, its
 	// own output) go through a delay of 31 less that wait, set by its Hit, so that every Hit sounds 31 samples after its
-	// note, its own voice's start aside. The contributions are the products the mixer DSP sums (Mixer::gains): the
+	// note, plus what its machine's voice is quicker than the latest (ticket 36: voiceStart, AlignedStart), so that
+	// every voice sounds as late as TRX-BD's. The contributions are the products the mixer DSP sums (Mixer::gains): the
 	// level a Hit sets, PAN and the sends move with the Hit, and the sum wraps as the DSP's does, so equal delays give
-	// the engine's own mix, shifted.
+	// the engine's own mix, shifted. A Track's own output waits MasterDelay more, as Main does after the master
+	// effects.
 	struct Engine::State
 	{
 		State(const md::fw::FlashOs& _os, const bool _master) : engine(_os.firmware, _os.osImage)
@@ -52,8 +54,11 @@ namespace mdDrums
 			pending.fill(-1);
 		}
 
-		static constexpr int Ring = 64;	// a block, plus the longest delay
+		// A block, plus the longest delay: the rest of a block, a voice held back to AlignedStart, MasterDelay on a
+		// Track's own output
+		static constexpr int Ring = 128;
 		static constexpr int Mask = Ring - 1;
+		static_assert(BlockSize + SampleAccurateDelay + AlignedStart + MasterDelay <= Ring);
 		static constexpr int Channels = 6;	// main L R, REV L R, DEL L R
 
 		struct Lane
@@ -113,10 +118,11 @@ namespace mdDrums
 			const auto by = host.cutBy(t);
 			if(by >= TrackCount)
 				continue;
-			for(auto time = start + delay[by]; time < start + SampleAccurateDelay; ++time)
+			// Up to the furthest a block written before this one reaches (its own output MasterDelay further)
+			for(auto time = start + delay[by]; time < start + SampleAccurateDelay + AlignedStart; ++time)
 			{
 				lanes[t].mix[time & Mask] = {};
-				lanes[t].solo[time & Mask] = 0;
+				lanes[t].solo[(time + MasterDelay) & Mask] = 0;
 			}
 			if(!struck[t])
 				extend[t] = std::max(0, delay[by] - delay[t]);
@@ -143,8 +149,9 @@ namespace mdDrums
 					if(main)
 						for(int c = 0; c < Channels; ++c)
 							lane.mix[slot][c] = add(lane.mix[slot][c], mpy(gains[c], samples[i]));
-					// Mixer::solo, before its limiter
-					lane.solo[slot] = add(lane.solo[slot], asl(mpy(samples[i], vol), 4));
+					// Mixer::solo, before its limiter, as late as Main
+					auto& solo = lane.solo[(slot + MasterDelay) & Mask];
+					solo = add(solo, asl(mpy(samples[i], vol), 4));
 				}
 			};
 			mix(last, 0, extend[t]);
@@ -364,12 +371,37 @@ namespace mdDrums
 			return struck;
 
 		// The Hit lands BlockSize - used samples from now: each Track it struck, its own and its Link's, waits the rest
-		// of the 31
+		// of the 31, then what its machine's voice is quicker than the latest
 		const auto delay = static_cast<int>(state.used) - 1;
 		for(int t = 0; t < TrackCount; ++t)
 			if(struck & (1u << t))
-				state.pending[t] = delay;
+				state.pending[t] = delay + std::max(0, AlignedStart - voiceStart(state.engine.host().machine(t)));
 		return struck;
+	}
+
+	int Engine::voiceStart(const uint8_t _machine)
+	{
+		// Measured on each machine's own output, a Hit again at velocity 127 with the Kit's defaults (mdDrumsEngineTest's
+		// "voice starts"). The voices that start a block late are held back the least: TRX-BD and TRX-S2, and the ROM
+		// machines; most voices start 4 to 8 samples after their block, which their own sound sets (a noise, an
+		// attack), and count as 4. TRX-XT (40), TRX-XC (68) and TRX-CB (102) start later than TRX-BD, which sets
+		// AlignedStart: they are not held back and sound that much later, as on the Machinedrum. A machine's first Hit
+		// after it is chosen can start later still (P-I ML 260 samples, TRX-MA 27), its sound again.
+		switch(_machine)
+		{
+		case 16:	// TRX-BD
+		case 29:	// TRX-S2
+			return AlignedStart;
+		case 18:	// TRX-XT
+			return 40;
+		case 21:	// TRX-CB
+			return 102;
+		case 27:	// TRX-XC
+			return 68;
+		default:
+			// ROM-01 to -32, then ROM-33 to -48
+			return (_machine >= 128 && _machine < 160) || (_machine >= 176 && _machine < 192) ? 12 : 4;
+		}
 	}
 
 	void Engine::setSampleAccurate(const bool _on)

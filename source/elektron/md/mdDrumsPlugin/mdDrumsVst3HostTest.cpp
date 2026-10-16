@@ -49,7 +49,7 @@ namespace
 	constexpr int g_outs = 15;			// Out 01-15: Live opens at most 16 output buses per plug-in, Main included
 	constexpr int g_parameters = 608;	// 16 Tracks of 34, the 32 master effects, the 32 relays for Push 2
 	constexpr int g_relays = 576;		// the first relay: those follow the Track shown (ticket 27)
-	constexpr int g_latency = 51;		// what the plug-in reports at 44.1 kHz: Main's
+	constexpr int g_latency = 83;		// what the plug-in reports at 44.1 kHz: every Hit's, on Main and the Outs
 	constexpr float g_silence = 1e-5f;	// Main keeps a tail of a few LSB after a Hit (EQ and Dynamix)
 	constexpr float g_sound = 1e-3f;
 
@@ -649,7 +649,7 @@ namespace
 
 			// The latency the VST3 reports
 			std::printf("Latency at 44.1 kHz: %d samples\n", plugin.getLatencySamples());
-			require(plugin.getLatencySamples() == g_latency, "the VST3 does not report Main's 51 samples");
+			require(plugin.getLatencySamples() == g_latency, "the VST3 does not report its Hits' 83 samples");
 
 			// Each note 36-51 sounds on Main through the VST3 process call
 			{

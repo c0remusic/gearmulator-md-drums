@@ -87,8 +87,14 @@ namespace mdDrums
 		uint32_t trigger(int _track, int _velocity);
 
 		// On (the default), every Hit sounds the same time after its trigger: the engine's block wait, 0 to 31 samples,
-		// becomes a constant 31. Off, a Hit sounds at the engine's next block, as the Machinedrum does.
+		// becomes a constant 31, and each voice also waits to start with the latest (ticket 36): a machine's voice starts
+		// voiceStart samples after its block (4 for most machines, 36 for TRX-BD, whose voice sounds a block after its
+		// trigger), and is held back the rest of AlignedStart. Every Hit then sounds HitDelay samples after its trigger,
+		// on Main and on its Track's output. Off, a Hit plays at the engine's next block, its voice when it starts, as the
+		// Machinedrum does.
 		static constexpr int SampleAccurateDelay = BlockSize - 1;
+		static constexpr int AlignedStart = 36;
+		static int voiceStart(uint8_t _machine);
 		void setSampleAccurate(bool _on);
 		bool isSampleAccurate() const;
 
@@ -101,10 +107,14 @@ namespace mdDrums
 
 		// The master effects, the mixer DSP's own code on Main (md::engine::MasterEngine): the Kit's 32 bytes, 0-127, in
 		// the Kit dump's order (Gate Box, Rhythm Echo, EQ, Dynamix, 8 each), smoothed as the OS smooths them. The Echo's
-		// TIME follows the tempo. Main comes out MasterDelay samples after the Outs: Dynamix's look-ahead, as on the
-		// Machinedrum.
+		// TIME follows the tempo. Main comes out MasterDelay samples after the dry mix: Dynamix's look-ahead, as on the
+		// Machinedrum; the Tracks' own outputs wait as long, so that a Hit sounds on them when it sounds on Main.
 		static constexpr int MasterCount = 32;
 		static constexpr int MasterDelay = 16;
+		// From a trigger to where its Hit sounds, sample-accurate, whatever the machine; and to where the editor's
+		// capture of it starts on its Track's output, as many samples before that as most machines' voices take
+		static constexpr int HitDelay = SampleAccurateDelay + AlignedStart + MasterDelay;
+		static constexpr int CaptureDelay = HitDelay - 4;
 		// Factory Kit 1's, which the engine starts with
 		static const std::array<uint8_t, MasterCount>& masterDefaults();
 		void setMaster(int _index, int _value);
@@ -116,7 +126,7 @@ namespace mdDrums
 		void loadLfo(int _track, const uint8_t* _block);
 
 		// Outputs: Main left and right, after the master effects, then each track alone (after its effects and VOL,
-		// before PAN: the MD's individual-output formula).
+		// before PAN: the MD's individual-output formula), MasterDelay later than the Machinedrum's, as late as Main.
 		static constexpr int OutputCount = 2 + TrackCount;
 
 		// Tracks (bit n = track n + 1) that leave the main mix and play on their own output only; their sends still feed

@@ -30,7 +30,9 @@ later versions can be compared file by file. Their documentation is in `.scratch
   tracks itself (`mdDrums/mdDrumsEngine.cpp`): `Mixer::gains` and `Mixer::mainSample` are `process`'s own gain and
   output steps, split out (bit-exact, `process` uses them); `HostModel::trigger` returns the tracks a Hit struck
   (the track and its Link, a muted one left out) and `HostModel::cutBy` the Choke that silenced a track in the block
-  just rendered, where it zeroes the track's words (ticket 38 of MD Drums' editor map); `EngineT::mixOn = false` skips the mixer.
+  just rendered, where it zeroes the track's words (ticket 38 of MD Drums' editor map), and `HostModel::machine` the
+  machine a track plays, which sets how long MD Drums holds its voice back (ticket 36); `EngineT::mixOn = false` skips
+  the mixer.
 - `engine/MasterEngine.*` (new), `engine/HostModel.*`, `engine/MdEngine.h`: the master effects. `MasterEngine` runs
   the mixer DSP's master section (P:$342-$970 of OS 1.63's section 2: Rhythm Echo, Gate Box, their returns, EQ,
   Dynamix) on its own in a second dsp56300, after the parts of the program's boot it needs, on VoiceEngine's

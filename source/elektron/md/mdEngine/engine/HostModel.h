@@ -61,6 +61,8 @@ namespace md::engine
 		// md-drums: in the block just rendered, the track whose Hit's Choke silenced _track there, or kOff. Only a higher
 		// track goes silent in the Hit's block; a lower one waits for the next tick and is not reported.
 		uint8_t cutBy(int _track) const { return m_cutBy[_track]; }
+		// md-drums: the machine _track plays: from its trigger on, the one its Hit brought (a pending setMachine)
+		uint8_t machine(int _track) const { return m_machine[_track]; }
 		void setAccentAmount(int _amount) { m_accentAmount = std::clamp(_amount, 0, 127); }
 
 		// Caps how many tracks can be simultaneously active (most-recently-triggered N; a new distinct

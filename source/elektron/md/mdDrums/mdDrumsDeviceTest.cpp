@@ -601,7 +601,7 @@ namespace
 			}
 			mdDrums::Telemetry::Capture capture;
 			require(rig.telemetry->readCapture(0, false, capture), "no capture of the Hit");
-			const size_t start = offset + mdDrums::Engine::SampleAccurateDelay;
+			const size_t start = offset + mdDrums::Engine::CaptureDelay;
 			const auto full = std::min<size_t>(static_cast<size_t>(capture.count), (own.size() - start) / mdDrums::Telemetry::ColumnSamples);
 			size_t wrong = 0;
 			float peak = 0;
@@ -613,8 +613,8 @@ namespace
 					|| capture.columns[c][1] != mdDrums::Telemetry::level(*high);
 				peak = std::max({peak, std::abs(*low), std::abs(*high)});
 			}
-			std::printf("capture: Hit of velocity %u, %d columns, %zu compared with Out 01 from the note plus 31, %zu differ,"
-				" peak %.3f\n", capture.velocity, capture.count, full, wrong, peak);
+			std::printf("capture: Hit of velocity %u, %d columns, %zu compared with Out 01 from the note plus %d, %zu differ,"
+				" peak %.3f\n", capture.velocity, capture.count, full, mdDrums::Engine::CaptureDelay, wrong, peak);
 			require(capture.velocity == 110 && full > 400 && wrong == 0 && peak > 0.01f, "the capture is not the Track's output");
 		}
 
