@@ -55,9 +55,10 @@ namespace mdDrums
 		m_trackView = std::make_unique<TrackView>(*this);
 		auto& telemetry = processor().getTelemetry();
 		m_meterView = std::make_unique<MeterView>(*this, telemetry);
+		// The stack's folders are UTF-8, which a path made from a std::string would read in the ANSI code page
 		std::vector<std::filesystem::path> romFolders;
 		for(const auto& folder : processor().romFolders())
-			romFolders.emplace_back(folder);
+			romFolders.push_back(std::filesystem::u8path(folder));
 		m_hitView = std::make_unique<HitView>(*this, telemetry, std::move(romFolders));
 		m_filterView = std::make_unique<FilterView>(*this);
 		m_lfoView = std::make_unique<LfoView>(*this);
