@@ -707,8 +707,8 @@ namespace
 		int differ = 0;
 		for(int c = 0; c < mdDrums::Telemetry::CaptureColumns; ++c)
 			differ += shown.columns[static_cast<size_t>(c)] != expected.columns[static_cast<size_t>(c)];
-		std::printf("browser preview: %d of %d columns differ from the engine's Hit with EFM-SD's own parameters\n", differ,
-			mdDrums::Telemetry::CaptureColumns);
+		std::printf("browser preview: %d of %d columns differ from the engine's Hit with EFM-SD's own parameters\n",
+			differ, mdDrums::Telemetry::CaptureColumns);
 		require(shown.count == expected.count && differ == 0, "the browser's preview is not the machine's Hit");
 
 		click(_f, "browser_cancel");

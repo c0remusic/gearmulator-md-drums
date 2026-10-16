@@ -123,9 +123,9 @@ namespace mdDrums::messages
 	bool isKitParameter(uint8_t _page);
 	// The machine ids the Device takes (its OS's, Engine::machines): bit n for id n
 	using MachineSet = std::bitset<256>;
-	// A Kit host parameter's value into a Kit; false for one that is not the Kit's. A machine is the whole machine word,
-	// as ASSIGN MACHINE writes it; one _machines lacks leaves the Kit's as it was, as the Device does (any goes without
-	// a set)
+	// A Kit host parameter's value into a Kit; false for one that is not the Kit's. A machine is the whole machine
+	// word, as ASSIGN MACHINE writes it; one _machines lacks leaves the Kit's as it was, as the Device does (any goes
+	// without a set)
 	bool setKitValue(md::automation::sysex::MdKit& _kit, uint8_t _page, uint8_t _track, uint8_t _index, int _value,
 		const MachineSet* _machines = nullptr);
 

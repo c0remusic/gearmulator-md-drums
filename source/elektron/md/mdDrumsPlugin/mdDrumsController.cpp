@@ -11,6 +11,7 @@
 #include "synthLib/plugin.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace mdDrums
 {
@@ -18,22 +19,8 @@ namespace mdDrums
 	{
 		namespace pages = messages::pages;
 
-		// Where each page's parameters sit among a Track's 34, in the host's order: Machine, SYN1-8, the effects, the
-		// routing, the LFO, Level, Mute, Solo, Out
-		constexpr int g_machineAt = 0, g_synAt = 1, g_lfoAt = 25, g_levelAt = 30, g_muteAt = 31, g_mixerAt = 32;
-
-		// What each relay aims at on the Track shown: page and index; the relay Track (0) chooses the Track itself
-		struct RelayTarget
-		{
-			uint8_t page;
-			uint8_t index;
-		};
-		constexpr std::array<RelayTarget, Controller::RelayCount> g_relayTargets{{
-			{pages::Focus, 0}, {pages::Machine, 0}, {pages::Level, 0}, {pages::Mute, 0}, {pages::Mixer, 0},
-			{pages::Mixer, 1}, {pages::Lfo, 2}, {pages::Lfo, 3},
-			{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7},
-			{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7},
-			{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {2, 7}}};
+		// A relay's row is "Focus" and its target's name
+		constexpr std::string_view g_relayPrefix = "Focus";
 
 		size_t lowestBit(uint64_t _bits)
 		{
@@ -98,6 +85,7 @@ namespace mdDrums
 			return _nonPartSensitive ? juce::String("Master") : juce::String::formatted("T%02d", _part + 1);
 		});
 
+		numberSlots();
 		for(const auto& [index, parameters] : getExposedParameters())
 		{
 			const auto slot = slotOf(index.page, index.partNum, index.paramNum);
@@ -126,26 +114,52 @@ namespace mdDrums
 		stopControllerTimer();
 	}
 
-	int Controller::slotOf(const uint8_t _page, const uint8_t _part, const uint8_t _index)
+	void Controller::numberSlots()
 	{
-		if(_page == pages::Master)
-			return _index < MasterParameterCount ? static_cast<int>(TrackCount * TrackParameterCount + _index) : -1;
-		if(_part >= TrackCount)
-			return -1;
-		int local = -1;
-		switch(_page)
+		// The rows in their order, as registerParams makes the host parameters: a Track's, then the master effects'
+		for(auto& page : m_slotAt)
+			page.fill(-1);
+		m_relayTarget.fill(-1);
+		const auto& rows = getParameterDescriptions().getDescriptions();
+		const auto at = [&](const uint8_t _page, const uint8_t _index) -> int16_t*
 		{
-		case pages::Synthesis:
-		case pages::Effects:
-		case pages::Routing:	local = _index < 8 ? g_synAt + _page * 8 + _index : -1; break;
-		case pages::Level:		local = _index == 0 ? g_levelAt : -1; break;
-		case pages::Mute:		local = _index == 0 ? g_muteAt : -1; break;
-		case pages::Machine:	local = _index == 0 ? g_machineAt : -1; break;
-		case pages::Lfo:		local = _index < 5 ? g_lfoAt + _index : -1; break;
-		case pages::Mixer:		local = _index < 2 ? g_mixerAt + _index : -1; break;
-		default:				break;
+			return _page < m_slotAt.size() && _index < m_slotAt[_page].size() ? &m_slotAt[_page][_index] : nullptr;
+		};
+		size_t track = 0, master = 0, relays = 0;
+		for(const auto& row : rows)
+		{
+			auto* slot = at(row.page, row.index);
+			if(!slot || row.page == pages::Focus)
+				continue;
+			const auto number = row.isNonPartSensitive() ? TrackCount * TrackParameterCount + master++ : track++;
+			*slot = static_cast<int16_t>(number);
 		}
-		return local < 0 ? -1 : static_cast<int>(_part * TrackParameterCount + static_cast<size_t>(local));
+		// Each relay aims at the Track parameter its row names after "Focus"; the first chooses the Track shown
+		for(const auto& row : rows)
+		{
+			if(row.page != pages::Focus || row.index >= RelayCount)
+				continue;
+			++relays;
+			const auto target = std::string_view(row.name).substr(g_relayPrefix.size());
+			const auto it = std::find_if(rows.begin(), rows.end(), [&](const pluginLib::Description& _row)
+			{
+				return _row.name == target && !_row.isNonPartSensitive();
+			});
+			if(it != rows.end())
+				m_relayTarget[row.index] = *at(it->page, it->index);
+		}
+		if(track != TrackParameterCount || master != MasterParameterCount || relays != RelayCount)
+			throw std::logic_error("parameterDescriptions_mddrums.json does not hold MD Drums' parameters");
+	}
+
+	int Controller::slotOf(const uint8_t _page, const uint8_t _part, const uint8_t _index) const
+	{
+		if(_page >= m_slotAt.size() || _index >= m_slotAt[_page].size())
+			return -1;
+		const auto slot = m_slotAt[_page][_index];
+		if(slot < 0 || slot >= static_cast<int>(TrackParameterCount))
+			return slot;	// none, or a master effect's
+		return _part < TrackCount ? static_cast<int>(_part * TrackParameterCount) + slot : -1;
 	}
 
 	pluginLib::Parameter* Controller::createParameter(pluginLib::Controller& _controller,
@@ -252,10 +266,10 @@ namespace mdDrums
 			m_pendingPart.store(std::clamp(_value, 0, TrackCount - 1), std::memory_order_release);
 			return;
 		}
-		const auto& target = g_relayTargets[_index];
-		const auto slot = slotOf(target.page, m_shownPart.load(std::memory_order_acquire), target.index);
-		if(slot < 0)
+		const auto target = m_relayTarget[_index];
+		if(target < 0)
 			return;
+		const auto slot = static_cast<int>(m_shownPart.load(std::memory_order_acquire) * TrackParameterCount) + target;
 		// To the Device at the next block, as host automation goes; to the parameter on the message thread
 		m_values[static_cast<size_t>(slot)].store(_value, std::memory_order_relaxed);
 		m_dirty[static_cast<size_t>(slot) / 64].fetch_or(1ull << (slot % 64), std::memory_order_release);
@@ -275,8 +289,8 @@ namespace mdDrums
 		// take the relay for the parameter last touched in the editor, so that its automation chooser offered "FLTF"
 		// rather than "Track 1 FLTF", and would record it beside the knob turned; as a re-read, Live would write every
 		// parameter on its panel while it records. Push 2 then shows the relay's former value until the Track shown
-		// changes, when the relays reach the host as edits, or until a re-read (a Kit, a state, a machine's parameters),
-		// which they follow silently.
+		// changes, when the relays reach the host as edits, or until a re-read (a Kit, a state, a machine's 24
+		// parameters), which they follow silently.
 		const auto silent = pluginLib::Parameter::Origin::PresetChange;
 		const auto shown = part != m_relaysPart && !m_valuesChanged.load(std::memory_order_relaxed)
 			? pluginLib::Parameter::Origin::Midi : silent;
@@ -305,8 +319,8 @@ namespace mdDrums
 			int value = part;
 			if(i > 0)
 			{
-				const auto slot = slotOf(g_relayTargets[i].page, part, g_relayTargets[i].index);
-				const auto* parameter = slot >= 0 ? m_parameters[static_cast<size_t>(slot)] : nullptr;
+				const auto target = m_relayTarget[i];
+				const auto* parameter = target >= 0 ? m_parameters[part * TrackParameterCount + target] : nullptr;
 				if(!parameter)
 					continue;
 				value = parameter->getUnnormalizedValue();
@@ -317,13 +331,14 @@ namespace mdDrums
 			m_relayShown[i] = value;
 		}
 
-		// Last in the Controller's timer, after the Device's messages: once for a Kit, a state, a machine's parameters and the
-		// relays following them. As the stack does after a preset, the host reads every value again (VST3:
-		// restartComponent with kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value) rather
-		// than taking hundreds of edits (performEdit), which Live would record while it records, add to the device's panel
-		// and take for overrides of its automation. Measured in Live 12.2.1 on 2026-10-13: as edits, MD Drums loaded
-		// during Arrangement Record recorded the 32 relays; as a re-read, Live follows the values but, while it records,
-		// writes automation for every parameter on its panel, changed or not, and Live sets no kRecording to wait for.
+		// Last in the Controller's timer, after the Device's messages: once for a Kit, a state, a machine's 24
+		// parameters and the relays following them. As the stack does after a preset, the host reads every value again
+		// (VST3: restartComponent with kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value)
+		// rather than taking hundreds of edits (performEdit), which Live would record while it records, add to the
+		// device's panel and take for overrides of its automation. Measured in Live 12.2.1 on 2026-10-13: as edits, MD
+		// Drums loaded during Arrangement Record recorded the 32 relays; as a re-read, Live follows the values but,
+		// while it records, writes automation for every parameter on its panel, changed or not, and Live sets no
+		// kRecording to wait for.
 		if(m_valuesChanged.exchange(false, std::memory_order_relaxed))
 			getProcessor().updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 	}

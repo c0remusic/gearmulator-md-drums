@@ -207,7 +207,8 @@ namespace md::automation::sysex
 				_kit.lfos[_change.track][_change.index] = _change.value;
 				return true;
 			}
-			_kit.parameters[_change.track][MdKit::ParameterCount - KitChange::LfoFields + _change.index] = _change.value;
+			_kit.parameters[_change.track][MdKit::ParameterCount - KitChange::LfoFields + _change.index]
+				= _change.value;
 			return true;
 		case Kind::Link:
 			_kit.links[_change.track] = _change.value;

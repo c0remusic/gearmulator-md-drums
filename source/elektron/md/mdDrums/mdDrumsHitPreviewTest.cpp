@@ -217,8 +217,8 @@ int main()
 				// Factory Kit 1's parameters under the new machine, as the editor still has them meanwhile
 				request.kit.parameters[track] = factory->parameters[track];
 				const auto withOld = differing(device.capture, preview(os, bank, request));
-				std::printf("%s chosen on Track 3: %d columns differ with its defaults, %d with the parameters before it\n",
-					name, withDefaults, withOld);
+				std::printf("%s chosen on Track 3: %d columns differ with its defaults, %d with the parameters before"
+					" it\n", name, withDefaults, withOld);
 				require(withDefaults == 0, "a machine just chosen does not play its defaults");
 			}
 		}

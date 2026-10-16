@@ -1,9 +1,9 @@
 // MD Drums' Device driven by MIDI bytes alone, through synthLib::Plugin as the plug-in drives it: it boots with factory
 // Kit 1, plays notes 36-51 and drops the others, takes the Machinedrum's CCs and SysEx from the editor and ignores the
-// host's, answers ASSIGN MACHINE with the 24 parameters it sets as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
-// across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It reports the
-// note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of
-// one core.
+// host's, answers ASSIGN MACHINE with the 24 parameters it sets as CCs, plays Mute, Solo and Out, keeps its Kit and
+// mixer across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It
+// reports the note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at
+// most 1 % of one core.
 
 #include "mdDrumsAllocationCounter.h"
 #include "mdDrumsDevice.h"
@@ -336,7 +336,8 @@ namespace
 		const auto& machines = rig.device->machines();
 		const auto defaults = [&](const uint8_t _id)
 		{
-			const auto it = std::find_if(machines.begin(), machines.end(), [&](const auto& _m) { return _m.id == _id; });
+			const auto it = std::find_if(machines.begin(), machines.end(),
+				[&](const md::engine::MachineInfo& _m) { return _m.id == _id; });
 			require(it != machines.end(), "the OS has no machine " + std::to_string(_id));
 			return it->defaults;
 		};

@@ -16,8 +16,8 @@ namespace mdDrums
 	// MD Drums' host parameters (parameterDescriptions_mddrums.json) over its Device. A change from the host, the
 	// editor or MIDI Learn is published to the parameter's atomic slot, from any thread, and sent as the Machinedrum's
 	// message (messages::parameterMessage) at the start of the next audio block, without locking or allocating. What
-	// the Device changes itself, a new machine's 24 parameters, and a loaded state come back as parameter values without
-	// echoing to the Device.
+	// the Device changes itself, a new machine's 24 parameters, and a loaded state come back as parameter values
+	// without echoing to the Device.
 	class Controller final : public pluginLib::Controller
 	{
 	public:
@@ -49,8 +49,10 @@ namespace mdDrums
 		// the Processor hands it over as it loads a state, so that the parameters follow without touching the Device
 		void setLoadedState(std::vector<uint8_t> _state);
 
-		// Where a host parameter's value waits to be sent: its slot, or -1 for none
-		static int slotOf(uint8_t _page, uint8_t _part, uint8_t _index);
+		// Where a host parameter's value waits to be sent: its slot, or -1 for none. The slots are the JSON's rows in
+		// their order, as the host's parameters are: a Track's TrackParameterCount, Track after Track, then the master
+		// effects'.
+		int slotOf(uint8_t _page, uint8_t _part, uint8_t _index) const;
 
 		// Plays a Track from the editor, from any thread: its note goes to the Device at the next audio block, after the
 		// parameter changes published before it (a machine just chosen sounds, not the one before)
@@ -86,8 +88,8 @@ namespace mdDrums
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
 		// The host learns the relays as edits, without a gesture, when the Track shown changes; a relay that follows its
-		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's parameters it
-		// reads again, once (ticket 34).
+		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's
+		// parameters it reads again, once (ticket 34).
 		void syncRelays();
 		// For Live in Configure mode, which adds the parameters the plug-in moves to the device's list in that order, each
 		// moved to its own value in a gesture (ticket 37): a page of eight per Track, the Tracks' own parameters, so that
@@ -125,6 +127,13 @@ namespace mdDrums
 		// A SysEx message for the Device, at the next audio block
 		void sendToDevice(const std::vector<uint8_t>& _sysex);
 
+		// The slots and the relays' targets from the JSON's rows; throws for rows that are not MD Drums' parameters
+		void numberSlots();
+
+		// A row's slot by page and index: among a Track's, or among all for a master effect; -1 for none
+		std::array<std::array<int16_t, 32>, messages::pages::Focus + 1> m_slotAt{};
+		// Each relay's target among a Track's parameters, -1 for the relay Track
+		std::array<int16_t, RelayCount> m_relayTarget{};
 		std::array<Address, ParameterCount> m_addresses{};
 		std::array<pluginLib::Parameter*, ParameterCount> m_parameters{};
 		std::array<std::atomic<int32_t>, ParameterCount> m_values{};

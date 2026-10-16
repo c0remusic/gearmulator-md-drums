@@ -702,8 +702,8 @@ namespace
 				for(const auto& [name, value] : os)
 				{
 					const auto read = std::lround(instance->parameter(ids.index(name, 2)).getValue() * 127.0f);
-					require(read == value, std::string("the host reads Track 3's ") + name + " at " + std::to_string(read)
-						+ " after a new machine, not the OS's " + std::to_string(value));
+					require(read == value, std::string("the host reads Track 3's ") + name + " at "
+						+ std::to_string(read) + " after a new machine, not the OS's " + std::to_string(value));
 				}
 			}
 

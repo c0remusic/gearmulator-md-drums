@@ -189,8 +189,8 @@ namespace
 	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
 	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
 	// new name reaches the Device; a Link and a Choke reach the Device and the state (ticket 29); a machine changed gives
-	// the 24 parameters ASSIGN MACHINE sets their values. The host reads the values again after a Kit or a machine, with
-	// no edit.
+	// the 24 parameters ASSIGN MACHINE sets their values. The host reads the values again after a Kit or a machine,
+	// with no edit.
 	void kits(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();
@@ -264,8 +264,8 @@ namespace
 			require(parameter(_processor, names[p], 0).getUnnormalizedValue() == os,
 				std::string(names[p]) + " did not take the OS's default with the new machine");
 		}
-		require(watch.edits == 0 && watch.rereads > 0, "a machine's parameters did not reach the host as a re-read, but as "
-			+ std::to_string(watch.edits) + " edits");
+		require(watch.edits == 0 && watch.rereads > 0, "a machine's parameters did not reach the host as a re-read,"
+			" but as " + std::to_string(watch.edits) + " edits");
 		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
 			" the state; renamed; a Link and a Choke to the Device and the state; a machine change: SYN1 %d to %d, %d"
 			" re-reads and no edit\n", kit.displayName().c_str(), syn1Before, syn1.getUnnormalizedValue(), watch.rereads);
@@ -277,6 +277,66 @@ namespace
 	// Track shown moved elsewhere moves its relay, the host not told (ticket 34); the state keeps the Track shown;
 	// "Prepare Push list" moves a page of eight per Track, the Tracks' own parameters (ticket 37), and the relays' entry
 	// the 64 of ticket 27's list, each in order and in a gesture
+	// Every Track and master parameter, set by the host, reaches the Device: its state reads back what the host set
+	// (the Controller numbers its slots from the JSON's rows). Every relay has its target's range, default and text,
+	// and sets its target on the Track shown.
+	void everyParameter()
+	{
+		namespace pages = mdDrums::messages::pages;
+		mdDrums::Processor processor(true);
+		auto& host = static_cast<juce::AudioProcessor&>(processor);
+		host.setRateAndBufferSizeDetails(44100.0, g_block);
+		host.prepareToPlay(44100.0, g_block);
+		auto& controller = processor.controller();
+		// Another value in the parameter's range; another machine the OS has for Machine
+		const auto another = [](const pluginLib::Parameter& _p)
+		{
+			const auto& d = _p.getDescription();
+			const auto current = _p.getUnnormalizedValue();
+			if(d.page == pages::Machine)
+				return current == 17 ? 16 : 17;
+			return current < d.range.getEnd() ? current + 1 : current - 1;
+		};
+		size_t checked = 0, relays = 0;
+		for(auto* hostParameter : host.getParameters())
+		{
+			auto* p = dynamic_cast<pluginLib::Parameter*>(hostParameter);
+			if(!p)
+				continue;
+			const auto& d = p->getDescription();
+			const auto what = d.name + " (part " + std::to_string(p->getPart() + 1) + ")";
+			if(d.page == pages::Focus)
+			{
+				if(d.index == 0)
+					continue;
+				auto& target = parameter(processor, d.name.substr(std::string("Focus").size()), 0);
+				const auto& t = target.getDescription();
+				require(t.range == d.range && t.defaultValue == d.defaultValue && t.toText == d.toText,
+					"the relay " + d.name + " has not its target's range, default and text");
+				const auto value = another(target);
+				hostSets(*p, value);
+				block(processor);
+				controller.syncRelays();
+				require(target.getUnnormalizedValue() == value, "the relay " + d.name + " did not set its target");
+				++relays;
+				continue;
+			}
+			const auto value = another(*p);
+			hostSets(*p, value);
+			block(processor);
+			const mdDrums::messages::State state{device(processor).kit(), device(processor).mixer()};
+			const auto read = mdDrums::messages::parameterValue(state, static_cast<uint8_t>(d.page), p->getPart(),
+				d.index);
+			require(read && *read == value, what + ": the host set " + std::to_string(value) + ", the Device holds "
+				+ (read ? std::to_string(*read) : std::string("nothing")));
+			++checked;
+		}
+		std::printf("every parameter: %zu set by the host and read back from the Device, %zu relays setting their"
+			" targets\n", checked, relays);
+		require(checked == mdDrums::Controller::ParameterCount && relays == mdDrums::Controller::RelayCount - 1,
+			"not every Track and master parameter, or not every relay");
+	}
+
 	void relays(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();
@@ -610,6 +670,7 @@ int main()
 			latency(processor, rate);
 		}
 		flashLoader(44100.0);
+		everyParameter();
 		std::cout << "mdDrumsProcessorTest: PASS\n";
 		return 0;
 	}

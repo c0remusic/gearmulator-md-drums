@@ -304,7 +304,19 @@ namespace mdDrums::messages
 
 	bool isKitParameter(const uint8_t _page)
 	{
-		return _page != pages::Mute && _page != pages::Mixer && _page != pages::Focus;
+		switch(_page)
+		{
+		case pages::Synthesis:
+		case pages::Effects:
+		case pages::Routing:
+		case pages::Level:
+		case pages::Machine:
+		case pages::Lfo:
+		case pages::Master:
+			return true;
+		default:
+			return false;
+		}
 	}
 
 	bool setKitValue(md::automation::sysex::MdKit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index,
