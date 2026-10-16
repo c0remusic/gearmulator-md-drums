@@ -85,12 +85,6 @@ namespace mdDrums
 		void setChoke(uint8_t _track, uint8_t _target);
 		static constexpr uint8_t Off = md::automation::sysex::MdKit::Off;
 
-		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
-		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
-		// The host learns the relays as edits, without a gesture, when the Track shown changes; a relay that follows its
-		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's
-		// parameters it reads again, once (ticket 34).
-		void syncRelays();
 		// For Live in Configure mode, which adds the parameters the plug-in moves to the device's list in that order, each
 		// moved to its own value in a gesture (ticket 37): a page of eight per Track, the Tracks' own parameters, so that
 		// what Push records plays back on the Track it was recorded on (PushTrackParameters, 128 in all)
@@ -108,6 +102,13 @@ namespace mdDrums
 		void onControllerTimer() override;
 
 	private:
+		// The relays, on the Controller's timer: the Track the relay Track asked for shown; what a relay was set to
+		// given to its parameter of the Track shown; the relays set to what the Track shown holds. The host learns the
+		// relays as edits, without a gesture, when the Track shown changes; a relay that follows its parameter, and a
+		// parameter that follows its relay, it does not learn; a Kit, a state and a machine's parameters it reads
+		// again, once (ticket 34).
+		void syncRelays();
+
 		struct Address
 		{
 			uint8_t page = 0;

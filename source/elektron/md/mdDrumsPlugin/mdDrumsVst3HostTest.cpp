@@ -11,6 +11,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "mdDrumsHostDriver.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -245,13 +247,46 @@ namespace
 		}
 	};
 
+	// The VST3 as JUCE's hosting reaches it (mdDrumsHostDriver.h): a tick is the message loop's turn, and what the
+	// plug-in told the host is Told's
+	class Hosted final : public mdDrums::hostDriver::Host
+	{
+	public:
+		Hosted(juce::AudioPluginInstance& _plugin, Told& _told, const Frozen& _ids)
+			: Host(g_block), m_plugin(_plugin), m_told(_told), m_ids(_ids)
+		{
+		}
+
+		juce::AudioProcessor& plugin() override { return m_plugin; }
+		int index(const std::string& _name, const int _part) override { return m_ids.index(_name, _part); }
+		void tick() override { pump(300); }
+		std::vector<int> edits() override
+		{
+			const std::lock_guard lock(m_told.mutex);
+			return m_told.edits;
+		}
+		int rereads() override
+		{
+			const std::lock_guard lock(m_told.mutex);
+			return m_told.rereads;
+		}
+		void clear() override { m_told.clear(); }
+
+	private:
+		juce::AudioPluginInstance& m_plugin;
+		Told& m_told;
+		const Frozen& m_ids;
+	};
+
 	struct Instance
 	{
 		Told told;
 		std::unique_ptr<juce::AudioPluginInstance> plugin;
+		std::unique_ptr<Hosted> host;
 
 		~Instance()
 		{
+			host.reset();
 			if(plugin)
 				plugin->removeListener(&told);
 		}
@@ -279,26 +314,21 @@ namespace
 		}
 	};
 
-	std::unique_ptr<Instance> load(juce::AudioPluginFormatManager& _formats, const juce::PluginDescription& _description)
+	std::unique_ptr<Instance> load(juce::AudioPluginFormatManager& _formats,
+		const juce::PluginDescription& _description, const Frozen& _ids)
 	{
 		auto instance = std::make_unique<Instance>();
 		juce::String error;
 		instance->plugin = _formats.createPluginInstance(_description, g_rate, g_block, error);
 		require(instance->plugin != nullptr, "the host cannot create MD Drums: " + error.toStdString());
+		instance->host = std::make_unique<Hosted>(*instance->plugin, instance->told, _ids);
 		instance->plugin->addListener(&instance->told);
 		instance->plugin->prepareToPlay(g_rate, g_block);
 		pump(300);
 		return instance;
 	}
 
-	struct Note
-	{
-		int64_t sample;
-		int number;
-		int velocity;
-		int channel = 1;
-		bool off = false;
-	};
+	using mdDrums::hostDriver::Note;
 
 	// Notes 36-51 (Tracks 1-16) one after the other
 	std::vector<Note> eachTrack(const int64_t _start, const int64_t _spacing)
@@ -322,52 +352,14 @@ namespace
 		return notes;
 	}
 
-	// The plug-in played as a host's audio callback plays it, in blocks of g_block or, with a seed, of random sizes up
-	// to it; every channel the host enabled, the whole run
+	// The plug-in played as a host's audio callback plays it (hostDriver::render), in blocks of g_block or, with a
+	// seed, of random sizes up to it; what it tells the host meanwhile comes as the process call's outputs
 	juce::AudioBuffer<float> render(juce::AudioPluginInstance& _plugin, const std::vector<Note>& _notes,
-		const int64_t _samples, uint32_t _random = 0, std::vector<double>* _blockMs = nullptr,
+		const int64_t _samples, const uint32_t _random = 0, std::vector<double>* _blockMs = nullptr,
 		const std::function<void(int64_t)>& _beforeBlock = {})
 	{
-		const auto channels = _plugin.getTotalNumOutputChannels();
-		juce::AudioBuffer<float> take(channels, static_cast<int>(_samples));
-		take.clear();
-		juce::AudioBuffer<float> buffer(channels, g_block);
-		juce::MidiBuffer midi;
-		size_t next = 0;
-		for(int64_t position = 0; position < _samples;)
-		{
-			auto size = g_block;
-			if(_random)
-			{
-				_random ^= _random << 13;
-				_random ^= _random >> 17;
-				_random ^= _random << 5;
-				size = 1 + static_cast<int>(_random % static_cast<uint32_t>(g_block));
-			}
-			size = static_cast<int>(std::min<int64_t>(size, _samples - position));
-			buffer.setSize(channels, size, false, false, true);
-			buffer.clear();
-			midi.clear();
-			for(; next < _notes.size() && _notes[next].sample < position + size; ++next)
-			{
-				const auto& note = _notes[next];
-				midi.addEvent(note.off ? juce::MidiMessage::noteOff(note.channel, note.number)
-					: juce::MidiMessage::noteOn(note.channel, note.number, static_cast<juce::uint8>(note.velocity)),
-					static_cast<int>(note.sample - position));
-			}
-			if(_beforeBlock)
-				_beforeBlock(position);
-			const auto start = Clock::now();
-			g_inProcess = true;
-			_plugin.processBlock(buffer, midi);
-			g_inProcess = false;
-			if(_blockMs)
-				_blockMs->push_back(std::chrono::duration<double, std::milli>(Clock::now() - start).count());
-			for(int channel = 0; channel < channels; ++channel)
-				take.copyFrom(channel, static_cast<int>(position), buffer, channel, 0, size);
-			position += size;
-		}
-		return take;
+		return mdDrums::hostDriver::render(_plugin, _notes, _samples, g_block, _random, _blockMs, _beforeBlock,
+			&g_inProcess);
 	}
 
 	// Locks as a sequencer in Live sends them (md-drums-seq): at 126 BPM, each Hit with its Track's Locks at the same
@@ -427,23 +419,6 @@ namespace
 	float outValue(const int _out)
 	{
 		return static_cast<float>(_out) / g_outs;
-	}
-
-	// A host automating: the value set, then blocks for the VST3 process call to carry it
-	void automate(Instance& _instance, const int _index, const float _value)
-	{
-		_instance.parameter(_index).setValue(_value);
-		render(*_instance.plugin, {}, g_block * 4);
-		pump(50);
-	}
-
-	// A host restoring a state: the state set, then the messages and blocks that follow it
-	void restore(Instance& _instance, const juce::MemoryBlock& _state)
-	{
-		_instance.plugin->setStateInformation(_state.getData(), static_cast<int>(_state.getSize()));
-		pump(300);
-		render(*_instance.plugin, {}, g_block * 8);
-		pump(300);
 	}
 
 	// A block far over its deadline (2.9 ms), whatever the PC does meanwhile: what a DSP's JIT compiling on the audio
@@ -595,7 +570,7 @@ namespace
 
 		{
 			const auto start = Clock::now();
-			auto instance = load(formats, description);
+			auto instance = load(formats, description, ids);
 			auto& plugin = *instance->plugin;
 			std::printf("Loaded and prepared in %.0f ms; at load it told the host %s\n",
 				std::chrono::duration<double, std::milli>(Clock::now() - start).count(),
@@ -683,16 +658,13 @@ namespace
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
 					instance->told.summary(ids).c_str());
 				require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while it automated");
-				automate(*instance, syn1, kept[0]);
-				automate(*instance, level, kept[1]);
-				automate(*instance, echo, kept[2]);
+				instance->host->automate(syn1, kept[0]);
+				instance->host->automate(level, kept[1]);
+				instance->host->automate(echo, kept[2]);
 			}
-			instance->told.clear();
-			automate(*instance, ids.index("Machine", 2), 32.0f / 191.0f);
-			pump(300);
+			mdDrums::hostDriver::machineChange(*instance->host, 2, 32);
 			std::printf("The host set Track 3's machine to EFM-BD: told %s\n", instance->told.summary(ids).c_str());
-			require(instance->told.edited(ids).empty() && instance->told.rereads > 0
-				&& instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
+			require(instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
 				"a new machine's SYN1-8 did not reach the host as a re-read");
 			{
 				// The effects and routing pages OS 1.63 gives every machine but MID and CTR ($246148, $246150)
@@ -709,14 +681,10 @@ namespace
 
 			// The relay Track set by the host (Push 2's first encoder): Track 6 shown, the relays reaching the host as edits,
 			// none of the Track parameters
-			instance->told.clear();
-			automate(*instance, ids.index("FocusTrack"), 5.0f / 15.0f);
-			pump(300);
+			mdDrums::hostDriver::relayTrack(*instance->host, 5);
 			std::printf("The host showed Track 6 through the relay Track: told %s\n", instance->told.summary(ids).c_str());
-			require(!instance->told.edited(ids).empty() && instance->told.edited(ids, false).empty()
-				&& instance->told.rereads == 0, "showing another Track did not give the host its relays as edits alone");
-			automate(*instance, ids.index("FocusTrack"), 0.0f);
-			pump(300);
+			mdDrums::hostDriver::shownParameter(*instance->host, 5, "FLTF", 99);
+			instance->host->automate(ids.index("FocusTrack"), 0.0f);
 
 			// The Outs (ticket 33), the host taking the 15: Track n on Out n, Track 16 on Out 15 with Track 15, each Out's
 			// channel the bus's
@@ -724,7 +692,7 @@ namespace
 			require(plugin.getTotalNumOutputChannels() == 2 + g_outs, "Main and 15 Outs are not 17 channels");
 			const auto naturalOut = [](const int _track) { return std::min(_track + 1, g_outs); };
 			for(int track = 0; track < g_tracks; ++track)
-				automate(*instance, ids.index("Out", track), outValue(naturalOut(track)));
+				instance->host->automate(ids.index("Out", track), outValue(naturalOut(track)));
 			{
 				const auto spacing = std::llround(0.25 * g_rate);
 				const auto take = render(plugin, eachTrack(spacing, spacing), spacing * 18);
@@ -758,26 +726,25 @@ namespace
 					"Track 5 sounds although on an Out the host left");
 			}
 			for(int track = 1; track < g_tracks; ++track)
-				automate(*instance, ids.index("Out", track), 0.0f);
+				instance->host->automate(ids.index("Out", track), 0.0f);
 			instance->outs({});
 
 			// The state through IComponent. Restored where it was saved, nothing changes, so that whatever reaches the host
 			// comes from the plug-in (JUCE's hosting reads every value again after a state, and its listeners hear those
 			// that differ): no parameter of its own
-			automate(*instance, ids.index("Level", 1), 32.0f / 127.0f);	// on the plug-in's steps: it rounds the host's value
-			automate(*instance, ids.index("EchoTIME"), 64.0f / 127.0f);
+			// On the plug-in's steps: it rounds the host's value
+			instance->host->automate(ids.index("Level", 1), 32.0f / 127.0f);
+			instance->host->automate(ids.index("EchoTIME"), 64.0f / 127.0f);
 			juce::MemoryBlock saved;
 			plugin.getStateInformation(saved);
-			instance->told.clear();
-			restore(*instance, saved);
+			mdDrums::hostDriver::stateRestored(*instance->host);
 			std::printf("State of %zu bytes restored where it was saved: told %s\n", saved.getSize(),
 				instance->told.summary(ids).c_str());
-			require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while restoring a state");
 
 			// Another instance gets every parameter back, gives the same state back, and plays Track 1 off Main as saved
 			{
-				auto restored = load(formats, description);
-				restore(*restored, saved);
+				auto restored = load(formats, description, ids);
+				restored->host->restore(saved);
 				for(int i = 0; i < g_relays; ++i)
 				{
 					const auto expected = instance->parameter(i).getValue(), value = restored->parameter(i).getValue();
@@ -798,11 +765,11 @@ namespace
 		// Locks through VST3, as md-drums-seq sends them in Live: VOL locked to 0 silences its Hit, and the next Hit of the
 		// Track plays the Kit's VOL again. Each Track heard alone on its Out
 		{
-			auto instance = load(formats, description);
+			auto instance = load(formats, description, ids);
 			auto& plugin = *instance->plugin;
 			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
 			for(const int track : {0, 2, 6})
-				automate(*instance, ids.index("Out", track), outValue(track + 1));
+				instance->host->automate(ids.index("Out", track), outValue(track + 1));
 			render(plugin, {}, g_rate);
 			const auto beats = [&](const char* _name, const int _bars, const std::vector<int>& _tracks,
 				const std::vector<int>& _locked, const int _offbeat, const bool _channelOne = false)
@@ -877,9 +844,9 @@ namespace
 			const auto seconds = 6.0;
 			const auto notes = pattern(seconds, g_rate);
 			const auto samples = std::llround(seconds * g_rate);
-			auto fixed = load(formats, description);
+			auto fixed = load(formats, description, ids);
 			const auto reference = render(*fixed->plugin, notes, samples, 0, &blockMs);
-			auto varied = load(formats, description);
+			auto varied = load(formats, description, ids);
 			varied->plugin->setNonRealtime(true);
 			const auto other = render(*varied->plugin, notes, samples, 0x9e3779b9u);
 			int64_t first = -1;
@@ -916,7 +883,7 @@ namespace
 
 		// The editor through IPlugView in the host's window, an audio thread playing and the host automating meanwhile
 		{
-			auto instance = load(formats, description);
+			auto instance = load(formats, description, ids);
 			auto& plugin = *instance->plugin;
 			require(plugin.hasEditor(), "MD Drums has no editor through VST3");
 			const auto noEditor = cpuWhile([] { pump(3000); });

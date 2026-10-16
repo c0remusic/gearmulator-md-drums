@@ -98,6 +98,7 @@ Known failures outside the gate, on this PC: `mdHostSyncPluginTest` ("MD startup
 - A harness that paces a fake audio callback spin-waits to each deadline: a process without a visible window runs on the 15.6 ms timer, and a sleeping audio thread invents dropouts.
 - A new test's `main` sets `setvbuf(stdout, nullptr, _IONBF, 0)`: `_IOLBF` crashes the Microsoft runtime at startup (0xc0000409).
 - An editor test is the editor's clock (`Editor::setClock`): it steps `Editor::frame` as a display tick, and an RmlUi update runs the frame first, as in the plug-in.
+- MD Drums' two host tests share `mdDrumsPlugin/mdDrumsHostDriver.h` (header-only, JUCE alone: the VST3 test does not link the plug-in): notes played in blocks, a parameter automated, a state restored, and the scenarios of ticket 34 that `mdDrumsProcessorTest` (in process) and `mdDrumsVst3HostTest` (through VST3 hosting) both run, each adapter counting what the plug-in tells the host as its channel reports it.
 
 ## Critical implementation details
 
