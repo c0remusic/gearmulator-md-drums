@@ -275,7 +275,7 @@ namespace mdDrums
 		// take the relay for the parameter last touched in the editor, so that its automation chooser offered "FLTF"
 		// rather than "Track 1 FLTF", and would record it beside the knob turned; as a re-read, Live would write every
 		// parameter on its panel while it records. Push 2 then shows the relay's former value until the Track shown
-		// changes, when the relays reach the host as edits, or until a re-read (a Kit, a state, a machine's SYN1-8),
+		// changes, when the relays reach the host as edits, or until a re-read (a Kit, a state, a machine's parameters),
 		// which they follow silently.
 		const auto silent = pluginLib::Parameter::Origin::PresetChange;
 		const auto shown = part != m_relaysPart && !m_valuesChanged.load(std::memory_order_relaxed)
@@ -317,7 +317,7 @@ namespace mdDrums
 			m_relayShown[i] = value;
 		}
 
-		// Last in the Controller's timer, after the Device's messages: once for a Kit, a state, a machine's SYN1-8 and the
+		// Last in the Controller's timer, after the Device's messages: once for a Kit, a state, a machine's parameters and the
 		// relays following them. As the stack does after a preset, the host reads every value again (VST3:
 		// restartComponent with kParamValuesChanged; this JUCE's getParamNormalized reads the parameter's value) rather
 		// than taking hundreds of edits (performEdit), which Live would record while it records, add to the device's panel
@@ -369,7 +369,7 @@ namespace mdDrums
 
 	bool Controller::parseControllerMessage(const synthLib::SMidiEvent& _event)
 	{
-		// The Device's own word: a new machine's SYN1-8. The host's CCs are no parameter changes here.
+		// The Device's own word: the 24 parameters a new machine sets. The host's CCs are no parameter changes here.
 		if(_event.source != synthLib::MidiEventSource::Device)
 			return false;
 		const auto change = md::automation::decodeParameterChange(md::MachineModel::Machinedrum,
@@ -389,13 +389,24 @@ namespace mdDrums
 
 	md::automation::sysex::MdKit Controller::playedKit() const
 	{
+		// A machine the Device lacks it ignores; so does the Kit played. Before a Device, any machine goes.
+		messages::MachineSet machines;
+		const auto infos = static_cast<Processor&>(getProcessor()).getMachines();
+		if(infos)
+		{
+			for(const auto& machine : *infos)
+				machines.set(machine.id);
+		}
 		auto kit = m_kitBase;
 		for(size_t slot = 0; slot < ParameterCount; ++slot)
 		{
 			const auto* parameter = m_parameters[slot];
 			const auto& address = m_addresses[slot];
 			if(parameter && messages::isKitParameter(address.page))
-				messages::setKitValue(kit, address.page, address.part, address.index, parameter->getUnnormalizedValue());
+			{
+				messages::setKitValue(kit, address.page, address.part, address.index, parameter->getUnnormalizedValue(),
+					infos ? &machines : nullptr);
+			}
 		}
 		return kit;
 	}

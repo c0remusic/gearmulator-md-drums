@@ -211,6 +211,30 @@ namespace
 		require(blockDiffs == 0 && accurateDiffs == 0, "the delayed mix is not the engine's mix");
 	}
 
+	// The tables Engine::machineDefaults copies, as OS 1.63 holds them (its ASSIGN MACHINE handler, $2052fe)
+	void osTables(const md::fw::FlashOs& _os)
+	{
+		using Engine = mdDrums::Engine;
+		constexpr uint32_t base = 0x200000;	// the OS image's first address
+		const auto same = [&](const uint32_t _address, const auto& _table, const char* _name)
+		{
+			require(_address >= base && _address - base + _table.size() <= _os.osImage.size(),
+				(std::string(_name) + " lies past the OS image").c_str());
+			const auto* os = _os.osImage.data() + (_address - base);
+			require(std::equal(_table.begin(), _table.end(), os), (std::string(_name) + " is not the OS's").c_str());
+		};
+		same(Engine::OsEffectsAddress, Engine::OsEffects, "OsEffects");
+		same(Engine::OsEffectsAddress + 8, Engine::OsRouting, "OsRouting");
+		same(Engine::OsMidEffectsAddress, Engine::OsMidEffects, "OsMidEffects");
+		same(Engine::OsMidEffectsAddress + 8, Engine::OsMidRouting, "OsMidRouting");
+		same(Engine::OsCtrAlAddress, Engine::OsCtrAl, "OsCtrAl");
+		same(Engine::Os8pAddress, Engine::Os8pEffects, "Os8pEffects");
+		same(Engine::Os8pAddress + 8, Engine::Os8pRouting, "Os8pRouting");
+		same(Engine::Os8pAddress + 16, Engine::Os8pTargets, "Os8pTargets");
+		same(Engine::OsCtrBlocksAddress, Engine::OsCtrBlocks, "OsCtrBlocks");
+		std::printf("ASSIGN MACHINE's tables are OS 1.63's\n");
+	}
+
 	// Where the voices start (ticket 36): every machine that sounds, at velocity 127 with the Kit's defaults, on its own
 	// output (it does not go through the master effects), its first Hit after it is chosen and a Hit again once it is
 	// silent. It prints what each voice takes after the block its Hit lands in, its Hit again's (Engine::voiceStart's
@@ -454,6 +478,7 @@ int main()
 		// machines and the master compiled ahead, which leaves the samples as they are (mdDrumsFirstHitTest)
 		const auto os = md::fw::loadFirmwareFromFlash(flash);
 		const auto bank = md::fw::loadRomBankFromFlash(flash);
+		osTables(os);
 		// First: the checks below take where the Hits sound from it
 		voiceStarts(os, bank);
 

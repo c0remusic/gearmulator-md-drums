@@ -1,6 +1,6 @@
 // The Hit screen's preview (ticket 28 of the editor map), mdDrums::HitPreview:
 // - a Track's Hit rendered for a Kit is, column for column, the capture a Device just loaded with that Kit makes of its
-//   first Hit, for Tracks of several machines, and for a machine just chosen, its SYN1-8 at the machine's defaults as
+//   first Hit, for Tracks of several machines, and for a machine just chosen, the 24 parameters ASSIGN MACHINE sets as
 //   the editor takes them before the Device reports them;
 // - the same request renders the same Hit twice;
 // - through a Client: only the latest request waiting is rendered, the result comes back with its number, the next
@@ -181,7 +181,7 @@ int main()
 			require(rendered.velocity == velocity && rendered.id == 1, "the preview's velocity or id");
 		}
 
-		// A machine just chosen: the request still holds the previous machine's SYN1-8
+		// A machine just chosen: the request still holds the previous machine's parameters
 		{
 			mdDrums::Engine probe(os, bank, false);
 			const auto& machines = probe.machines();
@@ -204,15 +204,17 @@ int main()
 				request.track = track;
 				request.velocity = 100;
 				// The machine's defaults, as the editor takes them before the Device reports them (HitView)
-				for(int p = 0; p < 8; ++p)
-					request.kit.parameters[track][p] = machine.defaults[p];
+				const auto defaults = mdDrums::Engine::machineDefaults(machine, *factory, track,
+					mdDrums::Engine::AssignScope);
+				require(defaults == device.kit.parameters[track],
+					std::string("the editor's defaults for ") + name + " are not the Device's");
+				request.kit.parameters[track] = defaults;
 				const auto withDefaults = differing(device.capture, preview(os, bank, request));
-				// Factory Kit 1's SYN1-8 under the new machine, as the editor still has them meanwhile
-				for(int p = 0; p < 8; ++p)
-					request.kit.parameters[track][p] = factory->parameters[track][p];
+				// Factory Kit 1's parameters under the new machine, as the editor still has them meanwhile
+				request.kit.parameters[track] = factory->parameters[track];
 				const auto withOld = differing(device.capture, preview(os, bank, request));
-				std::printf("%s chosen on Track 3: %d columns differ with its defaults, %d with the SYN1-8 before it\n", name,
-					withDefaults, withOld);
+				std::printf("%s chosen on Track 3: %d columns differ with its defaults, %d with the parameters before it\n",
+					name, withDefaults, withOld);
 				require(withDefaults == 0, "a machine just chosen does not play its defaults");
 			}
 		}

@@ -612,8 +612,8 @@ namespace
 	}
 
 	// The preview (ticket 28): a change of the shown Track's sound renders its Hit, shown once rendered as "Preview,
-	// velocity n" at the last Hit's velocity, until the Track sounds again; in the browser, the machine chosen with its
-	// own SYN1-8 before the Device reports them: the Hit the engine renders for that Kit
+	// velocity n" at the last Hit's velocity, until the Track sounds again; in the browser, the machine chosen with the
+	// 24 parameters ASSIGN MACHINE sets before the Device reports them: the Hit the engine renders for that Kit
 	void hitPreview(Fixture& _f)
 	{
 		auto* view = _f.editor->getHitView();
@@ -627,7 +627,7 @@ namespace
 			"the Hit screen does not start on the last Hit");
 
 		// The engine renders on its own thread: the screen reads its result at each frame (the clock barely moves, so
-		// that a machine chosen keeps its own SYN1-8 meanwhile)
+		// that a machine chosen keeps its own parameters meanwhile)
 		const auto untilPreview = [&](const std::chrono::steady_clock::time_point _start)
 		{
 			while(view->previewPending() || !view->previewing())
@@ -686,15 +686,15 @@ namespace
 		require(tick2->IsVisible(true) && tick2->GetInnerRML().find("ms") != std::string::npos,
 			"the browser's preview has no graduations");
 
-		// The Hit the engine renders for the Kit played, with EFM-SD's own SYN1-8, at the last Hit's velocity
+		// The Hit the engine renders for the Kit played, with EFM-SD's own parameters, at the last Hit's velocity
 		const auto machines = _f.processor.getMachines();
 		require(machines != nullptr, "the Processor holds no machines");
 		mdDrums::HitPreview::Request request;
 		request.kit = controller.playedKit();
 		for(const auto& machine : *machines)
 			if(machine.id == 33)
-				for(int p = 0; p < 8; ++p)
-					request.kit.parameters[0][p] = machine.defaults[p];
+				request.kit.parameters[0] = mdDrums::Engine::machineDefaults(machine, request.kit, 0,
+					mdDrums::Engine::AssignScope);
 		request.track = 0;
 		request.velocity = 90;
 		const auto flash = mdDrums::Engine::findFlashImage({});
@@ -705,7 +705,7 @@ namespace
 		int differ = 0;
 		for(int c = 0; c < mdDrums::Telemetry::CaptureColumns; ++c)
 			differ += shown.columns[static_cast<size_t>(c)] != expected.columns[static_cast<size_t>(c)];
-		std::printf("browser preview: %d of %d columns differ from the engine's Hit with EFM-SD's own SYN1-8\n", differ,
+		std::printf("browser preview: %d of %d columns differ from the engine's Hit with EFM-SD's own parameters\n", differ,
 			mdDrums::Telemetry::CaptureColumns);
 		require(shown.count == expected.count && differ == 0, "the browser's preview is not the machine's Hit");
 

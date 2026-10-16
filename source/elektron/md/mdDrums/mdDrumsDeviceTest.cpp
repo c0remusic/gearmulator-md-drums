@@ -1,6 +1,6 @@
 // MD Drums' Device driven by MIDI bytes alone, through synthLib::Plugin as the plug-in drives it: it boots with factory
 // Kit 1, plays notes 36-51 and drops the others, takes the Machinedrum's CCs and SysEx from the editor and ignores the
-// host's, answers ASSIGN MACHINE with the new machine's SYN1-8 as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
+// host's, answers ASSIGN MACHINE with the 24 parameters it sets as CCs, plays Mute, Solo and Out, keeps its Kit and mixer
 // across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It reports the
 // note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at most 1 % of
 // one core.
@@ -140,6 +140,21 @@ namespace
 		return {(*message)[0], (*message)[1], (*message)[2]};
 	}
 
+	// The CCs the Device said back for _track's parameters with the values its Kit holds, since midiOut was cleared
+	size_t reported(const Rig& _rig, const uint8_t _track)
+	{
+		size_t count = 0;
+		for(const auto& event : _rig.midiOut)
+		{
+			const auto change = md::automation::decodeParameterChange(md::MachineModel::Machinedrum,
+				{event.a, event.b, event.c}, 0);
+			if(change && change->page <= machinedrum::Routing && change->track == _track
+				&& change->value == _rig.device->kit().parameters[_track][change->page * 8 + change->index])
+				++count;
+		}
+		return count;
+	}
+
 	void behaviour(const std::vector<uint8_t>& _flash)
 	{
 		Rig rig(_flash, 44100.0f);
@@ -170,22 +185,13 @@ namespace
 		require(rig.device->kit().levels[0] == 0 && rig.listen(2) == 0.0f, "the editor's level CC did not silence track 1");
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
 
-		// ASSIGN MACHINE: TRX-BD on track 1, its SYN1-8 defaults said back as CCs
+		// ASSIGN MACHINE: TRX-BD on track 1, the 24 parameters it sets said back as CCs
 		rig.midiOut.clear();
 		const auto assign = sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16);
 		rig.send(MidiEventSource::Editor, *assign);
 		rig.process();
-		size_t synCcs = 0;
-		for(const auto& event : rig.midiOut)
-		{
-			const auto change = md::automation::decodeParameterChange(md::MachineModel::Machinedrum,
-				{event.a, event.b, event.c}, 0);
-			if(change && change->page == machinedrum::Synthesis && change->track == 0
-				&& change->value == rig.device->kit().parameters[0][change->index])
-				++synCcs;
-		}
-		std::printf("$5B TRX-BD on track 1: machine %u, %zu SYN CCs back\n", rig.device->kit().machine(0), synCcs);
-		require(rig.device->kit().machine(0) == 16 && synCcs == 8, "ASSIGN MACHINE did not set and report the machine");
+		require(rig.device->kit().machine(0) == 16, "ASSIGN MACHINE did not set the machine");
+		require(reported(rig, 0) == 24, "ASSIGN MACHINE did not report the 24 parameters it set");
 
 		// Master effects, LFO, Link and Choke land in the Kit
 		rig.send(MidiEventSource::Editor, *sysex::masterEffectChange(sysex::MasterEffect::Echo, 2, 99));
@@ -305,8 +311,141 @@ namespace
 				}
 			}
 		}
-		require(!mdDrums::messages::parameterMessage(pages::Machine, 0, 0, 6), "a machine the Machinedrum lacks was sent");
 		std::printf("%zu host parameter values sent and read back from the Device\n", checked);
+
+		// A machine the OS lacks goes, and the Device ignores it; an LFO setting past its range the Machinedrum ignores
+		const auto before = rig.device->kit();
+		const auto absent = mdDrums::messages::parameterMessage(pages::Machine, 0, 0, 6);
+		require(absent.has_value(), "a machine id 0-191 was not sent");
+		rig.send(MidiEventSource::Editor, absent->message());
+		rig.process();
+		require(rig.device->kit() == before, "a machine the OS lacks changed the Kit");
+		require(!mdDrums::messages::parameterMessage(pages::Machine, 0, 0, 192), "a machine id past 191 was sent");
+		require(!mdDrums::messages::parameterMessage(pages::Lfo, 0, 2, md::LfoSettings::ShapeCount),
+			"an LFO shape past its range was sent");
+	}
+
+	// ASSIGN MACHINE and SET LFO PARAM as OS 1.63 reads them ($2052fe, $205852): the forms of $5B, the 24 parameters each
+	// machine family gets, and $62's fields 5-7 and values out of range
+	void assignAndLfo(const std::vector<uint8_t>& _flash)
+	{
+		using Engine = mdDrums::Engine;
+		Rig rig(_flash, 44100.0f);
+		const auto& machines = rig.device->machines();
+		const auto info = [&](const uint8_t _id) -> const md::engine::MachineInfo&
+		{
+			const auto it = std::find_if(machines.begin(), machines.end(), [&](const auto& _m) { return _m.id == _id; });
+			require(it != machines.end(), "the OS has no machine " + std::to_string(_id));
+			return *it;
+		};
+		// $5B's body: track, id, then the UW flag and a scope when given (-1 leaves one out)
+		const auto assign = [&](const uint8_t _track, const uint8_t _id, const int _uw, const int _scope)
+		{
+			std::vector<uint8_t> bytes{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x5b, _track, _id};
+			if(_uw >= 0)
+				bytes.push_back(static_cast<uint8_t>(_uw));
+			if(_scope >= 0)
+				bytes.push_back(static_cast<uint8_t>(_scope));
+			bytes.push_back(0xf7);
+			rig.midiOut.clear();
+			rig.send(MidiEventSource::Editor, bytes);
+			rig.process();
+		};
+		const auto setPage = [&](const uint8_t _track, const uint8_t _page, const uint8_t _value)
+		{
+			for(uint8_t i = 0; i < 8; ++i)
+				rig.send(MidiEventSource::Editor, cc(_page, _track, i, _value));
+			rig.process();
+		};
+		const auto page = [&](const uint8_t _track, const int _page)
+		{
+			std::array<uint8_t, 8> values{};
+			std::copy_n(rig.device->kit().parameters[_track].begin() + 8 * _page, 8, values.begin());
+			return values;
+		};
+		const auto kit = [&]() -> const sysex::MdKit& { return rig.device->kit(); };
+
+		// Without a scope (11 bytes, and 10 without the UW flag), the machine's SYN1-8 and the OS's effects and routing
+		setPage(1, machinedrum::Effects, 99);
+		setPage(1, machinedrum::Routing, 99);
+		assign(1, 17, 0, -1);	// TRX-SD
+		require(kit().machine(1) == 17 && page(1, 0) == info(17).defaults && page(1, 1) == Engine::OsEffects
+			&& page(1, 2) == Engine::OsRouting, "$5B did not set TRX-SD's 24 parameters");
+		require(reported(rig, 1) == 24, "$5B did not report the 24 parameters");
+		setPage(1, machinedrum::Routing, 99);
+		assign(1, 16, -1, -1);	// TRX-BD, without the UW flag
+		require(kit().machine(1) == 16 && page(1, 0) == info(16).defaults && page(1, 2) == Engine::OsRouting,
+			"a $5B without the UW flag was not taken");
+
+		// A scope: 0 sets SYN1-8, 1 the effects page too, 2 all 24
+		setPage(1, machinedrum::Effects, 99);
+		setPage(1, machinedrum::Routing, 99);
+		assign(1, 17, 0, 0);
+		const std::array<uint8_t, 8> kept{99, 99, 99, 99, 99, 99, 99, 99};
+		require(page(1, 0) == info(17).defaults && page(1, 1) == kept && page(1, 2) == kept, "scope 0 set more than SYN1-8");
+		assign(1, 16, 0, 1);
+		require(page(1, 0) == info(16).defaults && page(1, 1) == Engine::OsEffects && page(1, 2) == kept,
+			"scope 1 did not set the effects page alone");
+		assign(1, 17, 0, 2);
+		require(page(1, 2) == Engine::OsRouting, "scope 2 did not set the routing page");
+
+		// Only a UW flag of 1 adds 128
+		assign(2, 0, 1, -1);
+		require(kit().machine(2) == 128, "the UW flag did not make ROM-01");
+		assign(2, 0, 2, -1);
+		require(kit().machine(2) == 0, "a UW flag of 2 added 128");
+
+		// MID machines' own pages, CTR-AL's 64s, CTR-RE's Rhythm Echo
+		assign(3, 96, 0, -1);
+		require(page(3, 1) == Engine::OsMidEffects && page(3, 2) == Engine::OsMidRouting, "MID-01's pages are not the OS's");
+		assign(3, 112, 0, -1);
+		require(page(3, 1) == Engine::OsCtrAl && page(3, 2) == Engine::OsCtrAl, "CTR-AL's pages are not 64");
+		rig.send(MidiEventSource::Editor, *sysex::masterEffectChange(sysex::MasterEffect::Echo, 2, 99));
+		rig.process();
+		assign(3, 120, 0, -1);
+		std::array<uint8_t, 8> echo{};
+		std::copy_n(kit().masterEffects.begin() + 8, 8, echo.begin());
+		require(echo[2] == 99 && page(3, 0) == echo, "CTR-RE's SYN1-8 are not the Kit's Rhythm Echo");
+
+		// CTR-8P: its knobs take the values of the SYN1 they aim at (Track 3's own before it, as the OS reads it), its
+		// pages its knobs' targets; scope 0 only puts a target out of range back
+		for(uint8_t t = 0; t < 8; ++t)
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Synthesis, t, 0, static_cast<uint8_t>(10 + t)));
+		rig.process();
+		assign(2, 113, 0, -1);
+		const std::array<uint8_t, 8> aimed{10, 11, 10, 13, 14, 15, 17, 10};
+		require(page(2, 0) == aimed && page(2, 1) == Engine::Os8pEffects && page(2, 2) == Engine::Os8pRouting,
+			"CTR-8P's parameters are not its knobs' targets");
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 2, 0, 99));	// a track past 15
+		rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 2, 1, 20));	// a parameter, in range
+		rig.process();
+		assign(2, 113, 0, 0);
+		require(page(2, 1)[0] == Engine::Os8pEffects[0] && page(2, 1)[1] == 20, "CTR-8P's scope 0 did not check its targets");
+
+		// A machine the OS lacks: nothing changes, nothing is reported
+		const auto before = kit();
+		assign(4, 6, 0, -1);
+		require(kit() == before && rig.midiOut.empty(), "a machine the OS lacks was taken");
+		std::printf("$5B: scopes, UW flag, MID, CTR-AL, CTR-RE, CTR-8P and absent machines as OS 1.63\n");
+
+		// $62: a value out of range leaves the field; fields 5-7 are LFOS, LFOD, LFOM
+		const auto lfo = [&](const uint8_t _track, const uint8_t _field, const uint8_t _value)
+		{
+			rig.send(MidiEventSource::Editor, {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x62,
+				static_cast<uint8_t>(_track << 3 | _field), _value, 0xf7});
+			rig.process();
+		};
+		lfo(5, 0, 7);
+		lfo(5, 0, 16);
+		lfo(5, 2, 2);
+		lfo(5, 2, md::LfoSettings::ShapeCount);
+		require(kit().lfo(5).track == 7 && kit().lfo(5).shape1 == 2, "$62 past a field's range changed it");
+		lfo(5, 5, 77);
+		lfo(5, 6, 78);
+		lfo(5, 7, 79);
+		require(kit().parameters[5][21] == 77 && kit().parameters[5][22] == 78 && kit().parameters[5][23] == 79,
+			"$62's fields 5-7 did not set LFOS, LFOD and LFOM");
+		std::printf("$62: out of range ignored, fields 5-7 set LFOS LFOD LFOM\n");
 	}
 
 	// Locks (ADR 0003), heard on Main against takes that differ only in them. Every take boots the same Device, sets
@@ -326,8 +465,14 @@ namespace
 			rig.settle();
 		}
 
-		// TRX-BD on track 1 from its next Hit, which then takes its Kit's 24 values at once, as a Lock does
-		void assignAtNextHit() { rig.send(MidiEventSource::Editor, *sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16)); }
+		// TRX-BD on track 1 from its next Hit, which then takes its Kit's 24 values at once, as a Lock does. ASSIGN
+		// MACHINE gives the effects page the OS's values: the Kit's FLTF and SRR are set again after it.
+		void assignAtNextHit()
+		{
+			rig.send(MidiEventSource::Editor, *sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16));
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, Fltf - 8, 20));
+			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, Srr - 8, 0));
+		}
 		void kit(const uint8_t _param, const uint8_t _value)
 		{
 			rig.send(MidiEventSource::Editor, cc(machinedrum::Effects, 0, _param - 8, _value), Offset);
@@ -759,6 +904,7 @@ int main()
 	{
 		behaviour(flash);
 		parameters(flash);
+		assignAndLfo(flash);
 		locks(flash);
 		unplayed(flash);
 		allocations(flash);

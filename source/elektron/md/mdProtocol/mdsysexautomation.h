@@ -273,9 +273,10 @@ namespace md::automation::sysex
 	// Empty for a parameter or value out of range.
 	std::optional<Message> masterEffectChange(MasterEffect _effect, uint8_t _parameter, uint8_t _value);
 	// Machinedrum: one field of a track's LFO (SET LFO PARAM, $62, after MCL's MD::setLFOParam), 0 the
-	// destination track, 1 its parameter, 2 and 3 the shapes, 4 the update (LfoSettings). The firmware
-	// clamps a value out of range (mdPlayheadProbe --lfo); empty for one here, or a track or field out of
-	// range.
+	// destination track, 1 its parameter, 2 and 3 the shapes, 4 the update (LfoSettings). OS 1.63 ignores a
+	// value out of range, keeping the field's ($205852 on; mdPlayheadProbe --lfo sends rising values, the last
+	// in range stays); empty for one here, or a track or field out of range. Fields 5-7, which the OS also
+	// takes (LFOS, LFOD, LFOM), are the CCs' here.
 	std::optional<Message> lfoChange(uint8_t _track, uint8_t _field, uint8_t _value);
 	// Machinedrum: the output of a track (SET TRACK ROUTING, $5C), kept in the Global.
 	// Empty for a track or output out of range.

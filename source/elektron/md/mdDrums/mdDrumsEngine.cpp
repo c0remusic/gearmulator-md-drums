@@ -379,6 +379,45 @@ namespace mdDrums
 		return struck;
 	}
 
+	std::array<uint8_t, Engine::ParamCount> Engine::machineDefaults(const md::engine::MachineInfo& _machine,
+		const md::automation::sysex::MdKit& _kit, const int _track, const int _scope)
+	{
+		auto values = _kit.parameters[static_cast<size_t>(std::clamp(_track, 0, TrackCount - 1))];
+		const auto id = _machine.id;
+		if(id == 113)	// CTR-8P ($20553a)
+		{
+			// Each knob takes the value of the parameter it aims at, read as the OS reads it, after the knobs before it
+			for(size_t i = 0; i < 8; ++i)
+			{
+				const int target = Os8pTargets[2 * i];
+				const auto& source = target == _track ? values : _kit.parameters[static_cast<size_t>(target)];
+				values[i] = source[Os8pTargets[2 * i + 1]];
+			}
+			for(size_t i = 0; i < 8; ++i)
+			{
+				// Scope 0 keeps a target in range: a track 0-15, then a parameter 0-23
+				auto& effect = values[8 + i];
+				if(_scope >= 1 || effect > (i & 1 ? 23 : 15))
+					effect = Os8pEffects[i];
+				if(_scope >= AssignScope)
+					values[16 + i] = Os8pRouting[i];
+			}
+			return values;
+		}
+		if(id >= 120 && id < 124)	// CTR-RE, -GB, -EQ, -DX: the master effect each controls
+			std::copy_n(_kit.masterEffects.begin() + 8 * OsCtrBlocks[id - 120], 8, values.begin());
+		else
+			std::copy(_machine.defaults.begin(), _machine.defaults.end(), values.begin());
+		const bool mid = id >= 96 && id < 112;
+		const auto& effects = id == 112 ? OsCtrAl : mid ? OsMidEffects : OsEffects;
+		const auto& routing = id == 112 ? OsCtrAl : mid ? OsMidRouting : OsRouting;
+		if(_scope >= 1)
+			std::copy(effects.begin(), effects.end(), values.begin() + 8);
+		if(_scope >= AssignScope)
+			std::copy(routing.begin(), routing.end(), values.begin() + 16);
+		return values;
+	}
+
 	int Engine::voiceStart(const uint8_t _machine)
 	{
 		// Measured on each machine's own output, a Hit again at velocity 127 with the Kit's defaults (mdDrumsEngineTest's

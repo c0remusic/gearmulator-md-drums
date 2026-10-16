@@ -71,6 +71,32 @@ namespace mdDrums
 		Engine& operator=(const Engine&) = delete;
 
 		const std::vector<md::engine::MachineInfo>& machines() const;
+		// What ASSIGN MACHINE ($5B) leaves in _track's 24 parameters of _kit, as OS 1.63's handler does ($2052fe to
+		// $205696). _scope 0 sets SYN1-8, 1 the effects page too, AssignScope (a $5B without a scope byte) the routing
+		// page too; the rest keeps _kit's values. SYN1-8 are the machine's own; for CTR-RE, -GB, -EQ and -DX the Kit's
+		// master effect each controls (OsCtrBlocks); for CTR-8P the values of the parameters its knobs aim at by default
+		// (Os8pTargets). The effects and routing pages are the OS's defaults (OsEffects, OsRouting; MID machines' own; 64
+		// everywhere for CTR-AL); CTR-8P's are where its knobs aim (Os8pEffects, Os8pRouting), which scope 0 only checks.
+		// Left out: CTR-AL also aims the Track's LFO at "track 17", and a machine that replaces it aims the LFO back at its
+		// own Track. No host parameter holds that destination, and the engine plays no CTR machine.
+		static std::array<uint8_t, ParamCount> machineDefaults(const md::engine::MachineInfo& _machine,
+			const md::automation::sysex::MdKit& _kit, int _track, int _scope);
+		static constexpr int AssignScope = 2;
+		// The OS's own tables for it, which mdDrumsEngineTest reads in the OS image: the effects and routing pages
+		// ($246148, $246150; MID machines' $246258, $246260; CTR-AL's $246268 for both), CTR-8P's knobs' targets as
+		// (track, parameter) pairs ($246278, $246280, and its SYN1-8's from $246288), and the master block that each of
+		// CTR-RE, -GB, -EQ and -DX controls ($2462db)
+		static constexpr std::array<uint8_t, 8> OsEffects{0, 0, 64, 64, 0, 127, 0, 0};
+		static constexpr std::array<uint8_t, 8> OsRouting{0, 127, 64, 0, 0, 64, 0, 0};
+		static constexpr std::array<uint8_t, 8> OsMidEffects{0, 64, 0, 64, 0, 64, 0, 64};
+		static constexpr std::array<uint8_t, 8> OsMidRouting{0, 64, 0, 64, 0, 64, 0, 0};
+		static constexpr std::array<uint8_t, 8> OsCtrAl{64, 64, 64, 64, 64, 64, 64, 64};
+		static constexpr std::array<uint8_t, 8> Os8pEffects{0, 0, 1, 0, 2, 0, 3, 0};
+		static constexpr std::array<uint8_t, 8> Os8pRouting{4, 0, 5, 0, 6, 0, 7, 0};
+		static constexpr std::array<uint8_t, 16> Os8pTargets{0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 7, 0, 0, 0};
+		static constexpr std::array<uint8_t, 4> OsCtrBlocks{1, 0, 2, 3};
+		static constexpr uint32_t OsEffectsAddress = 0x246148, OsMidEffectsAddress = 0x246258, OsCtrAlAddress = 0x246268,
+			Os8pAddress = 0x246278, OsCtrBlocksAddress = 0x2462db;	// each page's routing 8 bytes after its effects
 		// The OS's tables the Tracks' effects read, immutable: the editor measures the filter and the EQ with them
 		std::shared_ptr<const md::engine::TrackFx::Tables> fxTables() const;
 

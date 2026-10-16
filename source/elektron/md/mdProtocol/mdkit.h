@@ -38,7 +38,7 @@ namespace md::automation::sysex
 		std::array<TrackParameters, machinedrum::TrackCount> parameters{};
 		std::array<uint8_t, machinedrum::TrackCount> levels{};
 		// A big-endian word in the dump: the machine id (mdmachines.h) in the low byte; the upper bytes are 0 in every
-		// factory Kit and kept as they came
+		// factory Kit and kept as a dump brings them. ASSIGN MACHINE writes the whole word, as OS 1.63 does ($205392)
 		std::array<uint32_t, machinedrum::TrackCount> machines{};
 		// Five fields $62 sets (LfoSettings: destination track and parameter, shapes, update), then the running LFO's
 		// state, which LOAD KIT copies into the running LFO

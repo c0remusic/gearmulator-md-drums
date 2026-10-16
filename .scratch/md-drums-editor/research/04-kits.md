@@ -245,8 +245,8 @@ unofficial firmwares MCL detects (`FW_CAP_TONAL`, `MD.cpp:496`). Version 1's lay
 | $4a7-$4cb, groups | not read | 16 trig groups then 16 mute groups, $ff or 0-15, 7-bit packed (37 bytes) |
 | checksum, length | checked | `finishDump` (`mdsysexautomation.cpp:217-229`) |
 
-LFO bytes 0-4 must stay in range: track 0-15, parameter 0-23, shapes 0-5, update 0-2 (the bounds `lfoChange` uses
-and the firmware clamps to, `mdsysexautomation.h:264-268`, `.scratch/md-editor/README.md:238`).
+LFO bytes 0-4 must stay in range: track 0-15, parameter 0-23, shapes 0-5, update 0-2 (the bounds `lfoChange` uses;
+OS 1.63 ignores a `$62` value past them, it does not clamp: ticket 39).
 
 Helpers already there: `append7Bit`, `read7Bit`, `finishDump` (anonymous, `mdsysexautomation.cpp:146-229`), and the
 test builder `makeKitDump` (`mdAutomationTestSupport.h:405-462`), which leaves the LFOs and groups at zero and goes

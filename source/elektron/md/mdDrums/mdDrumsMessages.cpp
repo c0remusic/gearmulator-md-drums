@@ -71,7 +71,8 @@ namespace mdDrums::messages
 		}
 
 		// The byte of _kit that holds a Kit host parameter, _track in range; null for one that is not a byte of the
-		// Kit (the machine is the low byte of a word). parameterValue reads through it, setKitValue writes.
+		// Kit (the machine is a word, whose low byte parameterValue reads and setKitValue writes whole). parameterValue
+		// reads through it, setKitValue writes.
 		template<typename Kit>
 		auto kitByte(Kit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index)
 			-> decltype(&_kit.levels[0])
@@ -260,21 +261,19 @@ namespace mdDrums::messages
 		}
 		case pages::Machine:
 		{
-			const auto id = static_cast<uint16_t>(std::clamp(_value, 0, 191));
-			const auto* machine = md::machines::find(md::MachineModel::Machinedrum, id);
-			if(_index != 0 || !machine || !machine->assignable)
+			if(_index != 0 || _value < 0 || _value > 191)
 				return std::nullopt;
 			// Machinedrum ids 128 and up go out as id - 128 with the UW flag
+			const auto id = static_cast<uint8_t>(_value);
 			return Writer::machinedrum(g_assignMachine).add(_track).add(static_cast<uint8_t>(id & 0x7f))
 				.add(id >= 128 ? 1 : 0).add(0xf7).raw;
 		}
 		case pages::Lfo:
 		{
 			const auto& maximum = md::LfoSettings::FieldMaximum;
-			if(_index >= maximum.size())
+			if(_index >= maximum.size() || value > maximum[_index])
 				return std::nullopt;
-			return Writer::machinedrum(g_lfoChange).add(static_cast<uint8_t>(_track << 3 | _index))
-				.add(std::min(value, maximum[_index])).add(0xf7).raw;
+			return Writer::machinedrum(g_lfoChange).add(static_cast<uint8_t>(_track << 3 | _index)).add(value).add(0xf7).raw;
 		}
 		case pages::Mixer:
 			if(_index > 1)
@@ -319,7 +318,7 @@ namespace mdDrums::messages
 	}
 
 	bool setKitValue(md::automation::sysex::MdKit& _kit, const uint8_t _page, const uint8_t _track, const uint8_t _index,
-		const int _value)
+		const int _value, const MachineSet* _machines)
 	{
 		if(_track >= md::automation::machinedrum::TrackCount)
 			return false;
@@ -328,7 +327,8 @@ namespace mdDrums::messages
 		{
 			if(_index != 0)
 				return false;
-			_kit.machines[_track] = (_kit.machines[_track] & ~0xffu) | value;
+			if(!_machines || _machines->test(value))
+				_kit.machines[_track] = value;
 			return true;
 		}
 		auto* byte = kitByte(_kit, _page, _track, _index);

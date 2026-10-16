@@ -42,7 +42,7 @@ namespace mdDrums
 	// When the Track's sound changes (its machine, 24 parameters, LFO or level), its Hit at the last Hit's velocity (else
 	// the head band's) is rendered on the process's HitPreview and shown once rendered, "Preview, velocity n", until a Hit
 	// of the Track sounds again; a Hit still playing when the sound changed plays to its end first. A machine just chosen
-	// previews with its own SYN1-8, which the Device reports a block later.
+	// previews with the 24 parameters ASSIGN MACHINE gives it, which the Device reports a block later.
 	// The window fits the Hit (0.1 to 0.8 s, ticks in ms); full scale is ±0.5 at the plot's edges, as the mockup draws
 	// it. The editor's frame reads the captures, the sound and the preview's result, and repaints a visible screen only
 	// when what it shows changed.
@@ -53,8 +53,9 @@ namespace mdDrums
 		static constexpr double SampleRate = 44100.0;
 		static constexpr int TickCount = 8;
 		// A Track's sound as host parameters: Machine, the 24 parameters, the LFO's five, Level
-		static constexpr int SoundCount = 31;
-		// How long a machine just chosen previews with its own SYN1-8, whatever its parameters still say
+		static constexpr int ParamCount = 24;
+		static constexpr int SoundCount = 1 + ParamCount + 6;
+		// How long a machine just chosen previews with its own parameters, whatever the host's still say
 		static constexpr double MachineReportMs = 500.0;
 
 		// _romFolders: where the Processor looks for the flash image, for the preview's engine
@@ -133,9 +134,10 @@ namespace mdDrums
 		std::array<pluginLib::Parameter*, SoundCount> m_soundParameters{};
 		std::array<int, SoundCount> m_raw{};	// the parameters as last read
 		std::array<int, SoundCount> m_sound{};	// the sound last asked for, or the Track's when shown
-		int m_chosenMachine = -1;				// a machine just chosen alone, previewed with its own SYN1-8
+		int m_chosenMachine = -1;				// a machine just chosen alone, previewed with its own parameters
 		double m_chosenAtMs = 0.0;
-		std::array<int, 8> m_synBefore{};		// the SYN1-8 it came with, until the Device reports its own
+		std::array<int, ParamCount> m_paramsBefore{};	// the parameters it came with, until the Device reports its own
+		std::array<int, ParamCount> m_chosenDefaults{};	// its own (Engine::machineDefaults)
 		bool m_soundChanged = false;	// a change not asked for yet: no screen showed
 		uint32_t m_requested = 0;		// the request being rendered; 0: none
 		uint32_t m_liveAtRequest = 0;	// the live capture when the sound changed

@@ -14,7 +14,8 @@ l'ADR 0002 :
   de façon synchrone, découpe ses blocs aux offsets des notes, rapporte 0 bloc et ses 0,48 ms internes ;
 - le JSON de 592 paramètres, pages et ordre du ticket 06 ; un Controller à automation temps réel sans verrou ;
 - l'état en dump `$52` + SysEx privée, relu par `onStateLoaded` ;
-- Machine qui remet SYN1-8 aux défauts et renvoie 8 CC ; Links et Chokes branchés (dump, `$65`/`$66`) ;
+- Machine qui remet SYN1-8 aux défauts et renvoie 8 CC (24 depuis le ticket 39, comme l'OS) ; Links et Chokes
+  branchés (dump, `$65`/`$66`) ;
   `setLfo` dans `mdDrums::Engine` ;
 - bus « Out 01 » à « Out 16 », `t<n>_out` qui décide ; resampler de la pile ; identité c0remusic/`C0rm`/`Mddr` ;
 - un rendu sans allocation (le `std::vector` de `MachineRunner::call`, `mdEngine/engine/MachineRunner.cpp:146`) ;
@@ -41,7 +42,7 @@ Master « Master ». Liste : `mdDrumsPlugin/Design/parameter-spec.md`.
   propres `F0 7D 4D 44 44` (Solo, Out, tempo, masques) ; CC et SysEx de l'hôte ignorés. `process` découpe le bloc à
   l'offset de chaque événement ; 0 bloc ; latence interne rapportée 21 échantillons ; 18 sorties. Démarre sur le Kit 1
   d'usine (TRX UW) tiré de l'image flash. `$5B` remet SYN1-8 aux défauts de la machine et renvoie, en fin de bloc, les
-  SYN1-8 laissés par le bloc en 8 CC. Mute et Solo donnent un mute effectif ; Out sort la Track de Main. Une exception
+  SYN1-8 laissés par le bloc en 8 CC (les 24 paramètres depuis le ticket 39). Mute et Solo donnent un mute effectif ; Out sort la Track de Main. Une exception
   du moteur rend `isValid()` faux. Les 32 valeurs Master vont dans le Kit, muettes jusqu'au ticket 09.
 - `mdDrumsMessages.*` : les messages propres (`Raw`, sans allocation), le format d'état (dump `$52` slot 0 + message
   masques), le Kit d'usine, et `parameterMessage` / `parameterValue` : le paramètre hôte en message de la MD, et sa

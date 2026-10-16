@@ -5,7 +5,7 @@
 // Live) and host automation through the VST3 process call; the latency reported; the state through IComponent; the same
 // samples whatever the block sizes and offline; no block that stalls the audio thread; nothing told to the host as an
 // edit (performEdit, which Live records while it records) as it loads, plays Locks, automates, restores a state or
-// changes a Track's machine, whose SYN1-8 the host reads again, and Push 2's relays as edits when the host shows
+// changes a Track's machine, whose 24 parameters the host reads again, and Push 2's relays as edits when the host shows
 // another Track; and the editor through IPlugView, drawn in the host's window while an audio thread plays.
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -666,7 +666,7 @@ namespace
 			}
 
 			// The host automating: no Track or master parameter echoed back. A Track's machine is the exception: the
-			// Machinedrum gives its SYN1-8 the machine's defaults
+			// Machinedrum gives its 24 parameters the machine's defaults and the OS's
 			instance->told.clear();
 			{
 				const auto syn1 = ids.index("SYN1", 0), level = ids.index("Level", 6), echo = ids.index("EchoTIME");
@@ -694,6 +694,18 @@ namespace
 			require(instance->told.edited(ids).empty() && instance->told.rereads > 0
 				&& instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
 				"a new machine's SYN1-8 did not reach the host as a re-read");
+			{
+				// The effects and routing pages OS 1.63 gives every machine but MID and CTR ($246148, $246150)
+				const std::vector<std::pair<const char*, int>> os{{"AMD", 0}, {"AMF", 0}, {"EQF", 64}, {"EQG", 64},
+					{"FLTF", 0}, {"FLTW", 127}, {"FLTQ", 0}, {"SRR", 0}, {"DIST", 0}, {"VOL", 127}, {"PAN", 64},
+					{"DEL", 0}, {"REV", 0}, {"LFOS", 64}, {"LFOD", 0}, {"LFOM", 0}};
+				for(const auto& [name, value] : os)
+				{
+					const auto read = std::lround(instance->parameter(ids.index(name, 2)).getValue() * 127.0f);
+					require(read == value, std::string("the host reads Track 3's ") + name + " at " + std::to_string(read)
+						+ " after a new machine, not the OS's " + std::to_string(value));
+				}
+			}
 
 			// The relay Track set by the host (Push 2's first encoder): Track 6 shown, the relays reaching the host as edits,
 			// none of the Track parameters

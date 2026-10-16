@@ -33,11 +33,12 @@ namespace mdDrums
 		constexpr float g_plotLeft = 15.0f, g_plotRight = 16.0f, g_plotTop = 48.0f, g_plotFoot = 36.0f;
 		constexpr float g_screenWidth = 399.0f;	// the canvas, inside the rule
 
-		// A Track's sound (HitView::SoundCount): Machine, the engine's 24 parameters (SYN1-8 from index 1), then these
+		// A Track's sound (HitView::SoundCount): Machine, the engine's 24 parameters (from index 1), then these
 		constexpr std::array<const char*, 6> g_soundAfter{
 			"LfoTrack", "LfoParam", "LfoShape1", "LfoShape2", "LfoMode", "Level"};
 		static_assert(HitView::SoundCount == 1 + Engine::ParamCount + static_cast<int>(g_soundAfter.size()));
-		constexpr size_t g_syn = 1;
+		static_assert(HitView::ParamCount == Engine::ParamCount);
+		constexpr size_t g_params = 1;
 
 		double tickMs(const double _window)
 		{
@@ -136,38 +137,42 @@ namespace mdDrums
 		std::array<int, SoundCount> raw{};
 		for(size_t i = 0; i < SoundCount; ++i)
 			raw[i] = m_soundParameters[i] ? m_soundParameters[i]->getUnnormalizedValue() : 0;
-		const auto syn = [](const std::array<int, SoundCount>& _values)
+		const auto params = [](const std::array<int, SoundCount>& _values)
 		{
-			std::array<int, 8> values{};
-			std::copy_n(_values.begin() + g_syn, values.size(), values.begin());
+			std::array<int, ParamCount> values{};
+			std::copy_n(_values.begin() + g_params, values.size(), values.begin());
 			return values;
 		};
 
-		// A machine chosen alone: the Device gives it its own SYN1-8 and reports them a block later. Until they change
-		// (a Kit's machine comes with its own at once), the sound is the machine's defaults.
+		// A machine chosen alone: the Device gives it the 24 parameters ASSIGN MACHINE sets (Engine::machineDefaults)
+		// and reports them a block later. Until they change (a Kit's machine comes with its own at once), the sound is
+		// the machine's defaults.
 		if(raw[0] != m_raw[0])
 		{
-			m_chosenMachine = syn(raw) == syn(m_raw) ? raw[0] : -1;
+			const bool alone = params(raw) == params(m_raw);
+			m_chosenMachine = -1;
 			m_chosenAtMs = _nowMs;
-			m_synBefore = syn(m_raw);
+			m_paramsBefore = params(m_raw);
+			const auto machines = alone ? m_editor.processor().getMachines() : nullptr;
+			for(size_t i = 0; machines && i < machines->size(); ++i)
+			{
+				const auto& machine = (*machines)[i];
+				if(machine.id != raw[0])
+					continue;
+				const auto defaults = Engine::machineDefaults(machine, m_editor.controller().playedKit(), m_track,
+					Engine::AssignScope);
+				std::copy(defaults.begin(), defaults.end(), m_chosenDefaults.begin());
+				m_chosenMachine = raw[0];
+				break;
+			}
 		}
 		m_raw = raw;
-		if(m_chosenMachine != raw[0] || _nowMs - m_chosenAtMs >= MachineReportMs || syn(raw) != m_synBefore)
+		if(m_chosenMachine != raw[0] || _nowMs - m_chosenAtMs >= MachineReportMs || params(raw) != m_paramsBefore)
 		{
 			m_chosenMachine = -1;
 			return raw;
 		}
-		if(const auto machines = m_editor.processor().getMachines())
-		{
-			for(const auto& machine : *machines)
-			{
-				if(machine.id != raw[0])
-					continue;
-				for(size_t p = 0; p < 8; ++p)
-					raw[g_syn + p] = machine.defaults[p];
-				break;
-			}
-		}
+		std::copy(m_chosenDefaults.begin(), m_chosenDefaults.end(), raw.begin() + g_params);
 		return raw;
 	}
 
@@ -178,8 +183,8 @@ namespace mdDrums
 		HitPreview::Request request;
 		request.kit = controller.playedKit();
 		request.track = track;
-		for(size_t p = 0; p < 8; ++p)
-			request.kit.parameters[track][p] = static_cast<uint8_t>(m_sound[g_syn + p]);
+		for(size_t p = 0; p < ParamCount; ++p)
+			request.kit.parameters[track][p] = static_cast<uint8_t>(m_sound[g_params + p]);
 		const auto* tracks = m_editor.getTrackView();
 		request.velocity = m_current.id ? m_current.velocity
 			: static_cast<uint8_t>(tracks ? tracks->getPlayVelocity() : TrackView::ListenVelocity);

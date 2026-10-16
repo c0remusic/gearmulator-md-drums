@@ -4,6 +4,7 @@
 #include "mdProtocol/mdkit.h"
 
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -112,15 +113,21 @@ namespace mdDrums::messages
 	}
 
 	// What a host parameter sends the Device at _value, built without allocating: a CC, ASSIGN MACHINE, SET LFO PARAM,
-	// a master effect message or one of MD Drums' own. Empty for a parameter MD Drums does not have, and for a machine
-	// id the Machinedrum does not offer.
+	// a master effect message or one of MD Drums' own. Empty for a parameter MD Drums does not have, and for an LFO
+	// setting past its range, which the Machinedrum ignores. Any machine id 0-191 goes: the Device takes only the ones
+	// its OS has (Engine::machines).
 	std::optional<Raw> parameterMessage(uint8_t _page, uint8_t _track, uint8_t _index, int _value);
 	// A host parameter's value in a Device state; empty for a parameter MD Drums does not have
 	std::optional<int> parameterValue(const State& _state, uint8_t _page, uint8_t _track, uint8_t _index);
 	// Whether a host parameter is part of the Kit (Mute, Solo and Out are the mixer's, the relays the plug-in's)
 	bool isKitParameter(uint8_t _page);
-	// A Kit host parameter's value into a Kit (a machine's upper bytes kept); false for one that is not the Kit's
-	bool setKitValue(md::automation::sysex::MdKit& _kit, uint8_t _page, uint8_t _track, uint8_t _index, int _value);
+	// The machine ids the Device takes (its OS's, Engine::machines): bit n for id n
+	using MachineSet = std::bitset<256>;
+	// A Kit host parameter's value into a Kit; false for one that is not the Kit's. A machine is the whole machine word,
+	// as ASSIGN MACHINE writes it; one _machines lacks leaves the Kit's as it was, as the Device does (any goes without
+	// a set)
+	bool setKitValue(md::automation::sysex::MdKit& _kit, uint8_t _page, uint8_t _track, uint8_t _index, int _value,
+		const MachineSet* _machines = nullptr);
 
 	// A Lock's value from its note's velocity (ADR 0003): velocity 0 is a note-off, so 1-127 stretch onto 0-127,
 	// rounded: 1-63 give 0-62 and 64-127 themselves. Both ends and the centre are there; 63 cannot be locked.

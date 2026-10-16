@@ -54,7 +54,7 @@ des paramètres hôte.
 
 **Machine.** `$5B` remet SYN1-8 aux défauts de la Machine, comme l'OS ; le Device renvoie 8 CC sortants et le
 Controller met les paramètres à jour (notification de l'hôte : règle du ticket 10). La Machine prend effet au Hit
-suivant.
+suivant. Corrigé le 2026-10-16 (ticket 39) : l'OS remet aussi les pages effets et routage, 24 paramètres et 24 CC.
 
 **Paramètres** (JSON, figés au premier push du port). Pages 0-4 de `mdautomation` (0 SYN1-8, 1 AMD…SRR, 2 DIST…LFOM,
 3 Level, 4 Mute), pour que `(page, part, index)` donne le CC sans table ; page 5 Machine (id MD brut 0-191, trous

@@ -297,9 +297,11 @@ namespace mdDrums
 		switch(s[6])
 		{
 		case g_assignMachine:
-			// The UW flag adds 128 to the id
-			if(s.size() == 11 && s[7] < Engine::TrackCount)
-				applyMachine(s[7], static_cast<uint8_t>(s[8] | (s[9] ? 0x80 : 0)));
+			// Track, id, then the UW flag and a scope if the message has them, as the OS reads it ($2052fe): only 1
+			// adds 128 to the id; without a scope, all 24 parameters (Engine::AssignScope)
+			if(s.size() >= 10 && s.size() <= 12 && s[7] < Engine::TrackCount)
+				applyMachine(s[7], static_cast<uint8_t>(s[8] | (s[9] == 1 ? 0x80 : 0)),
+					s.size() == 12 ? s[10] : Engine::AssignScope);
 			return;
 		case g_masterEffect:
 		case g_masterEffect + 1:
@@ -314,11 +316,22 @@ namespace mdDrums
 			return;
 		case g_lfoChange:
 		{
+			// Fields 0-4 are the LFO's settings, 5-7 its LFOS, LFOD and LFOM; a value past a field's range leaves it
+			// as it was, as the OS does ($205852 on)
 			const auto track = static_cast<uint8_t>(s[7] >> 3), field = static_cast<uint8_t>(s[7] & 7);
 			const auto& maximum = md::LfoSettings::FieldMaximum;
-			if(s.size() != 10 || track >= Engine::TrackCount || field >= maximum.size())
+			if(s.size() != 10 || track >= Engine::TrackCount)
 				return;
-			m_kit.lfos[track][field] = std::min(s[8], maximum[field]);
+			if(field >= maximum.size())
+			{
+				const auto parameter = static_cast<uint8_t>(Engine::ParamCount - 8 + field);	// LFOS LFOD LFOM
+				m_kit.parameters[track][parameter] = s[8];
+				m_engine->setParam(track, parameter, s[8]);
+				return;
+			}
+			if(s[8] > maximum[field])
+				return;
+			m_kit.lfos[track][field] = s[8];
 			m_engine->setLfo(track, m_kit.lfo(track));
 			return;
 		}
@@ -355,34 +368,35 @@ namespace mdDrums
 		}
 	}
 
-	void Device::applyMachine(const uint8_t _track, const uint8_t _machine)
+	void Device::applyMachine(const uint8_t _track, const uint8_t _machine, const int _scope)
 	{
+		// A machine the OS has: any other is no machine to the engine
 		const auto& machines = m_engine->machines();
 		const auto info = std::find_if(machines.begin(), machines.end(),
 			[&](const md::engine::MachineInfo& _m) { return _m.id == _machine; });
 		if(info == machines.end())
 			return;
-		// As the OS: the Kit takes the machine and its SYN1-8 defaults, the voice switches at its next Hit
+		// As the OS: the Kit takes the whole machine word and the defaults its scope sets, the voice switches at its
+		// next Hit
 		m_kit.machines[_track] = _machine;
 		m_engine->setMachine(_track, _machine);
-		for(uint8_t parameter = 0; parameter < 8; ++parameter)
-		{
-			m_kit.parameters[_track][parameter] = info->defaults[parameter];
-			m_engine->setParam(_track, parameter, info->defaults[parameter]);
-		}
+		m_kit.parameters[_track] = Engine::machineDefaults(*info, m_kit, _track, _scope);
+		for(uint8_t parameter = 0; parameter < Engine::ParamCount; ++parameter)
+			m_engine->setParam(_track, parameter, m_kit.parameters[_track][parameter]);
 		m_machinesToReport = static_cast<uint16_t>(m_machinesToReport | 1u << _track);
 	}
 
 	void Device::reportMachines(std::vector<synthLib::SMidiEvent>& _midiOut)
 	{
+		// The 24 parameters as CCs, the synthesis, effects and routing pages: the Controller takes the changed ones
 		for(uint8_t track = 0; track < Engine::TrackCount && m_machinesToReport; ++track)
 		{
 			if(!(m_machinesToReport & (1u << track)))
 				continue;
-			for(uint8_t parameter = 0; parameter < 8; ++parameter)
+			for(uint8_t parameter = 0; parameter < Engine::ParamCount; ++parameter)
 			{
-				const auto cc = md::automation::encodeParameterChange(g_model,
-					{machinedrum::Synthesis, track, parameter, m_kit.parameters[track][parameter]}, 0);
+				const auto cc = md::automation::encodeParameterChange(g_model, {static_cast<uint8_t>(parameter / 8),
+					track, static_cast<uint8_t>(parameter % 8), m_kit.parameters[track][parameter]}, 0);
 				if(cc)
 					_midiOut.emplace_back(synthLib::MidiEventSource::Device, (*cc)[0], (*cc)[1], (*cc)[2]);
 			}

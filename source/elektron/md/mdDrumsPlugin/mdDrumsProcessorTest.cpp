@@ -188,7 +188,8 @@ namespace
 	// The Kits (ticket 26): a Slot loaded reaches the Device as one dump, the parameters follow it, the mixer stays and it
 	// is the Kit played; a parameter changed makes it differ from its Slot; the plug-in's state brings back its Slot; a
 	// new name reaches the Device; a Link and a Choke reach the Device and the state (ticket 29); a machine changed gives
-	// its SYN1-8 the machine's values. The host reads the values again after a Kit or a machine, with no edit.
+	// the 24 parameters ASSIGN MACHINE sets their values. The host reads the values again after a Kit or a machine, with
+	// no edit.
 	void kits(mdDrums::Processor& _processor)
 	{
 		auto& controller = _processor.controller();
@@ -254,7 +255,14 @@ namespace
 		HostWatch watch(_processor);
 		automate(_processor, "Machine", 0, kit.machine(0) == 17 ? 16 : 17);
 		require(syn1.getUnnormalizedValue() != syn1Before, "SYN1 did not take the new machine's value");
-		require(watch.edits == 0 && watch.rereads > 0, "a machine's SYN1-8 did not reach the host as a re-read, but as "
+		const auto& names = mdDrums::Engine::paramNames();
+		for(size_t p = 8; p < names.size(); ++p)
+		{
+			const auto os = p < 16 ? mdDrums::Engine::OsEffects[p - 8] : mdDrums::Engine::OsRouting[p - 16];
+			require(parameter(_processor, names[p], 0).getUnnormalizedValue() == os,
+				std::string(names[p]) + " did not take the OS's default with the new machine");
+		}
+		require(watch.edits == 0 && watch.rereads > 0, "a machine's parameters did not reach the host as a re-read, but as "
 			+ std::to_string(watch.edits) + " edits");
 		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
 			" the state; renamed; a Link and a Choke to the Device and the state; a machine change: SYN1 %d to %d, %d"

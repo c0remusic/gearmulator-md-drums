@@ -205,6 +205,9 @@ mesurées avant et après. Pas de tag.
 - [Où une Choke coupe](issues/38-coupe-de-choke.md) : `HostModel` dit les Tracks frappées et les coupes de chaque bloc,
   le moteur aligne ses voies ; la cible s'arrête exactement là où sonne le Hit qui coupe (une Track plus basse au tick
   suivant, sans trou), Choke d'un Link comprise ; latence inchangée.
+- [Changement de machine comme l'OS](issues/39-changement-de-machine-comme-l-os.md) : `$5B` remet les 24 paramètres
+  (SYN1-8, effets, routage, tables de l'OS lues dans l'image) et en renvoie 24 CC ; `$62` hors plage ignoré, champs 5-7
+  (LFOS, LFOD, LFOM) ; mot de machine entier ; une seule liste de machines, celle de l'OS.
 
 ## Not yet specified
 

@@ -16,7 +16,7 @@ namespace mdDrums
 	// MD Drums' host parameters (parameterDescriptions_mddrums.json) over its Device. A change from the host, the
 	// editor or MIDI Learn is published to the parameter's atomic slot, from any thread, and sent as the Machinedrum's
 	// message (messages::parameterMessage) at the start of the next audio block, without locking or allocating. What
-	// the Device changes itself, a new machine's SYN1-8, and a loaded state come back as parameter values without
+	// the Device changes itself, a new machine's 24 parameters, and a loaded state come back as parameter values without
 	// echoing to the Device.
 	class Controller final : public pluginLib::Controller
 	{
@@ -86,7 +86,7 @@ namespace mdDrums
 		// The relays, on the message thread (the Controller's timer does it): the Track the relay Track asked for shown;
 		// what a relay was set to given to its parameter of the Track shown; the relays set to what the Track shown holds.
 		// The host learns the relays as edits, without a gesture, when the Track shown changes; a relay that follows its
-		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's SYN1-8 it
+		// parameter, and a parameter that follows its relay, it does not learn; a Kit, a state and a machine's parameters it
 		// reads again, once (ticket 34).
 		void syncRelays();
 		// For Live in Configure mode, which adds the parameters the plug-in moves to the device's list in that order, each
