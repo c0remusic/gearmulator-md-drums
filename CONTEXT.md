@@ -25,6 +25,10 @@ _Avoid_: voice, part, channel
 The synthesis engine a Track plays, such as EFM-BD or TRX-SD.
 _Avoid_: model, instrument
 
+**Sample**:
+The audio one of the 48 ROM Machines (ROM-01 to ROM-48) plays, named by its Machine: ROM-33's Sample.
+_Avoid_: slot (a Bank's place), user wave, ROM slot
+
 **Hit**:
 One trigger of a Track and the sound it makes.
 _Avoid_: note, trig (the firmware sequencer's word)
