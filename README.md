@@ -1,10 +1,13 @@
 # MD Drums
 
+> **MD Drums has moved to [c0remusic/MModule](https://github.com/c0remusic/MModule)**: new releases, issues and the
+> source live there from 0.1.1 on. This repository keeps release 0.1.0 and the history up to the move.
+
 The Elektron Machinedrum's own synthesis engines as a VST3 instrument, edited like Overbridge and played from your DAW.
 
 ![MD Drums in Ableton Live 12: the Track tab, factory Kit 1 playing](docs/images/md-drums-track.png)
 
-**[Download the preview](https://github.com/c0remusic/gearmulator-md-drums/releases)** · [Report a bug](https://github.com/c0remusic/gearmulator-md-drums/issues)
+**[Download the preview](https://github.com/c0remusic/MModule/releases)** · [Report a bug](https://github.com/c0remusic/MModule/issues)
 
 MD Drums runs the code of the Machinedrum's OS 1.63 machines on emulated DSPs: the voice DSP for the 16 tracks, and
 the mixer DSP for the master effects. The Machinedrum's OS and sequencer stay out, so it uses about a tenth of the CPU
