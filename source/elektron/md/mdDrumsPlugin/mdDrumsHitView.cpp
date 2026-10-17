@@ -240,7 +240,7 @@ namespace mdDrums
 			m_soundChanged = false;
 			requestPreview();
 		}
-		if(m_client.take(m_result) && m_requested && m_result.id == m_requested)
+		if(m_requested && m_client.take(m_result) && m_result.id == m_requested)
 		{
 			m_requested = 0;
 			if(m_result.capture.id)
@@ -268,13 +268,15 @@ namespace mdDrums
 			wrote = true;
 		}
 
-		auto text = m_showPreview ? "Preview, velocity " + std::to_string(m_preview.velocity)
-			: m_current.id ? "Last hit, velocity " + std::to_string(m_current.velocity) : std::string("Not played yet");
-		if(text != m_noteText)
+		// The note: the preview's velocity, the last Hit's, or nothing played yet
+		const auto says = m_showPreview ? 2 : m_current.id ? 1 : 0;
+		const std::pair<int, int> noteKey{says, says == 2 ? m_preview.velocity : says ? m_current.velocity : 0};
+		if(noteKey != m_noteKey)
 		{
-			m_noteText = std::move(text);
-			if(auto* note = find("hit_note"))
-				note->SetInnerRML(m_noteText);
+			m_noteKey = noteKey;
+			const auto velocity = std::to_string(noteKey.second);
+			setText(find("hit_note"), says == 2 ? "Preview, velocity " + velocity
+				: says ? "Last hit, velocity " + velocity : std::string("Not played yet"));
 			wrote = true;
 		}
 
@@ -307,14 +309,13 @@ namespace mdDrums
 			if(!tick)
 				continue;
 			const auto ms = i * step;
-			if(ms >= m_window * 1000.0 - 1.0)
-			{
-				tick->SetProperty("display", "none");
+			const bool shown = ms < m_window * 1000.0 - 1.0;
+			setDisplay(tick, shown);
+			if(!shown)
 				continue;
-			}
-			tick->SetInnerRML(i ? std::to_string(static_cast<int>(ms)) + " ms" : std::string("0"));
-			tick->SetProperty("left", dp(g_plotLeft + ms / 1000.0 / m_window * plotWidth + 4.0));
-			tick->SetProperty("display", "block");
+			setText(tick, i ? std::to_string(static_cast<int>(ms)) + " ms" : std::string("0"));
+			const auto left = g_plotLeft + ms / 1000.0 / m_window * plotWidth + 4.0;
+			setDp(tick, Rml::PropertyId::Left, static_cast<float>(left));
 		}
 	}
 

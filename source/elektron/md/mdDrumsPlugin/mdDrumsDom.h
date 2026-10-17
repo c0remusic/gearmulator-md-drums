@@ -5,7 +5,6 @@
 #include "RmlUi/Core/Element.h"
 
 #include <cstdio>
-#include <cstring>
 #include <string>
 
 namespace mdDrums
@@ -29,18 +28,27 @@ namespace mdDrums
 		return text;
 	}
 
-	// Shows _element with the display _shown ("block", "inline", "inline-block") or hides it; nothing without an
-	// element. Only a change is written: setting display, even to its value, lays the whole document out again.
-	// True when it wrote
-	inline bool setDisplay(Rml::Element* _element, const bool _visible, const char* _shown = "block")
+	// Shows _element with the display _shown or hides it; nothing without an element. Only a change is written:
+	// setting display, even to its value, lays the whole document out again. True when it wrote
+	inline bool setDisplay(Rml::Element* _element, const bool _visible,
+		const Rml::Style::Display _shown = Rml::Style::Display::Block)
 	{
-		if(!_element)
-			return false;
-		using Display = Rml::Style::Display;
-		const auto shown = std::strcmp(_shown, "inline") == 0 ? Display::Inline
-			: std::strcmp(_shown, "inline-block") == 0 ? Display::InlineBlock : Display::Block;
-		return juceRmlUi::helper::changeProperty(_element, Rml::PropertyId::Display,
-			Rml::Property(_visible ? shown : Display::None));
+		return _element && juceRmlUi::helper::changeProperty(_element, Rml::PropertyId::Display,
+			Rml::Property(_visible ? _shown : Rml::Style::Display::None));
+	}
+
+	// A length in dp, written only when it differs. True when it wrote
+	inline bool setDp(Rml::Element* _element, const Rml::PropertyId _property, const float _value)
+	{
+		return _element && juceRmlUi::helper::changeProperty(_element, _property, Rml::Property(_value, Rml::Unit::DP));
+	}
+
+	// A wheel step's direction, -1, 0 or 1: the vertical delta, else the horizontal one (Shift turns some wheels)
+	inline int wheelSign(const Rml::Event& _event)
+	{
+		const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
+		const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
+		return (delta > 0.0f) - (delta < 0.0f);
 	}
 
 	// _element's RML, written only when it differs: SetInnerRML builds the children again. True when it wrote

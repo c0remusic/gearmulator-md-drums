@@ -4,35 +4,32 @@
 // The filter and EQ response (mdDrumsFilterResponse.*): where its edges, its peak and its EQ fall, and what a measure
 // costs.
 
-#include "mdDrumsEngine.h"
 #include "mdDrumsFilterResponse.h"
 #include "mdDrumsLfo.h"
 
 #include "Firmware.h"
 #include "MdEngine.h"
 
+#include "mdDrumsTestSupport.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <iostream>
+#include <memory>
 #include <optional>
-#include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace
 {
-	void require(const bool _condition, const char* const _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::test::require;
 
-	// OS 1.63's addresses (md::engine::HostModel)
+	// OS 1.63's addresses (md::engine::HostModel), for what HostModel does not give: what the voices get after the
+	// LFOs is host.voiceParams
 	constexpr uint32_t g_lfo = 0x1000f8c;			// 16 LFO structs of $24 bytes
 	constexpr uint32_t g_work = 0x1000a4c;			// the smoothed parameters: 16 Tracks of $30 bytes, a word each
-	constexpr uint32_t g_voice = 0x10011cc;		// the same after the LFOs: what the voices get
 	constexpr uint32_t g_tempo = 0x100150c;		// BPM x 24
 	constexpr uint32_t g_trackStride = 0x30;
 	constexpr int g_blocksPerTick = 11;
@@ -64,12 +61,10 @@ namespace
 	// Track 1's LFO on Track 2's FLTF in the engine, every pair of shapes in every mode, the speed on both sides of
 	// $1fff, the depth, the mix and the destination moving, the tempo changing, Hits now and then (between ticks and on
 	// them): after each block, the port from the block's start against the engine's memory.
-	void lfoBitExact(const std::vector<uint8_t>& _flash)
+	void lfoBitExact(md::engine::Engine& _engine)
 	{
-		auto os = md::fw::loadFirmwareFromFlash(_flash);
-		md::engine::Engine engine(os.firmware, std::move(os.osImage));
-		auto& host = engine.host();
-		const auto& memory = engine.os();
+		auto& host = _engine.host();
+		const auto& memory = _engine.os();
 		// The RND generator seeded, as a Kit's LFO block does
 		std::array<uint8_t, md::engine::HostModel<>::kLfoBytes> block{};
 		block[0x18] = 0x12; block[0x19] = 0x34; block[0x1a] = 0x56; block[0x1b] = 0x78;
@@ -106,13 +101,13 @@ namespace
 						}
 						const bool ticking = blocks % g_blocksPerTick == 0;
 						auto expected = lfoState(memory, 0);
-						const auto speed = word(memory, g_voice, 0, 21);
+						const auto speed = host.voiceParams(0)[21];
 						const auto tempo = static_cast<int32_t>(memory.peek32(g_tempo));
 						const auto before = std::array<uint16_t, 3>{word(memory, g_work, 1, destination),
 							word(memory, g_work, 0, 23), word(memory, g_work, 0, 22)};
 
 						md::engine::Engine::Output out;
-						require(engine.render(out), "the engine faulted");
+						require(_engine.render(out), "the engine faulted");
 
 						// The Hit first (the tick's voice loop, or the Hit's own update between ticks): the waveform routine,
 						// then this LFO's apply alone, into the voices' array
@@ -133,17 +128,17 @@ namespace
 						}
 						else
 						{
-							written = atHit ? *atHit : word(memory, g_voice, 1, destination);
+							written = atHit ? *atHit : host.voiceParams(1)[destination];
 						}
 						const auto actual = lfoState(memory, 0);
-						if(!same(expected, actual) || written != word(memory, g_voice, 1, destination))
+						if(!same(expected, actual) || written != host.voiceParams(1)[destination])
 						{
 							if(differ < 5)
 								std::printf("  differs: shapes %d/%d type %d, block %d%s%s: phase %d/%d, current %d %d/%d %d, held %d %d/%d %d,"
 									" destination %d/%d\n", shape1, shape2, type, b, ticking ? ", a tick" : "", hit ? ", a Hit" : "",
 									expected.phase, actual.phase, expected.current[0], expected.current[1], actual.current[0],
 									actual.current[1], expected.held[0], expected.held[1], actual.held[0], actual.held[1], written,
-									word(memory, g_voice, 1, destination));
+									host.voiceParams(1)[destination]);
 							++differ;
 						}
 					}
@@ -261,16 +256,15 @@ namespace
 		return 20.0 * std::log10(2.0 * std::sqrt(i * i + q * q) / measure / amplitude);
 	}
 
-	void filterResponse(const std::vector<uint8_t>& _flash)
+	// On the OS's tables, which an engine shares (EngineT::tables) and Engine::fxTables gives the editor
+	void filterResponse(const std::shared_ptr<const md::engine::TrackFx::Tables>& _tables)
 	{
-		mdDrums::Engine engine(_flash);
-		const auto tables = engine.fxTables();
-		mdDrums::FilterResponse response(tables);
+		mdDrums::FilterResponse response(_tables);
 
 		// The response against the chain playing sines, both from an untouched Track's at 1 kHz, from 20 Hz to 20 kHz
 		// wherever the response is above -40 dB (the screen shows down to -29 dB; lower, the fixed-point recursions' own
 		// rounding parts from the linear response)
-		const auto reference = played(tables, {}, 1000.0);
+		const auto reference = played(_tables, {}, 1000.0);
 		const std::vector<mdDrums::FilterResponse::Settings> cases{{}, {64, 64, 0, 32, 0}, {64, 64, 64, 127, 0},
 			{64, 64, 64, 127, 127}, {64, 64, 32, 40, 64}, {64, 127, 0, 127, 0}, {0, 0, 0, 127, 0}, {127, 127, 0, 127, 0},
 			{100, 20, 20, 60, 100}, {10, 120, 2, 125, 30}, {64, 64, 127, 0, 127}};
@@ -284,7 +278,7 @@ namespace
 			{
 				if(response.gain(hz) < -40.0)
 					continue;
-				const auto chain = played(tables, settings, hz) - reference;
+				const auto chain = played(_tables, settings, hz) - reference;
 				if(std::abs(response.gain(hz) - chain) > 0.1)
 					std::printf("    %.0f Hz: computed %.3f, the chain %.3f\n", hz, response.gain(hz), chain);
 				caseWorst = std::max(caseWorst, std::abs(response.gain(hz) - chain));
@@ -364,24 +358,13 @@ namespace
 
 int main()
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
+	return mdDrums::test::run("mdDrumsScreensTest", [](const std::vector<uint8_t>& _flash)
 	{
-		std::cout << "mdDrumsScreensTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	try
-	{
-		lfoBitExact(flash);
+		// mdEngine's own engine: the LFO runs in its OS, the response on the tables it shares
+		auto os = md::fw::loadFirmwareFromFlash(_flash);
+		md::engine::Engine engine(os.firmware, std::move(os.osImage));
+		lfoBitExact(engine);
 		lfoTraces();
-		filterResponse(flash);
-	}
-	catch(const std::exception& _error)
-	{
-		std::cout << "mdDrumsScreensTest: FAIL: " << _error.what() << "\n";
-		return 1;
-	}
-	std::cout << "mdDrumsScreensTest: PASS\n";
-	return 0;
+		filterResponse(engine.tables());
+	});
 }

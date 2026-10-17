@@ -2,6 +2,9 @@
 
 #include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdkit.h"
+#include "mdProtocol/mdkitchange.h"
+
+#include "synthLib/midiTypes.h"
 
 #include <array>
 #include <bitset>
@@ -55,13 +58,14 @@ namespace mdDrums::messages
 	};
 
 	// A message built without allocating, for the audio thread: a CC in its first three bytes, or SysEx
-	struct Raw
+	using Raw = md::automation::sysex::RawMessage;
+	// A message as the event the Device takes from the editor, without allocating (SMidiEvent's inline SysEx)
+	inline synthLib::SMidiEvent toEvent(const Raw& _message)
 	{
-		std::array<uint8_t, 32> bytes{};
-		uint8_t size = 0;
-
-		Message message() const { return Message(bytes.begin(), bytes.begin() + size); }
-	};
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.assignRawData(_message.bytes.data(), _message.size, synthLib::MidiEventSource::Editor, 0);
+		return event;
+	}
 
 	Raw solo(uint8_t _track, bool _on);
 	Raw out(uint8_t _track, uint8_t _out);	// _out: 0 Main, 1-15 Out 01-15

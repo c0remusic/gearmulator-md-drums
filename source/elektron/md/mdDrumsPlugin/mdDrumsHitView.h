@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace juce
@@ -125,7 +126,7 @@ namespace mdDrums
 		Fitted m_previousFit;
 		Fitted m_previewFit;
 		double m_window = 0.1;
-		std::string m_noteText;	// the screen's note as last written
+		std::pair<int, int> m_noteKey{-1, -1};	// the screen's note as last written: what it says, a velocity
 		double m_lastGrowthMs = 0.0;
 		bool m_playing = false;
 

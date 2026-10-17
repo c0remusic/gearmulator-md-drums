@@ -42,8 +42,6 @@ namespace md::engine
 			{0x20b940, 0x20ba4c, 0x1001b74, 0x185, 8},	// Gate Box
 		};
 		constexpr uint16_t kRts = 0x4e75;
-
-		bool isAudioMachine(const uint8_t _id) { return !(_id >= 0x60 && _id <= 0x7b); }	// MID/CTR: no audio
 	}
 
 	template<class TVoices>

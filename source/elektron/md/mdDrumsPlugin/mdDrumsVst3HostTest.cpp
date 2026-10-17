@@ -13,8 +13,6 @@
 
 #include "mdDrumsHostDriver.h"
 
-#include "mdProtocol/mdkitchange.h"
-
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -54,18 +52,16 @@ namespace
 	constexpr int g_parameters = 608;	// 16 Tracks of 34, the 32 master effects, the 32 relays for Push 2
 	constexpr int g_relays = mdDrums::hostDriver::Host::Relays;	// the first relay: those follow the Track shown
 	constexpr int g_latency = 83;		// what the plug-in reports at 44.1 kHz: every Hit's, on Main and the Outs
-	constexpr float g_silence = 1e-5f;	// Main keeps a tail of a few LSB after a Hit (EQ and Dynamix)
 	constexpr float g_sound = 1e-3f;
 
 	// The VST3 class's ID as JUCE's hosting hashes it (PluginDescription::uniqueId), from the codes C0rm and Mddr: Live
 	// finds MD Drums in a set by it
 	constexpr int g_classHash = static_cast<int>(0xbeaa512fu);
 
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::hostDriver::g_silence;	// Main keeps a tail of a few LSB after a Hit (EQ and Dynamix)
+	using mdDrums::hostDriver::mainPeak;
+	using mdDrums::hostDriver::peak;
+	using mdDrums::hostDriver::require;
 
 	void pump(const int _milliseconds)
 	{
@@ -401,18 +397,6 @@ namespace
 		return notes;
 	}
 
-	float peak(const juce::AudioBuffer<float>& _audio, const int _channel, const int64_t _from, const int64_t _length)
-	{
-		const auto length = std::min<int64_t>(_length, _audio.getNumSamples() - _from);
-		return _audio.getMagnitude(_channel, static_cast<int>(_from), static_cast<int>(length));
-	}
-
-	// Main's peak, its two channels together
-	float mainPeak(const juce::AudioBuffer<float>& _audio, const int64_t _from, const int64_t _length)
-	{
-		return std::max(peak(_audio, 0, _from, _length), peak(_audio, 1, _from, _length));
-	}
-
 	// The Out parameter's value for Main (0) or Out 01-15, normalised
 	float outValue(const int _out)
 	{
@@ -656,43 +640,31 @@ namespace
 				std::printf("While the host automated SYN1 (Track 1, shown), Level (Track 7) and Echo TIME, it told %s\n",
 					instance->told.summary(ids).c_str());
 				require(instance->told.edited(ids).empty(), "MD Drums told the host an edit while it automated");
-				instance->host->automate(syn1, kept[0]);
-				instance->host->automate(level, kept[1]);
-				instance->host->automate(echo, kept[2]);
+				instance->host->automate({{syn1, kept[0]}, {level, kept[1]}, {echo, kept[2]}});
 			}
+			// The effects and routing pages the host reads after it are OS 1.63's (hostDriver::machineChange)
 			mdDrums::hostDriver::machineChange(*instance->host, 2, 32);
 			std::printf("The host set Track 3's machine to EFM-BD: told %s\n", instance->told.summary(ids).c_str());
 			require(instance->told.has(ids.index("SYN1", 2)) && instance->told.has(ids.index("SYN8", 2)),
 				"a new machine's SYN1-8 did not reach the host as a re-read");
-			{
-				// The effects and routing pages OS 1.63 gives every machine but MID and CTR (sysex::os163)
-				namespace os163 = md::automation::sysex::os163;
-				constexpr std::array<const char*, 16> names{"AMD", "AMF", "EQF", "EQG", "FLTF", "FLTW", "FLTQ", "SRR",
-					"DIST", "VOL", "PAN", "DEL", "REV", "LFOS", "LFOD", "LFOM"};
-				for(size_t p = 0; p < names.size(); ++p)
-				{
-					const auto* name = names[p];
-					const int value = p < 8 ? os163::Effects[p] : os163::Routing[p - 8];
-					const auto read = std::lround(instance->parameter(ids.index(name, 2)).getValue() * 127.0f);
-					require(read == value, std::string("the host reads Track 3's ") + name + " at "
-						+ std::to_string(read) + " after a new machine, not the OS's " + std::to_string(value));
-				}
-			}
 
 			// The relay Track set by the host (Push 2's first encoder): Track 6 shown, the relays reaching the host as edits,
 			// none of the Track parameters
 			mdDrums::hostDriver::relayTrack(*instance->host, 5);
 			std::printf("The host showed Track 6 through the relay Track: told %s\n", instance->told.summary(ids).c_str());
 			mdDrums::hostDriver::shownParameter(*instance->host, 5, "FLTF", 99);
-			instance->host->automate(ids.index("FocusTrack"), 0.0f);
 
 			// The Outs (ticket 33), the host taking the 15: Track n on Out n, Track 16 on Out 15 with Track 15, each Out's
-			// channel the bus's
+			// channel the bus's; Track 1 shown again with them
 			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
 			require(plugin.getTotalNumOutputChannels() == 2 + g_outs, "Main and 15 Outs are not 17 channels");
 			const auto naturalOut = [](const int _track) { return std::min(_track + 1, g_outs); };
-			for(int track = 0; track < g_tracks; ++track)
-				instance->host->automate(ids.index("Out", track), outValue(naturalOut(track)));
+			{
+				std::vector<std::pair<int, float>> values{{ids.index("FocusTrack"), 0.0f}};
+				for(int track = 0; track < g_tracks; ++track)
+					values.emplace_back(ids.index("Out", track), outValue(naturalOut(track)));
+				instance->host->automate(values);
+			}
 			{
 				const auto spacing = std::llround(0.25 * g_rate);
 				const auto take = render(plugin, eachTrack(spacing, spacing), spacing * 18);
@@ -725,16 +697,20 @@ namespace
 					&& mainPeak(take, spacing * 3, spacing) < g_silence,
 					"Track 5 sounds although on an Out the host left");
 			}
-			for(int track = 1; track < g_tracks; ++track)
-				instance->host->automate(ids.index("Out", track), 0.0f);
+			{
+				std::vector<std::pair<int, float>> values;
+				for(int track = 1; track < g_tracks; ++track)
+					values.emplace_back(ids.index("Out", track), 0.0f);
+				instance->host->automate(values);
+			}
 			instance->outs({});
 
 			// The state through IComponent. Restored where it was saved, nothing changes, so that whatever reaches the host
 			// comes from the plug-in (JUCE's hosting reads every value again after a state, and its listeners hear those
 			// that differ): no parameter of its own
 			// On the plug-in's steps: it rounds the host's value
-			instance->host->automate(ids.index("Level", 1), 32.0f / 127.0f);
-			instance->host->automate(ids.index("EchoTIME"), 64.0f / 127.0f);
+			instance->host->automate({{ids.index("Level", 1), 32.0f / 127.0f},
+				{ids.index("EchoTIME"), 64.0f / 127.0f}});
 			juce::MemoryBlock saved;
 			plugin.getStateInformation(saved);
 			mdDrums::hostDriver::stateRestored(*instance->host);
@@ -768,8 +744,8 @@ namespace
 			auto instance = load(formats, description, ids);
 			auto& plugin = *instance->plugin;
 			instance->outs({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});
-			for(const int track : {0, 2, 6})
-				instance->host->automate(ids.index("Out", track), outValue(track + 1));
+			instance->host->automate({{ids.index("Out", 0), outValue(1)}, {ids.index("Out", 2), outValue(3)},
+				{ids.index("Out", 6), outValue(7)}});
 			render(plugin, {}, g_rate);
 			const auto beats = [&](const char* _name, const int _bars, const std::vector<int>& _tracks,
 				const std::vector<int>& _locked, const int _offbeat, const bool _channelOne = false)
@@ -980,14 +956,7 @@ int main(const int _argc, char* _argv[])
 	}
 
 	// The plug-in's data folder (its config, Bank.syx) in a folder of this run, never the user's
-	const auto dataRoot = std::filesystem::temp_directory_path()
-		/ ("MDDrumsVst3HostTest_" + std::to_string(Clock::now().time_since_epoch().count()));
-	std::filesystem::create_directories(dataRoot);
-#if JUCE_WINDOWS
-	_putenv_s("GEARMULATOR_DATA_ROOT", dataRoot.string().c_str());
-#else
-	setenv("GEARMULATOR_DATA_ROOT", dataRoot.string().c_str(), 1);
-#endif
+	const mdDrums::hostDriver::ScopedDataRoot dataRoot("MDDrumsVst3HostTest_");
 
 	int result = 0;
 	{
@@ -1012,7 +981,5 @@ int main(const int _argc, char* _argv[])
 			}
 		}
 	}
-	std::error_code error;
-	std::filesystem::remove_all(dataRoot, error);
 	return result;
 }

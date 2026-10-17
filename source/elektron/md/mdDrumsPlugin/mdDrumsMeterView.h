@@ -85,6 +85,7 @@ namespace mdDrums
 		std::array<float, Telemetry::TrackCount> m_columnPeak{};	// the column being filled
 		double m_columnStartMs = 0.0;
 		int m_columns = 0;	// columns shifted so far, to know when the scopes moved
+		std::array<bool, Telemetry::TrackCount> m_silent{};	// a scope's history all silence, as of its last column
 
 		std::array<uint32_t, Telemetry::TrackCount> m_hits{};
 		std::array<double, Telemetry::TrackCount> m_litUntil{};

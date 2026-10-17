@@ -149,7 +149,7 @@ namespace
 	{
 		using Kind = sysex::KitChange::Kind;
 		using sysex::KitChange;
-		const auto bytes = [](const sysex::KitChangeMessage& _m) { return _m.message(); };
+		const auto bytes = [](const sysex::RawMessage& _m) { return _m.message(); };
 		const auto roundTrip = [&](const KitChange& _change)
 		{
 			const auto message = sysex::encodeKitChange(_change);

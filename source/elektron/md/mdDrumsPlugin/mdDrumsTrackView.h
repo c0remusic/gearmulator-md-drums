@@ -62,6 +62,8 @@ namespace mdDrums
 
 		Overlay getOverlay() const { return m_overlay; }
 		void setOverlay(Overlay _overlay);
+		// Opens _overlay, or closes it when it is the one open
+		void toggleOverlay(const Overlay _overlay) { setOverlay(m_overlay == _overlay ? Overlay::None : _overlay); }
 		// Esc: closes the open overlay, the browser as Cancel does; false when none is open
 		bool escape();
 
@@ -112,6 +114,9 @@ namespace mdDrums
 		Overlay m_overlay = Overlay::None;
 		int m_machineBeforeBrowser = -1;
 		std::vector<int> m_machines;	// the browser's, in its order
+		// Per Track, what shows it is the one shown: the list row's number and name ("tsel"), the strip's and the
+		// send's numbers ("on")
+		std::array<std::array<Rml::Element*, 4>, 16> m_shownMarks{};
 		float m_dragY = 0.0f;
 		int m_dragFrom = 0;
 

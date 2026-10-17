@@ -79,8 +79,9 @@ namespace mdDrums
 	protected:
 		// Nothing: process itself puts what the Device says back into its _midiOut (reportMachines)
 		void readMidiOut(std::vector<synthLib::SMidiEvent>&) override {}
-		void processAudio(const synthLib::TAudioInputs& _inputs, const synthLib::TAudioOutputs& _outputs, size_t _samples) override;
-		bool sendMidi(const synthLib::SMidiEvent& _ev, std::vector<synthLib::SMidiEvent>& _response) override;
+		// Nothing: process replaces the base's loop, the only caller of these two
+		void processAudio(const synthLib::TAudioInputs&, const synthLib::TAudioOutputs&, size_t) override {}
+		bool sendMidi(const synthLib::SMidiEvent&, std::vector<synthLib::SMidiEvent>&) override { return false; }
 
 	private:
 		void apply(const synthLib::SMidiEvent& _event);

@@ -5,6 +5,7 @@
 #include "Firmware.h"
 
 #include "mdProtocol/mdkit.h"
+#include "mdProtocol/mdmachines.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -198,6 +199,14 @@ namespace mdDrums
 		m_state->engine.host().setMaster(_index, _value);
 	}
 
+	std::string_view Engine::parameterName(const uint16_t _machine, const size_t _index)
+	{
+		if(_index < 8)
+			if(const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, _machine))
+				return (*names)[_index];
+		return paramNames()[_index];
+	}
+
 	const std::array<const char*, Engine::ParamCount>& Engine::paramNames()
 	{
 		static const std::array<const char*, ParamCount> names{
@@ -279,16 +288,7 @@ namespace mdDrums
 		: m_state(std::make_unique<State>(_os, _master))
 	{
 		m_state->engine.loadRomBank(_bank);
-		auto& host = m_state->engine.host();
-		for(int track = 0; track < TrackCount; ++track)
-		{
-			host.setMachine(track, defaultMachine(track));
-			for(int param = 8; param < ParamCount; ++param)
-				host.setParam(track, param, paramDefaults()[param]);
-			host.setLevel(track, DefaultLevel);
-		}
-		for(int index = 0; index < MasterCount; ++index)
-			host.setMaster(index, masterDefaults()[index]);
+		applyEngineDefaults(m_state->engine.host());
 	}
 
 	Engine::~Engine() = default;

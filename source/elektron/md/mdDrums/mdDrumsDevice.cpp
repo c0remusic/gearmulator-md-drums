@@ -2,7 +2,6 @@
 
 #include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdkitchange.h"
-#include "mdProtocol/mdsysexcodec.h"
 
 #include "synthLib/deviceException.h"
 
@@ -17,8 +16,6 @@ namespace mdDrums
 		namespace sysex = md::automation::sysex;
 		namespace machinedrum = md::automation::machinedrum;
 		constexpr auto g_model = md::MachineModel::Machinedrum;
-
-		constexpr uint8_t g_kitDump = 0x52;
 
 		// The Telemetry takes the engine's outputs and Tracks by their index
 		static_assert(Telemetry::OutputCount == Engine::OutputCount && Telemetry::TrackCount == Engine::TrackCount);
@@ -97,18 +94,6 @@ namespace mdDrums
 					std::fill_n(_outputs[channel] + done, _size - done, 0.0f);
 		}
 		reportMachines(_midiOut);
-	}
-
-	void Device::processAudio(const synthLib::TAudioInputs&, const synthLib::TAudioOutputs& _outputs, const size_t _samples)
-	{
-		render(_outputs, 0, _samples);
-		publishPlayed();
-	}
-
-	bool Device::sendMidi(const synthLib::SMidiEvent& _ev, std::vector<synthLib::SMidiEvent>&)
-	{
-		apply(_ev);
-		return true;
 	}
 
 	void Device::render(const synthLib::TAudioOutputs& _outputs, const size_t _offset, const size_t _count)
@@ -328,13 +313,10 @@ namespace mdDrums
 			applyChange(*change);
 			return;
 		}
-		if(s.size() > 6 && sysex::codec::hasHeader(g_model, s, g_kitDump))
+		if(auto kit = sysex::parseMdKit(s))
 		{
-			if(auto kit = sysex::parseMdKit(s))
-			{
-				m_kit = *kit;
-				applyKit();
-			}
+			m_kit = *kit;
+			applyKit();
 		}
 	}
 

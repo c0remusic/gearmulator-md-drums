@@ -9,20 +9,14 @@
 #include "mdDrumsAllocationCounter.h"	// a relay set by the host must not allocate (the audio thread sets it)
 #include "mdDrumsController.h"
 #include "mdDrumsDevice.h"
-#include "mdDrumsEditor.h"
 #include "mdDrumsHostDriver.h"
+#include "mdDrumsTestSupport.h"
 
-#include "jucePluginEditorLib/pluginEditorState.h"
-#include "juceRmlUi/juceRmlComponent.h"
-#include "juceRmlUi/rmlInterfaces.h"
-#include "mdProtocol/mdkitchange.h"
 #include "synthLib/plugin.h"
-
-#include "RmlUi/Core/Context.h"
-#include "RmlUi/Core/ElementDocument.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -32,16 +26,24 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace
 {
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::hostDriver::g_silence;
+	using mdDrums::hostDriver::mainPeak;
+	using mdDrums::hostDriver::Note;
+	using mdDrums::hostDriver::peak;
+	using mdDrums::hostDriver::require;
+	using mdDrums::testSupport::hostSets;
+	using mdDrums::testSupport::parameter;
+	using mdDrums::testSupport::prepare;
+	using mdDrums::testSupport::uiSets;
 
 	constexpr int g_block = 512;
+
+	// The relays for Push 2 come after the Tracks' parameters and the master effects
+	static_assert(static_cast<size_t>(mdDrums::hostDriver::Host::Relays) == mdDrums::Controller::ParameterCount);
 
 	// The processor as a host in process sees it (mdDrumsHostDriver.h), from its making to its end: what the plug-in
 	// tells the host by itself, as JUCE reports it in process. An edit is a parameter's listeners called, which JUCE's
@@ -101,72 +103,54 @@ namespace
 		int m_rereads = 0;
 	};
 
-	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
-	// silent below -100 dBFS rather than at 0
-	constexpr float g_silence = 1e-5f;
-
 	struct Result
 	{
 		int first = -1;		// host samples from the note to the first sample of Main above -100 dBFS
 		float peak = 0;		// Main
 		double energy = 0;
 		float outPeak = 0;	// Out 01, when the host enables it (channels 2 on)
+		float before = 0;	// Main in the block before the strike
 	};
 
-	void process(juce::AudioProcessor& _processor, juce::AudioBuffer<float>& _buffer, juce::MidiBuffer& _midi)
+	// A second of silence, then a second (in whole blocks) struck just before its first block: _notes in its MIDI, as a
+	// host gives them, and _strike, if any, playing a Track another way; the first sound is counted from sample _offset
+	// of that block
+	Result play(juce::AudioProcessor& _processor, const double _rate, const std::vector<Note>& _notes,
+		const std::function<void()>& _strike, const int _offset = 0)
 	{
-		_processor.processBlock(_buffer, _midi);
-		_midi.clear();
-	}
-
-	// A second of silence, then a second struck by _strike just before its first block: _strike gives that block's
-	// MIDI, as a host does, or plays a Track another way; the first sound is counted from sample _offset of the block
-	Result play(juce::AudioProcessor& _processor, const double _rate,
-		const std::function<void(juce::MidiBuffer&)>& _strike, const int _offset = 0)
-	{
-		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
-		juce::MidiBuffer midi;
-		const auto blocks = static_cast<int>(_rate / g_block);
-		for(int i = 0; i < blocks; ++i)
-			process(_processor, buffer, midi);
+		using mdDrums::hostDriver::render;
+		const auto second = static_cast<int64_t>(_rate / g_block) * g_block;
+		const auto silence = render(_processor, {}, second, g_block);
 		Result result;
-		int position = 0;
-		for(int i = 0; i < blocks; ++i)
+		result.before = mainPeak(silence, second - g_block, g_block);
+		const auto take = render(_processor, _notes, second, g_block, 0, nullptr, [&](const int64_t _position)
 		{
-			if(i == 0)
-				_strike(midi);
-			process(_processor, buffer, midi);
-			for(int s = 0; s < g_block; ++s)
-			{
-				const auto left = buffer.getSample(0, s), right = buffer.getSample(1, s);
-				const auto value = std::max(std::abs(left), std::abs(right));
-				if(result.first < 0 && value > g_silence)
-					result.first = position + s - _offset;
-				result.peak = std::max(result.peak, value);
-				result.energy += double(value) * value;
-				if(buffer.getNumChannels() > 2)
-					result.outPeak = std::max(result.outPeak, std::abs(buffer.getSample(2, s)));
-			}
-			position += g_block;
+			if(_position == 0 && _strike)
+				_strike();
+		});
+		for(int s = 0; s < static_cast<int>(second); ++s)
+		{
+			const auto value = std::max(std::abs(take.getSample(0, s)), std::abs(take.getSample(1, s)));
+			if(result.first < 0 && value > g_silence)
+				result.first = s - _offset;
+			result.energy += double(value) * value;
 		}
+		result.peak = mainPeak(take, 0, second);
+		if(take.getNumChannels() > 2)
+			result.outPeak = peak(take, 2, 0, second);
 		return result;
 	}
 
-	// A second of silence, then _note at sample _offset of a block, and a second after it
+	// A second of silence, then _note at sample _offset of a block, and a second from that block on
 	Result play(juce::AudioProcessor& _processor, const int _note, const int _offset, const double _rate)
 	{
-		return play(_processor, _rate, [&](juce::MidiBuffer& _midi)
-		{
-			_midi.addEvent(juce::MidiMessage::noteOn(1, _note, static_cast<juce::uint8>(100)), _offset);
-		}, _offset);
+		return play(_processor, _rate, {{_offset, _note, 100}}, {}, _offset);
 	}
 
 	// One block, then the Controller's pending messages, as its timer sends them
 	void block(mdDrums::Processor& _processor)
 	{
-		juce::AudioBuffer<float> buffer(_processor.getTotalNumOutputChannels(), g_block);
-		juce::MidiBuffer midi;
-		process(_processor, buffer, midi);
+		mdDrums::hostDriver::render(_processor, {}, g_block, g_block);
 		_processor.getController().processPendingMidiMessages();
 	}
 
@@ -185,19 +169,6 @@ namespace
 		juce::MemoryBlock state;
 		_processor.getStateInformation(state);
 		return restoredFrom(state);
-	}
-
-	pluginLib::Parameter& parameter(mdDrums::Processor& _processor, const std::string& _name, const uint8_t _part)
-	{
-		auto* p = _processor.getController().getParameter(_name, _part);
-		require(p != nullptr, "no parameter " + _name);
-		return *p;
-	}
-
-	// A value set as a host sets it, normalised
-	void hostSets(pluginLib::Parameter& _p, const int _value)
-	{
-		_p.setValue(_p.convertTo0to1(static_cast<float>(_value)));
 	}
 
 	// As a host automates: the value set on the parameter, then a block for the Controller to send it
@@ -248,11 +219,6 @@ namespace
 		automate(_processor, "FLTF", 2, kit.parameters[2][12] == 99 ? 98 : 99);
 		require(controller.playedKit() != kit, "a parameter changed does not make the Kit differ from its Slot");
 
-		const auto restored = restoredFrom(_processor);
-		const auto& restoredController = restored->controller();
-		require(restoredController.playedSlot() == 3 && restoredController.playedKit() == controller.playedKit(),
-			"the state did not bring back the Kit played and its Slot");
-
 		controller.renameKit("RENAMED");
 		block(_processor);
 		require(device(_processor).kit().displayName() == "RENAMED" && controller.playedKit().displayName() == "RENAMED",
@@ -271,10 +237,14 @@ namespace
 			&& device(_processor).kit().links[1] == mdDrums::Controller::Off, "a Track linked to itself is not Off");
 		require(controller.playedKit() != linkedKit && controller.playedKit().links[0] == 4,
 			"a Link does not make the Kit played differ");
+		// The state, once for the parameter changed, the name and the Link and Choke: the Kit played (all of them) and
+		// its Slot come back, and the Device plays the Link
 		{
-			const auto restoredLinks = restoredFrom(_processor);
-			const auto& c = restoredLinks->controller();
-			require(c.link(0) == 4 && c.choke(0) == 2 && device(*restoredLinks).kit().links[0] == 4,
+			const auto restored = restoredFrom(_processor);
+			const auto& c = restored->controller();
+			require(c.playedSlot() == 3 && c.playedKit() == controller.playedKit(),
+				"the state did not bring back the Kit played and its Slot");
+			require(c.link(0) == 4 && c.choke(0) == 2 && device(*restored).kit().links[0] == 4,
 				"the state did not keep a Link and a Choke");
 		}
 		controller.setLink(0, mdDrums::Controller::Off);
@@ -286,16 +256,9 @@ namespace
 		auto& syn1 = parameter(_processor, "SYN1", 0);
 		const auto syn1Before = syn1.getUnnormalizedValue();
 		HostWatch watch(_processor);
+		// The effects and routing pages take OS 1.63's defaults with it (hostDriver::machineChange)
 		mdDrums::hostDriver::machineChange(watch, 0, kit.machine(0) == 17 ? 16 : 17);
 		require(syn1.getUnnormalizedValue() != syn1Before, "SYN1 did not take the new machine's value");
-		const auto& names = mdDrums::Engine::paramNames();
-		for(size_t p = 8; p < names.size(); ++p)
-		{
-			namespace os163 = md::automation::sysex::os163;
-			const auto os = p < 16 ? os163::Effects[p - 8] : os163::Routing[p - 16];
-			require(parameter(_processor, names[p], 0).getUnnormalizedValue() == os,
-				std::string(names[p]) + " did not take the OS's default with the new machine");
-		}
 		std::printf("kits: Slot 04 %s loaded as one dump, parameters and Device following, mixer kept; Slot and Kit back from"
 			" the state; renamed; a Link and a Choke to the Device and the state; a machine change: SYN1 %d to %d, %d"
 			" re-reads and no edit\n", kit.displayName().c_str(), syn1Before, syn1.getUnnormalizedValue(),
@@ -309,9 +272,8 @@ namespace
 	{
 		namespace pages = mdDrums::messages::pages;
 		mdDrums::Processor processor(true);
+		require(prepare(processor, 44100.0, g_block), "no Device");
 		auto& host = static_cast<juce::AudioProcessor&>(processor);
-		host.setRateAndBufferSizeDetails(44100.0, g_block);
-		host.prepareToPlay(44100.0, g_block);
 		// Another value in the parameter's range; another machine the OS has for Machine
 		const auto another = [](const pluginLib::Parameter& _p)
 		{
@@ -368,17 +330,11 @@ namespace
 		std::string text;
 		{
 			mdDrums::Processor processor(true);
-			auto& host = static_cast<juce::AudioProcessor&>(processor);
-			host.setRateAndBufferSizeDetails(44100.0, g_block);
-			host.prepareToPlay(44100.0, g_block);
-			juce::AudioBuffer<float> buffer(host.getTotalNumOutputChannels(), g_block);
-			juce::MidiBuffer midi;
+			require(prepare(processor, 44100.0, g_block), "no Device");
+			std::vector<Note> hello;
 			for(int note = 0; note < mdDrums::Device::HelloNotes; ++note)
-			{
-				const auto velocity = mdDrums::Device::helloVelocity(id, note);
-				midi.addEvent(juce::MidiMessage::noteOn(1, mdDrums::Device::FirstHelloNote + note, velocity), 10);
-			}
-			process(host, buffer, midi);
+				hello.push_back({10, mdDrums::Device::FirstHelloNote + note, mdDrums::Device::helloVelocity(id, note)});
+			mdDrums::hostDriver::render(processor, hello, g_block, g_block);
 			processor.getController().processPendingMidiMessages();
 			std::ifstream in(file, std::ios::binary);
 			text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
@@ -459,34 +415,32 @@ namespace
 			std::printf("Push list, a page per Track: %zu parameters moved, from \"%s\" to \"%s\", %d gestures ended\n",
 				watch.begun.size(), host.getParameters()[expected.front()]->getName(64).toRawUTF8(),
 				host.getParameters()[expected.back()]->getName(64).toRawUTF8(), watch.ended);
-			require(watch.begun == expected && watch.ended == 128 && watch.edits().size() >= 128,
-				"Prepare Push list did not move the Tracks' 128 in order");
+			require(watch.begun == expected && watch.ended == static_cast<int>(expected.size())
+				&& watch.edits().size() >= expected.size(), "Prepare Push list did not move the Tracks' 128 in order");
 		}
 		// The relays' entry: the relays then the master effects
 		{
+			using mdDrums::Controller;
 			HostWatch watch(_processor);
 			controller.preparePushRelays();
-			bool ordered = watch.begun.size() == 64;
-			for(size_t i = 0; ordered && i < 64; ++i)
-				ordered = watch.begun[i] == static_cast<int>(i < 32 ? 576 + i : 544 + (i - 32));
+			constexpr auto relays = Controller::RelayCount;
+			constexpr auto entry = relays + Controller::MasterParameterCount;
+			constexpr auto master = Controller::TrackCount * Controller::TrackParameterCount;
+			bool ordered = watch.begun.size() == entry;
+			for(size_t i = 0; ordered && i < entry; ++i)
+			{
+				const auto index = i < relays ? mdDrums::hostDriver::Host::Relays + i : master + (i - relays);
+				ordered = watch.begun[i] == static_cast<int>(index);
+			}
 			std::printf("relays: FLTF set through its relay to %d; Track 6 shown by the relay Track, the relays"
 				" following (%zu edits); the relays' Push list moved %zu parameters in order (no allocation setting a"
 				" relay), %zu changes, %d gestures ended\n", set, shownEdits, watch.begun.size(), watch.edits().size(),
 				watch.ended);
-			require(ordered && watch.ended == 64 && watch.edits().size() >= 64,
+			require(ordered && watch.ended == static_cast<int>(entry) && watch.edits().size() >= entry,
 				"Prepare Push list (relays) did not move the 64 in order");
 		}
 		controller.setCurrentPart(0);
 		block(_processor);
-	}
-
-	void setEnvironment(const char* _name, const std::string& _value)
-	{
-#if defined(_MSC_VER)
-		_putenv_s(_name, _value.c_str());
-#else
-		setenv(_name, _value.c_str(), 1);
-#endif
 	}
 
 	// A flash image chosen in the editor (ticket 35), from where a tester without one stands: the stack's silent stand-in
@@ -503,20 +457,15 @@ namespace
 			std::printf("flash loader: no flash image on this PC, skipped\n");
 			return;
 		}
-		const auto root = std::filesystem::temp_directory_path() / ("MDDrumsFlash_" + juce::Uuid().toString().toStdString());
-		std::filesystem::create_directories(root);
+		const mdDrums::hostDriver::ScopedDataRoot data("MDDrumsFlash_");
+		const auto& root = data.path();
 		const auto chosen = root / "chosen.bin";
 		std::ofstream(chosen, std::ios::binary).write(reinterpret_cast<const char*>(flash.data()),
 			static_cast<std::streamsize>(flash.size()));
-		const auto* kept = std::getenv("GEARMULATOR_DATA_ROOT");
-		const std::string keptRoot = kept ? kept : "";
-		setEnvironment("GEARMULATOR_DATA_ROOT", root.string());
 		{
 			mdDrums::Processor processor(true);
+			require(prepare(processor, _rate, g_block), "no Device to start from");
 			juce::AudioProcessor& host = processor;
-			host.setRateAndBufferSizeDetails(_rate, g_block);
-			host.prepareToPlay(_rate, g_block);
-			require(processor.hasDevice(), "no Device to start from");
 			automate(processor, "Machine", 0, 32);
 			juce::MemoryBlock set;
 			host.getStateInformation(set);
@@ -554,31 +503,10 @@ namespace
 				wrong.filename().string().c_str(), refused.c_str(), written.parent_path().string().c_str(), hit.peak);
 			require(hit.peak > 0.01f, "note 36 is silent after the flash image was loaded");
 		}
-		setEnvironment("GEARMULATOR_DATA_ROOT", keptRoot);
-		std::error_code error;
-		std::filesystem::remove_all(root, error);
 	}
 
-	// The v22 skin opens, its document 1296 x 824 (mdDrumsSkinTest checks the skin view by view and every parameter's
-	// control)
-	void editor(mdDrums::Processor& _processor)
-	{
-		_processor.setForceSoftwareRendererForSession(true);
-		auto& state = _processor.getOrCreateEditorState();
-		require(state.getCurrentSkin().filename == "mdDrums.rml", "the default skin is " + state.getCurrentSkin().filename);
-		auto* editor = dynamic_cast<mdDrums::Editor*>(state.getEditor());
-		require(editor != nullptr, "the processor did not create the editor");
-		auto* component = editor->getRmlComponent();
-		require(component && component->getContext() && component->getDocument(), "the editor has no RmlUi document");
-		juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
-		component->getContext()->Update();
-		const auto size = component->getDocumentSize();
-		require(size.x == 1296 && size.y == 824, "the document is " + std::to_string(size.x) + "x" + std::to_string(size.y));
-		std::printf("editor: %dx%d, skin %s\n", static_cast<int>(size.x), static_cast<int>(size.y),
-			state.getCurrentSkin().filename.c_str());
-		_processor.destroyEditorState();
-	}
-
+	// Note to sound: two seconds from one note to the next (Main below -100 dBFS in the block before each). A second
+	// is not enough: the last note's tail, under the threshold, moves the next one's first sample at 48 kHz
 	void latency(mdDrums::Processor& _processor, const double _rate)
 	{
 		automate(_processor, "Machine", 0, 16);
@@ -590,6 +518,8 @@ namespace
 		{
 			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
 			const auto hit = play(_processor, 36, static_cast<int>(random % g_block), _rate);
+			require(hit.before < g_silence, "Main was not silent in the block before a note: "
+				+ std::to_string(hit.before));
 			require(hit.first >= 0, "a note stayed silent");
 			minimum = std::min(minimum, hit.first);
 			maximum = std::max(maximum, hit.first);
@@ -610,14 +540,12 @@ int main()
 		for(const double rate : {44100.0, 48000.0})
 		{
 			mdDrums::Processor processor(true);
-			if(!processor.hasDevice())
+			if(!prepare(processor, rate, g_block))
 			{
 				std::cout << "mdDrumsProcessorTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
 				return 77;
 			}
 			juce::AudioProcessor& host = processor;
-			host.setRateAndBufferSizeDetails(rate, g_block);
-			host.prepareToPlay(rate, g_block);
 
 			// The parameters, frozen from the port's first push: per Track Machine, 24, 5 LFO, Level, Mute, Solo, Out
 			const auto& parameters = host.getParameters();
@@ -669,10 +597,9 @@ int main()
 			// The editor plays a Track (Listen while choosing): a machine chosen, the Track played at once, sounds the
 			// machine chosen, its note reaching the Device after the machine in the same block
 			{
-				const auto energy = play(processor, rate, [&](juce::MidiBuffer&)
+				const auto energy = play(processor, rate, {}, [&]
 				{
-					parameter(processor, "Machine", 0).setUnnormalizedValueNotifyingHost(28,
-						pluginLib::Parameter::Origin::Ui);
+					uiSets(parameter(processor, "Machine", 0), 28);
 					processor.controller().audition(0, 100);
 				}).energy;
 				// The same machine at its defaults, struck by the host
@@ -721,7 +648,6 @@ int main()
 			{
 				kits(processor);
 				relays(processor);
-				editor(processor);
 			}
 			latency(processor, rate);
 		}

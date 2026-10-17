@@ -19,6 +19,9 @@
 
 namespace md::engine
 {
+	// MID and CTR machines ($60-$7b) give the voice DSP nothing to play
+	constexpr bool isAudioMachine(const uint8_t _id) { return !(_id >= 0x60 && _id <= 0x7b); }
+
 	// TVoices: VoiceEngine (default) or any type with the same setSlot/renderBlock/Block/kSlotWords surface
 	// (e.g. ParallelVoiceEngine, which splits the 16 slots across threads - see its header).
 	template<class TVoices = VoiceEngine>

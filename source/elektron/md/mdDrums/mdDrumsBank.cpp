@@ -1,8 +1,9 @@
 #include "mdDrumsBank.h"
 
+#include "baseLib/filesystem.h"
+
 #include <algorithm>
 #include <fstream>
-#include <iterator>
 
 namespace mdDrums
 {
@@ -19,22 +20,23 @@ namespace mdDrums
 		std::error_code error;
 		if(!std::filesystem::exists(m_file, error))
 		{
+			// A new Bank whole or not at all: another instance creating it at the same moment keeps its own
 			std::filesystem::create_directories(m_file.parent_path(), error);
-			std::ofstream out(m_file, std::ios::binary);
+			std::vector<uint8_t> bytes;
+			bytes.reserve(static_cast<size_t>(SlotCount) * SlotSize);
 			for(int slot = 0; slot < SlotCount; ++slot)
 			{
-				const auto kit = static_cast<size_t>(slot) < m_factory.size() ? std::optional<Kit>(m_factory[static_cast<size_t>(slot)])
-					: std::nullopt;
-				const auto bytes = dump(kit, slot);
-				out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+				const auto s = static_cast<size_t>(slot);
+				const auto kit = dump(s < m_factory.size() ? std::optional<Kit>(m_factory[s]) : std::nullopt, slot);
+				bytes.insert(bytes.end(), kit.begin(), kit.end());
 			}
-			if(!out)
+			const auto written = baseLib::filesystem::writeFileExclusive(m_file.u8string(), bytes);
+			if(!written && !std::filesystem::exists(m_file, error))
 				return false;
 		}
-		std::ifstream in(m_file, std::ios::binary);
-		if(!in)
+		std::vector<uint8_t> bytes;
+		if(!baseLib::filesystem::readFile(bytes, m_file.u8string()))
 			return false;
-		const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 		for(int slot = 0; slot < SlotCount; ++slot)
 		{
 			const auto at = static_cast<size_t>(slot) * SlotSize;

@@ -75,25 +75,25 @@ namespace mdDrums
 		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
 		{
 			const auto n = std::to_string(t + 1);
-			for(const auto& id : {"row" + n + "_num", "row" + n + "_name", "strip" + n + "_num", "strip" + n + "_name",
-				"send" + n + "_num", "send" + n + "_name"})
-				m_editor.addClick(id, [this, t](Rml::Event&) { showTrack(t); });
+			const auto show = [this, t](Rml::Event&) { showTrack(t); };
+			m_shownMarks[t] = {m_editor.addClick("row" + n + "_num", show),
+				m_editor.addClick("row" + n + "_name", show), m_editor.addClick("strip" + n + "_num", show),
+				m_editor.addClick("send" + n + "_num", show)};
+			m_editor.addClick("strip" + n + "_name", show);
+			m_editor.addClick("send" + n + "_name", show);
 		}
 		// The Mix strips' Outs
 		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
 		{
-			const auto id = "strip" + std::to_string(t + 1) + "_out";
-			m_editor.addClick(id, [this, t](Rml::Event&)
+			auto* e = m_editor.addClick("strip" + std::to_string(t + 1) + "_out", [this, t](Rml::Event&)
 			{
 				setStripOut(t, value(m_outParameters[t]) ? 0 : naturalOut(t));
 			});
-			if(auto* e = find(id))
+			if(e)
 				juceRmlUi::EventListener::Add(e, Rml::EventId::Mousescroll, [this, t](Rml::Event& _event)
 				{
-					const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
-					const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
-					if(delta != 0.0f)
-						setStripOut(t, value(m_outParameters[t]) + (delta > 0.0f ? 1 : -1));
+					if(const auto sign = wheelSign(_event))
+						setStripOut(t, value(m_outParameters[t]) + sign);
 					_event.StopPropagation();
 				});
 		}
@@ -104,22 +104,21 @@ namespace mdDrums
 		// The overlays: a tab closes them; the machine's name, the LFO's target and the kit row open and close theirs
 		for(const auto* tab : {"tab_track", "tab_mix", "tab_master"})
 			m_editor.addClick(tab, [this](Rml::Event&) { setOverlay(Overlay::None); });
-		m_editor.addClick("machine", [this](Rml::Event&)
-		{
-			setOverlay(m_overlay == Overlay::Browser ? Overlay::None : Overlay::Browser);
-		});
+		m_editor.addClick("machine", [this](Rml::Event&) { toggleOverlay(Overlay::Browser); });
 		m_editor.addClick("browser_keep", [this](Rml::Event&) { setOverlay(Overlay::None); });
 		m_editor.addClick("browser_cancel", [this](Rml::Event&) { escape(); });
 		// A machine chosen (its cell has set Machine by then: its own listener came first) shows in the head band and
 		// plays the Track when listening
-		for(int id = 0; id < 256; ++id)
-			if(m_editor.addClick("mach_" + std::to_string(id), [this](Rml::Event&)
+		for(const auto& machine : md::machines::machines(md::MachineModel::Machinedrum))
+			if(m_editor.addClick("mach_" + std::to_string(machine.id), [this](Rml::Event&)
 			{
 				followMachine();
 				if(isListening())
 					m_editor.controller().audition(m_part, ListenVelocity);
 			}))
-				m_machines.push_back(id);
+				m_machines.push_back(machine.id);
+		// The table goes family by family: the browser's order is the ids'
+		std::sort(m_machines.begin(), m_machines.end());
 		m_editor.addClick("preview_listen", [this](Rml::Event&) { setListening(!isListening()); });
 		setListening(isListening());
 
@@ -146,21 +145,16 @@ namespace mdDrums
 		if(auto* machine = find("machine"))
 			juceRmlUi::EventListener::Add(machine, Rml::EventId::Mousescroll, [this](Rml::Event& _event)
 			{
-				const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
-				const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
-				if(delta != 0.0f)
-					stepMachine(delta > 0.0f ? 1 : -1);
+				if(const auto sign = wheelSign(_event))
+					stepMachine(sign);
 				_event.StopPropagation();
 			});
-		m_editor.addClick("lfo_target", [this](Rml::Event&)
-		{
-			setOverlay(m_overlay == Overlay::LfoMenu ? Overlay::None : Overlay::LfoMenu);
-		});
+		m_editor.addClick("lfo_target", [this](Rml::Event&) { toggleOverlay(Overlay::LfoMenu); });
 		m_editor.addClick("lfomenu_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
 		// Choosing the parameter closes the menu, after the button has set it
 		for(int p = 1; p <= Engine::ParamCount; ++p)
 			m_editor.addClick("lfomenu_param" + std::to_string(p), [this](Rml::Event&) { setOverlay(Overlay::None); });
-		m_editor.addClick("kit", [this](Rml::Event&) { setOverlay(m_overlay == Overlay::Kits ? Overlay::None : Overlay::Kits); });
+		m_editor.addClick("kit", [this](Rml::Event&) { toggleOverlay(Overlay::Kits); });
 		m_editor.addClick("kits_done", [this](Rml::Event&) { setOverlay(Overlay::None); });
 
 		updateSize();
@@ -248,11 +242,9 @@ namespace mdDrums
 	{
 		const auto velocity = std::clamp(_velocity, 1, 127);
 		m_editor.getProcessor().getConfig().setValue(g_velocityKey, velocity);
-		if(auto* value = find("velocity"))
-			value->SetInnerRML(std::to_string(velocity));
+		setText(find("velocity"), std::to_string(velocity));
 		// The bar: 64 px at 127, as the mockup rounds it
-		if(auto* fill = find("velocity_fill"))
-			fill->SetProperty("width", dp(static_cast<int>(std::lround(velocity * 64.0 / 127.0))));
+		setDp(find("velocity_fill"), Rml::PropertyId::Width, static_cast<float>(std::lround(velocity * 64.0 / 127.0)));
 	}
 
 	void TrackView::play() const
@@ -392,15 +384,9 @@ namespace mdDrums
 			bar->SetProperty("left", dp(column(_part + 1)));
 
 		for(uint8_t t = 0; t < Controller::TrackCount; ++t)
-		{
-			const auto n = std::to_string(t + 1);
-			for(const auto& id : {"row" + n + "_num", "row" + n + "_name"})
-				if(auto* e = find(id))
-					e->SetClass("tsel", t == _part);
-			for(const auto& id : {"strip" + n + "_num", "send" + n + "_num"})
-				if(auto* e = find(id))
-					e->SetClass("on", t == _part);
-		}
+			for(size_t i = 0; i < m_shownMarks[t].size(); ++i)
+				if(auto* e = m_shownMarks[t][i])
+					e->SetClass(i < 2 ? "tsel" : "on", t == _part);
 		if(auto* caption = find("caption"))
 			caption->SetInnerRML("Track " + twoDigits(_part + 1));
 		if(auto* forTrack = find("browser_for"))
@@ -467,12 +453,10 @@ namespace mdDrums
 			kind->SetInnerRML(family ? familyKind(family->name) : "");
 
 		// SYN1-8 by the machine's own names; a slot it does not use reads "—", dimmed, without a value
-		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, id);
 		for(size_t i = 0; i < 8; ++i)
 		{
-			const auto* syn = Engine::paramNames()[i];
-			const auto suffix = std::string("_") + syn;
-			const auto name = names ? std::string((*names)[i]) : std::string(syn);
+			const auto suffix = std::string("_") + Engine::paramNames()[i];
+			const auto name = std::string(Engine::parameterName(id, i));
 			const auto unused = name.empty();
 			if(auto* label = find("n" + suffix))
 			{
@@ -535,14 +519,12 @@ namespace mdDrums
 		}
 
 		// The target Track's parameters by its machine's names: "—", dimmed, for a SYN slot it does not use
-		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum, id);
-		const auto& paramNames = Engine::paramNames();
-		for(size_t i = 0; i < paramNames.size(); ++i)
+		for(size_t i = 0; i < Engine::paramNames().size(); ++i)
 		{
 			auto* cell = find("lfomenu_param" + std::to_string(i + 1));
 			if(!cell)
 				continue;
-			const auto name = i < 8 && names ? std::string((*names)[i]) : std::string(paramNames[i]);
+			const auto name = std::string(Engine::parameterName(id, i));
 			cell->SetClass("off", name.empty());
 			cell->SetInnerRML(name.empty() ? "—" : name);
 		}

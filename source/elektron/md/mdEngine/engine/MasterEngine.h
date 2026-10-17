@@ -22,9 +22,6 @@ namespace md::engine
 		static constexpr int kBlock = Mixer::kBlock;
 		static constexpr int MainDelay = 16;
 
-		// The four parameter blocks the OS sends the DSP (Y addresses and word counts), one effect per tick
-		static constexpr uint32_t kEchoWords = 0x150, kDynamixWords = 0x17a, kEqWords = 0x170, kGateBoxWords = 0x185;
-
 		// Loads the mixer program (section 2) and runs the parts of its boot the master needs: the sine table, the
 		// clears and the three effects' own initialisation. Throws on failure.
 		explicit MasterEngine(const fw::Firmware& _fw);
@@ -50,9 +47,7 @@ namespace md::engine
 		// run. Between two blocks. False on a fault.
 		bool warmUp(int _blocks = 64);
 
-		uint32_t readX(uint32_t _addr) const;
 		uint32_t readY(uint32_t _addr) const;
-		uint64_t instructionsLastBlock() const { return m_lastInstructions; }
 		const std::string& faultReason() const { return m_fault; }
 		dsp56k::DSP& dsp() { return *m_dsp; }
 
@@ -65,7 +60,6 @@ namespace md::engine
 		std::unique_ptr<dsp56k::Peripherals56303> m_periphX;
 		std::unique_ptr<dsp56k::PeripheralsNop> m_periphY;
 		std::unique_ptr<dsp56k::DSP> m_dsp;
-		uint64_t m_lastInstructions = 0;
 		std::string m_fault;
 	};
 }

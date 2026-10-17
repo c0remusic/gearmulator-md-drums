@@ -24,7 +24,9 @@ namespace md::engine
 		// Memory as gearmulator-md-mm models the Machinedrum: external SRAM from $020000 is shared by P, X and Y.
 		// P is 2M words, not the DSP's 8M: the MD's map stays below $200000 (samples end at $18fc12), and the interpreter's
 		// per-word opcode cache made the full size cost ~300 MB of RAM in MPC. Output is identical.
-		constexpr TWord kSizeP = 0x200000, kSizeXY = 0x800000, kBridge = 0x020000;
+		// md-drums: X and Y 2M too, as MasterEngine's. Bridged, P is as large as the larger of the two: 8M of X and
+		// Y gave P 8M words all the same, which warmUpVoices' saveState then copied whole
+		constexpr TWord kSizeP = 0x200000, kSizeXY = 0x200000, kBridge = 0x020000;
 
 		// DSP2 state after the ColdFire's first-stage loader, read from a running gearmulator-md-mm (OS 1.63):
 		// the full SPS-1 UW memory map (AAR0-3) and OMR.

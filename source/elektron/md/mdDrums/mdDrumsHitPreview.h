@@ -95,8 +95,7 @@ namespace mdDrums
 		struct Slot
 		{
 			std::optional<Request> pending;
-			uint32_t pendingId = 0;
-			uint32_t ids = 0;
+			uint32_t ids = 0;	// the last request's id, the pending one's while there is one
 			std::optional<Result> result;
 		};
 

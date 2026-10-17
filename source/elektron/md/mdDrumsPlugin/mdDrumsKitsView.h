@@ -78,7 +78,6 @@ namespace mdDrums
 		// The action a second click is asked for: "load", "savehere" or "delete"; null when none is
 		const char* confirming() const;
 		bool isRenaming() const { return m_renaming; }
-		void setRenameText(const std::string& _text);
 
 	private:
 		// The actions that ask for a second click, in the order of g_questions in the .cpp

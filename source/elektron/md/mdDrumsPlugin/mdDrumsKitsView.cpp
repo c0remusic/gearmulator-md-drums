@@ -104,9 +104,8 @@ namespace mdDrums
 			return true;
 		}
 		// The head band, RefreshHz times a second: the Kit played is made of every parameter. The first frame draws it
-		if(_frame.now < m_nextHeadMs)
+		if(!_frame.every(m_nextHeadMs, RefreshHz))
 			return false;
-		m_nextHeadMs = _frame.now + 1000.0 / RefreshHz;
 		auto* b = bank();
 		const bool followed = b && b->follow();	// a Slot another instance wrote
 		auto now = head();
@@ -134,6 +133,9 @@ namespace mdDrums
 
 	void KitsView::setOpen(const bool _open)
 	{
+		// Every overlay change closes the Kits: closed already, nothing to draw
+		if(!_open && !m_open)
+			return;
 		if(_open && !m_open)
 		{
 			if(auto* b = bank())
@@ -229,12 +231,6 @@ namespace mdDrums
 			edit->Focus();
 		}
 		say("Type its name, up to 16 characters; Enter keeps it, Esc leaves it");
-	}
-
-	void KitsView::setRenameText(const std::string& _text)
-	{
-		if(auto* edit = find("kit_name_edit"))
-			edit->SetAttribute("value", _text);
 	}
 
 	void KitsView::commitRename(const bool _keep)
@@ -495,7 +491,7 @@ namespace mdDrums
 			if(!element)
 				continue;
 			const auto& kit = b->slot(slot);
-			element->SetInnerRML("<span class=\"num\">" + twoDigits(slot + 1) + "</span>"
+			setText(element, "<span class=\"num\">" + twoDigits(slot + 1) + "</span>"
 				+ (kit ? escaped(kit->displayName()) : std::string("Empty")));
 			element->SetClass("empty", !kit);
 			element->SetClass("on", slot == m_chosen);
@@ -503,18 +499,14 @@ namespace mdDrums
 		// The chosen Slot lit from the gutters' middles (the window's edge for the first column); the played one marked
 		const auto from = [](const int _slot) { return _slot < 16 ? 0 : slotLeft(_slot) - 8; };
 		const auto top = [](const int _slot) { return SlotTop + RowHeight * (_slot % 16); };
-		if(auto* bg = find("slot_sel_bg"))
-		{
-			bg->SetProperty("left", dp(from(m_chosen)));
-			bg->SetProperty("top", dp(top(m_chosen) - 8));
-			bg->SetProperty("width", dp(slotLeft(m_chosen) + 224 + 8 - from(m_chosen)));
-		}
+		auto* bg = find("slot_sel_bg");
+		setDp(bg, Rml::PropertyId::Left, static_cast<float>(from(m_chosen)));
+		setDp(bg, Rml::PropertyId::Top, static_cast<float>(top(m_chosen) - 8));
+		setDp(bg, Rml::PropertyId::Width, static_cast<float>(slotLeft(m_chosen) + 224 + 8 - from(m_chosen)));
 		const auto played = m_editor.controller().playedSlot();
-		if(auto* mark = find("slot_play_mark"))
-		{
-			mark->SetProperty("left", dp(from(played)));
-			mark->SetProperty("top", dp(top(played)));
-		}
+		auto* mark = find("slot_play_mark");
+		setDp(mark, Rml::PropertyId::Left, static_cast<float>(from(played)));
+		setDp(mark, Rml::PropertyId::Top, static_cast<float>(top(played)));
 	}
 
 	void KitsView::updatePanel() const
@@ -525,11 +517,10 @@ namespace mdDrums
 		const auto& kit = b->slot(m_chosen);
 		const auto playing = m_chosen == m_editor.controller().playedSlot();
 
-		if(auto* e = find("kit_caption"))
-			e->SetInnerRML("Slot " + twoDigits(m_chosen + 1) + (playing ? ", playing" : ""));
+		setText(find("kit_caption"), "Slot " + twoDigits(m_chosen + 1) + (playing ? ", playing" : ""));
 		if(auto* e = find("kit_name_big"))
 		{
-			e->SetInnerRML(kit ? escaped(kit->displayName()) : std::string("Empty"));
+			setText(e, kit ? escaped(kit->displayName()) : std::string("Empty"));
 			e->SetClass("empty", !kit);
 		}
 		setDisplay(find("kit_name_big"), !m_renaming);
@@ -542,22 +533,21 @@ namespace mdDrums
 			if(!kit)
 				continue;
 			const auto* machine = md::machines::find(md::MachineModel::Machinedrum, kit->machine(t));
-			if(auto* e = find(id))
-				e->SetInnerRML("<span class=\"num\">" + twoDigits(t + 1) + "</span>"
-					+ (machine ? std::string(machine->name) : std::string("--")));
+			setText(find(id), "<span class=\"num\">" + twoDigits(t + 1) + "</span>"
+				+ (machine ? std::string(machine->name) : std::string("--")));
 		}
 
 		// Asking for a second click, the row holds that action and Cancel only
 		const bool asking = m_confirm != Confirm::None;
-		setDisplay(find("kit_load"), !asking && kit.has_value(), "inline");
-		setDisplay(find("kit_savehere"), !asking, "inline");
-		setDisplay(find("kit_rename"), !asking && kit.has_value(), "inline");
-		setDisplay(find("kit_delete"), !asking && kit.has_value(), "inline");
-		setDisplay(find("kit_confirm"), asking, "inline");
-		setDisplay(find("kit_cancel"), asking, "inline");
-		if(auto* e = find("kit_confirm"); e && asking)
-			e->SetInnerRML(g_questions[static_cast<size_t>(m_confirm)].button);
-		if(auto* e = find("kit_note"))
-			e->SetInnerRML(escaped(m_note));
+		using Display = Rml::Style::Display;
+		setDisplay(find("kit_load"), !asking && kit.has_value(), Display::Inline);
+		setDisplay(find("kit_savehere"), !asking, Display::Inline);
+		setDisplay(find("kit_rename"), !asking && kit.has_value(), Display::Inline);
+		setDisplay(find("kit_delete"), !asking && kit.has_value(), Display::Inline);
+		setDisplay(find("kit_confirm"), asking, Display::Inline);
+		setDisplay(find("kit_cancel"), asking, Display::Inline);
+		if(asking)
+			setText(find("kit_confirm"), g_questions[static_cast<size_t>(m_confirm)].button);
+		setText(find("kit_note"), escaped(m_note));
 	}
 }

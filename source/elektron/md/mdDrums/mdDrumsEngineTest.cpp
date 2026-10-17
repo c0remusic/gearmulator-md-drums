@@ -11,35 +11,25 @@
 
 #include "mdProtocol/mdkitchange.h"
 
+#include "mdDrumsTestSupport.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <iostream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace
 {
-	void require(const bool _condition, const char* const _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::test::differences;
+	using mdDrums::test::machineId;
+	using mdDrums::test::require;
 
 	// Main after a Hit: the master effects' EQ and Dynamix keep a tail of a few LSB, as the Machinedrum's do, so Main is
 	// silent below -100 dBFS rather than at 0
 	constexpr float g_silence = 1e-5f;
-
-	uint8_t machineId(const mdDrums::Engine& _engine, const char* _name)
-	{
-		for(const auto& machine : _engine.machines())
-			if(machine.name == _name)
-				return machine.id;
-		throw std::runtime_error("machine missing from the OS's table");
-	}
 
 	// Samples from now to the first one at or above -60 dBFS, and the peak, over a second.
 	std::pair<int, float> listen(mdDrums::Engine& _engine)
@@ -69,27 +59,37 @@ namespace
 	int latency(mdDrums::Engine& _engine)
 	{
 		constexpr size_t hostBlock = 256;
-		std::vector<float> left(44100), right(44100);
+		// The rest of the engine's block (or the constant 31), then TRX-BD's voice, which sounds a block after its
+		// trigger, from its 5th sample, then Dynamix's look-ahead on Main
+		constexpr int longest = mdDrums::Engine::BlockSize * 2 + 5 + mdDrums::Engine::MasterDelay;
+		// From the note on, host blocks up to past that
+		constexpr size_t reach = longest + hostBlock;
+		std::vector<float> left(reach + hostBlock), right(reach + hostBlock);
+		const auto sounds = [&](const size_t _i)
+		{
+			return std::abs(left[_i]) > g_silence || std::abs(right[_i]) > g_silence;
+		};
 		uint32_t random = 0x16305eedu;
 		int minimum = 1 << 30, maximum = 0;
 		double sum = 0;
 		for(int note = 0; note < 48; ++note)
 		{
+			// Two seconds between the notes: a shorter silence leaves the last note's tail just under the threshold,
+			// where it moves the next note's first sample
 			settle(_engine);
-			random ^= random << 13; random ^= random >> 17; random ^= random << 5;
-			const auto offset = random % hostBlock;
+			const auto offset = mdDrums::test::xorshift(random) % hostBlock;
 			_engine.render(left.data(), right.data(), offset);
 			_engine.trigger(0, 100);
-			// Then the host's blocks from the note on: the rest of this one, then whole ones
-			for(size_t done = 0, count = hostBlock - offset; done < left.size(); done += count, count = hostBlock)
-			{
-				count = std::min(count, left.size() - done);
-				_engine.render(left.data() + done, right.data() + done, count);
-			}
+			// Then the host's blocks from the note on, the rest of this one, then whole ones, until it sounds
 			int first = -1;
-			for(size_t i = 0; i < left.size() && first < 0; ++i)
-				if(std::abs(left[i]) > g_silence || std::abs(right[i]) > g_silence)
-					first = static_cast<int>(i);
+			for(size_t done = 0, count = hostBlock - offset; first < 0 && done < reach;
+				done += count, count = hostBlock)
+			{
+				_engine.render(left.data() + done, right.data() + done, count);
+				for(auto i = done; i < done + count && first < 0; ++i)
+					if(sounds(i))
+						first = static_cast<int>(i);
+			}
 			require(first >= 0, "a note stayed silent");
 			minimum = std::min(minimum, first);
 			maximum = std::max(maximum, first);
@@ -98,10 +98,7 @@ namespace
 		std::printf("note to sound (TRXBD, 48 notes, %s): %d-%d samples, mean %.1f (%.2f ms), jitter %d (%.2f ms)\n",
 			_engine.isSampleAccurate() ? "sample-accurate" : "on the engine's blocks", minimum, maximum, sum / 48,
 			sum / 48 * 1000.0 / 44100.0, maximum - minimum, (maximum - minimum) * 1000.0 / 44100.0);
-		// The rest of the engine's block (or the constant 31), then TRX-BD's voice, which sounds a block after its
-		// trigger, from its 5th sample, then Dynamix's look-ahead on Main
-		require(maximum <= mdDrums::Engine::BlockSize * 2 + 5 + mdDrums::Engine::MasterDelay,
-			"a note took more than two blocks to sound");
+		require(maximum <= longest, "a note took more than two blocks to sound");
 		return maximum - minimum;
 	}
 
@@ -130,19 +127,12 @@ namespace
 		md::engine::Engine raw(_os.firmware, _os.osImage);
 		raw.loadRomBank(_bank);
 		md::engine::MasterEngine onBlocks(_os.firmware), late(_os.firmware);
-		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
-		{
-			raw.host().setMachine(track, machine(track));
-			for(int param = 8; param < mdDrums::Engine::ParamCount; ++param)
-				raw.host().setParam(track, param, mdDrums::Engine::paramDefaults()[param]);
-			raw.host().setLevel(track, mdDrums::Engine::DefaultLevel);
-		}
-		for(int index = 0; index < mdDrums::Engine::MasterCount; ++index)
-			raw.host().setMaster(index, mdDrums::Engine::masterDefaults()[index]);
+		mdDrums::applyEngineDefaults(raw.host());
 		mdDrums::Engine accurate(_flash), blocks(_flash);
 		blocks.setSampleAccurate(false);
 		for(int track = 0; track < mdDrums::Engine::TrackCount; ++track)
 		{
+			raw.host().setMachine(track, machine(track));
 			accurate.setMachine(track, machine(track));
 			blocks.setMachine(track, machine(track));
 		}
@@ -200,13 +190,9 @@ namespace
 			accurate.render(accLeft.data() + b * block, accRight.data() + b * block, block);
 			blocks.render(blkLeft.data() + b * block, blkRight.data() + b * block, block);
 		}
-		const auto al = toSamples(accLeft), ar = toSamples(accRight), bl = toSamples(blkLeft), br = toSamples(blkRight);
-		size_t blockDiffs = 0, accurateDiffs = 0;
-		for(size_t i = 0; i < rawLeft.size(); ++i)
-		{
-			blockDiffs += (bl[i] != rawLeft[i]) + (br[i] != rawRight[i]);
-			accurateDiffs += (al[i] != lateLeft[i]) + (ar[i] != lateRight[i]);
-		}
+		const auto blockDiffs = differences(toSamples(blkLeft), rawLeft) + differences(toSamples(blkRight), rawRight);
+		const auto accurateDiffs = differences(toSamples(accLeft), lateLeft)
+			+ differences(toSamples(accRight), lateRight);
 		std::printf("Main against the engine's own mixer and master effects, 200 Hits on its blocks, %zu samples: %zu differ"
 			" on the engine's blocks, %zu sample-accurate (buses %zu samples later)\n", rawLeft.size(), blockDiffs,
 			accurateDiffs, shift);
@@ -221,9 +207,9 @@ namespace
 		const auto same = [&](const uint32_t _address, const auto& _table, const char* _name)
 		{
 			require(_address >= base && _address - base + _table.size() <= _os.osImage.size(),
-				(std::string(_name) + " lies past the OS image").c_str());
+				std::string(_name) + " lies past the OS image");
 			const auto* image = _os.osImage.data() + (_address - base);
-			require(std::equal(_table.begin(), _table.end(), image), (std::string(_name) + " is not the OS's").c_str());
+			require(std::equal(_table.begin(), _table.end(), image), std::string(_name) + " is not the OS's");
 		};
 		same(os::EffectsAddress, os::Effects, "Effects");
 		same(os::EffectsAddress + 8, os::Routing, "Routing");
@@ -303,14 +289,15 @@ namespace
 			// The references: a machine of each family, the voices that start a block late, ROM, and the two not held
 			const std::string name = machine.name;
 			const bool exact = name == "TRXBD" || name == "TRXS2" || name == "ROM01" || name == "ROM16";
-			const bool near = name == "TRXSD" || name == "TRXCH" || name == "EFMBD" || name == "EFMSD" || name == "E12BD"
-				|| name == "E12SD" || name == "P-IBD" || name == "GNDSN";
+			// Not "near": windows.h defines it away (mdDrumsTestSupport.h)
+			const bool close = name == "TRXSD" || name == "TRXCH" || name == "EFMBD" || name == "EFMSD"
+				|| name == "E12BD" || name == "E12SD" || name == "P-IBD" || name == "GNDSN";
 			const bool late = name == "TRXXT" || name == "TRXXC" || name == "TRXCB";
-			if(!exact && !near && !late)
+			if(!exact && !close && !late)
 				continue;
 			const auto want = late ? expected(machine.id, mdDrums::Engine::voiceStart(machine.id))
 				: mdDrums::Engine::HitDelay;
-			const auto tolerance = exact ? 0 : near ? 4 : 1;
+			const auto tolerance = exact ? 0 : close ? 4 : 1;
 			// A sound that never goes silent (GND-SN, a sine) gives its first Hit
 			const auto at = again >= 0 ? again : first;
 			if(at < want || at > want + tolerance)
@@ -358,7 +345,7 @@ namespace
 		const auto run = [&](const Case& _case, const bool _choke)
 		{
 			mdDrums::Engine engine(_os, _bank, true);
-			engine.setMachine(_case.target, machineId(engine, "E12RC"));
+			engine.setMachine(_case.target, machineId(engine.machines(), "E12RC"));
 			engine.setParam(_case.target, 1, 127);
 			engine.setParam(_case.target, 2, 127);
 			engine.setSeparateOutputs(1u << _case.target);
@@ -423,7 +410,7 @@ namespace
 		{
 			mdDrums::Engine engine(_os, _bank, true);
 			engine.setSampleAccurate(_accurate);
-			engine.setMachine(0, machineId(engine, "E12RC"));
+			engine.setMachine(0, machineId(engine.machines(), "E12RC"));
 			engine.setParam(0, 1, 127);
 			engine.setParam(0, 2, 127);
 			std::vector<float> left(44100), right(44100);
@@ -464,27 +451,20 @@ namespace
 
 int main()
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
+	return mdDrums::test::run("mdDrumsEngineTest", [](const std::vector<uint8_t>& _flash)
 	{
-		std::cout << "mdDrumsEngineTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	try
-	{
-		mdDrums::Engine engine(flash);
+		mdDrums::Engine engine(_flash);
 		require(engine.machines().size() > 100, "the OS's machine table is incomplete");
 
 		// The scenarios on engines of their own build them from the OS and the UW bank read once, without the
 		// machines and the master compiled ahead, which leaves the samples as they are (mdDrumsFirstHitTest)
-		const auto os = md::fw::loadFirmwareFromFlash(flash);
-		const auto bank = md::fw::loadRomBankFromFlash(flash);
+		const auto os = md::fw::loadFirmwareFromFlash(_flash);
+		const auto bank = md::fw::loadRomBankFromFlash(_flash);
 		osTables(os);
 		// First: the checks below take where the Hits sound from it
 		voiceStarts(os, bank);
 
-		engine.setMachine(0, machineId(engine, "TRXBD"));
+		engine.setMachine(0, machineId(engine.machines(), "TRXBD"));
 		engine.setLevel(0, 100);
 		settle(engine);
 		require(listen(engine).second == 0.0f, "a track sounds without a trigger");
@@ -509,12 +489,12 @@ int main()
 		{
 			mdDrums::Engine fresh(os, bank, true);
 			fresh.setSampleAccurate(accurate);
-			fresh.setMachine(0, machineId(fresh, "TRXBD"));
+			fresh.setMachine(0, machineId(fresh.machines(), "TRXBD"));
 			fresh.setLevel(0, 100);
 			const auto jitter = latency(fresh);
 			require(!accurate || jitter == 0, "sample-accurate Hits jitter");
 		}
-		equivalence(flash, os, bank);
+		equivalence(_flash, os, bank);
 		retrigger(os, bank);
 		chokes(os, bank);
 
@@ -548,7 +528,7 @@ int main()
 		{
 			for(int track = 1; track < 6; ++track)
 			{
-				engine.setMachine(track, machineId(engine, "EFMCB"));
+				engine.setMachine(track, machineId(engine.machines(), "EFMCB"));
 				engine.setLevel(track, 100);
 			}
 			engine.setSeparateOutputs(0x3e);
@@ -619,7 +599,7 @@ int main()
 			const int whole[8] = {64, 127, 127, 0, 0, 127, 0, 0};
 			for(const char* name : {"ROM01", "ROM32", "ROM33"})
 			{
-				engine.setMachine(0, machineId(engine, name));
+				engine.setMachine(0, machineId(engine.machines(), name));
 				for(int param = 0; param < 8; ++param)
 					engine.setParam(0, param, whole[param]);
 				settle(engine);
@@ -633,12 +613,11 @@ int main()
 			}
 		}
 
-		// All 16 tracks, each on a TRX machine, triggered every 64th of a second for 8 seconds.
-		const char* kit[16] = {"TRXBD", "TRXSD", "TRXXT", "TRXCP", "TRXRS", "TRXCB", "TRXCH", "TRXOH",
-			"TRXCY", "TRXMA", "TRXCL", "TRXXC", "TRXB2", "TRXS2", "EFMBD", "EFMSD"};
+		// All 16 tracks on the machines they start with (TRX, then EFM-BD and -SD), triggered every 64th of a second
+		// for 8 seconds.
 		for(int track = 0; track < 16; ++track)
 		{
-			engine.setMachine(track, machineId(engine, kit[track]));
+			engine.setMachine(track, mdDrums::Engine::defaultMachine(track));
 			engine.setLevel(track, 100);
 		}
 		std::vector<float> left(689), right(689);
@@ -658,13 +637,5 @@ int main()
 			// The audio thread's budget (ticket 09): what MD Drums renders, at most 30 % of real time on the reference PC
 			require(seconds < audio * 0.3, "the engine takes more than 30 % of real time for 16 tracks and the master");
 		}
-
-		std::cout << "mdDrumsEngineTest: PASS\n";
-		return 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::cerr << "mdDrumsEngineTest: " << _error.what() << '\n';
-		return 1;
-	}
+	});
 }

@@ -12,6 +12,7 @@
 #include "mdDrumsEditor.h"
 #include "mdDrumsHitView.h"
 #include "mdDrumsProcessor.h"
+#include "mdDrumsTestSupport.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
 #include "juceRmlUi/juceRmlComponent.h"
@@ -41,17 +42,13 @@
 
 namespace
 {
-	using Clock = std::chrono::steady_clock;
+	using mdDrums::testSupport::Clock;
+	using mdDrums::testSupport::msSince;
+	using mdDrums::testSupport::require;
 
 	constexpr double g_rate = 44100.0;
 	constexpr int g_block = 128;
 	constexpr double g_sixteenth = g_rate * 60.0 / 120.0 / 4.0;	// samples, at 120 BPM
-
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
 
 	// The process's private memory, in MB
 	double privateMb()
@@ -63,11 +60,6 @@ namespace
 #else
 		return 0.0;
 #endif
-	}
-
-	double msSince(const Clock::time_point _start)
-	{
-		return std::chrono::duration<double, std::milli>(Clock::now() - _start).count();
 	}
 
 	// The Tracks a sixteenth strikes: one walking over the 16, a kick on the beats, hats on every one, a snare on the
@@ -142,14 +134,12 @@ int main(const int _argc, char** _argv)
 		{
 			Instance instance;
 			instance.processor = std::make_unique<mdDrums::Processor>(true);
-			if(!instance.processor->hasDevice())
+			if(!mdDrums::testSupport::prepare(*instance.processor, g_rate, g_block))
 			{
 				std::cout << "mdDrumsInstancesTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
 				return 77;
 			}
 			auto& host = static_cast<juce::AudioProcessor&>(*instance.processor);
-			host.setRateAndBufferSizeDetails(g_rate, g_block);
-			host.prepareToPlay(g_rate, g_block);
 			instance.buffer.setSize(host.getTotalNumOutputChannels(), g_block);
 			instance.offset = static_cast<int64_t>(i) * 37;
 			render(instance);
@@ -228,24 +218,19 @@ int main(const int _argc, char** _argv)
 		const auto beforeEditors = privateMb();
 		const auto open = [&](Instance& _instance) -> mdDrums::Editor&
 		{
-			_instance.processor->setForceSoftwareRendererForSession(true);
-			auto& state = _instance.processor->getOrCreateEditorState();
-			auto* editor = dynamic_cast<mdDrums::Editor*>(state.getEditor());
-			require(editor != nullptr, "no editor");
+			auto& editor = mdDrums::testSupport::openEditor(*_instance.processor);
 			// One layout, so that the screens know they show
-			auto* component = editor->getRmlComponent();
-			require(component && component->getContext(), "the editor has no RmlUi context");
+			auto* component = editor.getRmlComponent();
 			juceRmlUi::RmlInterfaces::ScopedAccess access(*component);
 			component->getContext()->Update();
-			return *editor;
+			return editor;
 		};
 		auto& first = open(instances.front());
 		const auto oneEditor = privateMb() - beforeEditors;
 
 		auto* view = first.getHitView();
 		require(view != nullptr, "no Hit view");
-		auto* fltf = instances.front().processor->getController().getParameter("FLTF", 0);
-		require(fltf != nullptr, "no FLTF");
+		auto& fltf = mdDrums::testSupport::parameter(*instances.front().processor, "FLTF");
 		// The editor's frames on this test's clock, from where the editor's first frame left it
 		double now = first.lastFrameMs();
 		first.setClock([&now] { return now; });
@@ -253,24 +238,20 @@ int main(const int _argc, char** _argv)
 		// The audio stopped with the pattern: its last Hit is no longer playing 100 ms later, and the preview may show
 		now += 100.0;
 		first.frame();
-		fltf->setUnnormalizedValueNotifyingHost(fltf->getUnnormalizedValue() == 40 ? 41 : 40, pluginLib::Parameter::Origin::Ui);
+		mdDrums::testSupport::uiSets(fltf, fltf.getUnnormalizedValue() == 40 ? 41 : 40);
 		now += 1.0;
 		first.frame();
-		const auto start = Clock::now();
-		while(view->previewPending() || !view->previewing())
+		mdDrums::testSupport::untilPreview(*view, [&]
 		{
-			if(msSince(start) >= 10000.0)
-			{
-				const auto* screen = first.findChild("screen_hit", false);
-				std::printf("no preview: Hit screen %s, request %s, live Hit %u playing %s\n",
-					screen && screen->IsVisible(true) ? "visible" : "hidden", view->previewPending() ? "waiting" : "none",
-					view->current().id, view->playing() ? "yes" : "no");
-				throw std::runtime_error("no preview within 10 s");
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			now += 0.05;
 			first.frame();
-		}
+		}, Clock::now(), [&]
+		{
+			const auto* screen = first.findChild("screen_hit", false);
+			std::printf("no preview: Hit screen %s, request %s, live Hit %u playing %s\n",
+				screen && screen->IsVisible(true) ? "visible" : "hidden", view->previewPending() ? "waiting" : "none",
+				view->current().id, view->playing() ? "yes" : "no");
+		});
 		first.setClock({});
 		// The next engine is built while nothing waits
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));

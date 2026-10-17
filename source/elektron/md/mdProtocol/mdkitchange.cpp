@@ -40,22 +40,15 @@ namespace md::automation::sysex
 			return false;
 		}
 
-		struct Writer
+		// The Machinedrum's header up to its command byte
+		RawMessage header(const uint8_t _command)
 		{
-			KitChangeMessage message;
-
-			explicit Writer(const uint8_t _command)
-			{
-				for(const auto byte : {uint8_t{0xf0}, uint8_t{0x00}, uint8_t{0x20}, uint8_t{0x3c},
-					codec::product(MachineModel::Machinedrum), uint8_t{0x00}, _command})
-					add(byte);
-			}
-			Writer& add(const uint8_t _byte)
-			{
-				message.bytes[message.size++] = _byte;
-				return *this;
-			}
-		};
+			RawMessage message;
+			for(const auto byte : {uint8_t{0xf0}, uint8_t{0x00}, uint8_t{0x20}, uint8_t{0x3c},
+				codec::product(MachineModel::Machinedrum), uint8_t{0x00}, _command})
+				message.add(byte);
+			return message;
+		}
 
 		// What $5B leaves in _track's 24 parameters ($2053e0 to $205662)
 		void assign(MdKit& _kit, const uint8_t _track, const uint8_t _id, const uint8_t _scope,
@@ -145,7 +138,7 @@ namespace md::automation::sysex
 		return change;
 	}
 
-	std::optional<KitChangeMessage> encodeKitChange(const KitChange& _change)
+	std::optional<RawMessage> encodeKitChange(const KitChange& _change)
 	{
 		if(!valid(_change))
 			return std::nullopt;
@@ -154,22 +147,23 @@ namespace md::automation::sysex
 		case Kind::Machine:
 		{
 			// Ids 128 and up go out as id - 128 with the UW flag; a scope byte only for a scope but AssignScope
-			Writer writer(g_assignMachine);
-			writer.add(_change.track).add(static_cast<uint8_t>(_change.value & 0x7f)).add(_change.value >= 128 ? 1 : 0);
+			auto message = header(g_assignMachine);
+			message.add(_change.track).add(static_cast<uint8_t>(_change.value & 0x7f));
+			message.add(_change.value >= 128 ? 1 : 0);
 			if(_change.index != KitChange::AssignScope)
-				writer.add(_change.index);
-			return writer.add(0xf7).message;
+				message.add(_change.index);
+			return message.add(0xf7);
 		}
 		case Kind::Master:
-			return Writer(static_cast<uint8_t>(g_masterEffect + _change.index / MasterEffectParameters))
-				.add(static_cast<uint8_t>(_change.index % MasterEffectParameters)).add(_change.value).add(0xf7).message;
+			return header(static_cast<uint8_t>(g_masterEffect + _change.index / MasterEffectParameters))
+				.add(static_cast<uint8_t>(_change.index % MasterEffectParameters)).add(_change.value).add(0xf7);
 		case Kind::Lfo:
-			return Writer(g_lfoChange).add(static_cast<uint8_t>(_change.track << 3 | _change.index)).add(_change.value)
-				.add(0xf7).message;
+			return header(g_lfoChange).add(static_cast<uint8_t>(_change.track << 3 | _change.index)).add(_change.value)
+				.add(0xf7);
 		case Kind::Link:
 		case Kind::Choke:
-			return Writer(_change.kind == Kind::Link ? g_linkChange : g_chokeChange).add(_change.track)
-				.add(_change.value == MdKit::Off ? g_offOnTheWire : _change.value).add(0xf7).message;
+			return header(_change.kind == Kind::Link ? g_linkChange : g_chokeChange).add(_change.track)
+				.add(_change.value == MdKit::Off ? g_offOnTheWire : _change.value).add(0xf7);
 		}
 		return std::nullopt;
 	}

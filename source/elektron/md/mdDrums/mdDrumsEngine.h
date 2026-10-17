@@ -5,8 +5,10 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "HostModel.h"
 #include "MachineRunner.h"
 #include "TrackFx.h"
 
@@ -40,6 +42,9 @@ namespace mdDrums
 
 		// The parameter names, in parameter order (SYN1-8 are named per machine: MachineInfo::params).
 		static const std::array<const char*, ParamCount>& paramNames();
+		// Parameter _index as machine _machine names it: SYN1-8 by the machine's own names (empty for one it does not
+		// use; SYN1-8 for a machine the table lacks), the others as paramNames
+		static std::string_view parameterName(uint16_t _machine, size_t _index);
 		// What every track starts with: filter open, no effect, VOL 100, PAN centre, LFO at zero depth (mdEngine
 		// itself starts at 0 everywhere, which is silent). SYN1-8 start at the machine's own defaults.
 		static const std::array<uint8_t, ParamCount>& paramDefaults();
@@ -155,4 +160,20 @@ namespace mdDrums
 	// A whole Kit into an engine, as the Device plays one: each Track's machine, its 24 parameters, level, LFO (settings and
 	// running state), Link and Choke, then the master effects
 	void applyKit(Engine& _engine, const md::automation::sysex::MdKit& _kit);
+
+	// What an Engine starts with, into mdEngine's own engine, as Engine's constructor gives it: each Track's machine
+	// (defaultMachine), whose SYN1-8 are the machine's own defaults, the other 16 parameters (paramDefaults) and
+	// DefaultLevel, then the master effects (masterDefaults)
+	template<class TVoices> void applyEngineDefaults(md::engine::HostModel<TVoices>& _host)
+	{
+		for(int track = 0; track < Engine::TrackCount; ++track)
+		{
+			_host.setMachine(track, Engine::defaultMachine(track));
+			for(int param = 8; param < Engine::ParamCount; ++param)
+				_host.setParam(track, param, Engine::paramDefaults()[param]);
+			_host.setLevel(track, Engine::DefaultLevel);
+		}
+		for(int index = 0; index < Engine::MasterCount; ++index)
+			_host.setMaster(index, Engine::masterDefaults()[index]);
+	}
 }

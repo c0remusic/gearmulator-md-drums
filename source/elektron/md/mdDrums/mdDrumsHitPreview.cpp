@@ -61,7 +61,6 @@ namespace mdDrums
 			auto& slot = m_preview->m_slots[m_id];
 			id = ++slot.ids;
 			slot.pending = std::move(_request);
-			slot.pendingId = id;
 		}
 		m_preview->m_wake.notify_one();
 		return id;
@@ -192,7 +191,7 @@ namespace mdDrums
 			auto request = std::move(*next->second.pending);
 			next->second.pending.reset();
 			Result result;
-			result.id = next->second.pendingId;
+			result.id = next->second.ids;
 			result.track = request.track;
 			m_lastServed = client;
 			lastRequest = Clock::now();

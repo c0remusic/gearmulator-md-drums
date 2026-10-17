@@ -20,48 +20,22 @@
 
 #include "synthLib/midiTypes.h"
 
+#include "mdDrumsTestSupport.h"
+
 #include <chrono>
 #include <cstdio>
-#include <iostream>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
-
-#ifdef _WIN32
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <psapi.h>
-#endif
 
 namespace
 {
 	using Capture = mdDrums::Telemetry::Capture;
-
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
-
-	// The process's private memory, in MB
-	double privateMb()
-	{
-#ifdef _WIN32
-		PROCESS_MEMORY_COUNTERS_EX counters{};
-		GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters));
-		return static_cast<double>(counters.PrivateUsage) / (1024.0 * 1024.0);
-#else
-		return 0.0;
-#endif
-	}
-
-	double msSince(const std::chrono::steady_clock::time_point _start)
-	{
-		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _start).count();
-	}
+	using mdDrums::test::msSince;
+	using mdDrums::test::privateMb;
+	using mdDrums::test::require;
 
 	// Columns that differ between two captures of a full Hit
 	int differing(const Capture& _a, const Capture& _b)
@@ -151,24 +125,17 @@ namespace
 
 int main()
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
+	return mdDrums::test::run("mdDrumsHitPreviewTest", [](const std::vector<uint8_t>& _flash)
 	{
-		std::cout << "mdDrumsHitPreviewTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	try
-	{
-		const auto os = md::fw::loadFirmwareFromFlash(flash);
-		const auto bank = md::fw::loadRomBankFromFlash(flash);
-		const auto factory = mdDrums::messages::factoryKit(flash);
+		const auto os = md::fw::loadFirmwareFromFlash(_flash);
+		const auto bank = md::fw::loadRomBankFromFlash(_flash);
+		const auto factory = mdDrums::messages::factoryKit(_flash);
 		require(factory.has_value(), "no factory Kit in the flash image");
 
 		// The Device's first Hit, Track by Track of factory Kit 1, at two velocities
 		for(const auto& [track, velocity] : std::vector<std::pair<int, uint8_t>>{{0, 100}, {4, 127}, {9, 60}, {15, 110}})
 		{
-			const auto device = live(flash, {note(track, velocity)}, track);
+			const auto device = live(_flash, {note(track, velocity)}, track);
 			mdDrums::HitPreview::Request request;
 			request.kit = device.kit;
 			request.track = static_cast<uint8_t>(track);
@@ -185,19 +152,11 @@ int main()
 		// A machine just chosen: the request still holds the previous machine's parameters
 		{
 			mdDrums::Engine probe(os, bank, false);
-			const auto& machines = probe.machines();
-			const auto find = [&](const char* _name)
-			{
-				for(const auto& machine : machines)
-					if(machine.name == _name)
-						return machine;
-				throw std::runtime_error(std::string("no machine ") + _name);
-			};
 			for(const auto* name : {"EFMSD", "ROM01", "P-IMT"})
 			{
-				const auto machine = find(name);
+				const auto& machine = mdDrums::test::machineNamed(probe.machines(), name);
 				constexpr int track = 2;
-				const auto device = live(flash, {sysex(*md::automation::sysex::assignMachine(
+				const auto device = live(_flash, {sysex(*md::automation::sysex::assignMachine(
 					md::MachineModel::Machinedrum, track, machine.id)), note(track, 100)}, track);
 				require(device.kit.machine(track) == machine.id, std::string("the Device did not take ") + name);
 				mdDrums::HitPreview::Request request;
@@ -300,13 +259,5 @@ int main()
 			require(differing(result.capture, preview(os, bank, request)) == 0, "the Hit after the idle time differs");
 			std::printf("after the idle time: OS read again, engine built, Hit rendered in %.1f ms\n", result.renderMs);
 		}
-
-		std::cout << "mdDrumsHitPreviewTest: PASS\n";
-		return 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::cerr << "mdDrumsHitPreviewTest: FAIL: " << _error.what() << '\n';
-		return 1;
-	}
+	});
 }

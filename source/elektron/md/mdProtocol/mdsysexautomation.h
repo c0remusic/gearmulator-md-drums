@@ -83,6 +83,12 @@ namespace md::automation::sysex
 	{
 		return static_cast<uint8_t>(MdKitMasterEffectBlock[_effect] * MasterEffectParameters + _parameter);
 	}
+	// The same for a master effect's parameter in MasterEffect order (effect * 8 + parameter, 0..31)
+	constexpr uint8_t mdKitMasterIndex(const uint8_t _parameter)
+	{
+		return mdKitMasterIndex(static_cast<uint8_t>(_parameter / MasterEffectParameters),
+			static_cast<uint8_t>(_parameter % MasterEffectParameters));
+	}
 
 	struct KitDump
 	{

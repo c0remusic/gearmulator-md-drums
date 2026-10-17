@@ -82,11 +82,9 @@ namespace mdDrums
 		{
 			m_flashErrorNew = false;
 			m_flashErrorUntil = seconds + g_flashErrorSeconds;
-			m_nextMs = 0.0;
 		}
-		if(_frame.now < m_nextMs)
+		if(!_frame.every(m_nextMs, RefreshHz))
 			return false;
-		m_nextMs = _frame.now + 1000.0 / RefreshHz;
 
 		if(const auto release = updates::Check::latest(); release && release->version != m_latestSeen)
 		{

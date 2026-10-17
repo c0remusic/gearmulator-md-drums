@@ -113,8 +113,10 @@ namespace mdDrums
 		// The scopes: a column every 1/32 s, the highest level of its time (after a pause they start afresh, above)
 		for(int t = 0; t < Telemetry::TrackCount; ++t)
 			m_columnPeak[static_cast<size_t>(t)] = std::max(m_columnPeak[static_cast<size_t>(t)], level(2 + t));
+		bool shifted = _frame.resumed;
 		while(nowMs - m_columnStartMs >= ScopeColumnMs)
 		{
+			shifted = true;
 			for(int t = 0; t < Telemetry::TrackCount; ++t)
 			{
 				auto& history = m_history[static_cast<size_t>(t)];
@@ -128,9 +130,12 @@ namespace mdDrums
 		for(int t = 0; t < Telemetry::TrackCount; ++t)
 		{
 			const auto& history = m_history[static_cast<size_t>(t)];
-			const bool silent = std::all_of(history.begin(), history.end(), [](const float _v) { return _v <= 0.0f; });
+			auto& silent = m_silent[static_cast<size_t>(t)];
+			if(shifted)
+				silent = std::all_of(history.begin(), history.end(), [](const float _v) { return _v <= 0.0f; });
 			// Silent: drawn once; else at each new column, and when the shown Track changes its colour
-			wrote |= repaint(m_scopes[static_cast<size_t>(t)], silent ? -2 : (m_columns % 1000000) * 2 + (t == m_shown ? 1 : 0));
+			const auto key = silent ? -2 : (m_columns % 1000000) * 2 + (t == m_shown ? 1 : 0);
+			wrote |= repaint(m_scopes[static_cast<size_t>(t)], key);
 		}
 
 		// A struck Track's number, in the list, in Mix and among the sends, lit for 140 ms

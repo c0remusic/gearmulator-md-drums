@@ -3,7 +3,8 @@
 // host's, answers ASSIGN MACHINE with the 24 parameters it sets as CCs, plays Mute, Solo and Out, keeps its Kit and
 // mixer across a state round trip, plays Locks (ADR 0003), and renders with notes and CCs without allocating. It
 // reports the note-to-sound latency at 44.1 and 48 kHz, and fills the Telemetry the editor reads (peaks, Hits) for at
-// most 1 % of one core.
+// most 1 % of one core. md-drums-seq's Kit files need no flash image: they are checked without one too.
+// usage: mdDrumsDeviceTest [--measure], which also times the whole Device with and without its Telemetry
 
 #include "mdDrumsAllocationCounter.h"
 #include "mdDrumsDevice.h"
@@ -12,8 +13,11 @@
 
 #include "mdProtocol/mdautomation.h"
 #include "mdProtocol/mdkitchange.h"
+#include "mdProtocol/mdsysexcodec.h"
 
 #include "synthLib/plugin.h"
+
+#include "mdDrumsTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -21,12 +25,9 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
-#include <fstream>
 #include <functional>
 #include <initializer_list>
-#include <iterator>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -36,17 +37,9 @@ namespace
 	namespace sysex = md::automation::sysex;
 	namespace machinedrum = md::automation::machinedrum;
 	using synthLib::MidiEventSource;
-
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
-
-	std::vector<uint8_t> readFlash()
-	{
-		return mdDrums::Engine::findFlashImage({});
-	}
+	using mdDrums::test::readFile;
+	using mdDrums::test::require;
+	using mdDrums::test::xorshift;
 
 	// The Device behind synthLib::Plugin at a host rate, with a buffer of a block for each of its 17 outputs (Main left
 	// and right, Out 01-15)
@@ -190,13 +183,11 @@ namespace
 		require(rig.device->kit().levels[0] == 0 && rig.listen(2) == 0.0f, "the editor's level CC did not silence track 1");
 		rig.send(MidiEventSource::Editor, cc(machinedrum::Level, 0, 0, 100));
 
-		// ASSIGN MACHINE: TRX-BD on track 1, the 24 parameters it sets said back as CCs
-		rig.midiOut.clear();
+		// ASSIGN MACHINE: TRX-BD on track 1 (what it sets and says back as CCs: assignAndLfo)
 		const auto assign = sysex::assignMachine(md::MachineModel::Machinedrum, 0, 16);
 		rig.send(MidiEventSource::Editor, *assign);
 		rig.process();
 		require(rig.device->kit().machine(0) == 16, "ASSIGN MACHINE did not set the machine");
-		require(reported(rig, 0) == 24, "ASSIGN MACHINE did not report the 24 parameters it set");
 
 		// Master effects, LFO, Link and Choke land in the Kit
 		rig.send(MidiEventSource::Editor, *sysex::masterEffectChange(sysex::MasterEffect::Echo, 2, 99));
@@ -344,18 +335,26 @@ namespace
 			require(machine != nullptr, "the OS has no machine " + std::to_string(_id));
 			return machine->defaults;
 		};
-		// $5B's body: track, id, then the UW flag and a scope when given (-1 leaves one out)
-		const auto assign = [&](const uint8_t _track, const uint8_t _id, const int _uw, const int _scope)
+		using sysex::KitChange;
+		// A message to the Device; midiOut then holds what it says back to that one alone
+		const auto send = [&](const sysex::Message& _message)
 		{
-			std::vector<uint8_t> bytes{0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x5b, _track, _id};
-			if(_uw >= 0)
-				bytes.push_back(static_cast<uint8_t>(_uw));
-			if(_scope >= 0)
-				bytes.push_back(static_cast<uint8_t>(_scope));
-			bytes.push_back(0xf7);
 			rig.midiOut.clear();
-			rig.send(MidiEventSource::Editor, bytes);
+			rig.send(MidiEventSource::Editor, _message);
 			rig.process();
+		};
+		// A change as OS 1.63 sends it
+		const auto change = [](const KitChange::Kind _kind, const uint8_t _track, const uint8_t _index,
+			const uint8_t _value)
+		{
+			const auto message = sysex::encodeKitChange({_kind, _track, _index, _value});
+			require(message.has_value(), "no message for a Kit change");
+			return message->message();
+		};
+		// What OS 1.63 reads and no encoder sends: _command, then _body up to F7
+		const auto unsent = [](const uint8_t _command, const std::initializer_list<uint8_t> _body)
+		{
+			return sysex::codec::message(md::MachineModel::Machinedrum, _command, _body);
 		};
 		const auto setPage = [&](const uint8_t _track, const uint8_t _page, const uint8_t _value)
 		{
@@ -373,32 +372,26 @@ namespace
 
 		setPage(1, machinedrum::Effects, 99);
 		setPage(1, machinedrum::Routing, 99);
-		assign(1, 17, 0, -1);	// TRX-SD
+		send(change(KitChange::Kind::Machine, 1, KitChange::AssignScope, 17));	// TRX-SD: 11 bytes, the UW flag 0
 		require(kit().machine(1) == 17 && page(1, 0) == defaults(17) && page(1, 1) == os::Effects
 			&& page(1, 2) == os::Routing, "$5B did not set TRX-SD's 24 parameters");
 		require(reported(rig, 1) == 24, "$5B did not report the 24 parameters");
 		setPage(1, machinedrum::Effects, 99);
-		assign(1, 0, 1, 0);	// ROM-01, scope 0
+		send(change(KitChange::Kind::Machine, 1, 0, 128));	// ROM-01: id 0, the UW flag, scope 0
 		const std::array<uint8_t, 8> kept{99, 99, 99, 99, 99, 99, 99, 99};
 		require(kit().machine(1) == 128 && page(1, 0) == defaults(128) && page(1, 1) == kept,
 			"a $5B with the UW flag and scope 0 was not taken");
-		assign(1, 16, -1, -1);	// TRX-BD, without the UW flag
+		send(unsent(0x5b, {1, 16}));	// TRX-BD on track 2, without the UW flag: 10 bytes
 		require(kit().machine(1) == 16 && page(1, 1) == os::Effects, "a $5B without the UW flag was not taken");
 		const auto before = kit();
-		assign(4, 6, 0, -1);
+		send(change(KitChange::Kind::Machine, 4, KitChange::AssignScope, 6));
 		require(kit() == before && rig.midiOut.empty(), "a machine the OS lacks was taken");
 		std::printf("$5B: scopes, UW flag, the 24 parameters reported, absent machines as OS 1.63\n");
 
-		const auto lfo = [&](const uint8_t _track, const uint8_t _field, const uint8_t _value)
-		{
-			rig.send(MidiEventSource::Editor, {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x62,
-				static_cast<uint8_t>(_track << 3 | _field), _value, 0xf7});
-			rig.process();
-		};
-		lfo(5, 0, 7);
-		lfo(5, 0, 16);
+		send(change(KitChange::Kind::Lfo, 5, 0, 7));
+		send(unsent(0x62, {5 << 3, 16}));	// Track 6's field 0 (track << 3 | field), the LFO's track, past its range
 		require(kit().lfo(5).track == 7, "$62 past a field's range changed it");
-		lfo(5, 5, 77);
+		send(change(KitChange::Kind::Lfo, 5, 5, 77));
 		require(kit().parameters[5][21] == 77, "$62's field 5 did not set LFOS");
 		std::printf("$62: out of range ignored, field 5 sets LFOS\n");
 	}
@@ -656,31 +649,25 @@ namespace
 
 	// The files md-drums-seq reads (KitFiles), on a clock of the test's own: a new device's file at once, a change at
 	// the next step, nothing written for nothing changed, a device forgotten ForgetMs after its last hello, every file
-	// gone with the object
+	// gone with the object. It needs no flash image.
 	void kitFiles()
 	{
 		using mdDrums::KitFiles;
-		const auto folder = std::filesystem::temp_directory_path()
-			/ ("mdDrumsKitFiles_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-		const auto read = [](const std::filesystem::path& _file)
-		{
-			std::ifstream in(_file, std::ios::binary);
-			return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-		};
+		const mdDrums::test::TempFolder folder("mdDrumsKitFiles_");
 		sysex::MdKit kit;
 		kit.setName("KIT FILE");
 		kit.machines[0] = 16;	// TRX-BD
 		kit.machines[1] = 6;	// no machine
 		kit.parameters[0][12] = 99;
 		{
-			KitFiles files(folder);
+			KitFiles files(folder.path());
 			const auto a = files.file(0x00abcd), b = files.file(0xfedcba);
 			require(a.filename() == "00abcd.kit", "a device's file is not named by its id");
 			require(!files.due(0.0), "no device heard, and a step is due");
 			files.hello(0x00abcd, 0.0);
 			require(files.due(0.0), "a new device's file is not due at once");
 			files.step(KitFiles::text(kit), 0.0);
-			const auto text = read(a);
+			const auto text = readFile<std::string>(a);
 			std::printf("kit file:\n%s", text.substr(0, text.find("values 2")).c_str());
 			const std::string start =
 				"md-drums-kit 1\nkit KIT FILE\ntrack 1 16 TRX-BD PTCH DEC RAMP RDEC STRT NOIS HARM CLIP\n";
@@ -696,11 +683,13 @@ namespace
 			files.hello(0xfedcba, 100.0);
 			require(files.due(100.0), "a second device's file is not due at once");
 			files.step(KitFiles::text(kit), 100.0);
-			require(std::filesystem::exists(b) && read(b) == text, "the second device has not the same file");
+			require(std::filesystem::exists(b) && readFile<std::string>(b) == text,
+				"the second device has not the same file");
 			kit.parameters[0][12] = 98;
 			require(!files.due(300.0) && files.due(350.0), "a step came before StepMs");
 			files.step(KitFiles::text(kit), 350.0);
-			require(read(a) != text && read(a) == read(b), "a change did not reach both files");
+			const auto changed = readFile<std::string>(a);
+			require(changed != text && changed == readFile<std::string>(b), "a change did not reach both files");
 
 			// The first device goes quiet: its file goes ForgetMs after its last hello, the second stays
 			files.hello(0xfedcba, 10000.0);
@@ -708,9 +697,7 @@ namespace
 			require(!std::filesystem::exists(a) && std::filesystem::exists(b) && files.devices() == 1,
 				"a device silent for ForgetMs kept its file, or the other lost its own");
 		}
-		require(!std::filesystem::exists(folder / "fedcba.kit"), "a file stayed after the object went");
-		std::error_code error;
-		std::filesystem::remove_all(folder, error);
+		require(!std::filesystem::exists(folder.path() / "fedcba.kit"), "a file stayed after the object went");
 		std::printf("kit files: written at once, a change at the next step, forgotten after %.0f s, gone with the"
 			" object\n", KitFiles::ForgetMs / 1000.0);
 	}
@@ -752,8 +739,8 @@ namespace
 	// The Telemetry the editor reads (ticket 16): a note's Track and Main peak while the other Tracks stay silent, and
 	// its Hit is counted; a muted Track's Hit is not; the Hit's capture is the Track's output from where the Hit sounds.
 	// Then what writing it costs: the Device's own peak pass over 18 outputs and 16 captures at once, timed alone (at
-	// most 1 % of one core), and the whole Device with and without it, side by side, for information.
-	void telemetry(const std::vector<uint8_t>& _flash)
+	// most 1 % of one core), and with _measure the whole Device with and without it, side by side, for information.
+	void telemetry(const std::vector<uint8_t>& _flash, const bool _measure)
 	{
 		{
 			Rig rig(_flash, 44100.0f);
@@ -843,10 +830,7 @@ namespace
 			uint32_t random = 0x2468aceu;
 			for(auto& output : outputs)
 				for(auto& value : output)
-				{
-					random ^= random << 13; random ^= random >> 17; random ^= random << 5;
-					value = static_cast<float>(static_cast<int32_t>(random)) / 2147483648.0f;
-				}
+					value = static_cast<float>(static_cast<int32_t>(xorshift(random))) / 2147483648.0f;
 			auto telemetry = std::make_unique<mdDrums::Telemetry>();	// too large for the stack with its captures
 			auto& t = *telemetry;
 			constexpr int blocks = 20000;
@@ -882,7 +866,12 @@ namespace
 			require(seconds / audio <= 0.01, "the telemetry costs more than 1 % of one core");
 		}
 
-		// The whole Device with and without it, block by block side by side
+		// The whole Device with and without it, block by block side by side: it checks nothing, by hand only
+		if(!_measure)
+		{
+			std::printf("telemetry: the whole Device with and without it skipped (--measure runs it)\n");
+			return;
+		}
 		{
 			Rig with(_flash, 44100.0f, true), without(_flash, 44100.0f, false);
 			with.settle();
@@ -907,7 +896,7 @@ namespace
 	}
 
 	// Note to sound through the Plugin: TRX-BD on track 1, 48 notes at pseudo-random samples of 512-sample host blocks,
-	// to the first sample of Main above -100 dBFS
+	// to the first sample of Main above -100 dBFS, each once the one before has fallen silent
 	void latency(const std::vector<uint8_t>& _flash, const float _rate)
 	{
 		Rig rig(_flash, _rate);
@@ -931,27 +920,30 @@ namespace
 			}
 		};
 		Stats main, out;
+		// Sample _s of the last host block on Main, above -100 dBFS, and on Out 01, not 0
+		const auto onMain = [&](const uint32_t _s)
+		{
+			return std::abs(rig.buffers[0][_s]) > 1e-5f || std::abs(rig.buffers[1][_s]) > 1e-5f;
+		};
+		const auto onOut01 = [&](const uint32_t _s) { return rig.buffers[2][_s] != 0.0f; };
 		// Track 1 on Main, then on Out 01 (Main comes MasterDelay later, after the master effects)
 		for(const bool onOut : {false, true})
 		{
 			rig.send(MidiEventSource::Editor, mdDrums::messages::out(0, onOut ? 1 : 0).message());
 			for(int note = 0; note < 48; ++note)
 			{
+				// A second between the notes: one silent host block is not enough, the last note's tail crosses the
+				// threshold again (Main as early as 60 samples, Out 01 at 0 at 48 kHz)
 				rig.listen(0, static_cast<uint32_t>(_rate / Rig::Block));
-				random ^= random << 13; random ^= random >> 17; random ^= random << 5;
-				const auto offset = random % Rig::Block;
+				const auto offset = xorshift(random) % Rig::Block;
 				rig.send(MidiEventSource::Host, {0x90, 36, 100}, offset);
 				int first = -1;
 				for(uint32_t b = 0, position = 0; b < 8 && first < 0; ++b, position += Rig::Block)
 				{
 					rig.process();
 					for(uint32_t s = 0; s < Rig::Block && first < 0; ++s)
-					{
-						const bool heard = onOut ? rig.buffers[2][s] != 0.0f
-							: std::abs(rig.buffers[0][s]) > 1e-5f || std::abs(rig.buffers[1][s]) > 1e-5f;
-						if(heard)
+						if(onOut ? onOut01(s) : onMain(s))
 							first = static_cast<int>(position + s) - static_cast<int>(offset);
-					}
 				}
 				(onOut ? out : main).add(first);
 			}
@@ -965,34 +957,22 @@ namespace
 	}
 }
 
-int main()
+int main(const int _argc, char** _argv)
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = readFlash();
-	if(flash.empty())
+	// The whole Device timed with and without its Telemetry, which checks nothing, by hand only
+	const bool measure = _argc > 1 && std::string(_argv[1]) == "--measure";
+	// md-drums-seq's Kit files first: they need no flash image
+	return mdDrums::test::run("mdDrumsDeviceTest", kitFiles, [&](const std::vector<uint8_t>& _flash)
 	{
-		std::printf("mdDrumsDeviceTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n");
-		return 77;
-	}
-	try
-	{
-		behaviour(flash);
-		parameters(flash);
-		assignAndLfo(flash);
-		locks(flash);
-		unplayed(flash);
-		hello(flash);
-		kitFiles();
-		allocations(flash);
-		latency(flash, 44100.0f);
-		latency(flash, 48000.0f);
-		telemetry(flash);
-		std::printf("mdDrumsDeviceTest: PASS\n");
-		return 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::printf("mdDrumsDeviceTest: FAIL: %s\n", _error.what());
-		return 1;
-	}
+		behaviour(_flash);
+		parameters(_flash);
+		assignAndLfo(_flash);
+		locks(_flash);
+		unplayed(_flash);
+		hello(_flash);
+		allocations(_flash);
+		latency(_flash, 44100.0f);
+		latency(_flash, 48000.0f);
+		telemetry(_flash, measure);
+	});
 }

@@ -22,8 +22,7 @@ namespace mdDrums::messages
 
 			Writer& add(const uint8_t _byte)
 			{
-				if(raw.size < raw.bytes.size())
-					raw.bytes[raw.size++] = _byte;
+				raw.add(_byte);
 				return *this;
 			}
 			Writer& add21(const uint32_t _value)
@@ -45,17 +44,6 @@ namespace mdDrums::messages
 		{
 			return static_cast<uint32_t>(_message[_at]) << 14 | static_cast<uint32_t>(_message[_at + 1]) << 7
 				| _message[_at + 2];
-		}
-
-		std::optional<Raw> kitChange(const md::automation::sysex::KitChange& _change)
-		{
-			const auto message = md::automation::sysex::encodeKitChange(_change);
-			if(!message)
-				return std::nullopt;
-			Raw raw;
-			std::copy_n(message->bytes.begin(), message->size, raw.bytes.begin());
-			raw.size = message->size;
-			return raw;
 		}
 
 		Raw trackFlag(const Command _command, const uint8_t _track, const bool _on)
@@ -88,8 +76,7 @@ namespace mdDrums::messages
 			case pages::Master:
 				if(_index >= 32)
 					return nullptr;
-				return &_kit.masterEffects[md::automation::sysex::mdKitMasterIndex(static_cast<uint8_t>(_index / 8),
-					static_cast<uint8_t>(_index % 8))];
+				return &_kit.masterEffects[md::automation::sysex::mdKitMasterIndex(_index)];
 			default:
 				return nullptr;
 			}
@@ -238,6 +225,7 @@ namespace mdDrums::messages
 	std::optional<Raw> parameterMessage(const uint8_t _page, const uint8_t _track, const uint8_t _index, const int _value)
 	{
 		using md::automation::sysex::KitChange;
+		using md::automation::sysex::encodeKitChange;
 		using Kind = KitChange::Kind;
 		if(_track >= md::automation::machinedrum::TrackCount)
 			return std::nullopt;
@@ -254,26 +242,23 @@ namespace mdDrums::messages
 				{_page, _track, _index, value}, 0);
 			if(!cc)
 				return std::nullopt;
-			Raw raw;
-			raw.bytes = {(*cc)[0], (*cc)[1], (*cc)[2]};
-			raw.size = 3;
-			return raw;
+			return Raw{}.add((*cc)[0]).add((*cc)[1]).add((*cc)[2]);
 		}
 		case pages::Machine:
 			if(_index != 0 || _value < 0 || _value > KitChange::LastMachine)
 				return std::nullopt;
-			return kitChange({Kind::Machine, _track, KitChange::AssignScope, static_cast<uint8_t>(_value)});
+			return encodeKitChange({Kind::Machine, _track, KitChange::AssignScope, static_cast<uint8_t>(_value)});
 		case pages::Lfo:
 			// The LFO's five settings: LFOS, LFOD and LFOM are the routing page's
 			if(_index >= md::LfoSettings::FieldMaximum.size())
 				return std::nullopt;
-			return kitChange({Kind::Lfo, _track, _index, value});
+			return encodeKitChange({Kind::Lfo, _track, _index, value});
 		case pages::Mixer:
 			if(_index > 1)
 				return std::nullopt;
 			return _index == 0 ? solo(_track, value != 0) : out(_track, value);
 		case pages::Master:
-			return kitChange({Kind::Master, 0, _index, value});
+			return encodeKitChange({Kind::Master, 0, _index, value});
 		default:
 			return std::nullopt;
 		}

@@ -36,11 +36,7 @@ namespace md::automation::sysex
 		uint8_t value = 0;
 
 		// Where a Master change lands among the Kit's 32 master bytes, in the dump's order
-		uint8_t masterIndex() const
-		{
-			return mdKitMasterIndex(static_cast<uint8_t>(index / MasterEffectParameters),
-				static_cast<uint8_t>(index % MasterEffectParameters));
-		}
+		uint8_t masterIndex() const { return mdKitMasterIndex(index); }
 		// The Track parameter an LFO change sets, LFOS, LFOD or LFOM (21 to 23); -1 for one of the LFO's settings
 		int lfoParameter() const
 		{
@@ -53,12 +49,20 @@ namespace md::automation::sysex
 		}
 	};
 
-	// A message from F0 to F7, 12 bytes at most (a $5B with its scope)
-	struct KitChangeMessage
+	// A message built without allocating, for the audio thread: a CC in its first three bytes, or SysEx from F0 to F7
+	// (a Kit change takes 12 bytes at most, a $5B with its scope; MD Drums' own messages fit too)
+	struct RawMessage
 	{
-		std::array<uint8_t, 12> bytes{};
+		std::array<uint8_t, 32> bytes{};
 		uint8_t size = 0;
 
+		// A byte past the 32 is dropped
+		RawMessage& add(const uint8_t _byte)
+		{
+			if(size < bytes.size())
+				bytes[size++] = _byte;
+			return *this;
+		}
 		Message message() const { return Message(bytes.begin(), bytes.begin() + size); }
 	};
 
@@ -69,7 +73,7 @@ namespace md::automation::sysex
 	std::optional<KitChange> decodeKitChange(MessageView _message);
 	// The message for a change, as OS 1.63 sends one: a $5B without a scope byte for AssignScope. Empty for a change
 	// decodeKitChange would not give.
-	std::optional<KitChangeMessage> encodeKitChange(const KitChange& _change);
+	std::optional<RawMessage> encodeKitChange(const KitChange& _change);
 	// The same as an allocating Message, for the encoders that return one (assignMachine, masterEffectChange,
 	// lfoChange, linkChange, chokeChange)
 	std::optional<Message> kitChangeMessage(const KitChange& _change);

@@ -63,6 +63,12 @@ later versions can be compared file by file. Their documentation is in `.scratch
   same, sample for sample, the first block costs 0.25 ms, and no master parameter through its range costs a block more
   than 0.12 ms of master (`mdDrums/mdDrumsFirstHitTest.cpp`).
 
+- `engine/VoiceEngine.cpp`: the voice DSP's X and Y are 2M words, not 8M. With X and Y bridged to P from `$020000`,
+  P is as large as the larger of the two, so upstream's voice DSP held 8M words of P where the board's map ends below
+  `$200000` (as its own comment says), and `saveState` copied them all. `MasterEngine` already uses 2M.
+- `engine/HostModel.h`: `isAudioMachine` (MID and CTR give the voice DSP nothing), shared with `warmUpVoices`.
+- `engine/MachineRunner.cpp`: `call` pushes its arguments from their list itself, without copying them into a vector.
+
 Machinemodule's own `dsp56300` fork is not used: its x64 JIT stops the voice DSP's init on Windows
 (`instruction budget exceeded at PC=$10008b`), and ours runs it.
 
@@ -109,7 +115,3 @@ do not depend on what came before, and match the firmware's within -100 to -112 
 dB in others (all 32 slots measured one by one, 2026-10-07). The voice DSP's P, X and Y memory and the voice's
 coefficient words are the same in both; the cause is not known. With 8 or more ROM machines sounding, the firmware's
 voice DSP misses its deadline (ROM-09 played as the 8th of 15: residual +3.6 dB), and this engine does not.
-
-Known difference: a voice keeps its noise generator's state between hits, and the engine stops rendering a voice
-that has died away while the firmware keeps it running, so a noise-based machine's second hit on a track does not
-repeat the firmware's sample for sample.

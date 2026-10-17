@@ -89,7 +89,7 @@ namespace md::engine
 				const auto os = m_os->clone();
 				std::vector<const MachineInfo*> machines;
 				for(const auto& m : os->machines())
-					if(!(m.id >= 0x60 && m.id <= 0x7b) && m.name.rfind("RAM", 0) != 0)	// MID/CTR have no audio
+					if(isAudioMachine(m.id) && m.name.rfind("RAM", 0) != 0)
 						machines.push_back(&m);
 				typename TVoices::Block block;
 				bool ok = true;
@@ -100,8 +100,8 @@ namespace md::engine
 						for(size_t v = 0; v < static_cast<size_t>(kTracks) && first + v < machines.size(); ++v)
 						{
 							const auto& machine = *machines[first + v];
-							std::array<uint16_t, 24> params{};
-							params.fill(64 << 7);
+							// SYN1-8: the machine reads no other
+							std::array<uint16_t, 8> params{};
 							for(size_t p = 0; p < 8; ++p)
 								params[p] = static_cast<uint16_t>(machine.defaults[p] << 7);
 							uint32_t out[32];
@@ -192,29 +192,29 @@ namespace md::engine
 				if(m_host->takeMasterWords(words))
 					m_master->setWords(words.y, words.words.data(), words.count);
 			}
-			const auto tf0 = timingOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+			using Clock = std::chrono::steady_clock;
+			const auto tf0 = timingOn ? Clock::now() : Clock::time_point{};
+			// Parallel: the groups' threads already ran their tracks' effects (see init()).
+			if constexpr(!kParallel)
+				for(int t = 0; t < kTracks; ++t)
+					fxTrack(*m_fxs[0], t, m_voiceOut[t].data(), _out.tracks[t].data());
+			// md-drums: without the mixer (mixOn), each track's output is all there is
+			if(!mixOn)
+				return true;
 			std::array<const int32_t*, kTracks> in{};
 			std::array<std::array<uint32_t, 5>, kTracks> mix{};
 			for(int t = 0; t < kTracks; ++t)
 			{
-				// Parallel: the groups' threads already ran their tracks' effects (see init()).
-				if constexpr(!kParallel)
-					fxTrack(*m_fxs[0], t, m_voiceOut[t].data(), _out.tracks[t].data());
 				in[t] = _out.tracks[t].data();
 				mix[t] = m_host->mixerInput(t).mix;
 			}
-			if(!mixOn)
-				return true;
-			if(!timingOn)
-			{
-				m_mixer.process(in.data(), mix.data(), _out.mix, dryMute);
-				return !m_master || processMaster(_out.mix.main, _out.mix.rev, _out.mix.del, _out.master);
-			}
-			const auto tf1 = std::chrono::steady_clock::now();
+			const auto tf1 = timingOn ? Clock::now() : Clock::time_point{};
 			m_mixer.process(in.data(), mix.data(), _out.mix, dryMute);
-			const auto tf2 = std::chrono::steady_clock::now();
-			fxUs += std::chrono::duration<double, std::micro>(tf1 - tf0).count();
-			mixUs += std::chrono::duration<double, std::micro>(tf2 - tf1).count();
+			if(timingOn)
+			{
+				fxUs += std::chrono::duration<double, std::micro>(tf1 - tf0).count();
+				mixUs += std::chrono::duration<double, std::micro>(Clock::now() - tf1).count();
+			}
 			return !m_master || processMaster(_out.mix.main, _out.mix.rev, _out.mix.del, _out.master);
 		}
 

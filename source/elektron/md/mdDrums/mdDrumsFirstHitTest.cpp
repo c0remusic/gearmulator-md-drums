@@ -13,10 +13,11 @@
 #include "Firmware.h"
 #include "MdEngine.h"
 
+#include "mdDrumsTestSupport.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -24,6 +25,8 @@
 
 namespace
 {
+	using mdDrums::test::differences;
+	using mdDrums::test::require;
 	using Clock = std::chrono::steady_clock;
 
 	struct Cost
@@ -45,14 +48,6 @@ namespace
 			_samples.tracks.insert(_samples.tracks.end(), track.begin(), track.end());
 		for(const auto& frame : _out.master)
 			_samples.main.insert(_samples.main.end(), frame.begin(), frame.end());
-	}
-
-	size_t differences(const std::vector<int32_t>& _a, const std::vector<int32_t>& _b)
-	{
-		size_t differ = 0;
-		for(size_t i = 0; i < _a.size(); ++i)
-			differ += _a[i] != _b[i];
-		return differ;
 	}
 
 	// An engine with factory Kit 1 and the master effects, a second rendered: its first block printed, the samples
@@ -136,22 +131,14 @@ namespace
 
 int main()
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
+	return mdDrums::test::run("mdDrumsFirstHitTest", [](const std::vector<uint8_t>& _flash)
 	{
-		std::cout << "mdDrumsFirstHitTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	try
-	{
-		const auto kit = mdDrums::messages::factoryKit(flash);
-		if(!kit)
-			throw std::runtime_error("no factory Kit");
+		const auto kit = mdDrums::messages::factoryKit(_flash);
+		require(kit.has_value(), "no factory Kit");
 		Samples samples[2];
 		for(const bool warm : {false, true})
 		{
-			auto engine = build(flash, *kit, warm, samples[warm]);
+			auto engine = build(_flash, *kit, warm, samples[warm]);
 			for(int round = 1; round <= 2; ++round)
 			{
 				double worst = 0.0;
@@ -207,13 +194,7 @@ int main()
 			[](const int32_t _s) { return _s != 0; }));
 		std::printf("the two engines: %zu of %zu Track samples differ, %zu of %zu Main samples (%zu of them not silent)\n",
 			differTracks, samples[0].tracks.size(), differMain, samples[0].main.size(), heard);
-		const auto differ = differTracks + differMain + (heard ? 0 : 1);
-		std::cout << "mdDrumsFirstHitTest: " << (differ ? "the warmed engine sounds different" : "done") << '\n';
-		return differ ? 1 : 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::cerr << "mdDrumsFirstHitTest: " << _error.what() << '\n';
-		return 1;
-	}
+		require(heard > 0, "Main stayed silent");
+		require(differTracks + differMain == 0, "the warmed engine sounds different");
+	});
 }

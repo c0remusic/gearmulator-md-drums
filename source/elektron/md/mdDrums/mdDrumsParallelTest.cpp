@@ -11,19 +11,18 @@
 #include "Firmware.h"
 #include "MdEngine.h"
 
+#include "mdDrumsTestSupport.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <numeric>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
+// GetProcessTimes (windows.h, as mdDrumsTestSupport.h includes it), or std::clock
 #ifdef _WIN32
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <ctime>
@@ -31,11 +30,8 @@
 
 namespace
 {
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::test::differences;
+	using mdDrums::test::require;
 
 	// CPU time of the whole process, every thread, in seconds
 	double processCpu()
@@ -53,14 +49,6 @@ namespace
 #endif
 	}
 
-	uint8_t machineId(const std::vector<md::engine::MachineInfo>& _machines, const char* _name)
-	{
-		for(const auto& machine : _machines)
-			if(machine.name == _name)
-				return machine.id;
-		throw std::runtime_error(std::string("machine missing from the OS's table: ") + _name);
-	}
-
 	struct Result
 	{
 		std::vector<double> blockUs;		// per engine block, on the calling thread
@@ -74,17 +62,8 @@ namespace
 		_engine.loadRomBank(md::fw::loadRomBankFromFlash(_flash));
 		_engine.enableMaster(_os.firmware);
 		auto& host = _engine.host();
-		const char* kit[16] = {"TRXBD", "TRXSD", "TRXXT", "TRXCP", "TRXRS", "TRXCB", "TRXCH", "TRXOH",
-			"TRXCY", "TRXMA", "TRXCL", "TRXXC", "TRXB2", "TRXS2", "EFMBD", "EFMSD"};
-		for(int track = 0; track < 16; ++track)
-		{
-			host.setMachine(track, machineId(_engine.os().machines(), kit[track]));
-			for(int param = 8; param < mdDrums::Engine::ParamCount; ++param)
-				host.setParam(track, param, mdDrums::Engine::paramDefaults()[param]);
-			host.setLevel(track, 100);
-		}
-		for(int index = 0; index < mdDrums::Engine::MasterCount; ++index)
-			host.setMaster(index, mdDrums::Engine::masterDefaults()[index]);
+		// As MD Drums' engine starts: TRX machines, then EFM-BD and -SD
+		mdDrums::applyEngineDefaults(host);
 
 		typename TEngine::Output out;
 		const auto block = [&](const int _b)
@@ -128,9 +107,7 @@ namespace
 		for(size_t b = 0; b + 8 <= blocks; b += 8)
 			worstHost = std::max(worstHost, std::accumulate(_result.blockUs.begin() + static_cast<std::ptrdiff_t>(b),
 				_result.blockUs.begin() + static_cast<std::ptrdiff_t>(b + 8), 0.0));
-		size_t differ = 0;
-		for(size_t i = 0; i < _result.main.size() && i < _reference.main.size(); ++i)
-			differ += _result.main[i] != _reference.main[i];
+		const auto differ = differences(_result.main, _reference.main);
 		const auto audio = static_cast<double>(blocks) * blockUs * 1e-6;
 		std::printf("%-26s calling thread %5.1f %% of real time (block mean %5.1f us, p99 %6.1f, max %7.1f; worst 256-sample"
 			" host block %5.1f %% of its time); process CPU %5.1f %% of one core; Main: %zu of %zu samples differ\n",
@@ -142,40 +119,26 @@ namespace
 
 int main(const int _argc, char** _argv)
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
-	{
-		std::cout << "mdDrumsParallelTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	try
+	return mdDrums::test::measure("mdDrumsParallelTest", [&](const std::vector<uint8_t>& _flash)
 	{
 		const double seconds = _argc > 1 ? std::atof(_argv[1]) : 10.0;
 		const auto blocks = static_cast<int>(seconds * 44100.0 / 32.0);
-		const auto os = md::fw::loadFirmwareFromFlash(flash);
+		const auto os = md::fw::loadFirmwareFromFlash(_flash);
 		std::printf("16 tracks struck in turn, every voice rendering, master effects, %.0f s of audio per configuration\n",
 			seconds);
 
 		Result reference;
 		{
 			md::engine::Engine engine(os.firmware, os.osImage);
-			reference = run(engine, flash, os, blocks);
+			reference = run(engine, _flash, os, blocks);
 		}
 		report("one voice DSP (today)", reference, reference);
 		for(const int groups : {1, 2, 4})
 		{
 			md::engine::ParallelEngine engine(os.firmware, os.osImage, groups);
-			const auto result = run(engine, flash, os, blocks);
+			const auto result = run(engine, _flash, os, blocks);
 			const auto name = std::to_string(groups) + (groups == 1 ? " group" : " groups") + " (parallel)";
 			report(name.c_str(), result, reference);
 		}
-		std::cout << "mdDrumsParallelTest: done\n";
-		return 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::cerr << "mdDrumsParallelTest: " << _error.what() << '\n';
-		return 1;
-	}
+	});
 }

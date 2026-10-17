@@ -140,7 +140,6 @@ namespace md::engine
 		}
 		while(hi.hasTX())
 			hi.readTX();
-		m_lastInstructions = m_dsp->getInstructionCounter() - start;
 		return true;
 	}
 
@@ -223,11 +222,6 @@ namespace md::engine
 		if(ok)
 			m_fault.clear();
 		return ok;
-	}
-
-	uint32_t MasterEngine::readX(const uint32_t _addr) const
-	{
-		return m_mem->get(MemArea_X, _addr) & 0xffffff;
 	}
 
 	uint32_t MasterEngine::readY(const uint32_t _addr) const

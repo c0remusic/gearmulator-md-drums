@@ -132,7 +132,6 @@ namespace mdDrums
 		if(key == m_traced)
 			return false;
 		m_traced = key;
-		m_depth = depth;
 
 		// The values it reaches, in the label column at the plot's top and foot (in the knob's steps: a word's
 		// nearest, $3f80 to $3fff being 127); without depth, why there is no wave
@@ -204,8 +203,7 @@ namespace mdDrums
 		// Armed: the knobs of the shown Track's machine, a Track or a machine later
 		if(!m_armed)
 			return false;
-		const auto ringedFor = m_part * 256 + value(Machine, m_part);
-		if(ringedFor == m_ringedFor)
+		if(m_part * 256 + value(Machine, m_part) == m_ringedFor)
 			return false;
 		updateTargets();
 		return true;
@@ -213,16 +211,15 @@ namespace mdDrums
 
 	void LfoView::updateTargets()
 	{
-		m_ringedFor = m_part * 256 + value(Machine, m_part);
+		const auto machine = value(Machine, m_part);
+		m_ringedFor = m_part * 256 + machine;
 		// Every knob of the bands, but SYN slots the shown Track's machine does not use
-		const auto* names = md::machines::parameterNames(md::MachineModel::Machinedrum,
-			static_cast<uint16_t>(value(Machine, m_part)));
 		for(int i = 0; i < Engine::ParamCount; ++i)
 		{
-			auto* knob = dynamic_cast<Knob*>(find(std::string("k_") + Engine::paramNames()[static_cast<size_t>(i)]));
+			auto* knob = m_knobs[static_cast<size_t>(i)];
 			if(!knob)
 				continue;
-			const bool unused = i < 8 && names && (*names)[static_cast<size_t>(i)].empty();
+			const bool unused = Engine::parameterName(static_cast<uint16_t>(machine), static_cast<size_t>(i)).empty();
 			const bool target = m_armed && !unused;
 			if(target == knob->isTarget())
 				continue;
@@ -232,10 +229,8 @@ namespace mdDrums
 
 	void LfoView::updateTitle() const
 	{
-		if(auto* target = find("lfo_target"))
-			target->SetProperty("display", m_armed ? "none" : "inline-block");
-		if(auto* asking = find("lfo_assigning"))
-			asking->SetProperty("display", m_armed ? "inline-block" : "none");
+		setDisplay(find("lfo_target"), !m_armed, Rml::Style::Display::InlineBlock);
+		setDisplay(find("lfo_assigning"), m_armed, Rml::Style::Display::InlineBlock);
 		if(auto* assign = find("lfo_assign"))
 		{
 			assign->SetInnerRML(m_armed ? "Cancel" : "Assign");
@@ -288,7 +283,7 @@ namespace mdDrums
 
 	void LfoView::paint(juce::Graphics& _g, const float _dp) const
 	{
-		if(m_depth <= 0 || m_trace.words.empty())
+		if(m_traced[Depth] <= 0 || m_trace.words.empty())
 			return;
 		const auto left = g_left * _dp, top = g_top * _dp, bottom = g_bottom * _dp;
 		const auto pixels = static_cast<int>(std::round((g_right - g_left) * _dp));

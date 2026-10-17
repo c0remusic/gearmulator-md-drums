@@ -87,7 +87,7 @@ namespace mdDrums
 			if(auto* note = find("filter_srr"))
 			{
 				note->SetInnerRML(srr > 0 ? "SRR " + std::to_string(srr) : std::string());
-				setDisplay(note, srr > 0, "inline");
+				setDisplay(note, srr > 0, Rml::Style::Display::Inline);
 			}
 			wrote = true;
 		}

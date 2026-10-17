@@ -14,11 +14,8 @@ namespace mdDrums
 	{
 		const auto toggle = [this](Rml::Event&)
 		{
-			auto* tracks = m_editor.getTrackView();
-			if(!tracks)
-				return;
-			const bool open = tracks->getOverlay() == TrackView::Overlay::Links;
-			tracks->setOverlay(open ? TrackView::Overlay::None : TrackView::Overlay::Links);
+			if(auto* tracks = m_editor.getTrackView())
+				tracks->toggleOverlay(TrackView::Overlay::Links);
 		};
 		m_editor.addClick("link_word", toggle);
 		m_editor.addClick("choke_word", toggle);

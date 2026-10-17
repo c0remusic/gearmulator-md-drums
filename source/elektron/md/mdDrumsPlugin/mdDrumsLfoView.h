@@ -93,7 +93,6 @@ namespace mdDrums
 		bool m_armed = false;
 		uint8_t m_owner = 0;
 		Lfo::Trace m_trace;
-		int m_depth = 0;
 
 		// The LFO's target, found by name when LfoTrack or LfoParam change
 		pluginLib::Parameter* m_target = nullptr;

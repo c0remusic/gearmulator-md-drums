@@ -41,8 +41,8 @@ namespace mdDrums
 			const auto compiled = pluginLib::initProcessorProperties();
 			// Bus 0 is Main (device channels 0 and 1), bus n is Out n (channel n + 1): the host may enable any of them
 			std::vector<size_t> outputs{0};
-			for(size_t bus = 1; bus < Device::OutputCount - 1; ++bus)
-				outputs.push_back(bus + 1);
+			for(size_t out = 1; out <= messages::OutCount; ++out)
+				outputs.push_back(out + 1);
 			return {compiled.name, compiled.vendor, compiled.isSynth, compiled.wantsMidiInput, compiled.producesMidiOut,
 				compiled.isMidiEffect, compiled.plugin4CC, compiled.lv2Uri, compiled.binaryData, {}, {}, outputs};
 		}
@@ -51,8 +51,8 @@ namespace mdDrums
 	juce::AudioProcessor::BusesProperties Processor::buses()
 	{
 		auto properties = BusesProperties().withOutput("Main", juce::AudioChannelSet::stereo(), true);
-		for(int track = 1; track <= Device::OutputCount - 2; ++track)
-			properties = properties.withOutput(juce::String::formatted("Out %02d", track), juce::AudioChannelSet::mono(),
+		for(int out = 1; out <= messages::OutCount; ++out)
+			properties = properties.withOutput(juce::String::formatted("Out %02d", out), juce::AudioChannelSet::mono(),
 				false);
 		return properties;
 	}
@@ -174,10 +174,7 @@ namespace mdDrums
 	{
 		if(std::abs(_bpm - m_bpm.load(std::memory_order_relaxed)) < 0.005f)
 			return;
-		const auto message = messages::tempo(_bpm);
-		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
-		event.assignRawData(message.bytes.data(), message.size, synthLib::MidiEventSource::Editor, 0);
-		if(tryAddRealtimeMidiEvent(event))
+		if(tryAddRealtimeMidiEvent(messages::toEvent(messages::tempo(_bpm))))
 			m_bpm.store(_bpm, std::memory_order_relaxed);
 	}
 

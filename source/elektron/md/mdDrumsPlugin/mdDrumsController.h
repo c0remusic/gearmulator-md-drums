@@ -22,7 +22,7 @@ namespace mdDrums
 	class Controller final : public pluginLib::Controller
 	{
 	public:
-		static constexpr uint8_t TrackCount = 16;
+		static constexpr uint8_t TrackCount = md::automation::machinedrum::TrackCount;
 		static constexpr size_t TrackParameterCount = 34;	// Machine, 24 parameters, 5 LFO, Level, Mute, Solo, Out
 		static constexpr size_t MasterParameterCount = 32;
 		static constexpr size_t ParameterCount = TrackCount * TrackParameterCount + MasterParameterCount;
@@ -130,6 +130,11 @@ namespace mdDrums
 		void tellHost();
 		// A SysEx message for the Device, at the next audio block
 		void sendToDevice(const std::vector<uint8_t>& _sysex);
+		void sendToDevice(const messages::Raw& _message);
+		// A host parameter's value for the audio thread to send: in its slot, the slot marked
+		void publish(size_t _slot, int _value);
+		// A Link or a Choke of the Kit played, to the Device too
+		void setGroup(md::automation::sysex::KitChange::Kind _kind, uint8_t _track, uint8_t _target);
 
 		// The slots and the relays' targets from the JSON's rows; throws for rows that are not MD Drums' parameters
 		void numberSlots();

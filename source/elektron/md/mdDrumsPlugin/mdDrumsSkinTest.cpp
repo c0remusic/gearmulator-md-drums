@@ -34,6 +34,7 @@
 #include "mdDrumsMeterView.h"
 #include "mdDrumsProcessor.h"
 #include "mdDrumsStatusView.h"
+#include "mdDrumsTestSupport.h"
 #include "mdDrumsTrackView.h"
 
 #include "jucePluginEditorLib/pluginEditorState.h"
@@ -77,11 +78,12 @@ namespace juceRmlUi
 
 namespace
 {
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::testSupport::Clock;
+	using mdDrums::testSupport::hostSets;
+	using mdDrums::testSupport::msSince;
+	using mdDrums::testSupport::parameter;
+	using mdDrums::testSupport::require;
+	using mdDrums::testSupport::uiSets;
 
 	struct Box
 	{
@@ -140,13 +142,6 @@ namespace
 		return boxesOnly.count(_key) == 0;
 	}
 
-	using Clock = std::chrono::steady_clock;
-
-	double since(const Clock::time_point _start)
-	{
-		return std::chrono::duration<double, std::milli>(Clock::now() - _start).count();
-	}
-
 	struct Fixture
 	{
 		mdDrums::Processor& processor;
@@ -159,12 +154,10 @@ namespace
 
 		explicit Fixture(mdDrums::Processor& _processor) : processor(_processor)
 		{
-			processor.setForceSoftwareRendererForSession(true);
-			auto& state = processor.getOrCreateEditorState();
-			editor = dynamic_cast<mdDrums::Editor*>(state.getEditor());
-			require(editor != nullptr, "the processor did not create the editor");
+			editor = &mdDrums::testSupport::openEditor(processor);
 			component = editor->getRmlComponent();
-			require(component && component->getContext() && component->getDocument(), "the editor has no RmlUi document");
+			const auto& skin = processor.getOrCreateEditorState().getCurrentSkin();
+			require(skin.filename == "mdDrums.rml", "the default skin is " + skin.filename);
 			require(editor->getTrackView() != nullptr, "the default skin is not the v22 one");
 			component->setLookAndFeel(&lookAndFeel);
 			now = editor->lastFrameMs();
@@ -237,7 +230,7 @@ namespace
 			context().ProcessMouseButtonDown(0, 0);
 			context().ProcessMouseButtonUp(0, 0);
 			frame();
-			return since(start);
+			return msSince(start);
 		}
 
 		Box box(Rml::Element& _element) const
@@ -440,7 +433,7 @@ namespace
 			const auto start = Clock::now();
 			_f.moveTo(cx, cy - 3.0f * i);
 			_f.frame();
-			const auto ms = since(start);
+			const auto ms = msSince(start);
 			worst = std::max(worst, ms);
 			sum += ms;
 		}
@@ -548,7 +541,8 @@ namespace
 		_f.frame();
 		const auto screen = _f.box(*_f.find("screen_hit"));
 		const auto left = screen.x + 16, width = screen.w - 32, top = screen.y + 48, mid = screen.y + (216 - 36 + 48) / 2.0f;
-		const auto playhead = left + static_cast<float>(600 * 8 / 44100.0 / view->window()) * width;
+		const auto captured = 600 * mdDrums::Telemetry::ColumnSamples / mdDrums::Engine::SampleRate;	// seconds
+		const auto playhead = left + static_cast<float>(captured / view->window()) * width;
 		const auto ink = _f.pixel(left + 1, mid - 30).getBrightness();
 		const bool accentHead = isAccent(_f.pixel(playhead, top + 4));
 		std::printf("hit screen: window %.1f s, note \"%s\", waveform %.2f bright, playhead at x %.0f %s\n", view->window(),
@@ -570,9 +564,7 @@ namespace
 	// A parameter set as the editor's controls set it: the views read it at the next frame
 	void set(Fixture& _f, const char* _name, const uint8_t _part, const int _value)
 	{
-		auto* p = _f.processor.getController().getParameter(_name, _part);
-		require(p != nullptr, std::string("no parameter ") + _name);
-		p->setUnnormalizedValueNotifyingHost(_value, pluginLib::Parameter::Origin::Ui);
+		uiSets(parameter(_f.processor, _name, _part), _value);
 	}
 
 	// A click as the mouse makes it, at an element's centre
@@ -630,18 +622,12 @@ namespace
 
 		// The engine renders on its own thread: the screen reads its result at each frame (the clock barely moves, so
 		// that a machine chosen keeps its own parameters meanwhile)
-		const auto untilPreview = [&](const std::chrono::steady_clock::time_point _start)
+		const auto untilPreview = [&](const Clock::time_point _start)
 		{
-			while(view->previewPending() || !view->previewing())
-			{
-				require(std::chrono::steady_clock::now() - _start < std::chrono::seconds(10), "no preview within 10 s");
-				std::this_thread::sleep_for(std::chrono::milliseconds(2));
-				_f.step(0.05);
-			}
-			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _start).count();
+			return mdDrums::testSupport::untilPreview(*view, [&] { _f.step(0.05); }, _start);
 		};
 
-		auto start = std::chrono::steady_clock::now();
+		auto start = Clock::now();
 		set(_f, "FLTF", 0, 30);
 		_f.step(1);
 		require(view->previewPending(), "a change of the sound asks for no preview");
@@ -656,7 +642,7 @@ namespace
 
 		// The next engine is built meanwhile
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
-		start = std::chrono::steady_clock::now();
+		start = Clock::now();
 		set(_f, "FLTF", 0, 31);
 		_f.step(1);
 		const auto next = untilPreview(start);
@@ -674,7 +660,7 @@ namespace
 		// The browser, listening off (no audio runs here): EFM-SD chosen on Track 1
 		tracks->setListening(false);
 		_f.showView("browser");
-		start = std::chrono::steady_clock::now();
+		start = Clock::now();
 		click(_f, "mach_33");
 		require(controller.getParameter("Machine", 0)->getUnnormalizedValue() == 33, "the cell did not choose its machine");
 		_f.step(1);
@@ -1093,7 +1079,8 @@ namespace
 		clickNow(_f, "kit_rename");
 		_f.layout();
 		require(view->isRenaming() && visible("kit_name_edit") && !visible("kit_name_big"), "Rename does not open the name");
-		view->setRenameText("MY KIT");
+		// The name typed: the field's value, which Enter keeps
+		_f.find("kit_name_edit")->SetAttribute("value", std::string("MY KIT"));
 		context.ProcessKeyDown(Rml::Input::KI_RETURN, 0);
 		require(!view->isRenaming() && bank->slot(19)->displayName() == "MY KIT" && controller.playedKit().displayName() == "MY KIT"
 			&& !saveLit() && has("kit_name", "MY KIT"), "Rename did not name the Slot and the Kit played");
@@ -1179,7 +1166,7 @@ namespace
 		const auto start = Clock::now();
 		clickNow(_f, "links_link5");
 		_f.frame();
-		const auto ms = since(start);
+		const auto ms = msSince(start);
 		require(controller.link(0) == 4 && _f.on("links_link5") && !_f.on("links_link_off")
 			&& _f.text("link_text") == "Also strikes <b>track 05</b>", "a cell does not set the Link");
 		require(ms <= 33.0, "a cell clicked took over 33 ms to reach the pixels");
@@ -1332,10 +1319,9 @@ namespace
 
 		const auto host = [&](const char* _name, const int _value)
 		{
-			auto* p = controller.getParameter(_name, 0);
-			require(p != nullptr, std::string("no parameter ") + _name);
-			const auto before = p->getUnnormalizedValue();
-			p->setValue(p->convertTo0to1(static_cast<float>(_value)));
+			auto& p = parameter(_f.processor, _name);
+			const auto before = p.getUnnormalizedValue();
+			hostSets(p, _value);
 			return before;
 		};
 		// Track 1's LFO on its own FLTF, then each value to one it does not hold
@@ -1394,7 +1380,7 @@ namespace
 				}
 				const auto start = Clock::now();
 				wrote += _f.step(tick);
-				us.push_back(since(start) * 1000.0);
+				us.push_back(msSince(start) * 1000.0);
 			}
 			const auto cost = spread(us);
 			std::printf("frame: %s, %s, %d of 600 frames wrote\n", _name, cost.text.c_str(), wrote);

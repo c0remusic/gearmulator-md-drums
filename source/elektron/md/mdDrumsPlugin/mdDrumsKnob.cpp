@@ -2,6 +2,7 @@
 
 #include "mdDrumsCanvas.h"
 #include "mdDrumsColours.h"
+#include "mdDrumsDom.h"
 
 #include "juceRmlUi/rmlElemCanvas.h"
 #include "juceRmlUi/rmlHelper.h"
@@ -54,7 +55,7 @@ namespace mdDrums
 			m_hover = false;
 		if(m_ring)
 		{
-			m_ring->SetProperty(Rml::PropertyId::Display, m_onPick ? Rml::Style::Display::Block : Rml::Style::Display::None);
+			setDisplay(m_ring, static_cast<bool>(m_onPick));
 			m_ring->repaint();
 		}
 	}
@@ -123,12 +124,10 @@ namespace mdDrums
 		case Rml::EventId::Mousescroll:
 			{
 				// Shift turns some wheels sideways
-				const auto wheel = juceRmlUi::helper::getMouseWheelDelta(_event);
-				const auto delta = wheel.y != 0.0f ? wheel.y : wheel.x;
-				if(delta != 0.0f)
+				if(const auto sign = wheelSign(_event))
 				{
 					const auto steps = juceRmlUi::helper::getKeyModShift(_event) ? 1.0f : 2.0f;
-					step(delta > 0.0f ? -steps : steps);
+					step(sign > 0 ? -steps : steps);
 				}
 				_event.StopPropagation();
 				return;

@@ -179,10 +179,14 @@ namespace mdDrums
 			return;
 		}
 		const auto slot = slotOf(static_cast<uint8_t>(description.page), _parameter.getPart(), description.index);
-		if(slot < 0)
-			return;
-		m_values[static_cast<size_t>(slot)].store(_value, std::memory_order_relaxed);
-		m_dirty[static_cast<size_t>(slot) / 64].fetch_or(1ull << (slot % 64), std::memory_order_release);
+		if(slot >= 0)
+			publish(static_cast<size_t>(slot), _value);
+	}
+
+	void Controller::publish(const size_t _slot, const int _value)
+	{
+		m_values[_slot].store(_value, std::memory_order_relaxed);
+		m_dirty[_slot / 64].fetch_or(1ull << (_slot % 64), std::memory_order_release);
 	}
 
 	void Controller::processRealtimeParameterChanges(const size_t _maximum)
@@ -201,9 +205,7 @@ namespace mdDrums
 				const auto message = messages::parameterMessage(address.page, address.part, address.index, value);
 				if(!message)
 					continue;
-				synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
-				event.assignRawData(message->bytes.data(), message->size, synthLib::MidiEventSource::Editor, 0);
-				if(sent >= _maximum || !getProcessor().tryAddRealtimeMidiEvent(event))
+				if(sent >= _maximum || !getProcessor().tryAddRealtimeMidiEvent(messages::toEvent(*message)))
 				{
 					// The rest waits for the next block, this one included
 					m_dirty[word].fetch_or(bits | (1ull << bit), std::memory_order_release);
@@ -288,8 +290,7 @@ namespace mdDrums
 			return;
 		const auto slot = static_cast<int>(m_shownPart.load(std::memory_order_acquire) * TrackParameterCount) + target;
 		// To the Device at the next block, as host automation goes; to the parameter on the message thread
-		m_values[static_cast<size_t>(slot)].store(_value, std::memory_order_relaxed);
-		m_dirty[static_cast<size_t>(slot) / 64].fetch_or(1ull << (slot % 64), std::memory_order_release);
+		publish(static_cast<size_t>(slot), _value);
 		m_relaySlot[_index].store(slot, std::memory_order_relaxed);
 		m_relayPending.fetch_or(1u << _index, std::memory_order_release);
 	}
@@ -465,26 +466,28 @@ namespace mdDrums
 	void Controller::renameKit(const std::string& _name)
 	{
 		m_kitBase.setName(_name);
-		sendToDevice(messages::kitName(m_kitBase.name).message());
+		sendToDevice(messages::kitName(m_kitBase.name));
 	}
 
 	void Controller::setLink(const uint8_t _track, const uint8_t _target)
 	{
-		if(_track >= TrackCount)
-			return;
-		const auto target = _target < TrackCount && _target != _track ? _target : Off;
-		m_kitBase.links[_track] = target;
-		if(const auto message = md::automation::sysex::linkChange(_track, target))
-			sendToDevice(*message);
+		setGroup(md::automation::sysex::KitChange::Kind::Link, _track, _target);
 	}
 
 	void Controller::setChoke(const uint8_t _track, const uint8_t _target)
 	{
+		setGroup(md::automation::sysex::KitChange::Kind::Choke, _track, _target);
+	}
+
+	void Controller::setGroup(const md::automation::sysex::KitChange::Kind _kind, const uint8_t _track,
+		const uint8_t _target)
+	{
+		namespace sysex = md::automation::sysex;
 		if(_track >= TrackCount)
 			return;
-		const auto target = _target < TrackCount && _target != _track ? _target : Off;
-		m_kitBase.chokes[_track] = target;
-		if(const auto message = md::automation::sysex::chokeChange(_track, target))
+		const sysex::KitChange change{_kind, _track, 0, _target < TrackCount && _target != _track ? _target : Off};
+		sysex::applyKitChange(change, m_kitBase);
+		if(const auto message = sysex::encodeKitChange(change))
 			sendToDevice(*message);
 	}
 
@@ -493,6 +496,11 @@ namespace mdDrums
 		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
 		event.sysex.assign(_sysex.begin(), _sysex.end());
 		getProcessor().addMidiEvent(event);
+	}
+
+	void Controller::sendToDevice(const messages::Raw& _message)
+	{
+		getProcessor().addMidiEvent(messages::toEvent(_message));
 	}
 
 	void Controller::setLoadedState(std::vector<uint8_t> _state)

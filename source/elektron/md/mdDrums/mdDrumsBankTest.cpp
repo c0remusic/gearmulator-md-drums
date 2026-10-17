@@ -5,60 +5,39 @@
 // follows a Slot another one wrote. Every factory Kit, and a new one, seeds the LFO RND generator.
 
 #include "mdDrumsBank.h"
-#include "mdDrumsEngine.h"
 #include "mdDrumsMessages.h"
+
+#include "mdDrumsTestSupport.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace
 {
-	void require(const bool _condition, const std::string& _message)
-	{
-		if(!_condition)
-			throw std::runtime_error(_message);
-	}
+	using mdDrums::test::readFile;
+	using mdDrums::test::require;
 
 	using Kit = md::automation::sysex::MdKit;
 
-	std::vector<uint8_t> readFile(const std::filesystem::path& _file)
-	{
-		std::ifstream in(_file, std::ios::binary);
-		return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-	}
-
 	Kit named(Kit _kit, const char* _name)
 	{
-		_kit.name.fill(0);
-		for(size_t i = 0; _name[i] && i < _kit.name.size(); ++i)
-			_kit.name[i] = static_cast<uint8_t>(_name[i]);
+		_kit.setName(_name);
 		return _kit;
 	}
 }
 
 int main()
 {
-	setvbuf(stdout, nullptr, _IONBF, 0);
-	const auto flash = mdDrums::Engine::findFlashImage({});
-	if(flash.empty())
+	return mdDrums::test::run("mdDrumsBankTest", [](const std::vector<uint8_t>& _flash)
 	{
-		std::cout << "mdDrumsBankTest: SKIP (no Machinedrum UW OS 1.63 flash image found)\n";
-		return 77;
-	}
-	const auto folder = std::filesystem::temp_directory_path()
-		/ ("mdDrumsBankTest_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-	try
-	{
-		const auto factory = mdDrums::messages::factoryKits(flash);
-		const auto kit1 = mdDrums::messages::factoryKit(flash);
+		const mdDrums::test::TempFolder folder("mdDrumsBankTest_");
+		const auto factory = mdDrums::messages::factoryKits(_flash);
+		const auto kit1 = mdDrums::messages::factoryKit(_flash);
 		require(factory.size() == 16, "the flash image holds " + std::to_string(factory.size()) + " factory Kits");
 		require(kit1 && factory[0] == *kit1, "Slot 1 is not the Kit a Machinedrum boots with");
 
@@ -78,7 +57,7 @@ int main()
 			blankSeeded ? "too" : "not");
 		require(seeded == 16 * 16 && blankSeeded, "a Kit leaves the LFO RND generator unseeded");
 
-		const auto file = folder / "Bank.syx";
+		const auto file = folder.path() / "Bank.syx";
 		mdDrums::Bank bank(file, factory);
 		require(bank.read(), "a new Bank cannot be written");
 		const auto bytes = readFile(file);
@@ -146,15 +125,7 @@ int main()
 		std::printf("one write: Slots 41 \"%s\" and 43 \"%s\", 42 left empty\n", third.slot(40)->displayName().c_str(),
 			third.slot(42)->displayName().c_str());
 
-		std::filesystem::remove_all(folder);
-		std::cout << "mdDrumsBankTest: PASS\n";
-		return 0;
-	}
-	catch(const std::exception& _error)
-	{
-		std::error_code error;
-		std::filesystem::remove_all(folder, error);
-		std::cerr << "mdDrumsBankTest: " << _error.what() << '\n';
-		return 1;
-	}
+		// The folder goes, a failure to remove it a failure of the test (TempFolder removes it after one too)
+		std::filesystem::remove_all(folder.path());
+	});
 }
